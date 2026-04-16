@@ -11,6 +11,7 @@ import {
   EyeOff, DollarSign, AlertTriangle, Trash2, Loader2, Radio,
   BarChart3, User, Volume2, VolumeX, Bell,
   Crown, Package, Users, CalendarDays, CheckCircle, XCircle, Settings, ChevronDown,
+  Home, Flame, Trophy, ArrowUpRight, ArrowDownRight, Hash, Globe, PieChart, Sparkles, Timer, TrendingUpIcon, CircleDot, Gavel, Banknote, Wallet, Percent,
 } from "lucide-react";
 
 /* ═══════════════════════════════════════════════════════════════
@@ -46,7 +47,7 @@ interface Stats {
 }
 
 type View = "login" | "register" | "pending" | "blocked" | "expired" | "main" | "changePwd";
-type Tab = "signals" | "dashboard" | "analyst" | "users" | "packages" | "account";
+type Tab = "home" | "signals" | "dashboard" | "analyst" | "users" | "packages" | "account";
 type Filter = "all" | "buy" | "sell" | "active" | "closed";
 
 interface SubPackage { id: string; name: string; durationDays: number; price: number; type: string; description: string; isActive: boolean; order: number; }
@@ -1990,6 +1991,7 @@ export default function HomePage() {
   const isAdmin = session?.role === "admin";
 
   const tabs: { key: Tab; label: string; icon: React.ReactNode; badge?: number; adminOnly?: boolean }[] = [
+    { key: "home", label: "الرئيسية", icon: <Home className="w-5 h-5" /> },
     { key: "signals", label: "الإشارات", icon: <Activity className="w-5 h-5" />, badge: activeCount },
     { key: "dashboard", label: "الإحصائيات", icon: <BarChart3 className="w-5 h-5" /> },
     ...(isAdmin ? [{ key: "analyst" as Tab, label: "المحلل", icon: <Send className="w-5 h-5" /> }] : []),
@@ -2035,6 +2037,474 @@ export default function HomePage() {
 
       {/* ── Content ── */}
       <main className="flex-1 px-4 pb-24 pt-3 max-w-lg mx-auto w-full">
+
+        {/* ══════ TAB: HOME — PROFESSIONAL DASHBOARD ══════ */}
+        {tab === "home" && (() => {
+          const activeSignals = signals.filter(s => s.status === "ACTIVE");
+          const closedSignals = signals.filter(s => s.status !== "ACTIVE");
+          const winClosed = closedSignals.filter(s => s.status === "HIT_TP");
+          const lossClosed = closedSignals.filter(s => s.status === "HIT_SL");
+          const totalPnl = closedSignals.reduce((acc, s) => acc + (s.pnlDollars ?? 0), 0);
+          const totalPoints = closedSignals.reduce((acc, s) => acc + (s.pnlPoints ?? 0), 0);
+          const todaySignals = signals.filter(s => {
+            const d = new Date(s.createdAt);
+            const now = new Date();
+            return d.toDateString() === now.toDateString();
+          });
+          const todayWins = todaySignals.filter(s => s.status === "HIT_TP").length;
+          const todayLosses = todaySignals.filter(s => s.status === "HIT_SL").length;
+          const todayPnl = todaySignals.reduce((acc, s) => acc + (s.pnlDollars ?? 0), 0);
+          const subDaysLeft = session?.subscriptionExpiry ? Math.max(0, Math.ceil((new Date(session.subscriptionExpiry).getTime() - Date.now()) / 86400000)) : null;
+          const totalActiveUsers = users.filter(u => u.status === "active" && u.role === "user").length;
+          const totalSubscribers = users.filter(u => u.subscriptionType === "subscriber").length;
+          const weeklySignals = signals.filter(s => {
+            const d = new Date(s.createdAt);
+            const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
+            return d >= weekAgo;
+          });
+          const weeklyWinRate = weeklySignals.length > 0 ? Math.round((weeklySignals.filter(s => s.status === "HIT_TP").length / weeklySignals.filter(s => s.status !== "ACTIVE").length) * 100) || 0 : 0;
+          const streak = (() => {
+            let count = 0;
+            const sorted = [...closedSignals].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+            for (const s of sorted) {
+              if (s.status === "HIT_TP") count++;
+              else break;
+            }
+            return count;
+          })();
+          const hour = new Date().getHours();
+          const greeting = hour < 12 ? "صباح الخير" : hour < 17 ? "مساء الخير" : "مساء النور";
+          const currentDay = new Date().toLocaleDateString("ar-SA", { weekday: "long", day: "numeric", month: "long" });
+
+          return (
+          <div className="space-y-5">
+
+            {/* ── Welcome Hero Card ── */}
+            <div className="rounded-3xl border border-amber-500/15 overflow-hidden relative" style={{ background: "linear-gradient(145deg, rgba(255,215,0,0.1) 0%, rgba(255,140,0,0.05) 40%, rgba(139,92,246,0.05) 100%)" }}>
+              {/* Decorative circles */}
+              <div className="absolute -top-10 -right-10 w-32 h-32 rounded-full bg-amber-500/[0.07] blur-2xl" />
+              <div className="absolute -bottom-8 -left-8 w-24 h-24 rounded-full bg-purple-500/[0.07] blur-2xl" />
+              <div className="relative p-5">
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <div className="text-[11px] text-amber-400/70 font-medium">{currentDay}</div>
+                    <h1 className="text-xl font-extrabold text-white mt-1">
+                      {isAdmin ? "مرحباً، المدير" : `${greeting}، ${session?.name?.split(" ")[0] || ""}`}
+                    </h1>
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      {isAdmin
+                        ? `${totalActiveUsers} مستخدم نشط • ${activeSignals.length} إشارة مفتوحة`
+                        : `لديك ${activeSignals.length} إشارة نشطة حالياً`
+                      }
+                    </p>
+                  </div>
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-500/25">
+                    {isAdmin ? <ShieldAlert className="w-6 h-6 text-black" /> : <Sparkles className="w-6 h-6 text-black" />}
+                  </div>
+                </div>
+                {/* Quick Stats Row */}
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="bg-black/20 backdrop-blur-sm rounded-xl p-2.5 text-center border border-white/[0.06]">
+                    <div className="text-lg font-extrabold text-emerald-400">{todayWins}</div>
+                    <div className="text-[9px] text-emerald-400/70 font-medium">ربح اليوم</div>
+                  </div>
+                  <div className="bg-black/20 backdrop-blur-sm rounded-xl p-2.5 text-center border border-white/[0.06]">
+                    <div className="text-lg font-extrabold text-red-400">{todayLosses}</div>
+                    <div className="text-[9px] text-red-400/70 font-medium">خسارة اليوم</div>
+                  </div>
+                  <div className="bg-black/20 backdrop-blur-sm rounded-xl p-2.5 text-center border border-white/[0.06]">
+                    <div className={`text-lg font-extrabold ${todayPnl >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                      {todayPnl >= 0 ? "+" : ""}{todayPnl > 0 ? `$${todayPnl}` : todayPnl < 0 ? `-$${Math.abs(todayPnl)}` : "$0"}
+                    </div>
+                    <div className="text-[9px] text-slate-500 font-medium">أرباح اليوم</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* ── Live Pulse Indicator ── */}
+            <div className="flex items-center gap-2 px-1">
+              <div className="flex items-center gap-1.5 bg-emerald-500/[0.08] border border-emerald-500/15 rounded-full px-3 py-1">
+                <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="text-[10px] text-emerald-400 font-semibold">مباشر</span>
+              </div>
+              <span className="text-[10px] text-slate-500">آخر تحديث: {new Date().toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" })}</span>
+            </div>
+
+            {/* ── Active Signals Summary (if any) ── */}
+            {activeSignals.length > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-3 px-1">
+                  <div className="flex items-center gap-2">
+                    <div className="w-1 h-5 rounded-full bg-gradient-to-b from-amber-400 to-orange-500" />
+                    <span className="text-xs font-bold text-white">الإشارات النشطة</span>
+                    <span className="text-[9px] bg-amber-500/15 text-amber-400 px-1.5 py-0.5 rounded-md font-bold">{activeSignals.length}</span>
+                  </div>
+                  <button onClick={() => setTab("signals")} className="text-[10px] text-amber-400 font-medium flex items-center gap-0.5 hover:text-amber-300 transition-colors">
+                    عرض الكل <ArrowUpRight className="w-3 h-3" />
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {activeSignals.slice(0, 3).map((s, i) => {
+                    const ac = entryAccent(s);
+                    const isBuy = s.type === "BUY";
+                    return (
+                      <div key={s.id} className="animate-[fadeInUp_0.3s_ease-out]" style={{ animationDelay: `${i * 60}ms`, animationFillMode: "both" }}>
+                        <div className={`rounded-2xl border ${ac.border} bg-white/[0.03] p-3 flex items-center gap-3 active:scale-[0.99] transition-transform cursor-pointer`} onClick={() => setTab("signals")}>
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${ac.bg}`}>
+                            {isBuy ? <TrendingUp className={`w-5 h-5 ${ac.text}`} /> : <TrendingDown className={`w-5 h-5 ${ac.text}`} />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-white text-sm">{s.pair}</span>
+                              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${isBuy ? "bg-emerald-500/15 text-emerald-400" : "bg-red-500/15 text-red-400"}`}>
+                                {isBuy ? "شراء" : "بيع"}
+                              </span>
+                              {s.timeframe && <span className="text-[8px] bg-white/[0.06] text-slate-500 px-1 py-0.5 rounded-md">{s.timeframe}</span>}
+                            </div>
+                            <div className="flex items-center gap-3 mt-1 text-[10px]">
+                              <span className="text-slate-400">دخول: <span className="font-mono font-semibold text-slate-200">{s.entry}</span></span>
+                              <span className="text-red-400/60">وقف: <span className="font-mono font-semibold text-red-300">{s.stopLoss}</span></span>
+                            </div>
+                          </div>
+                          <div className="flex flex-col items-end gap-1">
+                            <div className="flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                              <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                              <span className="text-[8px] text-emerald-400 font-semibold">نشطة</span>
+                            </div>
+                            <span className="text-[9px] text-slate-600">{timeAgo(s.createdAt)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* ── Performance Metrics Grid ── */}
+            <div>
+              <div className="flex items-center gap-2 mb-3 px-1">
+                <div className="w-1 h-5 rounded-full bg-gradient-to-b from-sky-400 to-blue-500" />
+                <span className="text-xs font-bold text-white">الأداء العام</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2.5">
+                {/* Win Rate */}
+                <Glass className="p-3.5 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-16 h-16 rounded-full bg-emerald-500/[0.06] -translate-y-4 translate-x-4" />
+                  <div className="relative">
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <Trophy className="w-3.5 h-3.5 text-amber-400" />
+                      <span className="text-[10px] text-slate-400 font-medium">نسبة الفوز</span>
+                    </div>
+                    <div className={`text-2xl font-extrabold ${stats && stats.winRate >= 60 ? "text-emerald-400" : stats && stats.winRate >= 40 ? "text-amber-400" : "text-red-400"}`}>
+                      {stats ? `${stats.winRate}%` : "—"}
+                    </div>
+                    <div className="mt-1.5 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+                      {stats && <div className="h-full rounded-full bg-gradient-to-l from-emerald-500 to-emerald-400 transition-all duration-500" style={{ width: `${stats.winRate}%` }} />}
+                    </div>
+                  </div>
+                </Glass>
+
+                {/* Total PnL */}
+                <Glass className="p-3.5 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-16 h-16 rounded-full bg-amber-500/[0.06] -translate-y-4 translate-x-4" />
+                  <div className="relative">
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <DollarSign className="w-3.5 h-3.5 text-amber-400" />
+                      <span className="text-[10px] text-slate-400 font-medium">إجمالي الأرباح</span>
+                    </div>
+                    <div className={`text-2xl font-extrabold ${totalPnl >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                      {totalPnl >= 0 ? "+" : ""}{totalPnl > 0 ? `$${totalPnl.toLocaleString()}` : totalPnl < 0 ? `-$${Math.abs(totalPnl).toLocaleString()}` : "$0"}
+                    </div>
+                    <div className="text-[10px] text-slate-500 mt-1 font-mono">{totalPoints >= 0 ? "+" : ""}{totalPoints} نقطة</div>
+                  </div>
+                </Glass>
+
+                {/* Win Streak */}
+                <Glass className="p-3.5">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <Flame className="w-3.5 h-3.5 text-orange-400" />
+                    <span className="text-[10px] text-slate-400 font-medium">سلسلة الأرباح</span>
+                  </div>
+                  <div className="flex items-end gap-1.5">
+                    <span className={`text-2xl font-extrabold ${streak >= 3 ? "text-orange-400" : streak > 0 ? "text-amber-400" : "text-slate-500"}`}>{streak}</span>
+                    <span className="text-[10px] text-slate-500 mb-1">صفقات</span>
+                  </div>
+                  {streak >= 3 && <div className="text-[9px] text-orange-400/70 mt-1">أداء ممتاز!</div>}
+                </Glass>
+
+                {/* Weekly Performance */}
+                <Glass className="p-3.5">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <PieChart className="w-3.5 h-3.5 text-sky-400" />
+                    <span className="text-[10px] text-slate-400 font-medium">أداء الأسبوع</span>
+                  </div>
+                  <div className="flex items-end gap-1.5">
+                    <span className="text-2xl font-extrabold text-sky-400">{weeklyWinRate}%</span>
+                  </div>
+                  <div className="text-[10px] text-slate-500 mt-1">{weeklySignals.filter(s => s.status !== "ACTIVE").length} صفقة مغلقة</div>
+                </Glass>
+
+                {/* Total Trades */}
+                <Glass className="p-3.5">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <Hash className="w-3.5 h-3.5 text-purple-400" />
+                    <span className="text-[10px] text-slate-400 font-medium">إجمالي الصفقات</span>
+                  </div>
+                  <div className="flex items-end gap-1.5">
+                    <span className="text-2xl font-extrabold text-purple-400">{stats?.total || 0}</span>
+                  </div>
+                  <div className="text-[10px] text-slate-500 mt-1">{stats?.active || 0} نشطة</div>
+                </Glass>
+
+                {/* Avg Confidence */}
+                <Glass className="p-3.5">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <Star className="w-3.5 h-3.5 text-amber-400" />
+                    <span className="text-[10px] text-slate-400 font-medium">متوسط الثقة</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl font-extrabold text-amber-400">{stats?.avgConfidence || 0}</span>
+                    <Stars r={Math.round(stats?.avgConfidence || 0)} />
+                  </div>
+                  <div className="text-[10px] text-slate-500 mt-1">من 5 نجوم</div>
+                </Glass>
+              </div>
+            </div>
+
+            {/* ── Win/Loss Visual Bar ── */}
+            {stats && (stats.hitTp + stats.hitSl) > 0 && (
+              <Glass className="p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-1.5">
+                    <Target className="w-3.5 h-3.5 text-amber-400" />
+                    <span className="text-xs font-bold text-white">نتائج الصفقات</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-[10px]">
+                    <span className="text-emerald-400 font-semibold">{stats.hitTp} ربح</span>
+                    <span className="text-slate-600">|</span>
+                    <span className="text-red-400 font-semibold">{stats.hitSl} خسارة</span>
+                  </div>
+                </div>
+                <div className="h-4 rounded-2xl bg-white/[0.06] overflow-hidden flex">
+                  <div className="bg-gradient-to-l from-emerald-400 to-emerald-500 h-full rounded-r-2xl transition-all duration-700 flex items-center justify-center"
+                    style={{ width: `${(stats.hitTp / (stats.hitTp + stats.hitSl)) * 100}%` }}>
+                    {(stats.hitTp / (stats.hitTp + stats.hitSl)) * 100 > 15 && (
+                      <span className="text-[9px] font-bold text-white/90">{Math.round((stats.hitTp / (stats.hitTp + stats.hitSl)) * 100)}%</span>
+                    )}
+                  </div>
+                  <div className="bg-gradient-to-l from-red-500 to-red-400 h-full rounded-l-2xl flex-1 flex items-center justify-center">
+                    {((stats.hitSl / (stats.hitTp + stats.hitSl)) * 100) > 15 && (
+                      <span className="text-[9px] font-bold text-white/90">{Math.round((stats.hitSl / (stats.hitTp + stats.hitSl)) * 100)}%</span>
+                    )}
+                  </div>
+                </div>
+              </Glass>
+            )}
+
+            {/* ── Subscription Card (User Only) ── */}
+            {!isAdmin && (
+              <Glass className="overflow-hidden">
+                <div className="p-4" style={{ background: session?.subscriptionType && session.subscriptionType !== "none" ? "linear-gradient(135deg, rgba(56,189,248,0.06) 0%, rgba(168,85,247,0.04) 100%)" : "" }}>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Crown className="w-4 h-4 text-amber-400" />
+                      <span className="text-xs font-bold text-white">حالة الاشتراك</span>
+                    </div>
+                    {session?.subscriptionType && session.subscriptionType !== "none" && (
+                      <div className={`px-2.5 py-1 rounded-xl text-[10px] font-bold ${subDaysLeft && subDaysLeft > 7 ? "bg-emerald-500/15 text-emerald-400" : subDaysLeft && subDaysLeft > 0 ? "bg-amber-500/15 text-amber-400" : "bg-red-500/15 text-red-400"}`}>
+                        {subDaysLeft !== null ? `${subDaysLeft} يوم متبقي` : "نشط"}
+                      </div>
+                    )}
+                  </div>
+                  {session?.subscriptionType && session.subscriptionType !== "none" ? (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className={`inline-block w-2 h-2 rounded-full ${session.subscriptionType === "subscriber" ? "bg-sky-400" : "bg-purple-400"}`} />
+                        <span className={`text-[11px] font-semibold ${session.subscriptionType === "subscriber" ? "text-sky-400" : "text-purple-400"}`}>
+                          {session.subscriptionType === "subscriber" ? "مشترك VIP" : "مسجل تحت وكالة"}
+                        </span>
+                      </div>
+                      {session.packageName && (
+                        <div className="bg-white/[0.04] rounded-xl p-3 border border-white/[0.06] flex items-center justify-between">
+                          <div>
+                            <div className="text-[10px] text-slate-500">الباقة</div>
+                            <div className="text-[13px] font-bold text-white">{session.packageName}</div>
+                          </div>
+                          {session.subscriptionExpiry && (
+                            <div className="text-left">
+                              <div className="text-[10px] text-slate-500">الانتهاء</div>
+                              <div className="text-[11px] font-semibold text-slate-300">{new Date(session.subscriptionExpiry).toLocaleDateString("ar-SA", { month: "short", day: "numeric" })}</div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {/* Expiry progress bar */}
+                      {subDaysLeft !== null && subDaysLeft > 0 && (
+                        <div className="mt-1">
+                          <div className="h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+                            <div className={`h-full rounded-full transition-all duration-500 ${subDaysLeft > 14 ? "bg-emerald-500" : subDaysLeft > 7 ? "bg-amber-500" : "bg-red-500"}`}
+                              style={{ width: `${Math.min(100, (subDaysLeft / 30) * 100)}%` }} />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-center py-3">
+                      <div className="text-xs text-slate-500">لا يوجد اشتراك نشط</div>
+                      <div className="text-[10px] text-slate-600 mt-1">تواصل مع الإدارة للاشتراك</div>
+                    </div>
+                  )}
+                </div>
+              </Glass>
+            )}
+
+            {/* ── Admin Quick Stats ── */}
+            {isAdmin && (
+              <div>
+                <div className="flex items-center gap-2 mb-3 px-1">
+                  <div className="w-1 h-5 rounded-full bg-gradient-to-b from-purple-400 to-pink-500" />
+                  <span className="text-xs font-bold text-white">إدارة سريعة</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <button onClick={() => setTab("users")} className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-3 text-center active:scale-95 transition-transform">
+                    <Users className="w-5 h-5 text-sky-400 mx-auto mb-1.5" />
+                    <div className="text-lg font-extrabold text-white">{totalActiveUsers}</div>
+                    <div className="text-[9px] text-slate-500 font-medium">مستخدم نشط</div>
+                  </button>
+                  <button onClick={() => setTab("packages")} className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-3 text-center active:scale-95 transition-transform">
+                    <Wallet className="w-5 h-5 text-emerald-400 mx-auto mb-1.5" />
+                    <div className="text-lg font-extrabold text-white">{totalSubscribers}</div>
+                    <div className="text-[9px] text-slate-500 font-medium">مشترك</div>
+                  </button>
+                  <button onClick={() => setTab("signals")} className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-3 text-center active:scale-95 transition-transform">
+                    <Activity className="w-5 h-5 text-amber-400 mx-auto mb-1.5" />
+                    <div className="text-lg font-extrabold text-white">{activeSignals.length}</div>
+                    <div className="text-[9px] text-slate-500 font-medium">إشارة مفتوحة</div>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ── Top Pairs (Mini) ── */}
+            {stats && stats.topPairs?.length > 0 && (
+              <Glass className="p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-1.5">
+                    <Globe className="w-3.5 h-3.5 text-amber-400" />
+                    <span className="text-xs font-bold text-white">الأزواج الأكثر تداولاً</span>
+                  </div>
+                </div>
+                <div className="space-y-2.5">
+                  {stats.topPairs.slice(0, 5).map((p, i) => {
+                    const maxCount = stats.topPairs[0].count;
+                    return (
+                      <div key={i} className="flex items-center gap-2.5">
+                        <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-bold ${i === 0 ? "bg-amber-500/15 text-amber-400" : i === 1 ? "bg-slate-400/10 text-slate-300" : i === 2 ? "bg-orange-500/10 text-orange-400" : "bg-white/[0.04] text-slate-500"}`}>
+                          {i + 1}
+                        </div>
+                        <span className="text-xs font-semibold text-white w-20 truncate">{p.pair}</span>
+                        <div className="flex-1 h-2 rounded-full bg-white/[0.06] overflow-hidden">
+                          <div className="h-full rounded-full bg-gradient-to-l from-amber-500 to-orange-500 transition-all duration-500" style={{ width: `${(p.count / maxCount) * 100}%` }} />
+                        </div>
+                        <span className="text-[10px] font-mono text-slate-400 w-6 text-left">{p.count}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </Glass>
+            )}
+
+            {/* ── Recent Activity (Last 5 Closed Signals) ── */}
+            {closedSignals.length > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-3 px-1">
+                  <div className="flex items-center gap-2">
+                    <div className="w-1 h-5 rounded-full bg-gradient-to-b from-emerald-400 to-red-500" />
+                    <span className="text-xs font-bold text-white">آخر النتائج</span>
+                  </div>
+                  <button onClick={() => setTab("signals")} className="text-[10px] text-amber-400 font-medium flex items-center gap-0.5 hover:text-amber-300 transition-colors">
+                    الكل <ArrowUpRight className="w-3 h-3" />
+                  </button>
+                </div>
+                <div className="space-y-1.5">
+                  {closedSignals.slice(0, 5).map((s, i) => {
+                    const isProfit = s.status === "HIT_TP";
+                    const isBuy = s.type === "BUY";
+                    return (
+                      <div key={s.id} className="flex items-center gap-3 rounded-xl px-3 py-2.5 border border-white/[0.04] bg-white/[0.02] animate-[fadeInUp_0.25s_ease-out]" style={{ animationDelay: `${i * 50}ms`, animationFillMode: "both" }}>
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isProfit ? "bg-emerald-500/10" : "bg-red-500/10"}`}>
+                          {isProfit ? (
+                            <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                          ) : (
+                            <svg className="w-4 h-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-bold text-white">{s.pair}</span>
+                            <span className={`text-[8px] font-bold px-1 py-0.5 rounded ${isBuy ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"}`}>{isBuy ? "BUY" : "SELL"}</span>
+                          </div>
+                          <span className="text-[9px] text-slate-500">{timeAgo(s.createdAt)}</span>
+                        </div>
+                        <div className="text-right">
+                          <div className={`text-[12px] font-extrabold font-mono ${isProfit ? "text-emerald-400" : "text-red-400"}`}>
+                            {isProfit ? "+" : "-"}${Math.abs(s.pnlDollars ?? 0)}
+                          </div>
+                          <div className="text-[8px] text-slate-600 font-mono">{s.pnlPoints ?? 0} pts</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* ── Buy/Sell Ratio (Visual) ── */}
+            {stats && (stats.buyCount + stats.sellCount) > 0 && (
+              <Glass className="p-4">
+                <div className="flex items-center gap-1.5 mb-3">
+                  <PieChart className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="text-xs font-bold text-white">توزيع الشراء والبيع</span>
+                </div>
+                <div className="flex gap-3">
+                  <div className="flex-1 rounded-xl bg-emerald-500/[0.06] border border-emerald-500/10 p-3 text-center">
+                    <ArrowUpRight className="w-4 h-4 text-emerald-400 mx-auto mb-1" />
+                    <div className="text-lg font-extrabold text-emerald-400">{stats.buyCount}</div>
+                    <div className="text-[9px] text-emerald-400/70 font-medium">شراء</div>
+                  </div>
+                  <div className="flex-1 rounded-xl bg-red-500/[0.06] border border-red-500/10 p-3 text-center">
+                    <ArrowDownRight className="w-4 h-4 text-red-400 mx-auto mb-1" />
+                    <div className="text-lg font-extrabold text-red-400">{stats.sellCount}</div>
+                    <div className="text-[9px] text-red-400/70 font-medium">بيع</div>
+                  </div>
+                </div>
+                <div className="mt-3 h-2.5 rounded-full bg-white/[0.06] overflow-hidden flex">
+                  <div className="bg-gradient-to-l from-emerald-500 to-emerald-400 h-full rounded-r-full transition-all duration-500"
+                    style={{ width: `${(stats.buyCount / (stats.buyCount + stats.sellCount)) * 100}%` }} />
+                  <div className="bg-gradient-to-l from-red-500 to-red-400 h-full rounded-l-full flex-1" />
+                </div>
+              </Glass>
+            )}
+
+            {/* ── Motivational Footer ── */}
+            <div className="text-center py-2">
+              <div className="inline-flex items-center gap-1.5 bg-white/[0.03] rounded-full px-4 py-2 border border-white/[0.05]">
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <span className="text-[10px] text-slate-400">
+                  {stats && stats.winRate >= 70
+                    ? "أداء استثنائي! استمر بنفس المستوى"
+                    : stats && stats.winRate >= 50
+                    ? "أداء جيد! يمكنك تحسين النتائج أكثر"
+                    : "ركز على إدارة المخاطر واتبع الخطة"}
+                </span>
+              </div>
+            </div>
+
+          </div>
+          );
+        })()}
 
         {/* ══════ TAB: SIGNALS — PREMIUM DESIGN ══════ */}
         {tab === "signals" && (() => {
