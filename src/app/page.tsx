@@ -35,7 +35,7 @@ interface Signal {
   instrument?: string; createdAt: string;
 }
 
-interface AdminSession { id: string; email: string; name: string; mustChangePwd: boolean; role?: string }
+interface AdminSession { id: string; email: string; name: string; mustChangePwd: boolean; role?: string; status?: string }
 
 interface Stats {
   total: number; active: number; hitTp: number; hitSl: number;
@@ -44,7 +44,7 @@ interface Stats {
   topPairs: { pair: string; count: number }[];
 }
 
-type View = "login" | "register" | "main" | "changePwd";
+type View = "splash" | "login" | "register" | "pending" | "blocked" | "expired" | "main" | "changePwd";
 type Tab = "signals" | "dashboard" | "analyst" | "users" | "account";
 type Filter = "all" | "buy" | "sell" | "active" | "closed";
 
@@ -678,8 +678,8 @@ function SignalCard({ s, idx, isAdmin, onUpdate, onDelete }: {
    MAIN APP
    ═══════════════════════════════════════════════════════════════ */
 export default function HomePage() {
-  /* ── View: login always shows first ── */
-  const [view, setView] = useState<View>("login");
+  /* ── View: splash shows first, then login ── */
+  const [view, setView] = useState<View>("splash");
   const [session, setSession] = useState<AdminSession | null>(null);
 
   /* ── Login ── */
@@ -768,14 +768,31 @@ export default function HomePage() {
           const s = JSON.parse(saved);
           if (s && s.id && s.email) {
             setSession(s);
-            setView("main");
+            // Check session status and role
+            if (s.role === "user" && s.status === "pending") {
+              setView("pending");
+            } else if (s.role === "user" && s.status === "blocked") {
+              setView("blocked");
+            } else if (s.role === "user" && s.status === "expired") {
+              setView("expired");
+            } else if (s.mustChangePwd) {
+              setCpEmail(s.email);
+              setView("changePwd");
+            } else {
+              setView("main");
+            }
             return;
           }
         }
       } catch { /* ignore */ }
     }
 
-    initDb().then(() => restoreSession());
+    // Splash screen for 2 seconds, then transition
+    const splashTimer = setTimeout(() => {
+      initDb().then(() => restoreSession());
+    }, 2000);
+
+    return () => clearTimeout(splashTimer);
   }, []);
 
   /* ── Fetch Signals ── */
@@ -847,13 +864,35 @@ export default function HomePage() {
         body: JSON.stringify({ action: "login", email, password: pwd }),
       });
       const data = await res.json();
-      if (!data.success) { setLoginErr(data.error || data.detail || "خطأ في تسجيل الدخول"); return; }
+      if (!data.success) {
+        // Check for pending/blocked/expired status
+        if (data.pending) {
+          setView("pending");
+          return;
+        }
+        if (data.blocked) {
+          setView("blocked");
+          return;
+        }
+        if (data.expired) {
+          setView("expired");
+          return;
+        }
+        setLoginErr(data.error || data.detail || "خطأ في تسجيل الدخول");
+        return;
+      }
       const s: AdminSession = data.admin;
       setSession(s);
       localStorage.setItem("adminSession", JSON.stringify(s));
       if (s.mustChangePwd) {
         setCpEmail(s.email);
         setView("changePwd");
+      } else if (s.role === "user" && s.status === "pending") {
+        setView("pending");
+      } else if (s.role === "user" && s.status === "blocked") {
+        setView("blocked");
+      } else if (s.role === "user" && s.status === "expired") {
+        setView("expired");
       } else {
         setView("main");
       }
@@ -1063,15 +1102,42 @@ export default function HomePage() {
   const filtered = getFiltered();
 
   /* ═══════════════════════════════════════════════════════════════
-     RENDER: LOGIN
+     RENDER: SPLASH SCREEN
+     ═══════════════════════════════════════════════════════════════ */
+  if (view === "splash") {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center splash-fade-in" style={{ background: "#070b14" }}>
+        <div className="glass-panel rounded-3xl p-8 relative premium-glow">
+          {/* Animated chart bars */}
+          <div className="flex items-end justify-center gap-2 h-16 mb-6">
+            <div className="chart-bar" style={{ height: "60%", animationDelay: "0s" }} />
+            <div className="chart-bar" style={{ height: "85%", animationDelay: "0.15s" }} />
+            <div className="chart-bar chart-bar-green" style={{ height: "100%", animationDelay: "0.3s" }} />
+          </div>
+          {/* Check icon overlay */}
+          <div className="absolute top-6 right-6 w-8 h-8 rounded-full gold-gradient flex items-center justify-center">
+            <svg className="w-4 h-4 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+        </div>
+        <div className="mt-8 text-center">
+          <h1 className="text-2xl font-bold gold-gradient bg-clip-text text-transparent">ForexYemeni VIP</h1>
+        </div>
+      </div>
+    );
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     RENDER: LOGIN (VIP Premium Design)
      ═══════════════════════════════════════════════════════════════ */
   if (view === "login") {
     if (!dbReady) {
       return (
-        <div className="min-h-screen flex items-center justify-center p-4" style={{ background: "linear-gradient(135deg, #080d1a 0%, #0f172a 50%, #080d1a 100%)" }}>
+        <div className="min-h-screen flex items-center justify-center p-4" style={{ background: "#070b14" }}>
           <div className="text-center space-y-4 animate-pulse">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center mx-auto shadow-lg shadow-amber-500/20">
-              <Radio className="w-8 h-8 text-black" />
+            <div className="w-16 h-16 rounded-2xl gold-gradient flex items-center justify-center mx-auto shadow-lg shadow-amber-500/20">
+              <Loader2 className="w-8 h-8 text-black animate-spin" />
             </div>
             <div className="text-white text-sm">جاري تهيئة النظام...</div>
           </div>
@@ -1079,52 +1145,89 @@ export default function HomePage() {
       );
     }
     return (
-      <div className="min-h-screen flex items-center justify-center p-4" style={{ background: "linear-gradient(135deg, #080d1a 0%, #0f172a 50%, #080d1a 100%)" }}>
-        <div className="w-full max-w-sm animate-[fadeIn_0.4s_ease-out]">
-          <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-xl p-6 space-y-6">
-            <div className="flex flex-col items-center gap-3">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-500/20">
-                <Radio className="w-8 h-8 text-black" />
+      <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" style={{ background: "#070b14" }}>
+        {/* Background gradient blurs */}
+        <div className="absolute top-[-20%] left-[-10%] w-72 h-72 rounded-full opacity-20" style={{ background: "radial-gradient(circle, #FFD700 0%, transparent 70%)", filter: "blur(80px)" }} />
+        <div className="absolute bottom-[-15%] right-[-10%] w-64 h-64 rounded-full opacity-15" style={{ background: "radial-gradient(circle, #00E676 0%, transparent 70%)", filter: "blur(80px)" }} />
+
+        <div className="w-full max-w-[480px] animate-[fadeInUp_0.5s_ease-out] relative z-10">
+          <div className="backdrop-blur-2xl bg-white/[0.03] border border-white/[0.08] shadow-2xl rounded-3xl p-8 space-y-7">
+            {/* Logo & Title */}
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-20 h-20 rounded-2xl gold-gradient flex items-center justify-center shadow-lg shadow-amber-500/25">
+                <svg className="w-10 h-10 text-black" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5zm14 3c0 .6-.4 1-1 1H6c-.6 0-1-.4-1-1v-1h14v1z" />
+                </svg>
               </div>
               <div className="text-center">
-                <h1 className="text-xl font-bold text-white tracking-wide">TradeSignal Pro</h1>
-                <p className="text-sm text-slate-400 mt-1">نظام إشارات التداول الذكي</p>
+                <h1 className="text-2xl font-extrabold text-white tracking-wide">ForexYemeni</h1>
+                <p className="text-sm font-bold mt-1.5" style={{ color: "#FFD700" }}>VIP TRADING SIGNALS</p>
               </div>
             </div>
+
+            {/* Form */}
             <div className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-xs text-slate-400 flex items-center gap-1.5"><Mail className="w-3.5 h-3.5" />البريد الإلكتروني</label>
-                <Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="admin@forexyemeni.com"
-                  className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-slate-600 h-11 rounded-xl text-sm" dir="ltr"
-                  onKeyDown={e => e.key === "Enter" && handleLogin()} />
+              {/* Email */}
+              <div className="input-glass rounded-2xl px-4 h-[60px] flex items-center gap-3">
+                <Mail className="w-5 h-5 text-slate-500 flex-shrink-0" />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  placeholder="البريد الإلكتروني"
+                  className="flex-1 bg-transparent border-none outline-none text-white placeholder:text-slate-600 text-sm"
+                  dir="ltr"
+                  onKeyDown={e => e.key === "Enter" && handleLogin()}
+                />
               </div>
-              <div className="space-y-1.5">
-                <label className="text-xs text-slate-400 flex items-center gap-1.5"><Lock className="w-3.5 h-3.5" />كلمة المرور</label>
-                <div className="relative">
-                  <Input type={showPwd ? "text" : "password"} value={pwd} onChange={e => setPwd(e.target.value)} placeholder="••••••••"
-                    className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-slate-600 h-11 rounded-xl text-sm" dir="ltr"
-                    onKeyDown={e => e.key === "Enter" && handleLogin()} />
-                  <button type="button" onClick={() => setShowPwd(!showPwd)} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300">
-                    {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
+
+              {/* Password */}
+              <div className="input-glass rounded-2xl px-4 h-[60px] flex items-center gap-3">
+                <Lock className="w-5 h-5 text-slate-500 flex-shrink-0" />
+                <input
+                  type={showPwd ? "text" : "password"}
+                  value={pwd}
+                  onChange={e => setPwd(e.target.value)}
+                  placeholder="كلمة المرور"
+                  className="flex-1 bg-transparent border-none outline-none text-white placeholder:text-slate-600 text-sm"
+                  dir="ltr"
+                  onKeyDown={e => e.key === "Enter" && handleLogin()}
+                />
+                <button type="button" onClick={() => setShowPwd(!showPwd)} className="text-slate-500 hover:text-slate-300 transition-colors">
+                  {showPwd ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
               </div>
+
+              {/* Error */}
               {loginErr && (
-                <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-3 text-[11px] text-red-400 text-center animate-[fadeIn_0.2s_ease-out] break-all leading-relaxed">{loginErr}</div>
+                <div className="bg-red-500/10 border border-red-500/20 rounded-2xl px-4 py-3 text-[12px] text-red-400 text-center animate-[fadeIn_0.2s_ease-out] break-all leading-relaxed">{loginErr}</div>
               )}
-              <Button onClick={handleLogin} disabled={loginLoad || !email || !pwd}
-                className="w-full h-11 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-black font-bold text-sm hover:from-amber-400 hover:to-orange-400 transition-all active:scale-[0.98] disabled:opacity-50">
-                {loginLoad ? <Loader2 className="w-4 h-4 animate-spin" /> : "تسجيل الدخول"}
-              </Button>
-            </div>
-            <div className="text-center text-[10px] text-slate-600">الإصدار 2.0 | FOREXYEMENI PRO</div>
-            <div className="text-center">
-              <button onClick={() => { setView("register"); setLoginErr(""); }} className="text-xs text-sky-400 hover:text-sky-300 transition-colors font-medium">
-                إنشاء حساب جديد
+
+              {/* Login Button */}
+              <button
+                onClick={handleLogin}
+                disabled={loginLoad || !email || !pwd}
+                className="w-full h-[56px] rounded-2xl gold-gradient text-black font-bold text-base hover:opacity-90 transition-all active:scale-[0.98] disabled:opacity-50 shadow-lg shadow-amber-500/20"
+              >
+                {loginLoad ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : "تسجيل الدخول"}
               </button>
             </div>
+
+            {/* Register Link */}
+            <div className="text-center">
+              <button
+                onClick={() => { setView("register"); setLoginErr(""); }}
+                className="text-sm font-medium transition-colors"
+                style={{ color: "#FFD700" }}
+              >
+                ليس لديك اشتراك؟ أنشئ حسابك الآن
+              </button>
+            </div>
+
+            {/* Version & DB Error */}
+            <div className="text-center text-[10px] text-slate-700">الإصدار 2.0 | FOREXYEMENI VIP</div>
             {dbError && (
-              <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2 text-xs text-red-400 text-center">
+              <div className="bg-red-500/10 border border-red-500/20 rounded-2xl px-4 py-3 text-xs text-red-400 text-center">
                 ⚠️ {dbError}
               </div>
             )}
@@ -1135,55 +1238,214 @@ export default function HomePage() {
   }
 
   /* ═══════════════════════════════════════════════════════════════
-     RENDER: REGISTER
+     RENDER: REGISTER (VIP Premium Design)
      ═══════════════════════════════════════════════════════════════ */
   if (view === "register") {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4" style={{ background: "linear-gradient(135deg, #080d1a 0%, #0f172a 50%, #080d1a 100%)" }}>
-        <div className="w-full max-w-sm animate-[fadeIn_0.4s_ease-out]">
-          <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-xl p-6 space-y-5">
-            <div className="flex flex-col items-center gap-3">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-sky-400 to-blue-600 flex items-center justify-center shadow-lg shadow-sky-500/20">
-                <User className="w-7 h-7 text-white" />
+      <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" style={{ background: "#070b14" }}>
+        {/* Background gradient blurs */}
+        <div className="absolute top-[-20%] left-[-10%] w-72 h-72 rounded-full opacity-20" style={{ background: "radial-gradient(circle, #FFD700 0%, transparent 70%)", filter: "blur(80px)" }} />
+        <div className="absolute bottom-[-15%] right-[-10%] w-64 h-64 rounded-full opacity-15" style={{ background: "radial-gradient(circle, #00E676 0%, transparent 70%)", filter: "blur(80px)" }} />
+
+        <div className="w-full max-w-[480px] animate-[fadeInUp_0.5s_ease-out] relative z-10">
+          <div className="backdrop-blur-2xl bg-white/[0.03] border border-white/[0.08] shadow-2xl rounded-3xl p-8 space-y-7">
+            {/* Icon & Title */}
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-sky-400 to-blue-600 flex items-center justify-center shadow-lg shadow-sky-500/25">
+                <User className="w-10 h-10 text-white" />
               </div>
               <div className="text-center">
-                <h2 className="text-lg font-bold text-white">إنشاء حساب جديد</h2>
-                <p className="text-xs text-slate-400 mt-1">سجل الآن وانتظر موافقة الإدارة</p>
+                <h2 className="text-2xl font-extrabold text-white">إنشاء حساب جديد</h2>
+                <p className="text-xs text-slate-400 mt-1.5">سجل الآن وانتظر موافقة الإدارة</p>
               </div>
             </div>
-            <div className="space-y-3">
-              <div className="space-y-1">
-                <label className="text-xs text-slate-400">الاسم الكامل</label>
-                <Input value={regName} onChange={e => setRegName(e.target.value)} placeholder="أدخل اسمك"
-                  className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-slate-600 h-11 rounded-xl text-sm" dir="rtl" />
+
+            {/* Form */}
+            <div className="space-y-4">
+              {/* Full Name */}
+              <div className="input-glass rounded-2xl px-4 h-[60px] flex items-center gap-3">
+                <User className="w-5 h-5 text-slate-500 flex-shrink-0" />
+                <input
+                  value={regName}
+                  onChange={e => setRegName(e.target.value)}
+                  placeholder="الاسم الكامل"
+                  className="flex-1 bg-transparent border-none outline-none text-white placeholder:text-slate-600 text-sm"
+                  dir="rtl"
+                />
               </div>
-              <div className="space-y-1">
-                <label className="text-xs text-slate-400 flex items-center gap-1.5"><Mail className="w-3.5 h-3.5" />البريد الإلكتروني</label>
-                <Input type="email" value={regEmail} onChange={e => setRegEmail(e.target.value)} placeholder="example@email.com"
-                  className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-slate-600 h-11 rounded-xl text-sm" dir="ltr" />
+
+              {/* Email */}
+              <div className="input-glass rounded-2xl px-4 h-[60px] flex items-center gap-3">
+                <Mail className="w-5 h-5 text-slate-500 flex-shrink-0" />
+                <input
+                  type="email"
+                  value={regEmail}
+                  onChange={e => setRegEmail(e.target.value)}
+                  placeholder="البريد الإلكتروني"
+                  className="flex-1 bg-transparent border-none outline-none text-white placeholder:text-slate-600 text-sm"
+                  dir="ltr"
+                />
               </div>
-              <div className="space-y-1">
-                <label className="text-xs text-slate-400 flex items-center gap-1.5"><Lock className="w-3.5 h-3.5" />كلمة المرور</label>
-                <Input type="password" value={regPwd} onChange={e => setRegPwd(e.target.value)} placeholder="••••••••"
-                  className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-slate-600 h-11 rounded-xl text-sm" dir="ltr"
-                  onKeyDown={e => e.key === "Enter" && handleRegister()} />
+
+              {/* Password */}
+              <div className="input-glass rounded-2xl px-4 h-[60px] flex items-center gap-3">
+                <Lock className="w-5 h-5 text-slate-500 flex-shrink-0" />
+                <input
+                  type="password"
+                  value={regPwd}
+                  onChange={e => setRegPwd(e.target.value)}
+                  placeholder="كلمة المرور (6 أحرف على الأقل)"
+                  className="flex-1 bg-transparent border-none outline-none text-white placeholder:text-slate-600 text-sm"
+                  dir="ltr"
+                  onKeyDown={e => e.key === "Enter" && handleRegister()}
+                />
               </div>
-              {regErr && <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2 text-xs text-red-400 text-center">{regErr}</div>}
+
+              {/* Error */}
+              {regErr && <div className="bg-red-500/10 border border-red-500/20 rounded-2xl px-4 py-3 text-[12px] text-red-400 text-center">{regErr}</div>}
+
+              {/* Success */}
               {regSuccess && (
-                <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-3 py-2 text-xs text-emerald-400 text-center animate-[fadeIn_0.3s_ease-out]">
+                <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl px-4 py-3 text-[12px] text-emerald-400 text-center animate-[fadeIn_0.3s_ease-out]">
                   {regSuccess}
                 </div>
               )}
-              <Button onClick={handleRegister} disabled={regLoad || !regName || !regEmail || !regPwd}
-                className="w-full h-11 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 text-white font-bold text-sm hover:from-sky-400 hover:to-blue-500 transition-all active:scale-[0.98] disabled:opacity-50">
-                {regLoad ? <Loader2 className="w-4 h-4 animate-spin" /> : "إنشاء الحساب"}
-              </Button>
-            </div>
-            <div className="text-center">
-              <button onClick={() => setView("login")} className="text-xs text-slate-400 hover:text-white transition-colors">
-                لديك حساب؟ تسجيل الدخول
+
+              {/* Submit Button */}
+              <button
+                onClick={handleRegister}
+                disabled={regLoad || !regName || !regEmail || !regPwd}
+                className="w-full h-[56px] rounded-2xl bg-gradient-to-r from-white to-slate-200 text-black font-bold text-base hover:opacity-90 transition-all active:scale-[0.98] disabled:opacity-50 shadow-lg"
+              >
+                {regLoad ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : "طلب اشتراك"}
               </button>
             </div>
+
+            {/* Login Link */}
+            <div className="text-center">
+              <button
+                onClick={() => setView("login")}
+                className="text-sm font-medium transition-colors"
+                style={{ color: "#FFD700" }}
+              >
+                لديك حساب؟ سجل دخولك
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     RENDER: PENDING STATUS
+     ═══════════════════════════════════════════════════════════════ */
+  if (view === "pending") {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" style={{ background: "#070b14" }}>
+        <div className="absolute top-[-20%] left-[-10%] w-72 h-72 rounded-full opacity-20" style={{ background: "radial-gradient(circle, #FFD700 0%, transparent 70%)", filter: "blur(80px)" }} />
+        <div className="absolute bottom-[-15%] right-[-10%] w-64 h-64 rounded-full opacity-15" style={{ background: "radial-gradient(circle, #00E676 0%, transparent 70%)", filter: "blur(80px)" }} />
+
+        <div className="w-full max-w-[480px] animate-[fadeInUp_0.5s_ease-out] relative z-10">
+          <div className="backdrop-blur-2xl bg-white/[0.03] border border-white/[0.08] shadow-2xl rounded-3xl p-8 space-y-7 text-center">
+            {/* Hourglass Icon */}
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-20 h-20 rounded-2xl bg-sky-500/15 flex items-center justify-center status-pending-icon">
+                <Clock className="w-10 h-10 text-sky-400" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-extrabold text-white">حسابك قيد المراجعة</h2>
+                <p className="text-sm text-slate-400 mt-3 leading-relaxed">
+                  أهلاً بك في نادي الـ VIP! حسابك قيد المراجعة من قبل الإدارة.
+                  <br />
+                  سيتم إشعارك فور تفعيل حسابك.
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={handleLogout}
+              className="w-full h-[56px] rounded-2xl gold-gradient text-black font-bold text-base hover:opacity-90 transition-all active:scale-[0.98] shadow-lg shadow-amber-500/20"
+            >
+              تسجيل الخروج
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     RENDER: BLOCKED STATUS
+     ═══════════════════════════════════════════════════════════════ */
+  if (view === "blocked") {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" style={{ background: "#070b14" }}>
+        <div className="absolute top-[-20%] right-[-10%] w-72 h-72 rounded-full opacity-25" style={{ background: "radial-gradient(circle, #EF4444 0%, transparent 70%)", filter: "blur(80px)" }} />
+
+        <div className="w-full max-w-[480px] animate-[fadeInUp_0.5s_ease-out] relative z-10">
+          <div className="backdrop-blur-2xl bg-white/[0.03] border border-red-500/15 shadow-2xl rounded-3xl p-8 space-y-7 text-center">
+            {/* Lock Icon */}
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-20 h-20 rounded-2xl bg-red-500/15 flex items-center justify-center status-pending-icon">
+                <Lock className="w-10 h-10 text-red-400" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-extrabold text-red-400">حساب محظور</h2>
+                <p className="text-sm text-slate-400 mt-3 leading-relaxed">
+                  تم حظر حسابك من قبل الإدارة.
+                  <br />
+                  يرجى التواصل مع الدعم الفني للحصول على المساعدة.
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={handleLogout}
+              className="w-full h-[56px] rounded-2xl bg-gradient-to-r from-red-500 to-red-600 text-white font-bold text-base hover:opacity-90 transition-all active:scale-[0.98] shadow-lg shadow-red-500/20"
+            >
+              تسجيل الخروج
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     RENDER: EXPIRED STATUS
+     ═══════════════════════════════════════════════════════════════ */
+  if (view === "expired") {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" style={{ background: "#070b14" }}>
+        <div className="absolute top-[-20%] left-[-10%] w-72 h-72 rounded-full opacity-20" style={{ background: "radial-gradient(circle, #FFD700 0%, transparent 70%)", filter: "blur(80px)" }} />
+        <div className="absolute bottom-[-15%] right-[-10%] w-64 h-64 rounded-full opacity-15" style={{ background: "radial-gradient(circle, #00E676 0%, transparent 70%)", filter: "blur(80px)" }} />
+
+        <div className="w-full max-w-[480px] animate-[fadeInUp_0.5s_ease-out] relative z-10">
+          <div className="backdrop-blur-2xl bg-white/[0.03] border border-white/[0.08] shadow-2xl rounded-3xl p-8 space-y-7 text-center">
+            {/* Ban Icon */}
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-20 h-20 rounded-2xl gold-gradient flex items-center justify-center status-pending-icon">
+                <svg className="w-10 h-10 text-black" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zM4 12c0-4.42 3.58-8 8-8 1.85 0 3.55.63 4.9 1.69L5.69 16.9A7.902 7.902 0 014 12zm8 8c-1.85 0-3.55-.63-4.9-1.69L18.31 7.1A7.902 7.902 0 0120 12c0 4.42-3.58 8-8 8z" />
+                </svg>
+              </div>
+              <div>
+                <h2 className="text-2xl font-extrabold" style={{ color: "#FFD700" }}>انتهى اشتراكك</h2>
+                <p className="text-sm text-slate-400 mt-3 leading-relaxed">
+                  انتهت مدة اشتراكك في نادي الـ VIP.
+                  <br />
+                  يرجى التواصل مع الإدارة لتجديد الاشتراك.
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={handleLogout}
+              className="w-full h-[56px] rounded-2xl gold-gradient text-black font-bold text-base hover:opacity-90 transition-all active:scale-[0.98] shadow-lg shadow-amber-500/20"
+            >
+              تسجيل الخروج
+            </button>
           </div>
         </div>
       </div>
@@ -1195,44 +1457,47 @@ export default function HomePage() {
      ═══════════════════════════════════════════════════════════════ */
   if (view === "changePwd") {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4" style={{ background: "linear-gradient(135deg, #080d1a 0%, #0f172a 50%, #080d1a 100%)" }}>
-        <div className="w-full max-w-sm animate-[fadeIn_0.4s_ease-out]">
-          <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-xl p-6 space-y-5">
-            <div className="flex flex-col items-center gap-3">
-              <div className="w-14 h-14 rounded-2xl bg-amber-500/15 flex items-center justify-center">
-                <AlertTriangle className="w-7 h-7 text-amber-400" />
+      <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" style={{ background: "#070b14" }}>
+        <div className="absolute top-[-20%] left-[-10%] w-72 h-72 rounded-full opacity-20" style={{ background: "radial-gradient(circle, #FFD700 0%, transparent 70%)", filter: "blur(80px)" }} />
+        <div className="absolute bottom-[-15%] right-[-10%] w-64 h-64 rounded-full opacity-15" style={{ background: "radial-gradient(circle, #00E676 0%, transparent 70%)", filter: "blur(80px)" }} />
+
+        <div className="w-full max-w-[480px] animate-[fadeInUp_0.5s_ease-out] relative z-10">
+          <div className="backdrop-blur-2xl bg-white/[0.03] border border-white/[0.08] shadow-2xl rounded-3xl p-8 space-y-6">
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-20 h-20 rounded-2xl gold-gradient flex items-center justify-center shadow-lg shadow-amber-500/25">
+                <AlertTriangle className="w-10 h-10 text-black" />
               </div>
               <div className="text-center">
-                <h2 className="text-lg font-bold text-white">تغيير بيانات الحساب</h2>
-                <p className="text-xs text-slate-400 mt-1">يجب تغيير البريد وكلمة المرور للمتابعة</p>
+                <h2 className="text-xl font-extrabold text-white">تغيير بيانات الحساب</h2>
+                <p className="text-xs text-slate-400 mt-1.5">يجب تغيير البريد وكلمة المرور للمتابعة</p>
               </div>
             </div>
-            <div className="space-y-3">
-              <div className="space-y-1">
-                <label className="text-xs text-slate-400">كلمة المرور الحالية</label>
-                <Input type="password" value={cpCur} onChange={e => setCpCur(e.target.value)} placeholder="••••••••"
-                  className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-slate-600 h-11 rounded-xl text-sm" dir="ltr" />
+            <div className="space-y-4">
+              <div className="input-glass rounded-2xl px-4 h-[60px] flex items-center gap-3">
+                <Lock className="w-5 h-5 text-slate-500 flex-shrink-0" />
+                <input type="password" value={cpCur} onChange={e => setCpCur(e.target.value)} placeholder="كلمة المرور الحالية"
+                  className="flex-1 bg-transparent border-none outline-none text-white placeholder:text-slate-600 text-sm" dir="ltr" />
               </div>
-              <div className="space-y-1">
-                <label className="text-xs text-slate-400">البريد الإلكتروني الجديد</label>
-                <Input type="email" value={cpEmail} onChange={e => setCpEmail(e.target.value)} placeholder="new@email.com"
-                  className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-slate-600 h-11 rounded-xl text-sm" dir="ltr" />
+              <div className="input-glass rounded-2xl px-4 h-[60px] flex items-center gap-3">
+                <Mail className="w-5 h-5 text-slate-500 flex-shrink-0" />
+                <input type="email" value={cpEmail} onChange={e => setCpEmail(e.target.value)} placeholder="البريد الإلكتروني الجديد"
+                  className="flex-1 bg-transparent border-none outline-none text-white placeholder:text-slate-600 text-sm" dir="ltr" />
               </div>
-              <div className="space-y-1">
-                <label className="text-xs text-slate-400">كلمة المرور الجديدة</label>
-                <Input type="password" value={cpNew} onChange={e => setCpNew(e.target.value)} placeholder="••••••••"
-                  className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-slate-600 h-11 rounded-xl text-sm" dir="ltr" />
+              <div className="input-glass rounded-2xl px-4 h-[60px] flex items-center gap-3">
+                <Lock className="w-5 h-5 text-slate-500 flex-shrink-0" />
+                <input type="password" value={cpNew} onChange={e => setCpNew(e.target.value)} placeholder="كلمة المرور الجديدة"
+                  className="flex-1 bg-transparent border-none outline-none text-white placeholder:text-slate-600 text-sm" dir="ltr" />
               </div>
-              <div className="space-y-1">
-                <label className="text-xs text-slate-400">تأكيد كلمة المرور</label>
-                <Input type="password" value={cpConf} onChange={e => setCpConf(e.target.value)} placeholder="••••••••"
-                  className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-slate-600 h-11 rounded-xl text-sm" dir="ltr" />
+              <div className="input-glass rounded-2xl px-4 h-[60px] flex items-center gap-3">
+                <Lock className="w-5 h-5 text-slate-500 flex-shrink-0" />
+                <input type="password" value={cpConf} onChange={e => setCpConf(e.target.value)} placeholder="تأكيد كلمة المرور"
+                  className="flex-1 bg-transparent border-none outline-none text-white placeholder:text-slate-600 text-sm" dir="ltr" />
               </div>
-              {cpErr && <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2 text-xs text-red-400 text-center">{cpErr}</div>}
-              <Button onClick={handleChangePwd} disabled={cpLoad}
-                className="w-full h-11 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-black font-bold text-sm hover:from-amber-400 hover:to-orange-400 transition-all active:scale-[0.98] disabled:opacity-50">
-                {cpLoad ? <Loader2 className="w-4 h-4 animate-spin" /> : "تحديث البيانات"}
-              </Button>
+              {cpErr && <div className="bg-red-500/10 border border-red-500/20 rounded-2xl px-4 py-3 text-[12px] text-red-400 text-center">{cpErr}</div>}
+              <button onClick={handleChangePwd} disabled={cpLoad}
+                className="w-full h-[56px] rounded-2xl gold-gradient text-black font-bold text-base hover:opacity-90 transition-all active:scale-[0.98] disabled:opacity-50 shadow-lg shadow-amber-500/20">
+                {cpLoad ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : "تحديث البيانات"}
+              </button>
             </div>
           </div>
         </div>

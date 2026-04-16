@@ -231,3 +231,91 @@ html, body {
   border: 1.5px solid rgba(16, 185, 129, 0.4);
   animation: pulseRing 2s ease-out infinite;
 }
+
+/* ═══ VIP Premium Styles ═══ */
+
+/* Glass Panel */
+.glass-panel {
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+}
+
+.glass-nav {
+  background: rgba(7, 11, 20, 0.9);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Gold Gradient Background */
+.gold-gradient {
+  background: linear-gradient(135deg, #FFD700 0%, #FF8F00 100%);
+}
+
+.vip-gradient {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+}
+
+/* Chart Bar Animation (Loading Screen) */
+@keyframes growBar {
+  0% { transform: scaleY(0.3); }
+  100% { transform: scaleY(1); }
+}
+
+.chart-bar {
+  width: 6px;
+  border-radius: 4px;
+  background: #FFD700;
+  animation: growBar 1s infinite alternate ease-in-out;
+}
+
+.chart-bar-green {
+  background: #00E676;
+}
+
+/* Input Glass Focus Effect */
+.input-glass {
+  background: rgba(7, 11, 20, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.3s ease;
+}
+
+.input-glass:focus-within {
+  border-color: #00E676;
+  box-shadow: 0 0 15px rgba(0, 230, 118, 0.15);
+}
+
+/* Status views */
+.status-pending-icon {
+  animation: gentlePulse 2s ease-in-out infinite;
+}
+
+@keyframes gentlePulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.05); opacity: 0.8; }
+}
+
+/* Splash screen fade-in */
+@keyframes splashFadeIn {
+  from { opacity: 0; transform: translateY(15px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.splash-fade-in {
+  animation: splashFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Nav active effect */
+.nav-active-vip {
+  color: #FFD700;
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+  transform: translateY(-4px);
+}
+
+/* Premium glow */
+.premium-glow {
+  box-shadow: 0 0 40px rgba(255, 215, 0, 0.15);
+}
