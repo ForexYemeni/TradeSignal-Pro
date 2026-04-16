@@ -6,7 +6,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000 2>&1 | tee dev.log",
-    "build": "npx prisma generate && next build",
+    "build": "npx prisma generate && npx prisma db push --skip-generate --accept-data-loss && next build",
     "start": "next start",
     "lint": "eslint .",
     "postinstall": "prisma generate",
