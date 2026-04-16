@@ -210,3 +210,26 @@ Stage Summary:
 - Background polling checks API every 60 seconds for new signals
 - Build tools cached at /tmp/android-sdk for future builds
 - Debug keystore at android-app/app/build/apk-build/debug.keystore
+---
+Task ID: 1
+Agent: Main Agent
+Task: Fix notification messages (TP/SL showing "new signal") + prevent old notifications on first open
+
+Work Log:
+- Analyzed SignalService.java v2 to identify two bugs:
+  1. showSignalNotification() checked `signalCategory` for notification type, but when admin updates TP/SL via PUT, the `signalCategory` stays "ENTRY" while only `status` changes to "HIT_TP"/"HIT_SL"
+  2. On first app open, `knownStates` is empty so ALL existing signals get treated as "new" and trigger notifications
+- Rewrote SignalService.java v3 with two key fixes:
+  1. State-based notification: When detecting a state change, checks `status` field (HIT_TP, HIT_SL) instead of `signalCategory` to determine notification type
+  2. First-run detection: Added `KEY_INITIALIZED` flag in SharedPreferences. On first run, silently records all existing signals without sending any notifications
+- Split showSignalNotification into 3 separate methods: showNewSignalNotification, showTpNotification, showSlNotification
+- State change detection now properly handles: new TP hits, SL hits, and consecutive TP hits (TP1->TP2->TP3)
+- Built APK v4.2 using manual build (aapt + javac + d8 + apksigner)
+- Note: v4.2 signed with different keystore than v4.1 - user must uninstall old version first
+
+Stage Summary:
+- SignalService v3 with correct notification type detection
+- No more "new signal" notifications for TP/SL events
+- No more old notifications on first app install/open
+- APK v4.2 at /home/z/my-project/download/ForexYemeni-v4.2.apk
+- User needs to uninstall v4.1 before installing v4.2 (different signing key)
