@@ -1977,7 +1977,7 @@ export default function HomePage() {
             ) : (
               <div className="space-y-3">
                 {filtered.map((s, i) => (
-                  <SignalCard key={s.id} s={s} idx={i} isAdmin={true} onUpdate={handleUpdate} onDelete={handleDelete} />
+                  <SignalCard key={s.id} s={s} idx={i} isAdmin={isAdmin} onUpdate={handleUpdate} onDelete={handleDelete} />
                 ))}
               </div>
             )}
@@ -2273,7 +2273,8 @@ export default function HomePage() {
               </div>
             </Glass>
 
-            {/* ── Test Notifications ── */}
+            {/* ── Test Notifications (Admin Only) ── */}
+            {isAdmin && (
             <Glass className="p-4 space-y-3">
               <div className="flex items-center gap-2 text-sm font-bold text-slate-300">
                 <Bell className="w-4 h-4 text-amber-400" />
@@ -2308,22 +2309,21 @@ export default function HomePage() {
                   🛑 وقف خسارة
                 </button>
               </div>
-              {isAdmin && (
-                <div className="pt-1 border-t border-white/[0.04]">
-                  <button onClick={async () => {
-                    try {
-                      const res = await fetch("/api/test-notification", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "buy" }) });
-                      const data = await res.json();
-                      if (data.success) {
-                        alert("تم إرسال إشارة اختبار!");
-                      }
-                    } catch { /* ignore */ }
-                  }} className="w-full p-2.5 rounded-xl bg-gradient-to-r from-amber-500/15 to-orange-500/15 border border-amber-500/25 text-amber-400 text-[11px] font-semibold active:scale-95 transition-transform hover:from-amber-500/25 hover:to-orange-500/25">
-                    إرسال إشارة اختبار من الخادم
-                  </button>
-                </div>
-              )}
+              <div className="pt-1 border-t border-white/[0.04]">
+                <button onClick={async () => {
+                  try {
+                    const res = await fetch("/api/test-notification", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "buy" }) });
+                    const data = await res.json();
+                    if (data.success) {
+                      alert("تم إرسال إشارة اختبار!");
+                    }
+                  } catch { /* ignore */ }
+                }} className="w-full p-2.5 rounded-xl bg-gradient-to-r from-amber-500/15 to-orange-500/15 border border-amber-500/25 text-amber-400 text-[11px] font-semibold active:scale-95 transition-transform hover:from-amber-500/25 hover:to-orange-500/25">
+                  إرسال إشارة اختبار من الخادم
+                </button>
+              </div>
             </Glass>
+            )}
 
             {/* ── USER: Request Email Change ── */}
             {!isAdmin && (
