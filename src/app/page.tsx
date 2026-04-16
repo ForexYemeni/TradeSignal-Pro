@@ -380,7 +380,7 @@ function TradeStatusBanner({ s }: { s: Signal }) {
   const isProfit = s.status === "HIT_TP";
   const isLoss = s.status === "HIT_SL";
   const isManual = s.status === "MANUAL_CLOSE";
-  const hitCount = s.hitTpIndex >= 0 ? s.hitTpIndex + 1 : 0;
+  const hitCount = s.hitTpIndex >= 0 ? s.hitTpIndex : 0;
   const totalTPs = s.takeProfits?.length || 0;
 
   if (s.status === "ACTIVE") return null;
@@ -468,7 +468,7 @@ function EntryCard({ s, idx, isAdmin, onUpdate, onDelete }: {
   const isBuy = s.type === "BUY";
   const typeLabel = s.signalCategory === "REENTRY" ? "إعادة دخول" : s.signalCategory === "PYRAMID" ? "تدرج" : isBuy ? "شراء" : "بيع";
   const isClosed = s.status !== "ACTIVE";
-  const hitCount = s.hitTpIndex >= 0 ? s.hitTpIndex + 1 : 0;
+  const hitCount = s.hitTpIndex >= 0 ? s.hitTpIndex : 0;
 
   return (
     <div className="animate-[fadeInUp_0.35s_ease-out]" style={{ animationDelay: `${idx * 40}ms`, animationFillMode: "both" }}>
@@ -584,8 +584,8 @@ function EntryCard({ s, idx, isAdmin, onUpdate, onDelete }: {
                     key={i}
                     tp={tp}
                     index={i}
-                    isHit={s.hitTpIndex >= 0 && s.hitTpIndex >= i}
-                    isLastHit={s.hitTpIndex === i}
+                    isHit={s.hitTpIndex > 0 && i < s.hitTpIndex}
+                    isLastHit={s.hitTpIndex - 1 === i}
                     entry={s.entry}
                     type={s.type}
                   />
@@ -647,7 +647,7 @@ function ClosedSignalCard({ s, idx, isAdmin, onDelete }: { s: Signal; idx: numbe
   const isProfit = s.status === "HIT_TP";
   const isLoss = s.status === "HIT_SL";
   const [expanded, setExpanded] = useState(false);
-  const hitCount = s.hitTpIndex >= 0 ? s.hitTpIndex + 1 : 0;
+  const hitCount = s.hitTpIndex >= 0 ? s.hitTpIndex : 0;
   const totalTPs = s.takeProfits?.length || 0;
   const isBuy = s.type === "BUY";
   const catLabel = catCfg[s.signalCategory]?.label || "مغلقة";
@@ -733,7 +733,7 @@ function ClosedSignalCard({ s, idx, isAdmin, onDelete }: { s: Signal; idx: numbe
                   <div className="text-[9px] text-slate-500 font-medium">الأهداف ({hitCount}/{totalTPs})</div>
                   <div className="flex gap-1 flex-wrap">
                     {s.takeProfits.map((tp, i) => {
-                      const hit = s.hitTpIndex >= 0 && s.hitTpIndex >= i;
+                      const hit = s.hitTpIndex > 0 && i < s.hitTpIndex;
                       return (
                         <div key={i} className={`px-2 py-1 rounded-lg text-[9px] font-mono border ${hit ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/20" : "bg-white/[0.02] text-slate-500 border-white/[0.06] line-through opacity-50"}`}>
                           TP{i+1}: {tp.tp} ({tp.rr.toFixed(1)}R)
