@@ -430,6 +430,14 @@ function extractSignalType(text: string): "BUY" | "SELL" | null {
 }
 
 function extractPair(text: string): string | null {
+  // الأولوية 1: بعد 📌 (الأكثر دقة - من تنسيق FOREXYEMENI)
+  const pinMatch = text.match(/📌\s*([A-Za-z]{3,12}(?:\/[A-Za-z]{3})?)/i);
+  if (pinMatch) return pinMatch[1].replace(/\s/g, "").toUpperCase();
+
+  // الأولوية 2: أنماط محددة (نبحث في النص ما عدا الروابط)
+  // نزيل الروابط أولاً لمنع تطابق كلمة GOLD من رابط تليجرام
+  var cleanText = text.replace(/t\.me\/[^\s]*/gi, "").replace(/http[^\s]*/gi, "");
+
   const patterns = [
     /(?:XAU|GOLD)(?:USD)?/i,
     /(?:XAG|SILVER)(?:USD)?/i,
@@ -440,14 +448,12 @@ function extractPair(text: string): string | null {
     /ETH\s*\/?\s*USDT?/i,
   ];
   for (const p of patterns) {
-    const m = text.match(p);
+    const m = cleanText.match(p);
     if (m) return m[0].replace(/\s/g, "").toUpperCase();
   }
-  // After 📌
-  const pinMatch = text.match(/📌\s*([A-Za-z]{3,12}(?:\/[A-Za-z]{3})?)/i);
-  if (pinMatch) return pinMatch[1].replace(/\s/g, "").toUpperCase();
 
-  const anyMatch = text.match(/\b([A-Z]{3,10}(?:\/[A-Z]{3})?)\b/);
+  // الأولوية 3: أي رمز أزواج
+  const anyMatch = cleanText.match(/\b([A-Z]{3,10}(?:\/[A-Z]{3})?)\b/);
   if (anyMatch) return anyMatch[1];
   return null;
 }
