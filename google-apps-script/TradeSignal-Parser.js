@@ -1,62 +1,138 @@
-// FOREXYEMENI-PRO Google Apps Script v3.0
+// FOREXYEMENI-PRO Google Apps Script v4.0
 // Webhook مستقبل إشارات TradingView
+// بدون Google Sheets - تسجيل داخلي فقط
 //
 // بيانات الاتصال:
 // - رابط التطبيق: https://trade-signal-pro.vercel.app
-// - كلمة مرور الأدمن: admin123
-// - البريد: admin@forexyemeni.com
 
 var APP_URL = "https://trade-signal-pro.vercel.app/api/signals";
-var ADMIN_PASSWORD = "admin123";
-var ADMIN_EMAIL = "admin@forexyemeni.com";
-var SHEET_NAME = "Signals";
+
+// ═══════════════════════════════════════════════════════════════
+//  استقبال التنبيهات من TradingView
+// ═══════════════════════════════════════════════════════════════
 
 function doPost(e) {
+  var logId = saveLog("doPost", "START", "تم استلام طلب");
+  
   try {
+    // تسجيل معلومات الطلب
+    Logger.log("=== doPost استلام طلب جديد ===");
+    Logger.log("postData موجود: " + (e.postData ? "نعم" : "لا"));
+    
+    if (e.postData) {
+      Logger.log("postData.type: " + e.postData.type);
+      Logger.log("postData.contents (أول 300 حرف): " + (e.postData.contents || "").substring(0, 300));
+      Logger.log("postData.length: " + (e.postData.contents || "").length);
+    }
+    
+    // استخراج النص
     var rawText = extractRawText(e);
+    Logger.log("النص المستخرج (أول 200 حرف): " + (rawText || "").substring(0, 200));
+    
     if (!rawText || !rawText.trim()) {
+      saveLog("doPost", "ERROR", "النص فارغ - لم يتم استخراج أي نص");
       return jsonResponse({ success: false, error: "النص فارغ" }, 400);
     }
-    logToSheet(rawText);
+    
+    Logger.log("الفئة: " + detectCategory(rawText));
+    
+    // إرسال للتطبيق
+    Logger.log("إرسال للتطبيق...");
     var result = sendToApp(rawText);
+    Logger.log("نتيجة التطبيق: " + JSON.stringify(result));
+    
+    var status = (result && result.success) ? "SUCCESS" : "APP_ERROR";
+    saveLog("doPost", status, rawText.substring(0, 100));
+    
     return jsonResponse({ success: true, appResult: result });
+    
   } catch (error) {
+    Logger.log("خطأ في doPost: " + error.message);
+    Logger.log("Stack: " + error.stack);
+    saveLog("doPost", "EXCEPTION", error.message);
     return jsonResponse({ success: false, error: error.message }, 500);
   }
 }
 
 function doGet(e) {
+  var action = e && e.parameter && e.parameter.action;
+  
+  if (action === "logs") {
+    return jsonResponse(getLogs());
+  }
+  
   return jsonResponse({
     success: true,
     status: "running",
     app: "FOREXYEMENI-PRO",
-    version: "3.0",
+    version: "4.0",
     appUrl: APP_URL
   });
 }
 
+// ═══════════════════════════════════════════════════════════════
+//  استخراج النص من الطلب
+// ═══════════════════════════════════════════════════════════════
+
 function extractRawText(e) {
-  if (!e.postData) return "";
-  if (e.postData.contents) {
-    try {
-      var parsed = JSON.parse(e.postData.contents);
-      if (parsed.text) return parsed.text;
-      if (parsed.message) return parsed.message;
-      if (parsed.signal) return parsed.signal;
-    } catch (err) {}
-    return e.postData.contents;
+  // الحالة 1: لا يوجد postData أصلاً
+  if (!e.postData) {
+    Logger.log("تنبيه: لا يوجد postData في الطلب");
+    return "";
   }
+  
+  var contents = e.postData.contents;
+  
+  // الحالة 2: محتوى فارغ
+  if (!contents) {
+    Logger.log("تنبيه: postData.contents فارغ");
+    return "";
+  }
+  
+  // الحالة 3: محاولة تحليل كـ JSON
+  try {
+    var parsed = JSON.parse(contents);
+    Logger.log("تم تحليل المحتوى كـ JSON بنجاح");
+    Logger.log("مفاتيح JSON: " + JSON.stringify(Object.keys(parsed)));
+    
+    if (parsed.text) return parsed.text;
+    if (parsed.message) return parsed.message;
+    if (parsed.signal) return parsed.signal;
+    if (parsed.alert_message) return parsed.alert_message;
+    
+    // لو JSON ما فيه حقل معروف، نرجع المحتوى كاملاً
+    Logger.log("JSON لا يحتوي على حقل text/message/signal - استخدام المحتوى الكامل");
+    return contents;
+  } catch (err) {
+    // ليس JSON - نستخدم المحتوى كما هو (نص خام)
+    Logger.log("المحتوى ليس JSON - استخدامه كنص خام");
+  }
+  
+  // الحالة 4: form-urlencoded
   if (e.postData.type === "application/x-www-form-urlencoded") {
-    var params = e.postData.contents.split("&");
+    Logger.log("نوع المحتوى: form-urlencoded");
+    var params = contents.split("&");
     for (var i = 0; i < params.length; i++) {
       var kv = params[i].split("=");
-      if (kv[0] === "text" || kv[0] === "message" || kv[0] === "signal") {
-        return decodeURIComponent(kv[1].replace(/\+/g, " "));
+      if (kv.length === 2) {
+        var key = decodeURIComponent(kv[0]);
+        var val = decodeURIComponent(kv[1].replace(/\+/g, " "));
+        Logger.log("معامل: " + key + " = " + val.substring(0, 100));
+        if (key === "text" || key === "message" || key === "signal" || key === "alert_message") {
+          return val;
+        }
       }
     }
   }
-  return "";
+  
+  // الحالة 5: نص خام
+  Logger.log("استخدام المحتوى كنص خام");
+  return contents;
 }
+
+// ═══════════════════════════════════════════════════════════════
+//  إرسال للتطبيق
+// ═══════════════════════════════════════════════════════════════
 
 function sendToApp(rawText) {
   try {
@@ -66,27 +142,66 @@ function sendToApp(rawText) {
       payload: JSON.stringify({ text: rawText }),
       muteHttpExceptions: true
     };
+    
     var response = UrlFetchApp.fetch(APP_URL, options);
-    return JSON.parse(response.getContentText());
+    var responseCode = response.getResponseCode();
+    var responseText = response.getContentText();
+    
+    Logger.log("استجابة التطبيق - الكود: " + responseCode);
+    Logger.log("استجابة التطبيق - المحتوى: " + responseText.substring(0, 500));
+    
+    if (responseCode >= 200 && responseCode < 300) {
+      return JSON.parse(responseText);
+    } else {
+      return { success: false, error: "HTTP " + responseCode, body: responseText.substring(0, 200) };
+    }
   } catch (error) {
+    Logger.log("خطأ في sendToApp: " + error.message);
     return { success: false, error: error.message };
   }
 }
 
-function logToSheet(rawText) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEET_NAME);
-  if (!sheet) {
-    sheet = ss.insertSheet(SHEET_NAME);
-    sheet.getRange(1, 1, 1, 3).setValues([["التاريخ", "الفئة", "النص"]])
-      .setFontWeight("bold").setBackground("#1a1a2e").setFontColor("#e2e8f0");
+// ═══════════════════════════════════════════════════════════════
+//  نظام التسجيل الداخلي (بدون Google Sheets)
+// ═══════════════════════════════════════════════════════════════
+
+function saveLog(source, status, message) {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var logs = JSON.parse(props.getProperty("webhook_logs") || "[]");
+    logs.unshift({
+      time: new Date().toISOString(),
+      source: source,
+      status: status,
+      message: message.substring(0, 500)
+    });
+    // الاحتفاظ بآخر 50 سجل فقط
+    if (logs.length > 50) logs = logs.slice(0, 50);
+    props.setProperty("webhook_logs", JSON.stringify(logs));
+    return logs.length;
+  } catch (e) {
+    return -1;
   }
-  var category = detectCategory(rawText);
-  sheet.appendRow([new Date().toLocaleString("ar-SA"), category, rawText.substring(0, 500)]);
-  var row = sheet.getLastRow();
-  var colors = { "ENTRY": "#0f2922", "TP_HIT": "#0f2240", "SL_HIT": "#2d1517", "OTHER": "#1a1a2e" };
-  sheet.getRange(row, 1, 1, 3).setBackground(colors[category] || colors["OTHER"]).setFontColor("#e2e8f0");
 }
+
+function getLogs() {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var logs = JSON.parse(props.getProperty("webhook_logs") || "[]");
+    return { success: true, count: logs.length, logs: logs };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+function clearLogs() {
+  PropertiesService.getScriptProperties().deleteProperty("webhook_logs");
+  return { success: true, message: "تم مسح السجلات" };
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  تصنيف الإشارة
+// ═══════════════════════════════════════════════════════════════
 
 function detectCategory(text) {
   if (/إغلاق كامل بالربح/.test(text)) return "TP_HIT";
@@ -105,13 +220,19 @@ function detectCategory(text) {
   return "OTHER";
 }
 
-function jsonResponse(data) {
-  return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON);
+// ═══════════════════════════════════════════════════════════════
+//  مساعدات
+// ═══════════════════════════════════════════════════════════════
+
+function jsonResponse(data, code) {
+  var output = ContentService.createTextOutput(JSON.stringify(data));
+  output.setMimeType(ContentService.MimeType.JSON);
+  return output;
 }
 
-// =========================================
-// دوال الاختبار
-// =========================================
+// ═══════════════════════════════════════════════════════════════
+//  دوال الاختبار
+// ═══════════════════════════════════════════════════════════════
 
 function testBuySignal() {
   var signal = "🟢 إشارة شراء 🚀\n"
@@ -230,7 +351,6 @@ function testFullClose() {
 function testFullScenario() {
   Logger.log("بدء السيناريو الكامل");
 
-  // الخطوة 1: إشارة شراء
   Logger.log("-- الخطوة 1: إشارة شراء --");
   var entrySignal = "🟢 إشارة شراء 🚀\n"
     + "\n"
@@ -258,7 +378,6 @@ function testFullScenario() {
   var r1 = sendToApp(entrySignal);
   Logger.log("دخول: " + JSON.stringify(r1));
 
-  // الخطوة 2: تحقق TP1
   Logger.log("-- الخطوة 2: تحقق TP1 --");
   var tp1Signal = "✅ تحقق الهدف 1\n"
     + "\n"
@@ -272,7 +391,6 @@ function testFullScenario() {
   var r2 = sendToApp(tp1Signal);
   Logger.log("TP1: " + JSON.stringify(r2));
 
-  // الخطوة 3: تحقق TP2
   Logger.log("-- الخطوة 3: تحقق TP2 --");
   var tp2Signal = "✅ تحقق الهدف 2\n"
     + "\n"
@@ -286,7 +404,6 @@ function testFullScenario() {
   var r3 = sendToApp(tp2Signal);
   Logger.log("TP2: " + JSON.stringify(r3));
 
-  // الخطوة 4: إغلاق كامل بالربح
   Logger.log("-- الخطوة 4: إغلاق كامل بالربح --");
   var closeSignal = "🏆 إغلاق كامل بالربح\n"
     + "\n"
