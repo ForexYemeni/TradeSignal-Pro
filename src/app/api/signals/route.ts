@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
       hitTpIndex: parseResult.signal.hitTpIndex ?? -1,
       hitPrice: parseResult.signal.hitPrice ?? 0,
       pnlPoints: parseResult.signal.pnlPoints ?? 0,
-      pnlDollar: parseResult.signal.pnlDollar ?? 0,
+      pnlDollars: parseResult.signal.pnlDollar ?? 0,
       tpStatusList: parseResult.signal.tpStatusList ?? "",
       partialWin: parseResult.signal.partialWin ?? false,
       balance: parseResult.signal.riskData.balance,
