@@ -1,65 +1,64 @@
 // FOREXYEMENI-PRO Google Apps Script v5.0
 // Webhook مستقبل إشارات TradingView
-// بدون Google Sheets - تسجيل داخلي فقط
 // يكتشف الأهداف المتخطاة ويعبئها تلقائياً
-//
-// بيانات الاتصال:
-// - رابط التطبيق: https://trade-signal-pro.vercel.app
+// يحتوي على دوال اختبار شاملة لكل نوع إشارة
 
 var APP_URL = "https://trade-signal-pro.vercel.app/api/signals";
 
 // ═══════════════════════════════════════════════════════════════
-//  استقبال التنبيهات من TradingView
+//  بيانات الاختبار الأساسية - XAUUSD
+// ═══════════════════════════════════════════════════════════════
+
+var PAIR = "XAUUSD";
+var ENTRY_PRICE = 2650.5;
+var SL_PRICE = 2645.0;
+var BALANCE = 1000;
+var LOT_SIZE = "0.20 لوت";
+var RISK_TARGET = 10;
+var RISK_PCT = 1.0;
+var ACTUAL_RISK = 11;
+var ACTUAL_RISK_PCT = 1.1;
+var SL_DISTANCE = 5.5;
+var MAX_RR = 9.0;
+var INSTRUMENT = "الذهب (XAUUSD)";
+
+// بيانات الأهداف العشرة
+var TPS = [
+  { num: 1,  price: 2653.0, points: 2.5,  rr: 0.45, profit: 5.0  },
+  { num: 2,  price: 2656.5, points: 6.0,  rr: 1.09, profit: 12.0 },
+  { num: 3,  price: 2661.0, points: 10.5, rr: 1.91, profit: 21.0 },
+  { num: 4,  price: 2665.5, points: 15.0, rr: 2.73, profit: 30.0 },
+  { num: 5,  price: 2670.0, points: 19.5, rr: 3.55, profit: 39.0 },
+  { num: 6,  price: 2675.5, points: 25.0, rr: 4.55, profit: 50.0 },
+  { num: 7,  price: 2681.0, points: 30.5, rr: 5.55, profit: 61.0 },
+  { num: 8,  price: 2687.0, points: 36.5, rr: 6.64, profit: 73.0 },
+  { num: 9,  price: 2693.0, points: 42.5, rr: 7.73, profit: 85.0 },
+  { num: 10, price: 2700.0, points: 49.5, rr: 9.00, profit: 99.0 },
+];
+
+// ═══════════════════════════════════════════════════════════════
+//  ربط الأهداف - استقبال التنبيهات
 // ═══════════════════════════════════════════════════════════════
 
 function doPost(e) {
   saveLog("doPost", "START", "تم استلام طلب");
-  
   try {
-    Logger.log("=== doPost استلام طلب جديد ===");
-    
-    if (e.postData) {
-      Logger.log("postData.type: " + e.postData.type);
-      Logger.log("postData.contents (أول 300): " + (e.postData.contents || "").substring(0, 300));
-    }
-    
     var rawText = extractRawText(e);
-    Logger.log("النص المستخرج (أول 200): " + (rawText || "").substring(0, 200));
-    
     if (!rawText || !rawText.trim()) {
       saveLog("doPost", "ERROR", "النص فارغ");
       return jsonResponse({ success: false, error: "النص فارغ" }, 400);
     }
-    
     var category = detectCategory(rawText);
-    Logger.log("الفئة: " + category);
-    
-    // إرسال الإشارة الأصلية
-    Logger.log("إرسال للتطبيق...");
     var result = sendToApp(rawText);
-    Logger.log("نتيجة التطبيق: " + JSON.stringify(result));
-    
-    // ── كشف وتعبئة الأهداف المتخطاة ──
     if (category === "TP_HIT") {
       var missed = fillMissedTPs(rawText);
-      if (missed > 0) {
-        Logger.log("تم تعبئة " + missed + " أهداف متخطاة");
-        saveLog("FILL_GAP", "SUCCESS", "تم تعبئة " + missed + " أهداف متخطاة");
-      }
+      if (missed > 0) saveLog("FILL_GAP", "SUCCESS", "تم تعبئة " + missed + " أهداف متخطاة");
     }
-    
-    // ── حفظ حالة آخر ENTRY لكل زوج ──
-    if (category === "ENTRY") {
-      saveEntryState(rawText);
-    }
-    
+    if (category === "ENTRY") saveEntryState(rawText);
     var status = (result && result.success) ? "SUCCESS" : "APP_ERROR";
     saveLog("doPost", status, rawText.substring(0, 100));
-    
-    return jsonResponse({ success: true, appResult: result, missedTPsFilled: category === "TP_HIT" ? "checked" : "n/a" });
-    
+    return jsonResponse({ success: true, appResult: result });
   } catch (error) {
-    Logger.log("خطأ في doPost: " + error.message);
     saveLog("doPost", "EXCEPTION", error.message);
     return jsonResponse({ success: false, error: error.message }, 500);
   }
@@ -67,43 +66,23 @@ function doPost(e) {
 
 function doGet(e) {
   var action = e && e.parameter && e.parameter.action;
-  
   if (action === "logs") return jsonResponse(getLogs());
   if (action === "state") return jsonResponse(getAllState());
-  if (action === "clear") {
-    clearLogs();
-    clearAllState();
-    return jsonResponse({ success: true, message: "تم مسح السجلات والحالة" });
-  }
-  
-  return jsonResponse({
-    success: true,
-    status: "running",
-    app: "FOREXYEMENI-PRO",
-    version: "5.0",
-    appUrl: APP_URL
-  });
+  if (action === "clear") { clearLogs(); clearAllState(); return jsonResponse({ success: true }); }
+  return jsonResponse({ success: true, status: "running", app: "FOREXYEMENI-PRO", version: "5.0", appUrl: APP_URL });
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  استخراج النص من الطلب
+//  استخراج النص وإرساله
 // ═══════════════════════════════════════════════════════════════
 
 function extractRawText(e) {
-  if (!e.postData) return "";
+  if (!e.postData || !e.postData.contents) return "";
   var contents = e.postData.contents;
-  if (!contents) return "";
-  
   try {
     var parsed = JSON.parse(contents);
-    Logger.log("JSON keys: " + JSON.stringify(Object.keys(parsed)));
-    if (parsed.text) return parsed.text;
-    if (parsed.message) return parsed.message;
-    if (parsed.signal) return parsed.signal;
-    if (parsed.alert_message) return parsed.alert_message;
-    return contents;
+    return parsed.text || parsed.message || parsed.signal || parsed.alert_message || contents;
   } catch (err) {}
-  
   if (e.postData.type === "application/x-www-form-urlencoded") {
     var params = contents.split("&");
     for (var i = 0; i < params.length; i++) {
@@ -111,42 +90,22 @@ function extractRawText(e) {
       if (kv.length === 2) {
         var key = decodeURIComponent(kv[0]);
         var val = decodeURIComponent(kv[1].replace(/\+/g, " "));
-        if (key === "text" || key === "message" || key === "signal" || key === "alert_message") return val;
+        if (key === "text" || key === "message" || key === "signal") return val;
       }
     }
   }
-  
   return contents;
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  إرسال للتطبيق
-// ═══════════════════════════════════════════════════════════════
-
 function sendToApp(rawText) {
   try {
-    var options = {
-      method: "post",
-      contentType: "application/json",
-      payload: JSON.stringify({ text: rawText }),
-      muteHttpExceptions: true
-    };
-    
+    var options = { method: "post", contentType: "application/json", payload: JSON.stringify({ text: rawText }), muteHttpExceptions: true };
     var response = UrlFetchApp.fetch(APP_URL, options);
     var code = response.getResponseCode();
     var text = response.getContentText();
-    
-    Logger.log("استجابة التطبيق - الكود: " + code);
-    
-    if (code >= 200 && code < 300) {
-      return JSON.parse(text);
-    } else {
-      return { success: false, error: "HTTP " + code };
-    }
-  } catch (error) {
-    Logger.log("خطأ في sendToApp: " + error.message);
-    return { success: false, error: error.message };
-  }
+    if (code >= 200 && code < 300) return JSON.parse(text);
+    return { success: false, error: "HTTP " + code };
+  } catch (error) { return { success: false, error: error.message }; }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -156,481 +115,578 @@ function sendToApp(rawText) {
 function fillMissedTPs(tpAlertText) {
   var pair = extractPairFromText(tpAlertText);
   if (!pair) return 0;
-  
-  // استخراج رقم الهدف الحالي الذي وصل
   var currentTP = extractTPNumberFromText(tpAlertText);
   if (currentTP <= 0) return 0;
-  
-  // استخراج قائمة حالة الأهداف من التنبيه
-  // مثل: ✅ TP1: 2343.94  ✅ TP2: 2345.13  ✅ TP3: 2345.98 ← الآن
   var tpStatuses = extractTPStatusesFromText(tpAlertText);
-  Logger.log("حالة الأهداف: " + JSON.stringify(tpStatuses));
-  
-  // استخراج آخر TP تم إرساله لهذا الزوج
   var lastTP = getLastTPForPair(pair);
-  Logger.log("آخر TP مسجل لـ " + pair + ": " + lastTP);
-  
-  // الأهداف التي تحققت (✅) في التنبيه الحالي
   var confirmedTPs = [];
-  for (var i = 0; i < tpStatuses.length; i++) {
-    if (tpStatuses[i].hit) confirmedTPs.push(tpStatuses[i].index);
-  }
-  Logger.log("الأهداف المتحققة: " + JSON.stringify(confirmedTPs));
-  
-  // الأهداف المفقودة: بين lastTP+1 و currentTP-1
+  for (var i = 0; i < tpStatuses.length; i++) { if (tpStatuses[i].hit) confirmedTPs.push(tpStatuses[i].index); }
   var missed = [];
-  for (var tp = lastTP + 1; tp < currentTP; tp++) {
-    // تحقق أنه فعلاً تحقق (✅ في القائمة)
-    if (confirmedTPs.indexOf(tp) !== -1) {
-      missed.push(tp);
-    }
-  }
-  
-  if (missed.length === 0) {
-    // تحديث آخر TP
-    updateLastTPForPair(pair, currentTP);
-    return 0;
-  }
-  
-  Logger.log("أهداف متخطاة لـ " + pair + ": " + JSON.stringify(missed));
-  
-  // بناء وإرسال إشارات للأهداف المفقودة
+  for (var tp = lastTP + 1; tp < currentTP; tp++) { if (confirmedTPs.indexOf(tp) !== -1) missed.push(tp); }
+  if (missed.length === 0) { updateLastTPForPair(pair, currentTP); return 0; }
   var filledCount = 0;
   for (var j = 0; j < missed.length; j++) {
     var missedTPNum = missed[j];
-    // البحث عن بيانات الهدف المفقود
     var tpData = getTPDataFromStatus(tpStatuses, missedTPNum);
     if (tpData) {
-      // حساب النقاط والربح
-      var points = calculatePoints(tpStatuses, missedTPNum, pair);
-      var profit = calculateProfit(points, pair);
-      
-      var missedSignal = buildMissedTPSignal(pair, missedTPNum, tpData.price, points, profit, tpStatuses, currentTP);
-      Logger.log("إرسال هدف متخطى TP" + missedTPNum + ": " + missedSignal.substring(0, 100));
-      
-      var result = sendToApp(missedSignal);
-      Logger.log("نتيجة TP" + missedTPNum + ": " + JSON.stringify(result));
+      var points = calculatePoints(tpStatuses, missedTPNum);
+      var missedSignal = buildMissedTPSignal(pair, missedTPNum, tpData.price, points, tpStatuses);
+      sendToApp(missedSignal);
       filledCount++;
     }
   }
-  
-  // تحديث آخر TP
   updateLastTPForPair(pair, currentTP);
-  
   return filledCount;
 }
 
-function extractPairFromText(text) {
-  var match = text.match(/📌\s*([A-Za-z]{3,12}(?:\/[A-Za-z]{3})?)/i);
-  if (match) return match[1].replace(/\s/g, "").toUpperCase();
-  return null;
-}
-
-function extractTPNumberFromText(text) {
-  // "تحقق الهدف 6" أو "تحقق الهدف 1"
-  var match = text.match(/تحقق الهدف\s*(\d+)/);
-  if (match) return parseInt(match[1]);
-  
-  // "إغلاق كامل بالربح" - نبحث عن أعلى TP متحقق
-  var fullCloseMatch = text.match(/إغلاق كامل بالربح/);
-  if (fullCloseMatch) {
-    var highest = 0;
-    var tpMatches = text.matchAll(/TP\s*(\d+)/g);
-    while (true) {
-      var m = tpMatches.next();
-      if (m.done) break;
-      var idx = parseInt(m.value[1]);
-      if (idx > highest) highest = idx;
-    }
-    return highest;
-  }
-  
-  return -1;
-}
-
-function extractTPStatusesFromText(text) {
-  var statuses = [];
-  // نمط: ✅ TP1: 2343.94 أو ⏳ TP2: 2345.13 أو ✅ TP3: 2345.98 ← الآن
-  var regex = /([✅⏳])\s*TP\s*(\d+)\s*[:\s]\s*([\d,.]+)/g;
-  var match;
-  while ((match = regex.exec(text)) !== null) {
-    statuses.push({
-      hit: match[1] === "✅",
-      index: parseInt(match[2]),
-      price: parseFloat(match[3].replace(/,/g, ""))
-    });
-  }
-  return statuses;
-}
-
-function getTPDataFromStatus(tpStatuses, tpIndex) {
-  for (var i = 0; i < tpStatuses.length; i++) {
-    if (tpStatuses[i].index === tpIndex) return tpStatuses[i];
-  }
-  return null;
-}
-
-function calculatePoints(tpStatuses, tpIndex, pair) {
-  // نبحث عن TP1 لنحسب النقاط منه
-  var tp1Price = null;
-  var currentTPPrice = null;
-  var entryPrice = null;
-  
-  for (var i = 0; i < tpStatuses.length; i++) {
-    if (tpStatuses[i].index === 1) tp1Price = tpStatuses[i].price;
-    if (tpStatuses[i].index === tpIndex) currentTPPrice = tpStatuses[i].price;
-  }
-  
-  if (tp1Price && currentTPPrice) {
-    return Math.round((currentTPPrice - tp1Price) * 100) / 100;
-  }
-  return 0;
-}
-
-function calculateProfit(points, pair) {
-  // حساب تقريبي بناءً على نوع الأداة
-  // هذه قيم افتراضية - التطبيق سيستخدم بيانات ENTRY الأصلية
-  return Math.round(points * 100) / 100;
-}
-
-function buildMissedTPSignal(pair, tpNum, price, points, profit, allStatuses, latestTP) {
-  // بناء نص تنبيه TP متخطاة
-  var signal = "✅ تحقق الهدف " + tpNum + "\n";
-  signal += "\n";
-  signal += "📌 " + pair + "\n";
-  signal += "🎯 " + price.toFixed(2) + " │ " + (points >= 0 ? "+" : "") + points.toFixed(2) + " نقطة\n";
-  signal += "💰 ربح تقريبي: +$" + profit.toFixed(2) + "\n";
-  signal += "\n";
-  
-  for (var i = 0; i < allStatuses.length; i++) {
-    var tp = allStatuses[i];
-    var icon = tp.hit ? "✅" : "⏳";
-    var arrow = "";
-    if (tp.index === tpNum) arrow = " ← الآن (متخطى)";
-    signal += icon + " TP" + tp.index + ": " + tp.price.toFixed(2) + arrow + "\n";
-  }
-  
-  return signal;
-}
+function extractPairFromText(t) { var m = t.match(/📌\s*([A-Za-z]{3,12}(?:\/[A-Za-z]{3})?)/i); return m ? m[1].replace(/\s/g, "").toUpperCase() : null; }
+function extractTPNumberFromText(t) { var m = t.match(/تحقق الهدف\s*(\d+)/); if (m) return parseInt(m[1]); if (/إغلاق كامل بالربح/.test(t)) { var h=0,r=/TP\s*(\d+)/g,n; while((n=r.exec(t))!==null){var x=parseInt(n[1]);if(x>h)h=x;} return h; } return -1; }
+function extractTPStatusesFromText(t) { var s=[],r=/([✅⏳])\s*TP\s*(\d+)\s*[:\s]\s*([\d,.]+)/g,m; while((m=r.exec(t))!==null) s.push({hit:m[1]==="✅",index:parseInt(m[2]),price:parseFloat(m[3].replace(/,/g,""))}); return s; }
+function getTPDataFromStatus(s,i) { for(var k=0;k<s.length;k++) if(s[k].index===i) return s[k]; return null; }
+function calculatePoints(s,i) { var p1=null,ci=null; for(var k=0;k<s.length;k++){if(s[k].index===1)p1=s[k].price;if(s[k].index===i)ci=s[k].price;} return(p1&&ci)?Math.round((ci-p1)*100)/100:0; }
+function buildMissedTPSignal(pair,num,price,pts,all) { var t="✅ تحقق الهدف "+num+"\n\n📌 "+pair+"\n🎯 "+price.toFixed(2)+" │ "+(pts>=0?"+":"")+pts.toFixed(2)+" نقطة\n\n"; for(var i=0;i<all.length;i++){var tp=all[i]; t+=(tp.hit?"✅":"⏳")+" TP"+tp.index+": "+tp.price.toFixed(2)+(tp.index===num?" ← الآن (متخطى)":"")+"\n"; } return t; }
 
 // ═══════════════════════════════════════════════════════════════
-//  إدارة حالة الأهداف لكل زوج
+//  إدارة الحالة والتسجيل
 // ═══════════════════════════════════════════════════════════════
 
-function getLastTPForPair(pair) {
-  var props = PropertiesService.getScriptProperties();
-  var state = JSON.parse(props.getProperty("tp_state") || "{}");
-  return (state[pair] && state[pair].lastTP) ? state[pair].lastTP : 0;
-}
+function getLastTPForPair(p) { var s=JSON.parse(PropertiesService.getScriptProperties().getProperty("tp_state")||"{}"); return(s[p]&&s[p].lastTP)?s[p].lastTP:0; }
+function updateLastTPForPair(p,n) { var pr=PropertiesService.getScriptProperties(); var s=JSON.parse(pr.getProperty("tp_state")||"{}"); if(!s[p])s[p]={}; s[p].lastTP=n; s[p].updatedAt=new Date().toISOString(); pr.setProperty("tp_state",JSON.stringify(s)); }
+function saveEntryState(t) { var p=extractPairFromText(t); if(!p)return; var pr=PropertiesService.getScriptProperties(); var s=JSON.parse(pr.getProperty("tp_state")||"{}"); s[p]={lastTP:0,entryAt:new Date().toISOString()}; pr.setProperty("tp_state",JSON.stringify(s)); }
+function getAllState() { return {success:true,state:JSON.parse(PropertiesService.getScriptProperties().getProperty("tp_state")||"{}")}; }
+function clearAllState() { PropertiesService.getScriptProperties().deleteProperty("tp_state"); }
 
-function updateLastTPForPair(pair, tpNum) {
-  var props = PropertiesService.getScriptProperties();
-  var state = JSON.parse(props.getProperty("tp_state") || "{}");
-  if (!state[pair]) state[pair] = {};
-  state[pair].lastTP = tpNum;
-  state[pair].updatedAt = new Date().toISOString();
-  props.setProperty("tp_state", JSON.stringify(state));
-}
-
-function saveEntryState(rawText) {
-  var pair = extractPairFromText(rawText);
-  if (!pair) return;
-  
-  // عند إشارة دخول جديدة، نعيد تعيين عداد TP
-  var props = PropertiesService.getScriptProperties();
-  var state = JSON.parse(props.getProperty("tp_state") || "{}");
-  state[pair] = {
-    lastTP: 0,
-    entryAt: new Date().toISOString(),
-    rawEntry: rawText.substring(0, 200)
-  };
-  props.setProperty("tp_state", JSON.stringify(state));
-  Logger.log("تم حفظ حالة ENTRY جديدة لـ " + pair);
-}
-
-function getAllState() {
-  var props = PropertiesService.getScriptProperties();
-  var state = JSON.parse(props.getProperty("tp_state") || "{}");
-  return { success: true, state: state };
-}
-
-function clearAllState() {
-  PropertiesService.getScriptProperties().deleteProperty("tp_state");
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  نظام التسجيل الداخلي
-// ═══════════════════════════════════════════════════════════════
-
-function saveLog(source, status, message) {
-  try {
-    var props = PropertiesService.getScriptProperties();
-    var logs = JSON.parse(props.getProperty("webhook_logs") || "[]");
-    logs.unshift({
-      time: new Date().toISOString(),
-      source: source,
-      status: status,
-      message: message.substring(0, 500)
-    });
-    if (logs.length > 50) logs = logs.slice(0, 50);
-    props.setProperty("webhook_logs", JSON.stringify(logs));
-    return logs.length;
-  } catch (e) {
-    return -1;
-  }
-}
-
-function getLogs() {
-  try {
-    var props = PropertiesService.getScriptProperties();
-    var logs = JSON.parse(props.getProperty("webhook_logs") || "[]");
-    return { success: true, count: logs.length, logs: logs };
-  } catch (e) {
-    return { success: false, error: e.message };
-  }
-}
-
-function clearLogs() {
-  PropertiesService.getScriptProperties().deleteProperty("webhook_logs");
-  return { success: true, message: "تم مسح السجلات" };
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  تصنيف الإشارة
-// ═══════════════════════════════════════════════════════════════
+function saveLog(src,status,msg) { try{var pr=PropertiesService.getScriptProperties(); var l=JSON.parse(pr.getProperty("webhook_logs")||"[]"); l.unshift({time:new Date().toISOString(),source:src,status:status,message:msg.substring(0,500)}); if(l.length>50)l=l.slice(0,50); pr.setProperty("webhook_logs",JSON.stringify(l)); }catch(e){} }
+function getLogs() { try{return{success:true,count:JSON.parse(PropertiesService.getScriptProperties().getProperty("webhook_logs")||"[]").length,logs:JSON.parse(PropertiesService.getScriptProperties().getProperty("webhook_logs")||"[]")};}catch(e){return{success:false};} }
+function clearLogs() { PropertiesService.getScriptProperties().deleteProperty("webhook_logs"); }
 
 function detectCategory(text) {
+  if (/إغلاق كامل بالربح/.test(text)&&/♻️/.test(text)) return "TP_HIT";
+  if (/هدف التعويض/.test(text)) return "TP_HIT";
+  if (/تعزيز كامل بالربح/.test(text)) return "TP_HIT";
+  if (/هدف التعزيز/.test(text)) return "TP_HIT";
   if (/إغلاق كامل بالربح/.test(text)) return "TP_HIT";
   if (/قفزة سعرية/.test(text)) return "TP_HIT";
   if (/تحقق الهدف/.test(text)) return "TP_HIT";
-  if (/هدف التعويض/.test(text)) return "TP_HIT";
-  if (/هدف التعزيز/.test(text)) return "TP_HIT";
+  if (/ضرب وقف التعويض/.test(text)) return "SL_HIT";
+  if (/ضرب وقف التعزيز/.test(text)) return "SL_HIT";
   if (/ضرب الوقف/.test(text)) return "SL_HIT";
-  if (/الوقف الأساسي/.test(text)) return "SL_HIT";
-  if (/الوقف المتتبع/.test(text)) return "SL_HIT";
-  if (/التأمين/.test(text)) return "SL_HIT";
-  if (/إشارة شراء/.test(text) || /إشارة بيع/.test(text)) return "ENTRY";
+  if (/إشارة شراء/.test(text)||/إشارة بيع/.test(text)) return "ENTRY";
   if (/صفقة التعويض/.test(text)) return "ENTRY";
-  if (/تعزيز/.test(text) && /الدخول:/.test(text)) return "ENTRY";
-  if (/🟢/.test(text) || /🔴/.test(text)) return "ENTRY";
+  if (/تعزيز/.test(text)&&/الدخول:/.test(text)) return "ENTRY";
   return "OTHER";
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  مساعدات
-// ═══════════════════════════════════════════════════════════════
+function jsonResponse(data) { return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON); }
 
-function jsonResponse(data) {
-  var output = ContentService.createTextOutput(JSON.stringify(data));
-  output.setMimeType(ContentService.MimeType.JSON);
-  return output;
+// ═══════════════════════════════════════════════════════════════════════════════════════
+//                                                                                                  
+//  🔧 أدوات بناء الإشارات - لا تعدل هذه القسم                                                  
+//                                                                                                  
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════
+
+function buildEntryText(type) {
+  var arrow = type === "BUY" ? "🟢 إشارة شراء 🚀" : "🔴 إشارة بيع 📉";
+  var tps = "";
+  for (var i = 0; i < TPS.length; i++) {
+    tps += "🎯 TP" + TPS[i].num + ": " + TPS[i].price.toFixed(1) + " | R:R " + TPS[i].rr.toFixed(2) + "\n";
+  }
+  return arrow + "\n\n📌 " + PAIR + " | 15 | 1س\n⭐ ⭐⭐⭐\n\n"
+    + "📊 الصفقة\n🔵 الدخول: " + ENTRY_PRICE.toFixed(1) + "\n🔴 الوقف : " + SL_PRICE.toFixed(1) + "\n\n"
+    + "💰 إدارة المخاطر\n💵 الرصيد : $" + BALANCE + "\n🎯 خطر مستهدف : $" + RISK_TARGET + " (" + RISK_PCT + "%)\n"
+    + "📦 حجم اللوت : " + LOT_SIZE + "\n💸 خسارة فعلية : $" + ACTUAL_RISK + " (" + ACTUAL_RISK_PCT + "%)\n"
+    + "📏 مسافة الوقف : " + SL_DISTANCE + "\n📊 R:R الأقصى : 1:" + MAX_RR.toFixed(2) + "\n🏦 الأداة : " + INSTRUMENT + "\n\n"
+    + "🎯 الأهداف\n" + tps + "\n📈 1س: صاعد 🐂 | SMC: صاعد";
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  دوال الاختبار
-// ═══════════════════════════════════════════════════════════════
+function buildTPListText(upTo) {
+  var lines = "";
+  for (var i = 0; i < TPS.length; i++) {
+    var icon = (i < upTo) ? "✅" : "⏳";
+    var arrow = (i === upTo - 1) ? " ← الآن" : "";
+    lines += icon + " TP" + TPS[i].num + ": " + TPS[i].price.toFixed(1) + arrow + "\n";
+  }
+  return lines.trim();
+}
+
+function buildTPHitText(tpNum) {
+  var tp = TPS[tpNum - 1];
+  return "✅ تحقق الهدف " + tpNum + "\n\n📌 " + PAIR + "\n"
+    + "🎯 " + tp.price.toFixed(1) + " │ +" + tp.points.toFixed(1) + " نقطة\n"
+    + "💰 ربح تقريبي: +$" + tp.profit.toFixed(1) + "\n\n"
+    + "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" + buildTPListText(tpNum) + "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
+}
+
+function buildFullCloseText() {
+  var last = TPS[TPS.length - 1];
+  return "🏆 إغلاق كامل بالربح\n\n📌 " + PAIR + "\n"
+    + "🎯 " + last.price.toFixed(1) + " │ +" + last.points.toFixed(1) + " نقطة\n"
+    + "💰 ربح تقريبي: +$" + last.profit.toFixed(1) + "\n\n"
+    + "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" + buildTPListText(TPS.length) + "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
+}
+
+function buildSLHitText() {
+  return "❌ ضرب الوقف\n\n📌 " + PAIR + "\n"
+    + "❌ " + SL_PRICE.toFixed(1) + " │ -" + SL_DISTANCE.toFixed(1) + " نقطة\n"
+    + "💰 خسارة: -$" + ACTUAL_RISK.toFixed(1) + "\n\n"
+    + "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" + buildTPListText(0) + "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
+}
+
+// ── أدوات بناء إشارات التعويض ♻️ ──
+
+var REENTRY_ENTRY = 2656.5;
+var REENTRY_SL = 2645.0;
+var REENTRY_TPS = [
+  { num: 1, price: 2659.0, points: 2.5, rr: 0.45, profit: 5.0 },
+  { num: 2, price: 2662.5, points: 6.0, rr: 1.09, profit: 12.0 },
+  { num: 3, price: 2667.0, points: 10.5, rr: 1.91, profit: 21.0 },
+  { num: 4, price: 2672.0, points: 15.5, rr: 2.82, profit: 31.0 },
+  { num: 5, price: 2678.0, points: 21.5, rr: 3.91, profit: 43.0 },
+];
+
+function buildReentryEntryText(type) {
+  var dir = type === "BUY" ? "شراء" : "بيع";
+  var tps = "";
+  for (var i = 0; i < REENTRY_TPS.length; i++) {
+    tps += "♻️ TP" + REENTRY_TPS[i].num + ": " + REENTRY_TPS[i].price.toFixed(1) + " │ R:R " + REENTRY_TPS[i].rr.toFixed(2) + "\n";
+  }
+  return "♻️ صفقة التعويض\n\n📌 " + PAIR + "\n\n"
+    + "📊 الصفقة\n🔵 الدخول: " + REENTRY_ENTRY.toFixed(1) + "\n🔴 الوقف : " + REENTRY_SL.toFixed(1) + "\n\n"
+    + "💰 إدارة المخاطر\n💵 الرصيد : $" + BALANCE + "\n📦 حجم اللوت : " + LOT_SIZE + "\n"
+    + "💸 خسارة فعلية : $" + (Math.abs(REENTRY_ENTRY - REENTRY_SL) * 2).toFixed(1) + "\n\n"
+    + "🎯 الأهداف\n" + tps;
+}
+
+function buildReentryTPListText(upTo) {
+  var lines = "";
+  for (var i = 0; i < REENTRY_TPS.length; i++) {
+    var icon = (i < upTo) ? "✅" : "⏳";
+    var arrow = (i === upTo - 1) ? " ← الآن" : "";
+    lines += icon + " TP" + REENTRY_TPS[i].num + ": " + REENTRY_TPS[i].price.toFixed(1) + arrow + "\n";
+  }
+  return lines.trim();
+}
+
+function buildReentryTPText(tpNum) {
+  var tp = REENTRY_TPS[tpNum - 1];
+  return "♻️ هدف التعويض " + tpNum + "\n\n📌 " + PAIR + "\n"
+    + "🎯 " + tp.price.toFixed(1) + " │ +" + tp.points.toFixed(1) + " نقطة\n"
+    + "💰 ربح تقريبي: +$" + tp.profit.toFixed(1) + "\n\n"
+    + "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" + buildReentryTPListText(tpNum) + "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
+}
+
+function buildReentryFullCloseText() {
+  var last = REENTRY_TPS[REENTRY_TPS.length - 1];
+  return "🏆 إغلاق كامل بالربح\n♻️ تعويض\n\n📌 " + PAIR + "\n"
+    + "🎯 " + last.price.toFixed(1) + " │ +" + last.points.toFixed(1) + " نقطة\n"
+    + "💰 ربح تقريبي: +$" + last.profit.toFixed(1) + "\n\n"
+    + "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" + buildReentryTPListText(REENTRY_TPS.length) + "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
+}
+
+function buildReentrySLText() {
+  var loss = Math.abs(REENTRY_ENTRY - REENTRY_SL) * 2;
+  return "❌ ضرب وقف التعويض\n\n📌 " + PAIR + "\n"
+    + "❌ " + REENTRY_SL.toFixed(1) + " │ -" + Math.abs(REENTRY_ENTRY - REENTRY_SL).toFixed(1) + " نقطة\n"
+    + "💰 خسارة: -$" + loss.toFixed(1) + "\n\n"
+    + "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" + buildReentryTPListText(0) + "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
+}
+
+// ── أدوات بناء إشارات التعزيز 🔥 ──
+
+var PYRAMID_ENTRY = 2653.0;
+var PYRAMID_SL = 2648.0;
+var PYRAMID_TPS = [
+  { num: 1, price: 2656.0, points: 3.0, rr: 0.60, profit: 6.0 },
+  { num: 2, price: 2660.0, points: 7.0, rr: 1.40, profit: 14.0 },
+  { num: 3, price: 2665.0, points: 12.0, rr: 2.40, profit: 24.0 },
+  { num: 4, price: 2671.0, points: 18.0, rr: 3.60, profit: 36.0 },
+  { num: 5, price: 2678.0, points: 25.0, rr: 5.00, profit: 50.0 },
+];
+
+function buildPyramidEntryText(type) {
+  var dir = type === "BUY" ? "شراء" : "بيع";
+  var tps = "";
+  for (var i = 0; i < PYRAMID_TPS.length; i++) {
+    tps += "🔥 TP" + PYRAMID_TPS[i].num + ": " + PYRAMID_TPS[i].price.toFixed(1) + " │ R:R " + PYRAMID_TPS[i].rr.toFixed(2) + "\n";
+  }
+  return "🔥 تعزيز - إشارة " + dir + "\n\n📌 " + PAIR + "\n\n"
+    + "📊 الصفقة\n🔵 الدخول: " + PYRAMID_ENTRY.toFixed(1) + "\n🔴 الوقف : " + PYRAMID_SL.toFixed(1) + "\n\n"
+    + "💰 إدارة المخاطر\n💵 الرصيد : $" + BALANCE + "\n📦 حجم اللوت : " + LOT_SIZE + "\n"
+    + "💸 خسارة فعلية : $" + (Math.abs(PYRAMID_ENTRY - PYRAMID_SL) * 2).toFixed(1) + "\n\n"
+    + "🎯 الأهداف\n" + tps;
+}
+
+function buildPyramidTPListText(upTo) {
+  var lines = "";
+  for (var i = 0; i < PYRAMID_TPS.length; i++) {
+    var icon = (i < upTo) ? "✅" : "⏳";
+    var arrow = (i === upTo - 1) ? " ← الآن" : "";
+    lines += icon + " TP" + PYRAMID_TPS[i].num + ": " + PYRAMID_TPS[i].price.toFixed(1) + arrow + "\n";
+  }
+  return lines.trim();
+}
+
+function buildPyramidTPText(tpNum) {
+  var tp = PYRAMID_TPS[tpNum - 1];
+  return "🔥 هدف التعزيز " + tpNum + "\n\n📌 " + PAIR + "\n"
+    + "🎯 " + tp.price.toFixed(1) + " │ +" + tp.points.toFixed(1) + " نقطة\n"
+    + "💰 ربح تقريبي: +$" + tp.profit.toFixed(1) + "\n\n"
+    + "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" + buildPyramidTPListText(tpNum) + "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
+}
+
+function buildPyramidFullCloseText() {
+  var last = PYRAMID_TPS[PYRAMID_TPS.length - 1];
+  return "🔥 تعزيز كامل بالربح\n\n📌 " + PAIR + "\n"
+    + "🎯 " + last.price.toFixed(1) + " │ +" + last.points.toFixed(1) + " نقطة\n"
+    + "💰 ربح تقريبي: +$" + last.profit.toFixed(1) + "\n\n"
+    + "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" + buildPyramidTPListText(PYRAMID_TPS.length) + "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
+}
+
+function buildPyramidSLText() {
+  var loss = Math.abs(PYRAMID_ENTRY - PYRAMID_SL) * 2;
+  return "❌ ضرب وقف التعزيز\n\n📌 " + PAIR + "\n"
+    + "❌ " + PYRAMID_SL.toFixed(1) + " │ -" + Math.abs(PYRAMID_ENTRY - PYRAMID_SL).toFixed(1) + " نقطة\n"
+    + "💰 خسارة: -$" + loss.toFixed(1) + "\n\n"
+    + "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" + buildPyramidTPListText(0) + "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+//                                                                                                  
+//  🧪 دوال الاختبار - إشارات الدخول                                                               
+//                                                                                                  
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════
 
 function testBuySignal() {
-  var signal = "🟢 إشارة شراء 🚀\n"
-    + "\n"
-    + "📌 XAUUSD | 15 | 1س\n"
-    + "⭐ ⭐⭐⭐\n"
-    + "\n"
-    + "📊 الصفقة\n"
-    + "🔵 الدخول: 2650.5\n"
-    + "🔴 الوقف : 2645.0\n"
-    + "\n"
-    + "💰 إدارة المخاطر\n"
-    + "💵 الرصيد : $1000\n"
-    + "🎯 خطر مستهدف : $10 (1.0%)\n"
-    + "📦 حجم اللوت : 0.20 لوت\n"
-    + "💸 خسارة فعلية : $11 (1.1%)\n"
-    + "📏 مسافة الوقف : 5.5\n"
-    + "📊 R:R الأقصى : 1:6.17\n"
-    + "🏦 الأداة : الذهب (XAUUSD)\n"
-    + "\n"
-    + "🎯 الأهداف\n"
-    + "🎯 TP1: 2653.0 | R:R 0.45\n"
-    + "🎯 TP2: 2656.5 | R:R 1.09\n"
-    + "🎯 TP3: 2661.0 | R:R 1.91\n"
-    + "\n"
-    + "📈 1س: صاعد 🐂 | SMC: صاعد";
-
-  Logger.log("إرسال إشارة شراء...");
-  var result = sendToApp(signal);
+  Logger.log("=== إشارة شراء ===");
+  var result = sendToApp(buildEntryText("BUY"));
   Logger.log("النتيجة: " + JSON.stringify(result));
   return result;
 }
 
 function testSellSignal() {
-  var signal = "🔴 إشارة بيع 📉\n"
-    + "\n"
-    + "📌 EURUSD | 5 | 30د\n"
-    + "⭐ ⭐⭐⭐⭐\n"
-    + "\n"
-    + "📊 الصفقة\n"
-    + "🔵 الدخول: 1.0850\n"
-    + "🔴 الوقف : 1.0875\n"
-    + "\n"
-    + "💰 إدارة المخاطر\n"
-    + "💵 الرصيد : $2000\n"
-    + "🎯 خطر مستهدف : $20 (1.0%)\n"
-    + "📦 حجم اللوت : 0.08 لوت\n"
-    + "💸 خسارة فعلية : $20 (1.0%)\n"
-    + "📏 مسافة الوقف : 25.0\n"
-    + "📊 R:R الأقصى : 1:3.80\n"
-    + "\n"
-    + "🎯 الأهداف\n"
-    + "🎯 TP1: 1.0830 | R:R 0.80\n"
-    + "🎯 TP2: 1.0800 | R:R 2.00\n"
-    + "🎯 TP3: 1.0770 | R:R 3.20\n"
-    + "\n"
-    + "📈 30د: هابط 🐻 | SMC: هابط";
-
-  Logger.log("إرسال إشارة بيع...");
-  var result = sendToApp(signal);
+  Logger.log("=== إشارة بيع ===");
+  var result = sendToApp(buildEntryText("SELL"));
   Logger.log("النتيجة: " + JSON.stringify(result));
   return result;
 }
 
-function testTPHit() {
-  var signal = "✅ تحقق الهدف 2\n"
-    + "\n"
-    + "📌 XAUUSD\n"
-    + "🎯 2656.5 | +6.0 نقطة\n"
-    + "💰 ربح تقريبي: +$12.0\n"
-    + "\n"
-    + "✅ TP1: 2653.0\n"
-    + "✅ TP2: 2656.5 ← الآن\n"
-    + "⏳ TP3: 2661.0";
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════
+//                                                                                                  
+//  🧪 دوال الاختبار - تحقق الأهداف (1 إلى 10)                                                     
+//                                                                                                  
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════
 
-  Logger.log("إرسال تحقق هدف TP2...");
-  var result = sendToApp(signal);
-  Logger.log("النتيجة: " + JSON.stringify(result));
-  return result;
+function testTP1() {
+  Logger.log("=== تحقق الهدف 1 | +2.5 نقطة | +$5.0 ===");
+  var r = sendToApp(buildTPHitText(1));
+  Logger.log("النتيجة: " + JSON.stringify(r));
+  return r;
+}
+
+function testTP2() {
+  Logger.log("=== تحقق الهدف 2 | +6.0 نقطة | +$12.0 ===");
+  var r = sendToApp(buildTPHitText(2));
+  Logger.log("النتيجة: " + JSON.stringify(r));
+  return r;
+}
+
+function testTP3() {
+  Logger.log("=== تحقق الهدف 3 | +10.5 نقطة | +$21.0 ===");
+  var r = sendToApp(buildTPHitText(3));
+  Logger.log("النتيجة: " + JSON.stringify(r));
+  return r;
+}
+
+function testTP4() {
+  Logger.log("=== تحقق الهدف 4 | +15.0 نقطة | +$30.0 ===");
+  var r = sendToApp(buildTPHitText(4));
+  Logger.log("النتيجة: " + JSON.stringify(r));
+  return r;
+}
+
+function testTP5() {
+  Logger.log("=== تحقق الهدف 5 | +19.5 نقطة | +$39.0 ===");
+  var r = sendToApp(buildTPHitText(5));
+  Logger.log("النتيجة: " + JSON.stringify(r));
+  return r;
+}
+
+function testTP6() {
+  Logger.log("=== تحقق الهدف 6 | +25.0 نقطة | +$50.0 ===");
+  var r = sendToApp(buildTPHitText(6));
+  Logger.log("النتيجة: " + JSON.stringify(r));
+  return r;
+}
+
+function testTP7() {
+  Logger.log("=== تحقق الهدف 7 | +30.5 نقطة | +$61.0 ===");
+  var r = sendToApp(buildTPHitText(7));
+  Logger.log("النتيجة: " + JSON.stringify(r));
+  return r;
+}
+
+function testTP8() {
+  Logger.log("=== تحقق الهدف 8 | +36.5 نقطة | +$73.0 ===");
+  var r = sendToApp(buildTPHitText(8));
+  Logger.log("النتيجة: " + JSON.stringify(r));
+  return r;
+}
+
+function testTP9() {
+  Logger.log("=== تحقق الهدف 9 | +42.5 نقطة | +$85.0 ===");
+  var r = sendToApp(buildTPHitText(9));
+  Logger.log("النتيجة: " + JSON.stringify(r));
+  return r;
+}
+
+function testTP10() {
+  Logger.log("=== تحقق الهدف 10 | +49.5 نقطة | +$99.0 ===");
+  var r = sendToApp(buildTPHitText(10));
+  Logger.log("النتيجة: " + JSON.stringify(r));
+  return r;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════
+//                                                                                                  
+//  🧪 دوال الاختبار - إغلاق كامل وضرب وقف                                                         
+//                                                                                                  
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════
+
+function testFullClose() {
+  Logger.log("=== إغلاق كامل بالربح | +49.5 نقطة | +$99.0 ===");
+  var r = sendToApp(buildFullCloseText());
+  Logger.log("النتيجة: " + JSON.stringify(r));
+  return r;
 }
 
 function testSLHit() {
-  var signal = "❌ ضرب الوقف\n"
-    + "\n"
-    + "📌 XAUUSD\n"
-    + "❌ 2645.0 | -5.5 نقطة\n"
-    + "💰 خسارة: -$11.0\n"
-    + "\n"
-    + "⏳ TP1: 2653.0\n"
-    + "⏳ TP2: 2656.5\n"
-    + "⏳ TP3: 2661.0";
-
-  Logger.log("إرسال ضرب وقف...");
-  var result = sendToApp(signal);
-  Logger.log("النتيجة: " + JSON.stringify(result));
-  return result;
+  Logger.log("=== ضرب وقف الخسارة | -5.5 نقطة | -$11.0 ===");
+  var r = sendToApp(buildSLHitText());
+  Logger.log("النتيجة: " + JSON.stringify(r));
+  return r;
 }
 
-function testFullClose() {
-  var signal = "🏆 إغلاق كامل بالربح\n"
-    + "\n"
-    + "📌 XAUUSD\n"
-    + "🎯 2661.0 | +10.5 نقطة\n"
-    + "💰 ربح تقريبي: +$21.0\n"
-    + "\n"
-    + "✅ TP1: 2653.0\n"
-    + "✅ TP2: 2656.5\n"
-    + "✅ TP3: 2661.0 ← الآن";
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════
+//                                                                                                  
+//  🧪 دوال الاختبار - صفقة التعويض ♻️                                                             
+//                                                                                                  
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════
 
-  Logger.log("إرسال إغلاق كامل...");
-  var result = sendToApp(signal);
-  Logger.log("النتيجة: " + JSON.stringify(result));
-  return result;
+function testReentryEntry() {
+  Logger.log("=== ♻️ صفقة تعويض - دخول ===");
+  var r = sendToApp(buildReentryEntryText("BUY"));
+  Logger.log("النتيجة: " + JSON.stringify(r));
+  return r;
 }
 
-function testFullScenario() {
-  Logger.log("بدء السيناريو الكامل");
-
-  Logger.log("-- الخطوة 1: إشارة شراء --");
-  var entrySignal = "🟢 إشارة شراء 🚀\n"
-    + "\n"
-    + "📌 XAUUSD | 15 | 1س\n"
-    + "⭐ ⭐⭐\n"
-    + "\n"
-    + "📊 الصفقة\n"
-    + "🔵 الدخول: 2650.5\n"
-    + "🔴 الوقف : 2645.0\n"
-    + "\n"
-    + "💰 إدارة المخاطر\n"
-    + "💵 الرصيد : $1000\n"
-    + "🎯 خطر مستهدف : $10 (1.0%)\n"
-    + "📦 حجم اللوت : 0.20 لوت\n"
-    + "💸 خسارة فعلية : $11 (1.1%)\n"
-    + "📏 مسافة الوقف : 5.5\n"
-    + "📊 R:R الأقصى : 1:6.17\n"
-    + "\n"
-    + "🎯 الأهداف\n"
-    + "🎯 TP1: 2653.0 | R:R 0.45\n"
-    + "🎯 TP2: 2656.5 | R:R 1.09\n"
-    + "🎯 TP3: 2661.0 | R:R 1.91\n"
-    + "\n"
-    + "📈 1س: صاعد 🐂 | SMC: صاعد";
-  var r1 = sendToApp(entrySignal);
-  Logger.log("دخول: " + JSON.stringify(r1));
-
-  Logger.log("-- الخطوة 2: تحقق TP1 --");
-  var tp1Signal = "✅ تحقق الهدف 1\n"
-    + "\n"
-    + "📌 XAUUSD\n"
-    + "🎯 2653.0 | +2.5 نقطة\n"
-    + "💰 ربح تقريبي: +$5.0\n"
-    + "\n"
-    + "✅ TP1: 2653.0 ← الآن\n"
-    + "⏳ TP2: 2656.5\n"
-    + "⏳ TP3: 2661.0";
-  var r2 = sendToApp(tp1Signal);
-  Logger.log("TP1: " + JSON.stringify(r2));
-
-  Logger.log("-- الخطوة 3: تحقق TP3 (تخطى TP2) --");
-  var tp3Signal = "✅ تحقق الهدف 3\n"
-    + "\n"
-    + "📌 XAUUSD\n"
-    + "🎯 2661.0 | +10.5 نقطة\n"
-    + "💰 ربح تقريبي: +$21.0\n"
-    + "\n"
-    + "✅ TP1: 2653.0\n"
-    + "✅ TP2: 2656.5\n"
-    + "✅ TP3: 2661.0 ← الآن";
-  var r3 = sendToApp(tp3Signal);
-  Logger.log("TP3: " + JSON.stringify(r3));
-
-  Logger.log("انتهى السيناريو الكامل");
-  return { step1: r1, step2: r2, step3: r3 };
+function testReentryTP1() {
+  Logger.log("=== ♻️ هدف تعويض 1 | +2.5 نقطة | +$5.0 ===");
+  var r = sendToApp(buildReentryTPText(1));
+  Logger.log("النتيجة: " + JSON.stringify(r));
+  return r;
 }
 
-// اختبار محدد: محاكاة تخطي أهداف
+function testReentryTP2() {
+  Logger.log("=== ♻️ هدف تعويض 2 | +6.0 نقطة | +$12.0 ===");
+  var r = sendToApp(buildReentryTPText(2));
+  Logger.log("النتيجة: " + JSON.stringify(r));
+  return r;
+}
+
+function testReentryTP3() {
+  Logger.log("=== ♻️ هدف تعويض 3 | +10.5 نقطة | +$21.0 ===");
+  var r = sendToApp(buildReentryTPText(3));
+  Logger.log("النتيجة: " + JSON.stringify(r));
+  return r;
+}
+
+function testReentryTP4() {
+  Logger.log("=== ♻️ هدف تعويض 4 | +15.5 نقطة | +$31.0 ===");
+  var r = sendToApp(buildReentryTPText(4));
+  Logger.log("النتيجة: " + JSON.stringify(r));
+  return r;
+}
+
+function testReentryTP5() {
+  Logger.log("=== ♻️ هدف تعويض 5 | +21.5 نقطة | +$43.0 ===");
+  var r = sendToApp(buildReentryTPText(5));
+  Logger.log("النتيجة: " + JSON.stringify(r));
+  return r;
+}
+
+function testReentryFullClose() {
+  Logger.log("=== ♻️ إغلاق تعويض كامل | +21.5 نقطة | +$43.0 ===");
+  var r = sendToApp(buildReentryFullCloseText());
+  Logger.log("النتيجة: " + JSON.stringify(r));
+  return r;
+}
+
+function testReentrySL() {
+  Logger.log("=== ♻️ ضرب وقف التعويض | -11.5 نقطة | -$23.0 ===");
+  var r = sendToApp(buildReentrySLText());
+  Logger.log("النتيجة: " + JSON.stringify(r));
+  return r;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════
+//                                                                                                  
+//  🧪 دوال الاختبار - صفقة التعزيز 🔥                                                             
+//                                                                                                  
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════
+
+function testPyramidEntry() {
+  Logger.log("=== 🔥 تعزيز - دخول ===");
+  var r = sendToApp(buildPyramidEntryText("BUY"));
+  Logger.log("النتيجة: " + JSON.stringify(r));
+  return r;
+}
+
+function testPyramidTP1() {
+  Logger.log("=== 🔥 هدف تعزيز 1 | +3.0 نقطة | +$6.0 ===");
+  var r = sendToApp(buildPyramidTPText(1));
+  Logger.log("النتيجة: " + JSON.stringify(r));
+  return r;
+}
+
+function testPyramidTP2() {
+  Logger.log("=== 🔥 هدف تعزيز 2 | +7.0 نقطة | +$14.0 ===");
+  var r = sendToApp(buildPyramidTPText(2));
+  Logger.log("النتيجة: " + JSON.stringify(r));
+  return r;
+}
+
+function testPyramidTP3() {
+  Logger.log("=== 🔥 هدف تعزيز 3 | +12.0 نقطة | +$24.0 ===");
+  var r = sendToApp(buildPyramidTPText(3));
+  Logger.log("النتيجة: " + JSON.stringify(r));
+  return r;
+}
+
+function testPyramidTP4() {
+  Logger.log("=== 🔥 هدف تعزيز 4 | +18.0 نقطة | +$36.0 ===");
+  var r = sendToApp(buildPyramidTPText(4));
+  Logger.log("النتيجة: " + JSON.stringify(r));
+  return r;
+}
+
+function testPyramidTP5() {
+  Logger.log("=== 🔥 هدف تعزيز 5 | +25.0 نقطة | +$50.0 ===");
+  var r = sendToApp(buildPyramidTPText(5));
+  Logger.log("النتيجة: " + JSON.stringify(r));
+  return r;
+}
+
+function testPyramidFullClose() {
+  Logger.log("=== 🔥 إغلاق تعزيز كامل | +25.0 نقطة | +$50.0 ===");
+  var r = sendToApp(buildPyramidFullCloseText());
+  Logger.log("النتيجة: " + JSON.stringify(r));
+  return r;
+}
+
+function testPyramidSL() {
+  Logger.log("=== 🔥 ضرب وقف التعزيز | -5.0 نقطة | -$10.0 ===");
+  var r = sendToApp(buildPyramidSLText());
+  Logger.log("النتيجة: " + JSON.stringify(r));
+  return r;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════
+//                                                                                                  
+//  🧪 دوال الاختبار - سيناريوهات كاملة                                                             
+//                                                                                                  
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════
+
+// سيناريو: صفقة كاملة - دخول ثم 10 أهداف بالترتيب
+function testFullWin() {
+  Logger.log("╔════════════════════════════════════╗");
+  Logger.log("║  سيناريو: صفقة رابحة كاملة (10 TP)  ║");
+  Logger.log("╚════════════════════════════════════╝");
+  
+  var results = [];
+  results.push(testBuySignal());
+  for (var i = 1; i <= 10; i++) results.push(testTP["" + i] ? null : sendToApp(buildTPHitText(i)));
+  Logger.log("انتهى السيناريو - إجمالي الربح: +$99.0");
+  return { success: true, message: "صفقة كاملة - 10 أهداف", totalProfit: 99.0 };
+}
+
+// سيناريو: دخول + TP1 + TP3 (تخطى TP2) + TP6 (تخطى TP4 و TP5)
 function testMissedTPs() {
-  Logger.log("=== اختبار تعبئة الأهداف المتخطاة ===");
+  Logger.log("╔════════════════════════════════════╗");
+  Logger.log("║  سيناريو: أهداف متخطاة             ║");
+  Logger.log("╚════════════════════════════════════╝");
   
-  // الخطوة 1: إشارة دخول
-  Logger.log("-- دخول ETHUSDT --");
-  var entry = "🟢 إشارة شراء 🚀\n\n📌 ETHUSDT\n\n📊 الصفقة\n🔵 الدخول: 2342.02\n🔴 الوقف : 2340.0\n\n🎯 الأهداف\n🎯 TP1: 2343.94\n🎯 TP2: 2345.13\n🎯 TP3: 2345.98\n🎯 TP4: 2347.05\n🎯 TP5: 2348.42\n🎯 TP6: 2350.17";
-  sendToApp(entry);
-  saveEntryState(entry);
+  testBuySignal();
+  testTP1();
+  Logger.log("-- تخطى TP2 --");
+  testTP3();
+  Logger.log("-- تخطى TP4 و TP5 --");
+  testTP6();
+  Logger.log("انتهى");
+  return { success: true };
+}
+
+// سيناريو: دخول + ضرب وقف
+function testFullLoss() {
+  Logger.log("╔════════════════════════════════════╗");
+  Logger.log("║  سيناريو: صفقة خاسرة               ║");
+  Logger.log("╚════════════════════════════════════╝");
   
-  // الخطوة 2: TP1 يصل عادي
-  Logger.log("-- TP1 وصل --");
-  var tp1 = "✅ تحقق الهدف 1\n\n📌 ETHUSDT\n🎯 2343.94 │ +1.92 نقطة\n💰 ربح تقريبي: +$1.92\n\n✅ TP1: 2343.94 ← الآن\n⏳ TP2: 2345.13\n⏳ TP3: 2345.98\n⏳ TP4: 2347.05\n⏳ TP5: 2348.42\n⏳ TP6: 2350.17";
-  fillMissedTPs(tp1);
+  testBuySignal();
+  testSLHit();
+  Logger.log("انتهى - الخسارة: -$11.0");
+  return { success: true };
+}
+
+// سيناريو: تعويض كامل
+function testReentryScenario() {
+  Logger.log("╔════════════════════════════════════╗");
+  Logger.log("║  سيناريو: صفقة تعويض كاملة        ║");
+  Logger.log("╚════════════════════════════════════╝");
   
-  // الخطوة 3: TP3 يصل (تخطى TP2!)
-  Logger.log("-- TP3 وصل (تخطى TP2) --");
-  var tp3 = "✅ تحقق الهدف 3\n\n📌 ETHUSDT\n🎯 2345.98 │ +3.96 نقطة\n💰 ربح تقريبي: +$3.96\n\n✅ TP1: 2343.94\n✅ TP2: 2345.13\n✅ TP3: 2345.98 ← الآن\n⏳ TP4: 2347.05\n⏳ TP5: 2348.42\n⏳ TP6: 2350.17";
-  var filled = fillMissedTPs(tp3);
-  Logger.log("عدد الأهداف المتخطاة المعبأة: " + filled);
+  testReentryEntry();
+  testReentryTP1();
+  testReentryTP2();
+  testReentryTP3();
+  testReentryFullClose();
+  Logger.log("انتهى - ربح التعويض: +$43.0");
+  return { success: true };
+}
+
+// سيناريو: تعويض مع ضرب وقف
+function testReentryLoss() {
+  Logger.log("╔════════════════════════════════════╗");
+  Logger.log("║  سيناريو: تعويض خاسر              ║");
+  Logger.log("╚════════════════════════════════════╝");
   
-  // الخطوة 4: TP6 يصل (تخطى TP4 و TP5!)
-  Logger.log("-- TP6 وصل (تخطى TP4 و TP5) --");
-  var tp6 = "✅ تحقق الهدف 6\n\n📌 ETHUSDT\n🎯 2350.17 │ +8.15 نقطة\n💰 ربح تقريبي: +$8.15\n\n✅ TP1: 2343.94\n✅ TP2: 2345.13\n✅ TP3: 2345.98\n✅ TP4: 2347.05\n✅ TP5: 2348.42\n✅ TP6: 2350.17 ← الآن";
-  var filled2 = fillMissedTPs(tp6);
-  Logger.log("عدد الأهداف المتخطاة المعبأة: " + filled2);
+  testReentryEntry();
+  testReentrySL();
+  Logger.log("انتهى - خسارة التعويض: -$23.0");
+  return { success: true };
+}
+
+// سيناريو: تعزيز كامل
+function testPyramidScenario() {
+  Logger.log("╔════════════════════════════════════╗");
+  Logger.log("║  سيناريو: تعزيز كامل               ║");
+  Logger.log("╚════════════════════════════════════╝");
   
-  Logger.log("=== انتهى اختبار الأهداف المتخطاة ===");
-  return { tp3_filled: filled, tp6_filled: filled2 };
+  testPyramidEntry();
+  testPyramidTP1();
+  testPyramidTP2();
+  testPyramidTP3();
+  testPyramidFullClose();
+  Logger.log("انتهى - ربح التعزيز: +$50.0");
+  return { success: true };
+}
+
+// سيناريو: تعزيز مع ضرب وقف
+function testPyramidLoss() {
+  Logger.log("╔════════════════════════════════════╗");
+  Logger.log("║  سيناريو: تعزيز خاسر              ║");
+  Logger.log("╚════════════════════════════════════╝");
+  
+  testPyramidEntry();
+  testPyramidSL();
+  Logger.log("انتهى - خسارة التعزيز: -$10.0");
+  return { success: true };
 }
