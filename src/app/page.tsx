@@ -1026,9 +1026,10 @@ function SignalCard({ s, idx, isAdmin, onUpdate, onDelete }: {
   onUpdate: (id: string, status: string, tpIdx?: number) => void;
   onDelete: (id: string) => void;
 }) {
+  /* Closed signals (status !== ACTIVE) use compact card — whether category is ENTRY or TP/SL */
+  if (s.status !== "ACTIVE") return <ClosedSignalCard s={s} idx={idx} isAdmin={isAdmin} onDelete={onDelete} />;
+  /* Active entry signals use full card */
   if (isEntry(s.signalCategory)) return <EntryCard s={s} idx={idx} isAdmin={isAdmin} onUpdate={onUpdate} onDelete={onDelete} />;
-  /* All closed signals (TP/SL) use compact card */
-  if (isTpLike(s.signalCategory) || isSlLike(s.signalCategory)) return <ClosedSignalCard s={s} idx={idx} isAdmin={isAdmin} onDelete={onDelete} />;
   return <EntryCard s={s} idx={idx} isAdmin={isAdmin} onUpdate={onUpdate} onDelete={onDelete} />;
 }
 
