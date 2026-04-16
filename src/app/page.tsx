@@ -552,7 +552,7 @@ export default function HomePage() {
         body: JSON.stringify({ action: "login", email, password: pwd }),
       });
       const data = await res.json();
-      if (!data.success) { setLoginErr(data.error || "خطأ في تسجيل الدخول"); return; }
+      if (!data.success) { setLoginErr(data.error || data.detail || "خطأ في تسجيل الدخول"); return; }
       const s: AdminSession = data.admin;
       setSession(s);
       localStorage.setItem("adminSession", JSON.stringify(s));
@@ -719,7 +719,7 @@ export default function HomePage() {
                 </div>
               </div>
               {loginErr && (
-                <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2 text-xs text-red-400 text-center animate-[fadeIn_0.2s_ease-out]">{loginErr}</div>
+                <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-3 text-[11px] text-red-400 text-center animate-[fadeIn_0.2s_ease-out] break-all leading-relaxed">{loginErr}</div>
               )}
               <Button onClick={handleLogin} disabled={loginLoad || !email || !pwd}
                 className="w-full h-11 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-black font-bold text-sm hover:from-amber-400 hover:to-orange-400 transition-all active:scale-[0.98] disabled:opacity-50">
