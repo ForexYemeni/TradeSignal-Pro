@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "TradeSignal Pro — نظام تداول ذكي",
-  description: "نظام احترافي لاستقبال وتحليل إشارات TradingView وتحويلها إلى بيانات منظمة",
+  title: "ForexYemeni — VIP Trading Signals",
+  description: "نظام احترافي لإشارات التداول الذكي — ForexYemeni",
   icons: {
     icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
   },

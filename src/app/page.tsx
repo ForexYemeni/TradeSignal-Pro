@@ -1762,7 +1762,7 @@ export default function HomePage() {
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
               <Radio className="w-4 h-4 text-black" />
             </div>
-            <span className="font-bold text-white text-sm tracking-wide">TradeSignal Pro</span>
+            <span className="font-bold text-white text-sm tracking-wide">ForexYemeni</span>
           </div>
           <div className="flex items-center gap-2">
             {/* Audio Controls */}
