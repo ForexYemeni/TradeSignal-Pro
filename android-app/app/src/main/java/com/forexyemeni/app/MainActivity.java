@@ -1,39 +1,54 @@
 package com.forexyemeni.app;
 
+import android.Manifest;
 import android.app.Activity;
+import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
+import android.app.Service;
 import android.content.Context;
+import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.media.AudioAttributes;
 import android.media.RingtoneManager;
 import android.net.Uri;
+import android.net.http.SslError;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.IBinder;
+import android.os.Looper;
+import android.provider.Settings;
+import android.view.KeyEvent;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
-import android.webkit.WebView;
-import android.webkit.WebViewClient;
+import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
 import android.webkit.SslErrorHandler;
-import android.net.http.SslError;
-import android.net.Uri;
-import android.content.Intent;
-import android.graphics.Color;
-import android.view.KeyEvent;
-import android.webkit.JavascriptInterface;
 
+/**
+ * ForexYemeni VIP Trading Signals - Android App
+ * 
+ * Features:
+ * - WebView wrapping the Next.js PWA
+ * - Native notification bridge for JS -> Android notifications
+ * - Background signal polling via AlarmManager
+ * - Foreground service to keep notifications alive
+ * - Different notification sounds per event type
+ */
 public class MainActivity extends Activity {
 
     private WebView webView;
     private static final String APP_URL = "https://trade-signal-pro.vercel.app";
-    private static final String CHANNEL_ID = "forexyemeni_signals";
-    private static final String CHANNEL_NAME = "إشارات التداول";
-    private static final int NOTIFICATION_ID = 1001;
-    private int notificationCounter = 1001;
+    private static final String CHANNEL_FOREGROUND = "forexyemeni_foreground";
+    private static final int FOREGROUND_NOTIFICATION_ID = 9999;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -47,8 +62,18 @@ public class MainActivity extends Activity {
         getWindow().setStatusBarColor(Color.parseColor("#070b14"));
         getWindow().setNavigationBarColor(Color.parseColor("#070b14"));
 
-        // Create notification channel
-        createNotificationChannel();
+        // Create all notification channels
+        NotificationHelper.createAllChannels(this);
+        createForegroundChannel();
+
+        // Request notification permission for Android 13+
+        requestNotificationPermission();
+
+        // Start background signal polling
+        SignalPollReceiver.startPolling(this);
+
+        // Start foreground service to keep polling alive
+        startForegroundNotificationService();
 
         webView = new WebView(this);
         WebSettings s = webView.getSettings();
@@ -65,7 +90,7 @@ public class MainActivity extends Activity {
         s.setMediaPlaybackRequiresUserGesture(false);
         s.setBuiltInZoomControls(false);
         s.setDisplayZoomControls(false);
-        s.setUserAgentString(s.getUserAgentString() + " ForexYemeni/App/1.2");
+        s.setUserAgentString(s.getUserAgentString() + " ForexYemeni/App/2.0");
         webView.setBackgroundColor(Color.parseColor("#070b14"));
         webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
 
@@ -84,98 +109,36 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void createNotificationChannel() {
+    private void requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 100);
+            }
+        }
+    }
+
+    private void createForegroundChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
-                CHANNEL_ID,
-                CHANNEL_NAME,
-                NotificationManager.IMPORTANCE_HIGH
+                CHANNEL_FOREGROUND,
+                "خدمة الإشعارات",
+                NotificationManager.IMPORTANCE_LOW
             );
-            channel.setDescription("إشعارات إشارات التداول الجديدة");
-            channel.enableLights(true);
-            channel.setLightColor(Color.parseColor("#FFD700"));
-            channel.enableVibration(true);
-            channel.setVibrationPattern(new long[]{200, 100, 200, 100, 200});
-
-            // Set notification sound
-            Uri soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
-            AudioAttributes audioAttributes = new AudioAttributes.Builder()
-                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                .setUsage(AudioAttributes.USAGE_NOTIFICATION)
-                .build();
-            channel.setSound(soundUri, audioAttributes);
-
+            channel.setDescription("يحافظ على تشغيل الإشعارات في الخلفية");
+            channel.setShowBadge(false);
             NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-            manager.createNotificationChannel(channel);
-        }
-    }
-
-    // ── JavaScript Interface for Native Notifications ──
-    public class NativeNotificationInterface {
-        private Context context;
-
-        public NativeNotificationInterface(Context ctx) {
-            this.context = ctx;
-        }
-
-        @JavascriptInterface
-        public void sendNotification(String title, String body, String soundType) {
-            try {
-                NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-                notificationCounter++;
-
-                // Create intent to open app when notification is tapped
-                Intent intent = new Intent(context, MainActivity.class);
-                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-                PendingIntent pendingIntent = PendingIntent.getActivity(
-                    context, 0, intent,
-                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
-                );
-
-                // Build notification
-                android.app.Notification.Builder builder;
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    builder = new android.app.Notification.Builder(context, CHANNEL_ID);
-                } else {
-                    builder = new android.app.Notification.Builder(context);
-                    builder.setPriority(android.app.Notification.PRIORITY_HIGH);
-                }
-
-                builder.setContentTitle(title)
-                        .setContentText(body)
-                        .setSmallIcon(context.getApplicationInfo().icon)
-                        .setContentIntent(pendingIntent)
-                        .setAutoCancel(true)
-                        .setVibrate(new long[]{200, 100, 200, 100, 200})
-                        .setOnlyAlertOnce(false);
-
-                // Set color
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                    builder.setColor(Color.parseColor("#FFD700"));
-                }
-
-                manager.notify(notificationCounter, builder.build());
-
-            } catch (Exception e) {
-                e.printStackTrace();
+            if (manager != null) {
+                manager.createNotificationChannel(channel);
             }
         }
     }
 
-    private class AppWebViewClient extends WebViewClient {
-        @Override
-        public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest req) {
-            String url = req.getUrl().toString();
-            if (url.startsWith(APP_URL)) {
-                return false;
-            }
-            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
-            return true;
-        }
-
-        @Override
-        public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
-            handler.proceed();
+    private void startForegroundNotificationService() {
+        Intent intent = new Intent(this, NotificationService.class);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(intent);
+        } else {
+            startService(intent);
         }
     }
 
@@ -183,6 +146,26 @@ public class MainActivity extends Activity {
     protected void onSaveInstanceState(Bundle outState) {
         webView.saveState(outState);
         super.onSaveInstanceState(outState);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Restart polling when app comes to foreground
+        SignalPollReceiver.startPolling(this);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        // Keep polling running even when paused
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        // Stop the foreground service when activity is destroyed
+        stopService(new Intent(this, NotificationService.class));
     }
 
     @Override
@@ -206,6 +189,101 @@ public class MainActivity extends Activity {
                 | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
                 | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
             );
+        }
+    }
+
+    // ── JavaScript Interface for Native Notifications ──
+    public class NativeNotificationInterface {
+        private Context context;
+
+        public NativeNotificationInterface(Context ctx) {
+            this.context = ctx;
+        }
+
+        @JavascriptInterface
+        public void sendNotification(final String title, final String body, final String soundType) {
+            new Handler(Looper.getMainLooper()).post(new Runnable() {
+                @Override
+                public void run() {
+                    NotificationHelper.showNotification(context, title, body, soundType);
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public void startPolling() {
+            SignalPollReceiver.startPolling(context);
+        }
+
+        @JavascriptInterface
+        public void stopPolling() {
+            SignalPollReceiver.stopPolling(context);
+        }
+    }
+
+    private class AppWebViewClient extends WebViewClient {
+        @Override
+        public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest req) {
+            String url = req.getUrl().toString();
+            if (url.startsWith(APP_URL)) {
+                return false;
+            }
+            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+            return true;
+        }
+
+        @Override
+        public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
+            handler.proceed();
+        }
+    }
+
+    // ── Foreground Service to Keep Notifications Alive ──
+    public static class NotificationService extends Service {
+        @Override
+        public void onCreate() {
+            super.onCreate();
+            showForegroundNotification();
+        }
+
+        private void showForegroundNotification() {
+            Intent notificationIntent = new Intent(this, MainActivity.class);
+            notificationIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            PendingIntent pendingIntent = PendingIntent.getActivity(
+                this, 0, notificationIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+            );
+
+            Notification.Builder builder;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                builder = new Notification.Builder(this, CHANNEL_FOREGROUND);
+            } else {
+                builder = new Notification.Builder(this);
+                builder.setPriority(Notification.PRIORITY_LOW);
+            }
+
+            builder.setContentTitle("ForexYemeni VIP")
+                    .setContentText("جاري مراقبة الإشارات...")
+                    .setSmallIcon(android.R.drawable.ic_dialog_info)
+                    .setContentIntent(pendingIntent)
+                    .setOngoing(true);
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                builder.setColor(Color.parseColor("#FFD700"));
+            }
+
+            Notification notification = builder.build();
+            startForeground(FOREGROUND_NOTIFICATION_ID, notification);
+        }
+
+        @Override
+        public int onStartCommand(Intent intent, int flags, int startId) {
+            return START_STICKY;
+        }
+
+        @Override
+        public IBinder onBind(Intent intent) {
+            return null;
         }
     }
 }

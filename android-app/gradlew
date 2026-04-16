@@ -1,0 +1,3 @@
+#!/bin/bash
+export ANDROID_HOME=/home/z/android-sdk
+/tmp/gradle-install/gradle-8.4/bin/gradle "$@"
