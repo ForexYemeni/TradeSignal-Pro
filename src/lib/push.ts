@@ -8,13 +8,23 @@
 import webpush from 'web-push';
 import { getPushSubscriptions, PushSubscription, getUsers } from './store';
 
-// Configure VAPID
-const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || '';
-const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || '';
-const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:forexyemeni@push.local';
+// Lazy VAPID initialization - only configure when actually sending
+let vapidConfigured = false;
 
-if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
-  webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+function configureVapid() {
+  if (vapidConfigured) return true;
+  const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || '';
+  const privateKey = process.env.VAPID_PRIVATE_KEY || '';
+  if (!publicKey || !privateKey) return false;
+  try {
+    const subject = process.env.VAPID_SUBJECT || 'mailto:forexyemeni@push.local';
+    webpush.setVapidDetails(subject, publicKey, privateKey);
+    vapidConfigured = true;
+    return true;
+  } catch (e) {
+    console.error('[Push] Failed to configure VAPID:', e);
+    return false;
+  }
 }
 
 export interface PushPayload {
@@ -33,8 +43,7 @@ export interface PushPayload {
  * Send push notification to ALL subscribed users
  */
 export async function sendPushToAll(payload: PushPayload): Promise<{ success: number; failed: number }> {
-  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
-    console.warn('[Push] VAPID keys not configured, skipping push notification');
+  if (!configureVapid()) {
     return { success: 0, failed: 0 };
   }
 
@@ -95,7 +104,7 @@ export async function sendPushToAll(payload: PushPayload): Promise<{ success: nu
  * Send push notification to a specific user
  */
 export async function sendPushToUser(userId: string, payload: PushPayload): Promise<boolean> {
-  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) return false;
+  if (!configureVapid()) return false;
 
   try {
     const subs = await getPushSubscriptions();
@@ -133,7 +142,7 @@ export async function sendPushToUser(userId: string, payload: PushPayload): Prom
  * Send push notification to ADMIN users only
  */
 export async function sendPushToAdmins(payload: PushPayload): Promise<{ success: number; failed: number }> {
-  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
+  if (!configureVapid()) {
     return { success: 0, failed: 0 };
   }
 
