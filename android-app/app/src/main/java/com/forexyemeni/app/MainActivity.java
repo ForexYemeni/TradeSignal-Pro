@@ -19,6 +19,7 @@ import android.view.KeyEvent;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
+import android.webkit.ConsoleMessage;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
@@ -26,11 +27,13 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.webkit.SslErrorHandler;
-import android.webkit.ConsoleMessage;
 
 /**
- * ForexYemeni VIP Trading Signals - Android App v3.0
- * Stable WebView wrapper with native notification support
+ * ForexYemeni VIP Trading Signals - Android App v4.0
+ * - WebView wrapping the Next.js PWA
+ * - Foreground Service for real-time signal monitoring (every 5 seconds)
+ * - Native notification bridge for JS -> Android notifications
+ * - Different notification sounds per event type
  */
 public class MainActivity extends Activity {
 
@@ -56,6 +59,9 @@ public class MainActivity extends Activity {
             // Request notification permission for Android 13+
             requestNotificationPermission();
 
+            // Start the foreground service for real-time signal monitoring
+            startSignalService();
+
             // Setup WebView
             webView = new WebView(this);
             configureWebView(webView);
@@ -67,31 +73,21 @@ public class MainActivity extends Activity {
             webView.setWebChromeClient(new WebChromeClient() {
                 @Override
                 public boolean onConsoleMessage(ConsoleMessage cm) {
-                    android.util.Log.d("WebView", cm.message() + " -- " + cm.sourceId() + ":" + cm.lineNumber());
+                    android.util.Log.d("WebView", cm.message());
                     return true;
                 }
             });
 
             setContentView(webView);
 
-            // Load URL
-            webView.loadUrl(APP_URL);
-
-            // Start background signal polling after a short delay
-            new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        SignalPollReceiver.startPolling(MainActivity.this);
-                    } catch (Exception e) {
-                        android.util.Log.e("ForexYemeni", "Failed to start polling", e);
-                    }
-                }
-            }, 2000);
+            if (savedInstanceState != null) {
+                webView.restoreState(savedInstanceState);
+            } else {
+                webView.loadUrl(APP_URL);
+            }
 
         } catch (Exception e) {
             android.util.Log.e("ForexYemeni", "onCreate error", e);
-            // Show error to user
             android.widget.Toast.makeText(this, "Error: " + e.getMessage(), android.widget.Toast.LENGTH_LONG).show();
         }
     }
@@ -111,7 +107,7 @@ public class MainActivity extends Activity {
         s.setMediaPlaybackRequiresUserGesture(false);
         s.setBuiltInZoomControls(false);
         s.setDisplayZoomControls(false);
-        s.setUserAgentString(s.getUserAgentString() + " ForexYemeni/App/3.0");
+        s.setUserAgentString(s.getUserAgentString() + " ForexYemeni/App/4.0");
         wv.setBackgroundColor(Color.parseColor("#070b14"));
         wv.setLayerType(View.LAYER_TYPE_HARDWARE, null);
     }
@@ -128,6 +124,27 @@ public class MainActivity extends Activity {
         }
     }
 
+    /**
+     * Start the foreground service for real-time signal monitoring
+     * This service checks for new signals every 5 seconds
+     * and shows notifications even when the app is closed
+     */
+    private void startSignalService() {
+        try {
+            Intent serviceIntent = new Intent(this, SignalService.class);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(serviceIntent);
+            } else {
+                startService(serviceIntent);
+            }
+            android.util.Log.d("ForexYemeni", "SignalService started");
+        } catch (Exception e) {
+            android.util.Log.e("ForexYemeni", "Failed to start SignalService", e);
+            // Fallback: start AlarmManager polling
+            SignalPollReceiver.startPolling(this);
+        }
+    }
+
     @Override
     protected void onSaveInstanceState(Bundle outState) {
         if (webView != null) {
@@ -139,17 +156,14 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        try {
-            SignalPollReceiver.startPolling(this);
-        } catch (Exception ignored) {}
+        // Service keeps running in background
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        try {
-            SignalPollReceiver.stopPolling(this);
-        } catch (Exception ignored) {}
+        // Do NOT stop the service - it should keep running
+        // to monitor signals even when app is closed
         if (webView != null) {
             webView.destroy();
             webView = null;
@@ -213,7 +227,7 @@ public class MainActivity extends Activity {
             try {
                 startActivity(new Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)));
             } catch (Exception e) {
-                android.util.Log.e("ForexYemeni", "Cannot open URL: " + url, e);
+                android.util.Log.e("ForexYemeni", "Cannot open URL", e);
             }
             return true;
         }
