@@ -5,7 +5,13 @@ import android.os.Bundle;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
-import android.webkit.*;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
+import android.webkit.WebChromeClient;
+import android.webkit.WebResourceRequest;
+import android.webkit.WebSettings;
+import android.webkit.SslErrorHandler;
+import android.net.http.SslError;
 import android.net.Uri;
 import android.content.Intent;
 import android.graphics.Color;
@@ -14,6 +20,7 @@ import android.view.KeyEvent;
 public class MainActivity extends Activity {
 
     private WebView webView;
+    private static final String APP_URL = "https://trade-signal-pro.vercel.app";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -32,31 +39,21 @@ public class MainActivity extends Activity {
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
         s.setAllowFileAccess(true);
+        s.setAllowContentAccess(true);
         s.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
         s.setCacheMode(WebSettings.LOAD_DEFAULT);
         s.setSupportZoom(false);
         s.setUseWideViewPort(true);
         s.setLoadWithOverviewMode(true);
-        s.setUserAgentString(s.getUserAgentString() + " ForexYemeni/App/1.0");
+        s.setDatabaseEnabled(true);
+        s.setMediaPlaybackRequiresUserGesture(false);
+        s.setBuiltInZoomControls(false);
+        s.setDisplayZoomControls(false);
+        s.setUserAgentString(s.getUserAgentString() + " ForexYemeni/App/1.1");
         webView.setBackgroundColor(Color.parseColor("#070b14"));
+        webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
 
-        webView.setWebViewClient(new WebViewClient() {
-            @Override
-            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest req) {
-                String url = req.getUrl().toString();
-                if (url.startsWith("https://trade-signal-pro.vercel.app")) {
-                    return false;
-                }
-                startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
-                return true;
-            }
-
-            @Override
-            public void onReceivedSslError(WebView view, SslErrorHandler handler, android.net.http.SslError error) {
-                handler.proceed();
-            }
-        });
-
+        webView.setWebViewClient(new AppWebViewClient());
         webView.setWebChromeClient(new WebChromeClient());
 
         setContentView(webView);
@@ -64,7 +61,24 @@ public class MainActivity extends Activity {
         if (savedInstanceState != null) {
             webView.restoreState(savedInstanceState);
         } else {
-            webView.loadUrl("https://trade-signal-pro.vercel.app");
+            webView.loadUrl(APP_URL);
+        }
+    }
+
+    private class AppWebViewClient extends WebViewClient {
+        @Override
+        public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest req) {
+            String url = req.getUrl().toString();
+            if (url.startsWith(APP_URL)) {
+                return false;
+            }
+            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+            return true;
+        }
+
+        @Override
+        public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
+            handler.proceed();
         }
     }
 

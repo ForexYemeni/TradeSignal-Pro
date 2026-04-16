@@ -1,40 +1,9 @@
 <resources>
-    <!-- Base application theme -->
-    <style name="AppTheme" parent="Theme.AppCompat.Light.NoActionBar">
-        <!-- Primary brand color -->
-        <item name="colorPrimary">@color/colorPrimary</item>
-        <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
-        <item name="colorAccent">@color/colorAccent</item>
-
-        <!-- Status bar -->
-        <item name="android:statusBarColor">@color/colorPrimary</item>
-        <item name="android:navigationBarColor">@color/colorPrimary</item>
-
-        <!-- Window background -->
-        <item name="android:windowBackground">@color/colorBackground</item>
-
-        <!-- Text colors -->
-        <item name="android:textColorPrimary">@color/colorTextPrimary</item>
-        <item name="android:textColorSecondary">@color/colorTextSecondary</item>
-
-        <!-- Remove action bar -->
-        <item name="windowActionBar">false</item>
-        <item name="windowNoTitle">true</item>
-
-        <!-- Fullscreen -->
+    <style name="AppTheme" parent="android:Theme.NoTitleBar.Fullscreen">
+        <item name="android:statusBarColor">#070b14</item>
+        <item name="android:navigationBarColor">#070b14</item>
+        <item name="android:windowBackground">#070b14</item>
         <item name="android:windowFullscreen">true</item>
         <item name="android:windowContentOverlay">@null</item>
-
-        <!-- Immersive -->
-        <item name="android:windowTranslucentStatus">false</item>
-        <item name="android:windowTranslucentNavigation">false</item>
-
-        <!-- RTL support -->
-        <item name="android:supportsRtl">true</item>
-    </style>
-
-    <!-- Launcher theme (splash screen) -->
-    <style name="AppTheme.Launcher" parent="AppTheme">
-        <item name="android:windowBackground">@color/colorPrimary</item>
     </style>
 </resources>
