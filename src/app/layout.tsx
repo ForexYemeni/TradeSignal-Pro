@@ -17,8 +17,12 @@ export const metadata: Metadata = {
   title: "ForexYemeni — VIP Trading Signals",
   description: "نظام احترافي لإشارات التداول الذكي — ForexYemeni",
   icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+    icon: "/icon-192x192.png",
+    apple: "/icon-512x512.png",
   },
+  manifest: "/manifest.json",
+  theme_color: "#FFD700",
+  background_color: "#070b14",
 };
 
 export default function RootLayout({
@@ -28,11 +32,27 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ar" dir="rtl" suppressHydrationWarning>
+      <head>
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="ForexYemeni" />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         {children}
         <Toaster />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                window.addEventListener('load', () => {
+                  navigator.serviceWorker.register('/sw.js');
+                });
+              }
+            `,
+          }}
+        />
       </body>
     </html>
   );

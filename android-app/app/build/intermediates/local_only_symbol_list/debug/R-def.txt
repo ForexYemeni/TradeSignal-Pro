@@ -1,0 +1,27 @@
+R_DEF: Internal format may change without notice
+local
+color black
+color colorAccent
+color colorBackground
+color colorPrimary
+color colorPrimaryDark
+color colorProgress
+color colorProgressBarBackground
+color colorSurface
+color colorTextPrimary
+color colorTextSecondary
+color transparent
+color white
+drawable progress_drawable
+id progress_bar
+id webview
+layout activity_main
+mipmap ic_launcher
+string app_name
+string error_no_connection
+string error_ssl
+string loading
+string retry
+style AppTheme
+style AppTheme.Launcher
+xml network_security_config

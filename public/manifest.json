@@ -1,0 +1,29 @@
+{
+  "name": "ForexYemeni",
+  "short_name": "ForexYemeni",
+  "description": "VIP Trading Signals — نظام إشارات التداول الذكي",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#070b14",
+  "theme_color": "#FFD700",
+  "orientation": "portrait",
+  "dir": "rtl",
+  "lang": "ar",
+  "categories": ["finance", "business"],
+  "icons": [
+    {
+      "src": "/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "prefer_related_applications": false
+}
