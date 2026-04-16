@@ -36,7 +36,7 @@ interface Signal {
   instrument?: string; createdAt: string;
 }
 
-interface AdminSession { id: string; email: string; name: string; mustChangePwd: boolean; role?: string; status?: string }
+interface AdminSession { id: string; email: string; name: string; mustChangePwd: boolean; role?: string; status?: string; subscriptionType?: string; subscriptionExpiry?: string; packageName?: string; packageId?: string }
 
 interface Stats {
   total: number; active: number; hitTp: number; hitSl: number;
@@ -1092,7 +1092,7 @@ export default function HomePage() {
   const [regSuccess, setRegSuccess] = useState("");
 
   /* ── Users Management ── */
-  const [users, setUsers] = useState<{ id: string; name: string; email: string; role: string; status: string; createdAt: string }[]>([]);
+  const [users, setUsers] = useState<{ id: string; name: string; email: string; role: string; status: string; createdAt: string; subscriptionType?: string; subscriptionExpiry?: string; packageName?: string; packageId?: string }[]>([]);
   const [usersLoad, setUsersLoad] = useState(false);
 
   /* ── Email Change Request ── */
@@ -2636,36 +2636,56 @@ export default function HomePage() {
             </Glass>
 
             {/* ── User Subscription Status ── */}
-            {!isAdmin && session.subscriptionType && (
-              <div className={`rounded-2xl border overflow-hidden ${session.subscriptionType === "subscriber" ? "border-sky-500/20" : "border-purple-500/20"}`}
-                style={{ background: session.subscriptionType === "subscriber" ? "linear-gradient(135deg, rgba(56,189,248,0.06) 0%, rgba(56,189,248,0.02) 100%)" : "linear-gradient(135deg, rgba(168,85,247,0.06) 0%, rgba(168,85,247,0.02) 100%)" }}>
-                <div className="p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Crown className={`w-4 h-4 ${session.subscriptionType === "subscriber" ? "text-sky-400" : "text-purple-400"}`} />
-                    <span className={`text-xs font-bold ${session.subscriptionType === "subscriber" ? "text-sky-400" : "text-purple-400"}`}>
-                      {session.subscriptionType === "subscriber" ? "الاشتراك النشط" : "مسجل تحت وكالة"}
-                    </span>
-                  </div>
-                  {session.packageName && (
-                    <div className="flex items-center justify-between bg-white/[0.04] rounded-xl p-3 border border-white/[0.06]">
-                      <div>
-                        <div className="text-[11px] font-bold text-white">{session.packageName}</div>
-                        <div className="text-[9px] text-slate-500 mt-0.5">
-                          {session.subscriptionExpiry ? `تنتهي: ${new Date(session.subscriptionExpiry).toLocaleDateString("ar-SA")}` : "بدون مدة محددة"}
-                        </div>
-                      </div>
-                      {session.subscriptionExpiry && (() => {
-                        const days = Math.ceil((new Date(session.subscriptionExpiry).getTime() - Date.now()) / 86400000);
-                        return (
-                          <div className={`px-3 py-1.5 rounded-xl text-[11px] font-bold ${days > 7 ? "bg-emerald-500/15 text-emerald-400" : days > 0 ? "bg-amber-500/15 text-amber-400" : "bg-red-500/15 text-red-400"}`}>
-                            {days > 0 ? `${days} يوم` : "منتهي!"}
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  )}
+            {!isAdmin && (
+              <Glass className="p-4 space-y-3">
+                <div className="flex items-center gap-2 text-sm font-bold text-slate-300">
+                  <Crown className="w-4 h-4 text-amber-400" />
+                  حالة الاشتراك
                 </div>
-              </div>
+                {session.subscriptionType && session.subscriptionType !== "none" ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-block w-2 h-2 rounded-full ${session.subscriptionType === "subscriber" ? "bg-sky-400" : "bg-purple-400"}`} />
+                      <span className={`text-xs font-bold ${session.subscriptionType === "subscriber" ? "text-sky-400" : "text-purple-400"}`}>
+                        {session.subscriptionType === "subscriber" ? "مشترك نشط" : "مسجل تحت وكالة"}
+                      </span>
+                    </div>
+                    {session.packageName && (
+                      <div className="bg-white/[0.04] rounded-xl p-3 border border-white/[0.06] space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="text-[10px] text-slate-500">نوع الباقة</div>
+                            <div className="text-[13px] font-bold text-white mt-0.5">{session.packageName}</div>
+                          </div>
+                          {session.subscriptionExpiry && (() => {
+                            const days = Math.ceil((new Date(session.subscriptionExpiry).getTime() - Date.now()) / 86400000);
+                            return (
+                              <div className="text-center">
+                                <div className="text-[10px] text-slate-500">المتبقية</div>
+                                <div className={`text-lg font-extrabold mt-0.5 ${days > 7 ? "text-emerald-400" : days > 3 ? "text-amber-400" : "text-red-400"}`}>
+                                  {days > 0 ? days : 0}
+                                </div>
+                                <div className="text-[9px] text-slate-500">يوم</div>
+                              </div>
+                            );
+                          })()}
+                        </div>
+                        {session.subscriptionExpiry && (
+                          <div className="pt-2 border-t border-white/[0.04]">
+                            <div className="text-[10px] text-slate-500">تاريخ الانتهاء</div>
+                            <div className="text-[12px] font-semibold text-slate-300 mt-0.5">{new Date(session.subscriptionExpiry).toLocaleDateString("ar-SA", { year: "numeric", month: "long", day: "numeric" })}</div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-2">
+                    <div className="text-xs text-slate-500">لا يوجد اشتراك نشط حالياً</div>
+                    <div className="text-[10px] text-slate-600 mt-1">تواصل مع الإدارة للاشتراك في إحدى الباقات</div>
+                  </div>
+                )}
+              </Glass>
             )}
 
             {/* ── Test Notifications (Admin Only) ── */}

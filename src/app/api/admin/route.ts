@@ -42,6 +42,22 @@ async function handleLogin(body: Record<string, unknown>) {
       return NextResponse.json({ success: false, error: "حسابك محظور. تواصل مع الإدارة.", blocked: true }, { status: 403 });
     }
 
+    // Check subscription expiry for regular users
+    if (user.role === "user" && user.subscriptionType !== "none" && user.subscriptionExpiry) {
+      const now = new Date().toISOString();
+      if (user.subscriptionExpiry < now) {
+        const { updateUser } = await import("@/lib/store");
+        await updateUser(user.id, {
+          subscriptionType: "none",
+          subscriptionExpiry: null,
+          packageId: null,
+          packageName: null,
+          status: "expired",
+        });
+        return NextResponse.json({ success: false, error: "انتهت مدة اشتراكك. يرجى التواصل مع الإدارة لتجديد الاشتراك.", expired: true }, { status: 403 });
+      }
+    }
+
     return NextResponse.json({
       success: true,
       admin: {
@@ -50,6 +66,11 @@ async function handleLogin(body: Record<string, unknown>) {
         name: user.name,
         mustChangePwd: user.mustChangePwd,
         role: user.role,
+        status: user.status,
+        subscriptionType: user.subscriptionType,
+        subscriptionExpiry: user.subscriptionExpiry,
+        packageName: user.packageName,
+        packageId: user.packageId,
       },
       token: user.id,
     });
