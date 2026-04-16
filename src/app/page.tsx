@@ -1208,14 +1208,62 @@ export default function HomePage() {
     } catch (e) { console.error("Fetch stats:", e); }
   }, []);
 
-  /* ── Auto-refresh ── */
+  /* ── Auto-refresh + Real-time updates ── */
+  const lastCheckTimeRef = useRef<number>(Date.now());
+  const eventSourceRef = useRef<EventSource | null>(null);
+
+  // Fast polling for new signals (every 3 seconds)
+  const checkForUpdates = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/signals/updates?since=${lastCheckTimeRef.current}`);
+      const data = await res.json();
+      if (data.success && data.hasNew && data.newSignals?.length > 0) {
+        // Update last check time
+        lastCheckTimeRef.current = data.latestTime;
+        // Fetch full signals and show notifications
+        await fetchSignals();
+      } else if (data.success) {
+        lastCheckTimeRef.current = data.latestTime;
+      }
+    } catch { /* ignore */ }
+  }, [fetchSignals]);
+
   useEffect(() => {
     if (view !== "main" || !session) return;
     setLoading(true);
     Promise.all([fetchSignals(), fetchStats()]).finally(() => setLoading(false));
-    intervalRef.current = setInterval(() => { fetchSignals(); fetchStats(); }, 15000);
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [view, session, fetchSignals, fetchStats]);
+
+    // Fast update check every 3 seconds (lightweight - only checks timestamps)
+    const updateInterval = setInterval(checkForUpdates, 3000);
+
+    // Full signal refresh every 15 seconds
+    const fullInterval = setInterval(() => { fetchSignals(); fetchStats(); }, 15000);
+
+    // Try to connect to SSE for instant updates
+    try {
+      const es = new EventSource("/api/signals/stream");
+      es.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === "signal" || data.type === "new_signal" || data.type === "tp_hit" || data.type === "sl_hit") {
+            // New signal event from server - refresh immediately
+            fetchSignals();
+          }
+        } catch { /* ignore */ }
+      };
+      es.onerror = () => { /* SSE not supported or disconnected - polling handles it */ };
+      eventSourceRef.current = es;
+    } catch { /* SSE not available - polling is the fallback */ }
+
+    return () => {
+      clearInterval(updateInterval);
+      clearInterval(fullInterval);
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+    };
+  }, [view, session, fetchSignals, fetchStats, checkForUpdates]);
 
   /* ── Manual refresh ── */
   useEffect(() => {

@@ -146,7 +146,7 @@ public class SignalPollReceiver extends BroadcastReceiver {
             );
 
             // Use setInexactRepeating - no SCHEDULE_EXACT_ALARM permission needed
-            long intervalMillis = 60 * 1000; // 60 seconds
+            long intervalMillis = 30 * 1000; // 30 seconds
             alarmManager.setInexactRepeating(
                     AlarmManager.ELAPSED_REALTIME_WAKEUP,
                     System.currentTimeMillis() + intervalMillis,
