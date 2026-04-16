@@ -1176,17 +1176,19 @@ export default function HomePage() {
         const newSignals: Signal[] = data.signals;
         const newIds = new Set(newSignals.map((s: Signal) => s.id));
         const oldIds = prevIdsRef.current;
-        // Detect new signals
-        if (oldIds.size > 0 && !audioMuted) {
+        // Detect new signals - native notifications always fire, audio only if not muted
+        if (oldIds.size > 0) {
           for (const s of newSignals) {
             if (!oldIds.has(s.id)) {
-              // Web Audio
-              if (isEntry(s.signalCategory)) playSound(s.type === "BUY" ? "buy" : "sell", audioVol);
-              else if (isTpLike(s.signalCategory)) playSound("tp", audioVol);
-              else if (isSlLike(s.signalCategory)) playSound("sl", audioVol);
-              else playSound("message", audioVol);
-              // Native Android notification
-              if (isEntry(s.signalCategory)) nativeNotify(`📊 إشارة جديدة — ${s.pair}`, `${s.type === "BUY" ? "شراء" : "بيع"} @ ${s.entry}`, "new_signal");
+              // Web Audio (respects mute)
+              if (!audioMuted) {
+                if (isEntry(s.signalCategory)) playSound(s.type === "BUY" ? "buy" : "sell", audioVol);
+                else if (isTpLike(s.signalCategory)) playSound("tp", audioVol);
+                else if (isSlLike(s.signalCategory)) playSound("sl", audioVol);
+                else playSound("message", audioVol);
+              }
+              // Native Android notification (ALWAYS fires, even when muted)
+              if (isEntry(s.signalCategory)) nativeNotify(`📊 إشارة جديدة — ${s.pair}`, `${s.type === "BUY" ? "شراء" : "بيع"} @ ${s.entry}`, s.type === "BUY" ? "buy" : "sell");
               else if (isTpLike(s.signalCategory)) nativeNotify(`🎯 هدف محقق — ${s.pair}`, `TP${(s.hitTpIndex ?? 0) + 1} تم تحقيقه`, "tp_hit");
               else if (isSlLike(s.signalCategory)) nativeNotify(`🛑 وقف خسارة — ${s.pair}`, `تم ضرب وقف الخسارة`, "sl_hit");
             }
@@ -2223,6 +2225,58 @@ export default function HomePage() {
                   <div className="text-xs text-slate-400" dir="ltr">{session.email}</div>
                 </div>
               </div>
+            </Glass>
+
+            {/* ── Test Notifications ── */}
+            <Glass className="p-4 space-y-3">
+              <div className="flex items-center gap-2 text-sm font-bold text-slate-300">
+                <Bell className="w-4 h-4 text-amber-400" />
+                اختبار الإشعارات
+              </div>
+              <div className="text-[10px] text-slate-500">
+                اضغط على أي زر لتجربة الإشعار والصوت
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button onClick={() => {
+                  nativeNotify("📊 إشارة شراء — EURUSD", "شراء @ 1.0850", "buy");
+                  playSound("buy", audioVol);
+                }} className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-semibold active:scale-95 transition-transform hover:bg-emerald-500/20">
+                  📊 إشارة شراء
+                </button>
+                <button onClick={() => {
+                  nativeNotify("📊 إشارة بيع — GBPUSD", "بيع @ 1.2650", "sell");
+                  playSound("sell", audioVol);
+                }} className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-[11px] font-semibold active:scale-95 transition-transform hover:bg-red-500/20">
+                  📊 إشارة بيع
+                </button>
+                <button onClick={() => {
+                  nativeNotify("🎯 هدف محقق — EURUSD", "TP1 تم تحقيقه بنجاح!", "tp_hit");
+                  playSound("tp", audioVol);
+                }} className="p-2.5 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-400 text-[11px] font-semibold active:scale-95 transition-transform hover:bg-sky-500/20">
+                  🎯 تحقيق هدف
+                </button>
+                <button onClick={() => {
+                  nativeNotify("🛑 وقف خسارة — EURUSD", "تم ضرب وقف الخسارة!", "sl_hit");
+                  playSound("sl", audioVol);
+                }} className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[11px] font-semibold active:scale-95 transition-transform hover:bg-amber-500/20">
+                  🛑 وقف خسارة
+                </button>
+              </div>
+              {isAdmin && (
+                <div className="pt-1 border-t border-white/[0.04]">
+                  <button onClick={async () => {
+                    try {
+                      const res = await fetch("/api/test-notification", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "buy" }) });
+                      const data = await res.json();
+                      if (data.success) {
+                        alert("تم إرسال إشارة اختبار!");
+                      }
+                    } catch { /* ignore */ }
+                  }} className="w-full p-2.5 rounded-xl bg-gradient-to-r from-amber-500/15 to-orange-500/15 border border-amber-500/25 text-amber-400 text-[11px] font-semibold active:scale-95 transition-transform hover:from-amber-500/25 hover:to-orange-500/25">
+                    إرسال إشارة اختبار من الخادم
+                  </button>
+                </div>
+              )}
             </Glass>
 
             {/* ── USER: Request Email Change ── */}
