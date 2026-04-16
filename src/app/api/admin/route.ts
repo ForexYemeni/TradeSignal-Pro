@@ -1,28 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { getAdmin, setAdmin } from "@/lib/store";
 
-// POST /api/admin
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { action } = body;
 
-    if (action === "login") {
-      return handleLogin(body);
-    }
-
-    if (action === "change-password") {
-      return handleChangePassword(body);
-    }
+    if (action === "login") return handleLogin(body);
+    if (action === "change-password") return handleChangePassword(body);
 
     return NextResponse.json({ success: false, error: "Action not found" }, { status: 400 });
   } catch (error) {
     console.error("Admin API error:", error);
-    const msg = error instanceof Error ? error.message : String(error);
-    return NextResponse.json({
-      success: false,
-      error: "خطأ في قاعدة البيانات: " + msg.substring(0, 200),
-    }, { status: 500 });
+    return NextResponse.json({ success: false, error: "خطأ في الخادم" }, { status: 500 });
   }
 }
 
@@ -33,22 +23,23 @@ async function handleLogin(body: Record<string, unknown>) {
     return NextResponse.json({ success: false, error: "البريد وكلمة المرور مطلوبان" }, { status: 400 });
   }
 
+  let admin = await getAdmin();
+
   // Auto-create default admin if none exists
-  const adminCount = await db.admin.count();
-  if (adminCount === 0) {
-    await db.admin.create({
-      data: {
-        email: "admin@forexyemeni.com",
-        passwordHash: "admin123",
-        name: "مدير النظام",
-        mustChangePwd: true,
-      },
-    });
+  if (!admin) {
+    admin = {
+      id: crypto.randomUUID(),
+      email: "admin@forexyemeni.com",
+      passwordHash: "admin123",
+      name: "مدير النظام",
+      mustChangePwd: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    await setAdmin(admin);
   }
 
-  const admin = await db.admin.findUnique({ where: { email } });
-
-  if (!admin) {
+  if (admin.email !== email) {
     return NextResponse.json({ success: false, error: "بيانات الدخول غير صحيحة" }, { status: 401 });
   }
 
@@ -70,18 +61,14 @@ async function handleLogin(body: Record<string, unknown>) {
 
 async function handleChangePassword(body: Record<string, unknown>) {
   const { id, currentPassword, newEmail, newPassword } = body as {
-    id: string;
-    currentPassword: string;
-    newEmail: string;
-    newPassword: string;
+    id: string; currentPassword: string; newEmail: string; newPassword: string;
   };
 
   if (!id || !currentPassword || !newEmail || !newPassword) {
     return NextResponse.json({ success: false, error: "جميع الحقول مطلوبة" }, { status: 400 });
   }
 
-  const admin = await db.admin.findUnique({ where: { id } });
-
+  const admin = await getAdmin();
   if (!admin) {
     return NextResponse.json({ success: false, error: "المستخدم غير موجود" }, { status: 404 });
   }
@@ -90,21 +77,14 @@ async function handleChangePassword(body: Record<string, unknown>) {
     return NextResponse.json({ success: false, error: "كلمة المرور الحالية غير صحيحة" }, { status: 401 });
   }
 
-  if (newEmail !== admin.email) {
-    const existing = await db.admin.findUnique({ where: { email: newEmail } });
-    if (existing) {
-      return NextResponse.json({ success: false, error: "البريد الإلكتروني مستخدم بالفعل" }, { status: 400 });
-    }
-  }
-
-  const updated = await db.admin.update({
-    where: { id },
-    data: {
-      email: newEmail,
-      passwordHash: newPassword,
-      mustChangePwd: false,
-    },
-  });
+  const updated = {
+    ...admin,
+    email: newEmail,
+    passwordHash: newPassword,
+    mustChangePwd: false,
+    updatedAt: new Date().toISOString(),
+  };
+  await setAdmin(updated);
 
   return NextResponse.json({
     success: true,
@@ -119,10 +99,8 @@ async function handleChangePassword(body: Record<string, unknown>) {
 
 export async function GET() {
   try {
-    const admin = await db.admin.findFirst();
-    if (!admin) {
-      return NextResponse.json({ exists: false, mustChangePwd: false });
-    }
+    const admin = await getAdmin();
+    if (!admin) return NextResponse.json({ exists: false, mustChangePwd: false });
     return NextResponse.json({ exists: true, mustChangePwd: admin.mustChangePwd });
   } catch {
     return NextResponse.json({ exists: false, mustChangePwd: false });
