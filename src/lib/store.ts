@@ -204,3 +204,57 @@ export async function migrateAdminToUsers(): Promise<void> {
     });
   }
 }
+
+// ─── Email Change Requests ──────────────────────────────
+export interface EmailChangeRequest {
+  id: string;
+  userId: string;
+  userName: string;
+  oldEmail: string;
+  newEmail: string;
+  status: "pending" | "approved" | "rejected";
+  createdAt: string;
+}
+
+export async function getEmailChangeRequests(): Promise<EmailChangeRequest[]> {
+  const data = await kv.get<EmailChangeRequest[]>('email_change_requests');
+  return data || [];
+}
+
+export async function addEmailChangeRequest(req: EmailChangeRequest): Promise<EmailChangeRequest> {
+  const requests = await getEmailChangeRequests();
+  // Check if there's already a pending request for this user
+  const existing = requests.find(r => r.userId === req.userId && r.status === "pending");
+  if (existing) {
+    // Update existing request
+    existing.newEmail = req.newEmail;
+    existing.createdAt = req.createdAt;
+    await kv.set('email_change_requests', requests);
+    return existing;
+  }
+  requests.push(req);
+  await kv.set('email_change_requests', requests);
+  return req;
+}
+
+export async function updateEmailChangeRequest(id: string, updates: Partial<EmailChangeRequest>): Promise<EmailChangeRequest | null> {
+  const requests = await getEmailChangeRequests();
+  const idx = requests.findIndex(r => r.id === id);
+  if (idx === -1) return null;
+  requests[idx] = { ...requests[idx], ...updates };
+  await kv.set('email_change_requests', requests);
+  return requests[idx];
+}
+
+export async function deleteEmailChangeRequest(id: string): Promise<boolean> {
+  const requests = await getEmailChangeRequests();
+  const filtered = requests.filter(r => r.id !== id);
+  if (filtered.length === requests.length) return false;
+  await kv.set('email_change_requests', filtered);
+  return true;
+}
+
+export async function getPendingEmailRequestsForUser(userId: string): Promise<EmailChangeRequest | null> {
+  const requests = await getEmailChangeRequests();
+  return requests.find(r => r.userId === userId && r.status === "pending") || null;
+}

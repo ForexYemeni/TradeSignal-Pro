@@ -732,6 +732,13 @@ export default function HomePage() {
   const [users, setUsers] = useState<{ id: string; name: string; email: string; role: string; status: string; createdAt: string }[]>([]);
   const [usersLoad, setUsersLoad] = useState(false);
 
+  /* ── Email Change Request ── */
+  const [emailReqNew, setEmailReqNew] = useState("");
+  const [emailReqLoad, setEmailReqLoad] = useState(false);
+  const [emailReqMsg, setEmailReqMsg] = useState("");
+  const [emailRequests, setEmailRequests] = useState<{ id: string; userId: string; userName: string; oldEmail: string; newEmail: string; status: string; createdAt: string }[]>([]);
+  const [showEmailReqSection, setShowEmailReqSection] = useState(false);
+
   /* ── Session Init: restore from localStorage ── */
   const [dbReady, setDbReady] = useState(false);
   const [dbError, setDbError] = useState("");
@@ -823,8 +830,9 @@ export default function HomePage() {
 
   /* ── Load users when admin switches to users tab ── */
   useEffect(() => {
-    if (view === "main" && tab === "users" && session?.role === "admin") {
+    if (view === "main" && tab === "users" && isAdmin) {
       fetchUsers();
+      fetchEmailRequests();
     }
   }, [tab, view]);
 
@@ -937,6 +945,48 @@ export default function HomePage() {
       });
       fetchUsers();
     } catch (e) { console.error("Delete user:", e); }
+  }
+
+  async function handleSubmitEmailChange() {
+    setEmailReqMsg("");
+    if (!emailReqNew || !session?.id) return;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailReqNew)) { setEmailReqMsg("البريد الإلكتروني غير صالح"); return; }
+    setEmailReqLoad(true);
+    try {
+      const res = await fetch("/api/email-change", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: session.id, newEmail: emailReqNew }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setEmailReqMsg(data.message);
+        setEmailReqNew("");
+      } else {
+        setEmailReqMsg(data.error || "فشل إرسال الطلب");
+      }
+    } catch { setEmailReqMsg("خطأ في الاتصال"); }
+    finally { setEmailReqLoad(false); }
+  }
+
+  async function fetchEmailRequests() {
+    try {
+      const res = await fetch("/api/email-change");
+      const data = await res.json();
+      if (data.success) setEmailRequests(data.requests);
+    } catch (e) { console.error("Fetch email requests:", e); }
+  }
+
+  async function handleEmailRequestAction(id: string, action: string) {
+    try {
+      await fetch("/api/email-change", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, action }),
+      });
+      fetchEmailRequests();
+      fetchUsers();
+    } catch (e) { console.error("Email request action:", e); }
   }
 
   async function handleUpdate(id: string, status: string, tpIdx?: number) {
@@ -1198,13 +1248,15 @@ export default function HomePage() {
     { key: "sell", label: "بيع" }, { key: "active", label: "نشطة" }, { key: "closed", label: "مغلقة" },
   ];
 
+  const isAdmin = session?.role === "admin";
+
   const tabs: { key: Tab; label: string; icon: React.ReactNode; badge?: number; adminOnly?: boolean }[] = [
     { key: "signals", label: "الإشارات", icon: <Activity className="w-5 h-5" />, badge: activeCount },
     { key: "dashboard", label: "الإحصائيات", icon: <BarChart3 className="w-5 h-5" /> },
-    { key: "analyst", label: "المحلل", icon: <Send className="w-5 h-5" /> },
-    { key: "users", label: "المستخدمين", icon: <User className="w-5 h-5" />, adminOnly: true },
+    ...(isAdmin ? [{ key: "analyst" as Tab, label: "المحلل", icon: <Send className="w-5 h-5" /> }] : []),
+    ...(isAdmin ? [{ key: "users" as Tab, label: "المستخدمين", icon: <User className="w-5 h-5" />, adminOnly: true }] : []),
     { key: "account", label: "الحساب", icon: <User className="w-5 h-5" /> },
-  ].filter(t => !t.adminOnly || session?.role === "admin");
+  ];
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "linear-gradient(135deg, #080d1a 0%, #0f172a 50%, #080d1a 100%)" }}>
@@ -1398,7 +1450,7 @@ export default function HomePage() {
         )}
 
         {/* ══════ TAB: ACCOUNT ══════ */}
-        {tab === "users" && session?.role === "admin" && (
+        {tab === "users" && isAdmin && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-bold text-white flex items-center gap-2"><User className="w-4 h-4 text-amber-400" />إدارة المستخدمين</h2>
@@ -1507,24 +1559,90 @@ export default function HomePage() {
                 )}
               </div>
             )}
+            {/* Email Change Requests (Admin) */}
+            {isAdmin && (
+              <div className="mt-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Mail className="w-3.5 h-3.5 text-sky-400" />
+                    <span className="text-[10px] text-sky-400 font-bold">طلبات تغيير البريد</span>
+                  </div>
+                  <button onClick={fetchEmailRequests} className="text-[9px] text-slate-500 hover:text-slate-300">تحديث</button>
+                </div>
+                {emailRequests.filter(r => r.status === "pending").length === 0 && (
+                  <div className="text-[10px] text-slate-600 text-center py-2">لا توجد طلبات معلقة</div>
+                )}
+                {emailRequests.filter(r => r.status === "pending").map(r => (
+                  <Glass key={r.id} className="p-3 mb-2 border-sky-500/15">
+                    <div className="flex items-center gap-2.5 mb-2">
+                      <div className="w-8 h-8 rounded-lg bg-sky-500/15 flex items-center justify-center">
+                        <Mail className="w-3.5 h-3.5 text-sky-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[11px] font-bold text-white">{r.userName}</div>
+                        <div className="text-[9px] text-slate-500">
+                          <span className="line-through" dir="ltr">{r.oldEmail}</span>
+                          <span className="mx-1.5 text-slate-600">→</span>
+                          <span className="text-sky-400" dir="ltr">{r.newEmail}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button onClick={() => handleEmailRequestAction(r.id, "approve")} className="flex-1 px-2 py-1.5 rounded-lg text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 active:scale-95 transition-transform">قبول</button>
+                      <button onClick={() => handleEmailRequestAction(r.id, "reject")} className="flex-1 px-2 py-1.5 rounded-lg text-[10px] font-medium bg-red-500/10 text-red-400 border border-red-500/15 active:scale-95 transition-transform">رفض</button>
+                    </div>
+                  </Glass>
+                ))}
+              </div>
+            )}
           </div>
         )}
         {tab === "account" && session && (
           <div className="space-y-4">
-            {/* Admin Info */}
+            {/* Profile Info */}
             <Glass className="p-4">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${isAdmin ? "bg-gradient-to-br from-amber-400 to-orange-500" : "bg-gradient-to-br from-sky-400 to-blue-600"}`}>
                   <User className="w-6 h-6 text-black" />
                 </div>
-                <div>
-                  <div className="font-bold text-white text-sm">{session.name}</div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-white text-sm">{session.name}</span>
+                    {isAdmin && <span className="text-[8px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded-md font-bold">مدير</span>}
+                  </div>
                   <div className="text-xs text-slate-400" dir="ltr">{session.email}</div>
                 </div>
               </div>
             </Glass>
 
-            {/* Change Password */}
+            {/* ── USER: Request Email Change ── */}
+            {!isAdmin && (
+              <Glass className="overflow-hidden">
+                <button onClick={() => setShowEmailReqSection(!showEmailReqSection)} className="w-full p-4 flex items-center justify-between text-sm text-slate-300 hover:bg-white/[0.02] transition-colors">
+                  <span className="flex items-center gap-2"><Mail className="w-4 h-4 text-sky-400" />طلب تغيير البريد الإلكتروني</span>
+                  <ChevronIcon open={showEmailReqSection} />
+                </button>
+                {showEmailReqSection && (
+                  <div className="px-4 pb-4 space-y-3 animate-[fadeIn_0.2s_ease-out]">
+                    <div className="text-[10px] text-slate-500 bg-white/[0.02] rounded-lg p-2">
+                      لتغيير بريدك الإلكتروني، أرسل طلبا وانتظر موافقة الإدارة
+                    </div>
+                    <Input type="email" value={emailReqNew} onChange={e => setEmailReqNew(e.target.value)} placeholder="البريد الإلكتروني الجديد"
+                      className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-slate-600 h-10 rounded-xl text-sm" dir="ltr" />
+                    {emailReqMsg && (
+                      <div className={`rounded-xl px-3 py-2 text-xs text-center ${emailReqMsg.includes("فشل") || emailReqMsg.includes("غير صالح") || emailReqMsg.includes("مسجل") ? "bg-red-500/10 border border-red-500/20 text-red-400" : "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400"}`}>
+                        {emailReqMsg}
+                      </div>
+                    )}
+                    <Button onClick={handleSubmitEmailChange} disabled={emailReqLoad || !emailReqNew} className="w-full h-10 rounded-xl bg-sky-500/15 text-sky-400 border border-sky-500/25 text-xs font-semibold hover:bg-sky-500/25 transition-colors disabled:opacity-50">
+                      {emailReqLoad ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "إرسال طلب التغيير"}
+                    </Button>
+                  </div>
+                )}
+              </Glass>
+            )}
+
+            {/* Change Password (both admin and user) */}
             <Glass className="overflow-hidden">
               <button onClick={() => setShowCp(!showCp)} className="w-full p-4 flex items-center justify-between text-sm text-slate-300 hover:bg-white/[0.02] transition-colors">
                 <span className="flex items-center gap-2"><Lock className="w-4 h-4 text-amber-400" />تغيير كلمة المرور</span>
@@ -1532,14 +1650,27 @@ export default function HomePage() {
               </button>
               {showCp && (
                 <div className="px-4 pb-4 space-y-3 animate-[fadeIn_0.2s_ease-out]">
-                  <Input type="password" value={cpCur} onChange={e => setCpCur(e.target.value)} placeholder="كلمة المرور الحالية"
-                    className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-slate-600 h-10 rounded-xl text-sm" dir="ltr" />
-                  <Input type="email" value={cpEmail} onChange={e => setCpEmail(e.target.value)} placeholder="البريد الإلكتروني الجديد"
-                    className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-slate-600 h-10 rounded-xl text-sm" dir="ltr" />
-                  <Input type="password" value={cpNew} onChange={e => setCpNew(e.target.value)} placeholder="كلمة المرور الجديدة"
-                    className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-slate-600 h-10 rounded-xl text-sm" dir="ltr" />
-                  <Input type="password" value={cpConf} onChange={e => setCpConf(e.target.value)} placeholder="تأكيد كلمة المرور"
-                    className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-slate-600 h-10 rounded-xl text-sm" dir="ltr" />
+                  {isAdmin ? (
+                    <>
+                      <Input type="password" value={cpCur} onChange={e => setCpCur(e.target.value)} placeholder="كلمة المرور الحالية"
+                        className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-slate-600 h-10 rounded-xl text-sm" dir="ltr" />
+                      <Input type="email" value={cpEmail} onChange={e => setCpEmail(e.target.value)} placeholder="البريد الإلكتروني الجديد"
+                        className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-slate-600 h-10 rounded-xl text-sm" dir="ltr" />
+                      <Input type="password" value={cpNew} onChange={e => setCpNew(e.target.value)} placeholder="كلمة المرور الجديدة"
+                        className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-slate-600 h-10 rounded-xl text-sm" dir="ltr" />
+                      <Input type="password" value={cpConf} onChange={e => setCpConf(e.target.value)} placeholder="تأكيد كلمة المرور"
+                        className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-slate-600 h-10 rounded-xl text-sm" dir="ltr" />
+                    </>
+                  ) : (
+                    <>
+                      <Input type="password" value={cpCur} onChange={e => setCpCur(e.target.value)} placeholder="كلمة المرور الحالية"
+                        className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-slate-600 h-10 rounded-xl text-sm" dir="ltr" />
+                      <Input type="password" value={cpNew} onChange={e => setCpNew(e.target.value)} placeholder="كلمة المرور الجديدة"
+                        className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-slate-600 h-10 rounded-xl text-sm" dir="ltr" />
+                      <Input type="password" value={cpConf} onChange={e => setCpConf(e.target.value)} placeholder="تأكيد كلمة المرور"
+                        className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-slate-600 h-10 rounded-xl text-sm" dir="ltr" />
+                    </>
+                  )}
                   {cpErr && <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2 text-xs text-red-400 text-center">{cpErr}</div>}
                   <Button onClick={handleChangePwd} disabled={cpLoad} className="w-full h-10 rounded-xl bg-amber-500/15 text-amber-400 border border-amber-500/25 text-xs font-semibold hover:bg-amber-500/25 transition-colors disabled:opacity-50">
                     {cpLoad ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "تحديث"}
@@ -1548,22 +1679,24 @@ export default function HomePage() {
               )}
             </Glass>
 
-            {/* Clear All */}
-            <Glass className="overflow-hidden">
-              {!confirmClear ? (
-                <button onClick={() => setConfirmClear(true)} className="w-full p-4 flex items-center justify-between text-sm text-red-400 hover:bg-red-500/[0.03] transition-colors">
-                  <span className="flex items-center gap-2"><Trash2 className="w-4 h-4" />حذف جميع الإشارات</span>
-                </button>
-              ) : (
-                <div className="p-4 space-y-3 animate-[fadeIn_0.2s_ease-out]">
-                  <div className="text-xs text-red-400 text-center">هل أنت متأكد من حذف جميع الإشارات؟</div>
-                  <div className="flex gap-2">
-                    <Button onClick={handleClearAll} className="flex-1 h-10 rounded-xl bg-red-500/15 text-red-400 border border-red-500/25 text-xs font-semibold">نعم، احذف</Button>
-                    <Button onClick={() => setConfirmClear(false)} className="flex-1 h-10 rounded-xl bg-white/[0.04] text-slate-400 border border-white/[0.06] text-xs">إلغاء</Button>
+            {/* Admin Only: Clear All */}
+            {isAdmin && (
+              <Glass className="overflow-hidden">
+                {!confirmClear ? (
+                  <button onClick={() => setConfirmClear(true)} className="w-full p-4 flex items-center justify-between text-sm text-red-400 hover:bg-red-500/[0.03] transition-colors">
+                    <span className="flex items-center gap-2"><Trash2 className="w-4 h-4" />حذف جميع الإشارات</span>
+                  </button>
+                ) : (
+                  <div className="p-4 space-y-3 animate-[fadeIn_0.2s_ease-out]">
+                    <div className="text-xs text-red-400 text-center">هل أنت متأكد من حذف جميع الإشارات؟</div>
+                    <div className="flex gap-2">
+                      <Button onClick={handleClearAll} className="flex-1 h-10 rounded-xl bg-red-500/15 text-red-400 border border-red-500/25 text-xs font-semibold">نعم، احذف</Button>
+                      <Button onClick={() => setConfirmClear(false)} className="flex-1 h-10 rounded-xl bg-white/[0.04] text-slate-400 border border-white/[0.06] text-xs">إلغاء</Button>
+                    </div>
                   </div>
-                </div>
-              )}
-            </Glass>
+                )}
+              </Glass>
+            )}
 
             {/* Logout */}
             <button onClick={handleLogout}
