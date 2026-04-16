@@ -6,13 +6,14 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000 2>&1 | tee dev.log",
-    "build": "npx prisma generate && npx prisma db push --accept-data-loss && next build",
+    "build": "npx prisma generate && npx prisma migrate deploy && next build",
     "start": "next start",
     "lint": "eslint .",
     "postinstall": "prisma generate",
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate dev",
+    "db:migrate": "prisma migrate dev --name init",
+    "db:migrate:deploy": "prisma migrate deploy",
     "db:setup": "prisma generate && prisma db push",
     "db:seed": "npx tsx prisma/seed.ts",
     "db:reset": "prisma migrate reset"
