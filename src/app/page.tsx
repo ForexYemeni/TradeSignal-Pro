@@ -179,8 +179,177 @@ function SkeletonCard() {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   SIGNAL CARDS
+   SIGNAL CARDS — PROFESSIONAL EDITION
    ═══════════════════════════════════════════════════════════════ */
+
+/* ── Expandable TP Mini-Card ── */
+function TpMiniCard({ tp, index, isHit, isLastHit, entry, type }: {
+  tp: TakeProfit; index: number; isHit: boolean; isLastHit: boolean; entry: number; type: "BUY" | "SELL";
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const diff = Math.abs(tp.tp - entry).toFixed(1);
+  const direction = (type === "BUY" && tp.tp > entry) || (type === "SELL" && tp.tp < entry) ? "+" : "";
+  const pctFromEntry = ((Math.abs(tp.tp - entry) / entry) * 100).toFixed(3);
+
+  return (
+    <div>
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className={`w-full text-right transition-all duration-300 active:scale-[0.98] rounded-xl border ${
+          isHit
+            ? `bg-gradient-to-br from-emerald-500/[0.12] to-emerald-600/[0.06] border-emerald-500/30 ${isLastHit ? "animate-glow-pulse" : ""}`
+            : "bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.04] hover:border-white/[0.1]"
+        }`}
+      >
+        <div className="flex items-center justify-between px-3 py-2">
+          <div className="flex items-center gap-2.5">
+            {isHit ? (
+              <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center animate-check-pop">
+                <svg className="w-3.5 h-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+            ) : (
+              <div className="w-6 h-6 rounded-full bg-white/[0.04] flex items-center justify-center">
+                <span className="text-[9px] text-slate-500 font-bold">{index + 1}</span>
+              </div>
+            )}
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className={`text-xs font-bold font-mono ${isHit ? "text-emerald-300" : "text-slate-300"}`}>{tp.tp}</span>
+                <span className={`text-[8px] font-mono px-1.5 py-0.5 rounded-md ${isHit ? "bg-emerald-500/20 text-emerald-400" : "bg-white/[0.04] text-slate-500"}`}>
+                  {direction}{diff}
+                </span>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className={`text-[10px] font-mono font-semibold px-2 py-0.5 rounded-lg ${isHit ? "bg-emerald-500/15 text-emerald-400" : "bg-amber-500/[0.08] text-amber-400/70"}`}>
+              {tp.rr.toFixed(2)}
+            </div>
+            {!isHit && (
+              <svg className={`w-3.5 h-3.5 text-slate-600 transition-transform duration-300 ${expanded ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            )}
+            {isHit && (
+              <svg className={`w-3.5 h-3.5 text-emerald-500/60 transition-transform duration-300 ${expanded ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            )}
+          </div>
+        </div>
+      </button>
+      {expanded && (
+        <div className="tp-expand-enter mt-1 mx-2 mb-1 p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] space-y-2">
+          <div className="grid grid-cols-2 gap-2 text-[11px]">
+            <div className="flex justify-between"><span className="text-slate-500">سعر الهدف</span><span className="font-mono font-bold text-white">{tp.tp}</span></div>
+            <div className="flex justify-between"><span className="text-slate-500">المسافة</span><span className="font-mono text-slate-300">{direction}{diff} نقطة</span></div>
+            <div className="flex justify-between"><span className="text-slate-500">R:R</span><span className="font-mono font-semibold text-amber-400">{tp.rr.toFixed(2)}</span></div>
+            <div className="flex justify-between"><span className="text-slate-500">نسبة التحرك</span><span className="font-mono text-slate-300">{pctFromEntry}%</span></div>
+          </div>
+          {isHit && (
+            <div className="flex items-center gap-2 pt-1.5 border-t border-emerald-500/10">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+              <span className="text-[10px] text-emerald-400 font-semibold">تم تحقيق الهدف بنجاح</span>
+            </div>
+          )}
+          {!isHit && (
+            <div className="flex items-center gap-2 pt-1.5 border-t border-white/[0.04]">
+              <div className="w-1.5 h-1.5 rounded-full bg-slate-600" />
+              <span className="text-[10px] text-slate-500">في انتظار التحقيق</span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Trade Status Banner ── */
+function TradeStatusBanner({ s }: { s: Signal }) {
+  const isProfit = s.status === "HIT_TP";
+  const isLoss = s.status === "HIT_SL";
+  const isManual = s.status === "MANUAL_CLOSE";
+  const hitCount = s.hitTpIndex >= 0 ? s.hitTpIndex + 1 : 0;
+  const totalTPs = s.takeProfits?.length || 0;
+
+  if (s.status === "ACTIVE") return null;
+
+  return (
+    <div className={`mt-2.5 rounded-xl p-3 border ${
+      isProfit
+        ? "bg-gradient-to-br from-emerald-500/[0.1] to-emerald-600/[0.04] border-emerald-500/25 animate-profit-glow"
+        : isLoss
+        ? "bg-gradient-to-br from-red-500/[0.1] to-red-600/[0.04] border-red-500/25 animate-loss-glow"
+        : "bg-white/[0.03] border-white/[0.06]"
+    }`}>
+      <div className="flex items-center gap-2.5">
+        <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+          isProfit ? "bg-emerald-500/20" : isLoss ? "bg-red-500/20" : "bg-slate-500/20"
+        }`}>
+          {isProfit && (
+            <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          )}
+          {isLoss && (
+            <svg className="w-4 h-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          )}
+          {isManual && (
+            <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className={`text-xs font-bold ${isProfit ? "text-emerald-400" : isLoss ? "text-red-400" : "text-slate-400"}`}>
+              {isProfit ? "صفقة رابحة" : isLoss ? "صفقة خاسرة" : "صفقة مغلقة يدويا"}
+            </span>
+            {isProfit && hitCount > 0 && (
+              <span className="text-[9px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded-md font-bold">
+                {hitCount}/{totalTPs} أهداف
+              </span>
+            )}
+          </div>
+          {isProfit && (s.pnlDollars ?? 0) > 0 && (
+            <div className="text-[11px] font-mono font-bold text-emerald-400 mt-0.5">
+              +${s.pnlDollars}{" "}
+              <span className="text-[9px] font-normal text-emerald-400/60">({s.pnlPoints ?? 0} نقطة)</span>
+            </div>
+          )}
+          {isLoss && (s.pnlDollars ?? 0) !== 0 && (
+            <div className="text-[11px] font-mono font-bold text-red-400 mt-0.5">
+              -${Math.abs(s.pnlDollars ?? 0)}{" "}
+              <span className="text-[9px] font-normal text-red-400/60">({s.pnlPoints ?? 0} نقطة)</span>
+            </div>
+          )}
+          {isManual && (
+            <div className="text-[10px] text-slate-500 mt-0.5">
+              تم إغلاق الصفقة يدويا
+              {hitCount > 0 && ` بعد تحقيق ${hitCount} هدف`}
+            </div>
+          )}
+        </div>
+        {isProfit && (
+          <div className="text-[10px] font-bold text-emerald-400/70 bg-emerald-500/10 px-2 py-1 rounded-lg flex-shrink-0">
+            ربح
+          </div>
+        )}
+        {isLoss && (
+          <div className="text-[10px] font-bold text-red-400/70 bg-red-500/10 px-2 py-1 rounded-lg flex-shrink-0">
+            خسارة
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ── Entry Card (Professional) ── */
 function EntryCard({ s, idx, isAdmin, onUpdate, onDelete }: {
   s: Signal; idx: number; isAdmin: boolean;
   onUpdate: (id: string, status: string, tpIdx?: number) => void;
@@ -189,58 +358,93 @@ function EntryCard({ s, idx, isAdmin, onUpdate, onDelete }: {
   const ac = entryAccent(s);
   const isBuy = s.type === "BUY";
   const typeLabel = s.signalCategory === "REENTRY" ? "إعادة دخول" : s.signalCategory === "PYRAMID" ? "تدرج" : isBuy ? "شراء" : "بيع";
+  const isClosed = s.status !== "ACTIVE";
+  const hitCount = s.hitTpIndex >= 0 ? s.hitTpIndex + 1 : 0;
+
   return (
-    <div className="animate-[fadeInUp_0.3s_ease-out]" style={{ animationDelay: `${idx * 30}ms`, animationFillMode: "both" }}>
-      <Glass className={`overflow-hidden ${ac.border}`}>
-        <div className={`h-[2px] bg-gradient-to-l ${ac.accent}`} />
-        <div className="p-3.5 space-y-2.5">
+    <div className="animate-[fadeInUp_0.35s_ease-out]" style={{ animationDelay: `${idx * 40}ms`, animationFillMode: "both" }}>
+      <Glass className={`overflow-hidden ${ac.border} transition-all duration-300 ${isClosed ? "opacity-80" : ""}`}>
+        {/* Top gradient accent bar */}
+        <div className={`h-[3px] bg-gradient-to-l ${ac.accent}`} />
+
+        <div className="p-4 space-y-3">
+          {/* ── Header ── */}
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${ac.bg}`}>
-                {isBuy ? <TrendingUp className={`w-4 h-4 ${ac.text}`} /> : <TrendingDown className={`w-4 h-4 ${ac.text}`} />}
+            <div className="flex items-center gap-2.5">
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${ac.bg} shadow-lg`}>
+                {isBuy ? <TrendingUp className={`w-[18px] h-[18px] ${ac.text}`} /> : <TrendingDown className={`w-[18px] h-[18px] ${ac.text}`} />}
               </div>
               <div>
-                <div className="flex items-center gap-1.5">
-                  <span className="font-bold text-white text-sm">{s.pair}</span>
-                  {s.timeframe && <span className="text-[9px] bg-white/[0.06] text-slate-400 px-1.5 py-0.5 rounded">{s.timeframe}</span>}
-                  {s.htfTimeframe && <span className="text-[9px] bg-white/[0.06] text-slate-400 px-1.5 py-0.5 rounded">{s.htfTimeframe}</span>}
+                <div className="flex items-center gap-2">
+                  <span className="font-extrabold text-white text-[15px] tracking-wide">{s.pair}</span>
+                  {s.timeframe && <span className="text-[9px] bg-white/[0.06] text-slate-400 px-1.5 py-0.5 rounded-md font-medium">{s.timeframe}</span>}
+                  {s.htfTimeframe && <span className="text-[9px] bg-white/[0.06] text-slate-400 px-1.5 py-0.5 rounded-md font-medium">{s.htfTimeframe}</span>}
                 </div>
-                <span className="text-[10px] text-slate-500">{typeLabel}</span>
+                <span className="text-[10px] text-slate-500 font-medium">{typeLabel}</span>
               </div>
             </div>
-            <div className="flex flex-col items-end gap-1">
-              <Badge className={`${ac.bg} ${ac.text} border ${ac.border} text-[9px] font-semibold px-2 py-0`}>{typeLabel}</Badge>
-              {s.status === "ACTIVE" && <Badge className="bg-emerald-500/15 text-emerald-400 border-0 text-[8px] px-1.5">● نشطة</Badge>}
-              {(s.status === "HIT_TP" || s.status === "HIT_SL" || s.status === "MANUAL_CLOSE") && <Badge className="bg-slate-500/15 text-slate-400 border-0 text-[8px] px-1.5">مغلقة</Badge>}
+            <div className="flex flex-col items-end gap-1.5">
+              <div className="flex items-center gap-1.5">
+                <Badge className={`${ac.bg} ${ac.text} border ${ac.border} text-[9px] font-bold px-2 py-0`}>{typeLabel}</Badge>
+                {s.status === "ACTIVE" && (
+                  <div className="flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 active-pulse-ring" />
+                    <span className="text-[8px] text-emerald-400 font-semibold">نشطة</span>
+                  </div>
+                )}
+                {isClosed && (
+                  <Badge className={`${s.status === "HIT_TP" ? "bg-emerald-500/10 text-emerald-400" : s.status === "HIT_SL" ? "bg-red-500/10 text-red-400" : "bg-slate-500/10 text-slate-400"} border-0 text-[8px] font-semibold px-2`}>
+                    {s.status === "HIT_TP" ? "مغلقة بربح" : s.status === "HIT_SL" ? "مغلقة بخسارة" : "مغلقة"}
+                  </Badge>
+                )}
+              </div>
+              {s.confidence > 0 && <Stars r={s.confidence} />}
             </div>
           </div>
-          {s.confidence > 0 && (
-            <div className="flex items-center justify-between">
-              <Stars r={s.confidence} />
-              <span className="text-[10px] text-slate-500 flex items-center gap-1"><Clock className="w-3 h-3" />{timeAgo(s.createdAt)}</span>
+
+          {/* ── Time ── */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {s.status === "ACTIVE" && (
+                <div className="flex items-center gap-1">
+                  <Radio className="w-3 h-3 text-emerald-400/50 animate-pulse" />
+                  <span className="text-[9px] text-emerald-400/60">مباشر</span>
+                </div>
+              )}
             </div>
-          )}
-          <div className="grid grid-cols-2 gap-2">
-            <div className="bg-white/[0.03] rounded-xl p-2.5 border border-white/[0.04]">
-              <div className="flex items-center gap-1 mb-1"><Activity className="w-3 h-3 text-slate-500" /><span className="text-[9px] text-slate-500">الدخول</span></div>
-              <div className="text-sm font-bold font-mono text-white">{s.entry}</div>
+            <span className="text-[10px] text-slate-500 flex items-center gap-1"><Clock className="w-3 h-3" />{timeAgo(s.createdAt)}</span>
+          </div>
+
+          {/* ── Entry / SL Price Boxes ── */}
+          <div className="grid grid-cols-2 gap-2.5">
+            <div className={`rounded-xl p-3 border transition-all duration-300 ${isBuy ? "bg-gradient-to-br from-emerald-500/[0.06] to-emerald-600/[0.02] border-emerald-500/15" : "bg-gradient-to-br from-red-500/[0.06] to-red-600/[0.02] border-red-500/15"}`}>
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <Activity className={`w-3 h-3 ${isBuy ? "text-emerald-400" : "text-red-400"}`} />
+                <span className="text-[9px] text-slate-400 font-medium">سعر الدخول</span>
+              </div>
+              <div className={`text-[15px] font-extrabold font-mono ${isBuy ? "text-emerald-300" : "text-red-300"}`}>{s.entry}</div>
             </div>
-            <div className="bg-red-500/[0.04] rounded-xl p-2.5 border border-red-500/[0.08]">
-              <div className="flex items-center gap-1 mb-1"><ShieldAlert className="w-3 h-3 text-red-400" /><span className="text-[9px] text-red-400">الوقف</span></div>
-              <div className="text-sm font-bold font-mono text-red-400">{s.stopLoss}</div>
-              <div className="text-[8px] text-slate-500 mt-0.5">{s.slDistance || Math.abs(s.entry - s.stopLoss).toFixed(1)} نقطة</div>
+            <div className="bg-gradient-to-br from-red-500/[0.06] to-red-600/[0.02] rounded-xl p-3 border border-red-500/15">
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <ShieldAlert className="w-3 h-3 text-red-400" />
+                <span className="text-[9px] text-red-300 font-medium">وقف الخسارة</span>
+              </div>
+              <div className="text-[15px] font-extrabold font-mono text-red-400">{s.stopLoss}</div>
+              <div className="text-[8px] text-slate-500 mt-1 font-mono">{s.slDistance || Math.abs(s.entry - s.stopLoss).toFixed(1)} نقطة</div>
             </div>
           </div>
+
+          {/* ── Risk Management ── */}
           {(s.balance || s.lotSize || s.riskTarget) && (
             <>
               <Div />
-              <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mb-1">
-                <DollarSign className="w-3 h-3 text-amber-400" />
-                <span className="font-semibold text-slate-300">إدارة المخاطر</span>
+              <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mb-1.5">
+                <DollarSign className="w-3.5 h-3.5 text-amber-400" />
+                <span className="font-bold text-slate-300">إدارة المخاطر</span>
               </div>
               <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[11px]">
-                {s.balance && <div className="flex items-center justify-between"><span className="text-slate-500">الرصيد</span><span className="font-mono text-slate-200">${Number(s.balance).toLocaleString()}</span></div>}
-                {s.lotSize && <div className="flex items-center justify-between"><span className="text-slate-500">اللوت</span><span className="font-mono text-slate-200">{s.lotSize}</span></div>}
+                {s.balance && <div className="flex items-center justify-between"><span className="text-slate-500">الرصيد</span><span className="font-mono text-slate-200 font-semibold">${Number(s.balance).toLocaleString()}</span></div>}
+                {s.lotSize && <div className="flex items-center justify-between"><span className="text-slate-500">اللوت</span><span className="font-mono text-slate-200 font-semibold">{s.lotSize}</span></div>}
                 {s.riskTarget && <div className="flex items-center justify-between"><span className="text-slate-500">الخطر</span><span className="font-mono text-slate-200">${s.riskTarget}{s.riskPercent ? ` (${s.riskPercent}%)` : ""}</span></div>}
                 {s.actualRisk && <div className="flex items-center justify-between"><span className="text-slate-500">فعلي</span><span className="font-mono text-slate-200">${s.actualRisk}{s.actualRiskPct ? ` (${s.actualRiskPct}%)` : ""}</span></div>}
                 {s.maxRR && <div className="flex items-center justify-between"><span className="text-slate-500">R:R أقصى</span><span className="font-mono text-amber-400 font-bold">1:{s.maxRR}</span></div>}
@@ -248,35 +452,46 @@ function EntryCard({ s, idx, isAdmin, onUpdate, onDelete }: {
               </div>
             </>
           )}
+
+          {/* ── TP Targets (Clickable Cards) ── */}
           {s.takeProfits?.length > 0 && (
             <>
               <Div />
-              <div className="flex items-center justify-between text-[10px] mb-1.5">
-                <span className="flex items-center gap-1 text-slate-400 font-semibold"><Target className="w-3 h-3 text-amber-400" />الأهداف</span>
-                <span className="text-slate-500">R:R</span>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-1.5">
+                  <Target className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="text-[10px] text-slate-300 font-bold">الأهداف</span>
+                  {hitCount > 0 && (
+                    <span className="text-[9px] bg-emerald-500/15 text-emerald-400 px-1.5 py-0.5 rounded-md font-bold ml-1">
+                      {hitCount}/{s.takeProfits.length}
+                    </span>
+                  )}
+                </div>
+                <span className="text-[9px] text-slate-600 font-mono">R:R</span>
               </div>
               <div className="space-y-1.5">
                 {s.takeProfits.map((tp, i) => (
-                  <div key={i} className={`flex items-center justify-between px-3 py-2 rounded-lg border text-xs ${s.hitTpIndex >= 0 && s.hitTpIndex >= i ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" : "bg-white/[0.02] border-white/[0.04] text-slate-300"}`}>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold opacity-50 w-7">TP{i + 1}</span>
-                      <span className="font-bold font-mono">{tp.tp}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-[11px] text-amber-400/80">{tp.rr.toFixed(2)}</span>
-                      {s.hitTpIndex >= 0 && s.hitTpIndex >= i ? <span className="text-emerald-400 text-xs">✅</span> : <span className="text-slate-600 text-[10px]">⏳</span>}
-                    </div>
-                  </div>
+                  <TpMiniCard
+                    key={i}
+                    tp={tp}
+                    index={i}
+                    isHit={s.hitTpIndex >= 0 && s.hitTpIndex >= i}
+                    isLastHit={s.hitTpIndex === i}
+                    entry={s.entry}
+                    type={s.type}
+                  />
                 ))}
               </div>
             </>
           )}
+
+          {/* ── HTF/SMC Trends ── */}
           {(s.htfTrend || s.smcTrend) && (
             <>
               <Div />
               <div className="flex items-center gap-3 text-[11px]">
                 {s.htfTrend && (
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1.5">
                     <Activity className="w-3 h-3 text-slate-500" />
                     <span className="text-slate-500">{s.htfTimeframe || "HTF"}:</span>
                     <span className={`font-semibold ${s.htfTrend === "صاعد" ? "text-emerald-400" : s.htfTrend === "هابط" ? "text-red-400" : "text-slate-400"}`}>
@@ -285,7 +500,7 @@ function EntryCard({ s, idx, isAdmin, onUpdate, onDelete }: {
                   </div>
                 )}
                 {s.smcTrend && (
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1.5">
                     <Zap className="w-3 h-3 text-slate-500" />
                     <span className="text-slate-500">SMC:</span>
                     <span className={`font-semibold ${s.smcTrend === "صاعد" ? "text-emerald-400" : s.smcTrend === "هابط" ? "text-red-400" : "text-slate-400"}`}>{s.smcTrend}</span>
@@ -294,16 +509,21 @@ function EntryCard({ s, idx, isAdmin, onUpdate, onDelete }: {
               </div>
             </>
           )}
+
+          {/* ── Trade Close Status Banner ── */}
+          <TradeStatusBanner s={s} />
+
+          {/* ── Admin Actions ── */}
           {isAdmin && s.status === "ACTIVE" && (
             <>
               <Div />
               <div className="flex flex-wrap gap-1.5">
                 {s.takeProfits?.map((_, i) => (
-                  <button key={i} onClick={() => onUpdate(s.id, "HIT_TP", i)} className="px-2.5 py-1 rounded-lg text-[10px] font-medium bg-sky-500/10 text-sky-400 border border-sky-500/15 active:scale-95 transition-transform">TP{i + 1} ✅</button>
+                  <button key={i} onClick={() => onUpdate(s.id, "HIT_TP", i)} className="px-2.5 py-1 rounded-lg text-[10px] font-medium bg-sky-500/10 text-sky-400 border border-sky-500/15 active:scale-95 transition-transform hover:bg-sky-500/20">TP{i + 1} ✅</button>
                 ))}
-                <button onClick={() => onUpdate(s.id, "HIT_SL")} className="px-2.5 py-1 rounded-lg text-[10px] font-medium bg-red-500/10 text-red-400 border border-red-500/15 active:scale-95 transition-transform">وقف ❌</button>
-                <button onClick={() => onUpdate(s.id, "MANUAL_CLOSE")} className="px-2.5 py-1 rounded-lg text-[10px] font-medium bg-white/[0.04] text-slate-400 border border-white/[0.06] active:scale-95 transition-transform">إغلاق</button>
-                <button onClick={() => onDelete(s.id)} className="px-2.5 py-1 rounded-lg text-[10px] font-medium bg-red-500/5 text-red-300/60 border border-red-500/10 active:scale-95 transition-transform">🗑</button>
+                <button onClick={() => onUpdate(s.id, "HIT_SL")} className="px-2.5 py-1 rounded-lg text-[10px] font-medium bg-red-500/10 text-red-400 border border-red-500/15 active:scale-95 transition-transform hover:bg-red-500/20">وقف ❌</button>
+                <button onClick={() => onUpdate(s.id, "MANUAL_CLOSE")} className="px-2.5 py-1 rounded-lg text-[10px] font-medium bg-white/[0.04] text-slate-400 border border-white/[0.06] active:scale-95 transition-transform hover:bg-white/[0.08]">إغلاق</button>
+                <button onClick={() => onDelete(s.id)} className="px-2.5 py-1 rounded-lg text-[10px] font-medium bg-red-500/5 text-red-300/60 border border-red-500/10 active:scale-95 transition-transform hover:bg-red-500/10">🗑</button>
               </div>
             </>
           )}
@@ -313,83 +533,131 @@ function EntryCard({ s, idx, isAdmin, onUpdate, onDelete }: {
   );
 }
 
+/* ── TP Card (Professional) ── */
 function TpCard({ s, idx, isAdmin, onDelete }: { s: Signal; idx: number; isAdmin: boolean; onDelete: (id: string) => void }) {
   const cc = catCfg[s.signalCategory];
+  const [expanded, setExpanded] = useState(false);
+
   return (
-    <div className="animate-[fadeInUp_0.3s_ease-out]" style={{ animationDelay: `${idx * 30}ms`, animationFillMode: "both" }}>
-      <Glass className={`overflow-hidden ${cc.border}`}>
-        <div className={`h-[2px] bg-gradient-to-l ${cc.accent}`} />
-        <div className="p-3.5 space-y-2.5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-sky-500/15 flex items-center justify-center"><Target className="w-4 h-4 text-sky-400" /></div>
-              <div>
-                <span className="font-bold text-white text-sm">{s.pair}</span>
-                <br />
-                <span className="text-[10px] text-sky-400 font-semibold">{cc.label} — TP{(s.hitTpIndex ?? 0) + 1}</span>
+    <div className="animate-[fadeInUp_0.35s_ease-out]" style={{ animationDelay: `${idx * 40}ms`, animationFillMode: "both" }}>
+      <Glass className={`overflow-hidden ${cc.border} animate-profit-glow`}>
+        <div className={`h-[3px] bg-gradient-to-l ${cc.accent}`} />
+        <button onClick={() => setExpanded(!expanded)} className="w-full text-right">
+          <div className="p-3.5 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${s.signalCategory === "REENTRY_TP" ? "bg-cyan-500/15" : s.signalCategory === "PYRAMID_TP" ? "bg-purple-500/15" : "bg-sky-500/15"} shadow-lg`}>
+                  <div className="w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center animate-check-pop">
+                    <svg className="w-3 h-3 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-white text-sm">{s.pair}</span>
+                    <Badge className={`${s.signalCategory === "REENTRY_TP" ? "bg-cyan-500/15 text-cyan-400 border-cyan-500/25" : s.signalCategory === "PYRAMID_TP" ? "bg-purple-500/15 text-purple-400 border-purple-500/25" : "bg-sky-500/15 text-sky-400 border-sky-500/25"} border text-[9px] font-bold px-2 py-0`}>
+                      TP{(s.hitTpIndex ?? 0) + 1}
+                    </Badge>
+                  </div>
+                  <span className={`text-[10px] font-semibold ${s.signalCategory === "REENTRY_TP" ? "text-cyan-400" : s.signalCategory === "PYRAMID_TP" ? "text-purple-400" : "text-sky-400"}`}>{cc.label}</span>
+                </div>
+              </div>
+              <div className="flex flex-col items-end gap-1">
+                <div className="text-right">
+                  <div className="text-sm font-extrabold font-mono text-emerald-400">+${s.pnlDollars ?? 0}</div>
+                  <div className="text-[9px] font-mono text-emerald-400/60">{s.pnlPoints ?? 0} نقطة</div>
+                </div>
+                <svg className={`w-3.5 h-3.5 text-slate-600 transition-transform duration-300 ${expanded ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
               </div>
             </div>
-            <div className="flex flex-col items-end gap-1">
-              <Badge className="bg-sky-500/15 text-sky-400 border border-sky-500/25 text-[9px] px-2 py-0">{s.partialClose ? "جزئي" : "كامل"}</Badge>
-              <span className="text-[10px] text-slate-500 flex items-center gap-1"><Clock className="w-3 h-3" />{timeAgo(s.createdAt)}</span>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="bg-sky-500/[0.06] rounded-xl p-2.5 border border-sky-500/10">
-              <div className="text-[9px] text-slate-500 mb-0.5">سعر الهدف</div>
-              <div className="text-sm font-bold font-mono text-sky-300">{s.hitPrice ?? "—"}</div>
-            </div>
-            <div className="bg-emerald-500/[0.06] rounded-xl p-2.5 border border-emerald-500/10">
-              <div className="text-[9px] text-slate-500 mb-0.5">الربح</div>
-              <div className="text-sm font-bold font-mono text-emerald-400">
-                +${s.pnlDollars ?? 0}
-                <span className="text-[9px] text-emerald-400/60 mr-1">({s.pnlPoints ?? 0} نقطة)</span>
+            {expanded && (
+              <div className="tp-expand-enter space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="bg-white/[0.03] rounded-xl p-2.5 border border-white/[0.05]">
+                    <div className="text-[9px] text-slate-500 mb-0.5">سعر الهدف</div>
+                    <div className="text-sm font-bold font-mono text-white">{s.hitPrice ?? "—"}</div>
+                  </div>
+                  <div className="bg-emerald-500/[0.06] rounded-xl p-2.5 border border-emerald-500/10">
+                    <div className="text-[9px] text-slate-500 mb-0.5">نوع الإغلاق</div>
+                    <div className="text-sm font-bold text-emerald-400">{s.partialClose ? "جزئي" : "كامل"}</div>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between pt-1 text-[10px]">
+                  <span className="text-slate-500 flex items-center gap-1"><Clock className="w-3 h-3" />{timeAgo(s.createdAt)}</span>
+                  {isAdmin && (
+                    <button onClick={(e) => { e.stopPropagation(); onDelete(s.id); }} className="px-2.5 py-1 rounded-lg text-[10px] font-medium bg-red-500/5 text-red-300/60 border border-red-500/10 active:scale-95 transition-transform">🗑 حذف</button>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
           </div>
-          {isAdmin && <div className="flex justify-end"><button onClick={() => onDelete(s.id)} className="px-2.5 py-1 rounded-lg text-[10px] font-medium bg-red-500/5 text-red-300/60 border border-red-500/10 active:scale-95 transition-transform">🗑 حذف</button></div>}
-        </div>
+        </button>
       </Glass>
     </div>
   );
 }
 
+/* ── SL Card (Professional) ── */
 function SlCard({ s, idx, isAdmin, onDelete }: { s: Signal; idx: number; isAdmin: boolean; onDelete: (id: string) => void }) {
   const cc = catCfg[s.signalCategory];
+  const [expanded, setExpanded] = useState(false);
+
   return (
-    <div className="animate-[fadeInUp_0.3s_ease-out]" style={{ animationDelay: `${idx * 30}ms`, animationFillMode: "both" }}>
-      <Glass className={`overflow-hidden ${cc.border}`}>
-        <div className={`h-[2px] bg-gradient-to-l ${cc.accent}`} />
-        <div className="p-3.5 space-y-2.5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-red-500/15 flex items-center justify-center"><ShieldAlert className="w-4 h-4 text-red-400" /></div>
-              <div>
-                <span className="font-bold text-white text-sm">{s.pair}</span>
-                <br />
-                <span className="text-[10px] text-red-400 font-semibold">{cc.label}</span>
+    <div className="animate-[fadeInUp_0.35s_ease-out]" style={{ animationDelay: `${idx * 40}ms`, animationFillMode: "both" }}>
+      <Glass className={`overflow-hidden ${cc.border} animate-loss-glow`}>
+        <div className={`h-[3px] bg-gradient-to-l ${cc.accent}`} />
+        <button onClick={() => setExpanded(!expanded)} className="w-full text-right">
+          <div className="p-3.5 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${s.signalCategory === "REENTRY_SL" ? "bg-cyan-500/15" : s.signalCategory === "PYRAMID_SL" ? "bg-purple-500/15" : "bg-red-500/15"} shadow-lg`}>
+                  <ShieldAlert className="w-[18px] h-[18px] text-red-400" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-white text-sm">{s.pair}</span>
+                    {s.partialClose && <Badge className="bg-amber-500/15 text-amber-400 border border-amber-500/25 text-[9px] font-bold px-2 py-0">ربح جزئي</Badge>}
+                  </div>
+                  <span className={`text-[10px] font-semibold ${s.signalCategory === "REENTRY_SL" ? "text-cyan-400" : s.signalCategory === "PYRAMID_SL" ? "text-purple-400" : "text-red-400"}`}>{cc.label}</span>
+                </div>
+              </div>
+              <div className="flex flex-col items-end gap-1">
+                <div className="text-right">
+                  <div className="text-sm font-extrabold font-mono text-red-400">-${Math.abs(s.pnlDollars ?? 0)}</div>
+                  <div className="text-[9px] font-mono text-red-400/60">{s.pnlPoints ?? 0} نقطة</div>
+                </div>
+                <svg className={`w-3.5 h-3.5 text-slate-600 transition-transform duration-300 ${expanded ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
               </div>
             </div>
-            <div className="flex flex-col items-end gap-1">
-              {s.partialClose && <Badge className="bg-amber-500/15 text-amber-400 border border-amber-500/25 text-[9px] px-2 py-0">ربح جزئي</Badge>}
-              <span className="text-[10px] text-slate-500 flex items-center gap-1"><Clock className="w-3 h-3" />{timeAgo(s.createdAt)}</span>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="bg-red-500/[0.06] rounded-xl p-2.5 border border-red-500/10">
-              <div className="text-[9px] text-slate-500 mb-0.5">سعر الوقف</div>
-              <div className="text-sm font-bold font-mono text-red-300">{s.hitPrice ?? "—"}</div>
-            </div>
-            <div className="bg-red-500/[0.06] rounded-xl p-2.5 border border-red-500/10">
-              <div className="text-[9px] text-slate-500 mb-0.5">الخسارة</div>
-              <div className="text-sm font-bold font-mono text-red-400">
-                -${Math.abs(s.pnlDollars ?? 0)}
-                <span className="text-[9px] text-red-400/60 mr-1">({s.pnlPoints ?? 0} نقطة)</span>
+            {expanded && (
+              <div className="tp-expand-enter space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="bg-white/[0.03] rounded-xl p-2.5 border border-white/[0.05]">
+                    <div className="text-[9px] text-slate-500 mb-0.5">سعر الوقف</div>
+                    <div className="text-sm font-bold font-mono text-red-300">{s.hitPrice ?? "—"}</div>
+                  </div>
+                  <div className="bg-red-500/[0.06] rounded-xl p-2.5 border border-red-500/10">
+                    <div className="text-[9px] text-slate-500 mb-0.5">الخسارة</div>
+                    <div className="text-sm font-bold font-mono text-red-400">
+                      -${Math.abs(s.pnlDollars ?? 0)}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between pt-1 text-[10px]">
+                  <span className="text-slate-500 flex items-center gap-1"><Clock className="w-3 h-3" />{timeAgo(s.createdAt)}</span>
+                  {isAdmin && (
+                    <button onClick={(e) => { e.stopPropagation(); onDelete(s.id); }} className="px-2.5 py-1 rounded-lg text-[10px] font-medium bg-red-500/5 text-red-300/60 border border-red-500/10 active:scale-95 transition-transform">🗑 حذف</button>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
           </div>
-          {isAdmin && <div className="flex justify-end"><button onClick={() => onDelete(s.id)} className="px-2.5 py-1 rounded-lg text-[10px] font-medium bg-red-500/5 text-red-300/60 border border-red-500/10 active:scale-95 transition-transform">🗑 حذف</button></div>}
-        </div>
+        </button>
       </Glass>
     </div>
   );
