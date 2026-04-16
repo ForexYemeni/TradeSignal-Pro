@@ -35,7 +35,7 @@ interface Signal {
   instrument?: string; createdAt: string;
 }
 
-interface AdminSession { id: string; email: string; name: string; mustChangePwd: boolean }
+interface AdminSession { id: string; email: string; name: string; mustChangePwd: boolean; role?: string }
 
 interface Stats {
   total: number; active: number; hitTp: number; hitSl: number;
@@ -44,8 +44,8 @@ interface Stats {
   topPairs: { pair: string; count: number }[];
 }
 
-type View = "login" | "main" | "changePwd";
-type Tab = "signals" | "dashboard" | "analyst" | "account";
+type View = "login" | "register" | "main" | "changePwd";
+type Tab = "signals" | "dashboard" | "analyst" | "users" | "account";
 type Filter = "all" | "buy" | "sell" | "active" | "closed";
 
 /* ═══════════════════════════════════════════════════════════════
@@ -720,6 +720,18 @@ export default function HomePage() {
   const [showCp, setShowCp] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
 
+  /* ── Register ── */
+  const [regName, setRegName] = useState("");
+  const [regEmail, setRegEmail] = useState("");
+  const [regPwd, setRegPwd] = useState("");
+  const [regLoad, setRegLoad] = useState(false);
+  const [regErr, setRegErr] = useState("");
+  const [regSuccess, setRegSuccess] = useState("");
+
+  /* ── Users Management ── */
+  const [users, setUsers] = useState<{ id: string; name: string; email: string; role: string; status: string; createdAt: string }[]>([]);
+  const [usersLoad, setUsersLoad] = useState(false);
+
   /* ── Session Init: restore from localStorage ── */
   const [dbReady, setDbReady] = useState(false);
   const [dbError, setDbError] = useState("");
@@ -809,6 +821,13 @@ export default function HomePage() {
     Promise.all([fetchSignals(), fetchStats()]).finally(() => setLoading(false));
   }, [refreshKey]);
 
+  /* ── Load users when admin switches to users tab ── */
+  useEffect(() => {
+    if (view === "main" && tab === "users" && session?.role === "admin") {
+      fetchUsers();
+    }
+  }, [tab, view]);
+
   /* ── Handlers ── */
   async function handleLogin() {
     setLoginErr("");
@@ -864,6 +883,60 @@ export default function HomePage() {
     setView("login");
     setTab("signals");
     prevIdsRef.current = new Set();
+  }
+
+  async function handleRegister() {
+    setRegErr(""); setRegSuccess("");
+    if (!regName || !regEmail || !regPwd) { setRegErr("جميع الحقول مطلوبة"); return; }
+    if (regPwd.length < 4) { setRegErr("كلمة المرور يجب أن تكون 4 أحرف على الأقل"); return; }
+    setRegLoad(true);
+    try {
+      const res = await fetch("/api/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: regName, email: regEmail, password: regPwd }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setRegSuccess("تم إنشاء الحساب بنجاح! في انتظار موافقة الإدارة.");
+        setRegName(""); setRegEmail(""); setRegPwd("");
+      } else {
+        setRegErr(data.error || "فشل إنشاء الحساب");
+      }
+    } catch { setRegErr("خطأ في الاتصال بالخادم"); }
+    finally { setRegLoad(false); }
+  }
+
+  async function fetchUsers() {
+    setUsersLoad(true);
+    try {
+      const res = await fetch("/api/users");
+      const data = await res.json();
+      if (data.success) setUsers(data.users);
+    } catch (e) { console.error("Fetch users:", e); }
+    finally { setUsersLoad(false); }
+  }
+
+  async function handleUserAction(id: string, action: string) {
+    try {
+      await fetch("/api/users", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, action }),
+      });
+      fetchUsers();
+    } catch (e) { console.error("User action:", e); }
+  }
+
+  async function handleDeleteUser(id: string) {
+    try {
+      await fetch("/api/users", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      fetchUsers();
+    } catch (e) { console.error("Delete user:", e); }
   }
 
   async function handleUpdate(id: string, status: string, tpIdx?: number) {
@@ -995,11 +1068,72 @@ export default function HomePage() {
               </Button>
             </div>
             <div className="text-center text-[10px] text-slate-600">الإصدار 2.0 | FOREXYEMENI PRO</div>
+            <div className="text-center">
+              <button onClick={() => { setView("register"); setLoginErr(""); }} className="text-xs text-sky-400 hover:text-sky-300 transition-colors font-medium">
+                إنشاء حساب جديد
+              </button>
+            </div>
             {dbError && (
               <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2 text-xs text-red-400 text-center">
                 ⚠️ {dbError}
               </div>
             )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     RENDER: REGISTER
+     ═══════════════════════════════════════════════════════════════ */
+  if (view === "register") {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4" style={{ background: "linear-gradient(135deg, #080d1a 0%, #0f172a 50%, #080d1a 100%)" }}>
+        <div className="w-full max-w-sm animate-[fadeIn_0.4s_ease-out]">
+          <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-xl p-6 space-y-5">
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-sky-400 to-blue-600 flex items-center justify-center shadow-lg shadow-sky-500/20">
+                <User className="w-7 h-7 text-white" />
+              </div>
+              <div className="text-center">
+                <h2 className="text-lg font-bold text-white">إنشاء حساب جديد</h2>
+                <p className="text-xs text-slate-400 mt-1">سجل الآن وانتظر موافقة الإدارة</p>
+              </div>
+            </div>
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <label className="text-xs text-slate-400">الاسم الكامل</label>
+                <Input value={regName} onChange={e => setRegName(e.target.value)} placeholder="أدخل اسمك"
+                  className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-slate-600 h-11 rounded-xl text-sm" dir="rtl" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-slate-400 flex items-center gap-1.5"><Mail className="w-3.5 h-3.5" />البريد الإلكتروني</label>
+                <Input type="email" value={regEmail} onChange={e => setRegEmail(e.target.value)} placeholder="example@email.com"
+                  className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-slate-600 h-11 rounded-xl text-sm" dir="ltr" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-slate-400 flex items-center gap-1.5"><Lock className="w-3.5 h-3.5" />كلمة المرور</label>
+                <Input type="password" value={regPwd} onChange={e => setRegPwd(e.target.value)} placeholder="••••••••"
+                  className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-slate-600 h-11 rounded-xl text-sm" dir="ltr"
+                  onKeyDown={e => e.key === "Enter" && handleRegister()} />
+              </div>
+              {regErr && <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2 text-xs text-red-400 text-center">{regErr}</div>}
+              {regSuccess && (
+                <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-3 py-2 text-xs text-emerald-400 text-center animate-[fadeIn_0.3s_ease-out]">
+                  {regSuccess}
+                </div>
+              )}
+              <Button onClick={handleRegister} disabled={regLoad || !regName || !regEmail || !regPwd}
+                className="w-full h-11 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 text-white font-bold text-sm hover:from-sky-400 hover:to-blue-500 transition-all active:scale-[0.98] disabled:opacity-50">
+                {regLoad ? <Loader2 className="w-4 h-4 animate-spin" /> : "إنشاء الحساب"}
+              </Button>
+            </div>
+            <div className="text-center">
+              <button onClick={() => setView("login")} className="text-xs text-slate-400 hover:text-white transition-colors">
+                لديك حساب؟ تسجيل الدخول
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -1064,12 +1198,13 @@ export default function HomePage() {
     { key: "sell", label: "بيع" }, { key: "active", label: "نشطة" }, { key: "closed", label: "مغلقة" },
   ];
 
-  const tabs: { key: Tab; label: string; icon: React.ReactNode; badge?: number }[] = [
+  const tabs: { key: Tab; label: string; icon: React.ReactNode; badge?: number; adminOnly?: boolean }[] = [
     { key: "signals", label: "الإشارات", icon: <Activity className="w-5 h-5" />, badge: activeCount },
     { key: "dashboard", label: "الإحصائيات", icon: <BarChart3 className="w-5 h-5" /> },
     { key: "analyst", label: "المحلل", icon: <Send className="w-5 h-5" /> },
+    { key: "users", label: "المستخدمين", icon: <User className="w-5 h-5" />, adminOnly: true },
     { key: "account", label: "الحساب", icon: <User className="w-5 h-5" /> },
-  ];
+  ].filter(t => !t.adminOnly || session?.role === "admin");
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "linear-gradient(135deg, #080d1a 0%, #0f172a 50%, #080d1a 100%)" }}>
@@ -1263,6 +1398,117 @@ export default function HomePage() {
         )}
 
         {/* ══════ TAB: ACCOUNT ══════ */}
+        {tab === "users" && session?.role === "admin" && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-bold text-white flex items-center gap-2"><User className="w-4 h-4 text-amber-400" />إدارة المستخدمين</h2>
+              <button onClick={fetchUsers} className="px-3 py-1.5 rounded-lg text-[10px] font-medium bg-white/[0.04] text-slate-400 border border-white/[0.06] active:scale-95 transition-transform hover:bg-white/[0.08]">
+                تحديث
+              </button>
+            </div>
+            {usersLoad && <div className="space-y-3"><SkeletonCard /><SkeletonCard /></div>}
+            {!usersLoad && users.length === 0 && (
+              <Glass className="p-6 text-center">
+                <User className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+                <p className="text-xs text-slate-500">لا يوجد مستخدمين بعد</p>
+                <p className="text-[10px] text-slate-600 mt-1">المستخدمون الجدد سيظهرون هنا بعد التسجيل</p>
+              </Glass>
+            )}
+            {!usersLoad && users.length > 0 && (
+              <div className="space-y-2">
+                {/* Pending Users */}
+                {users.filter(u => u.status === "pending").length > 0 && (
+                  <div className="mb-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                      <span className="text-[10px] text-amber-400 font-bold">بانتظار الموافقة ({users.filter(u => u.status === "pending").length})</span>
+                    </div>
+                    {users.filter(u => u.status === "pending").map(u => (
+                      <Glass key={u.id} className="p-3 mb-2 border-amber-500/15">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-9 h-9 rounded-xl bg-amber-500/15 flex items-center justify-center">
+                              <User className="w-4 h-4 text-amber-400" />
+                            </div>
+                            <div>
+                              <div className="text-xs font-bold text-white">{u.name}</div>
+                              <div className="text-[10px] text-slate-500 font-mono" dir="ltr">{u.email}</div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <button onClick={() => handleUserAction(u.id, "approve")} className="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 active:scale-95 transition-transform">قبول</button>
+                            <button onClick={() => handleDeleteUser(u.id)} className="px-2 py-1.5 rounded-lg text-[10px] font-medium bg-red-500/10 text-red-400 border border-red-500/15 active:scale-95 transition-transform">رفض</button>
+                          </div>
+                        </div>
+                      </Glass>
+                    ))}
+                  </div>
+                )}
+                {/* Active Users */}
+                {users.filter(u => u.status === "active").length > 0 && (
+                  <div className="mb-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                      <span className="text-[10px] text-emerald-400 font-bold">مستخدمون نشطون ({users.filter(u => u.status === "active").length})</span>
+                    </div>
+                    {users.filter(u => u.status === "active").map(u => (
+                      <Glass key={u.id} className="p-3 mb-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2.5">
+                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${u.role === "admin" ? "bg-amber-500/15" : "bg-emerald-500/10"}`}>
+                              <User className={`w-4 h-4 ${u.role === "admin" ? "text-amber-400" : "text-emerald-400"}`} />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs font-bold text-white">{u.name}</span>
+                                {u.role === "admin" && <span className="text-[8px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded-md font-bold">مدير</span>}
+                              </div>
+                              <div className="text-[10px] text-slate-500 font-mono" dir="ltr">{u.email}</div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            {u.role !== "admin" && (
+                              <button onClick={() => handleUserAction(u.id, "make_admin")} className="px-2 py-1.5 rounded-lg text-[9px] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/15 active:scale-95 transition-transform">ترقية</button>
+                            )}
+                            <button onClick={() => handleUserAction(u.id, "block")} className="px-2 py-1.5 rounded-lg text-[9px] font-medium bg-red-500/10 text-red-400 border border-red-500/15 active:scale-95 transition-transform">حظر</button>
+                          </div>
+                        </div>
+                      </Glass>
+                    ))}
+                  </div>
+                )}
+                {/* Blocked Users */}
+                {users.filter(u => u.status === "blocked").length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-2 h-2 rounded-full bg-red-400" />
+                      <span className="text-[10px] text-red-400 font-bold">محظورون ({users.filter(u => u.status === "blocked").length})</span>
+                    </div>
+                    {users.filter(u => u.status === "blocked").map(u => (
+                      <Glass key={u.id} className="p-3 mb-2 opacity-60">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-9 h-9 rounded-xl bg-red-500/10 flex items-center justify-center">
+                              <User className="w-4 h-4 text-red-400" />
+                            </div>
+                            <div>
+                              <div className="text-xs font-bold text-white">{u.name}</div>
+                              <div className="text-[10px] text-slate-500 font-mono" dir="ltr">{u.email}</div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <button onClick={() => handleUserAction(u.id, "unblock")} className="px-2 py-1.5 rounded-lg text-[9px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/15 active:scale-95 transition-transform">فتح</button>
+                            <button onClick={() => handleDeleteUser(u.id)} className="px-2 py-1.5 rounded-lg text-[9px] font-medium bg-red-500/10 text-red-400 border border-red-500/15 active:scale-95 transition-transform">حذف</button>
+                          </div>
+                        </div>
+                      </Glass>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
         {tab === "account" && session && (
           <div className="space-y-4">
             {/* Admin Info */}

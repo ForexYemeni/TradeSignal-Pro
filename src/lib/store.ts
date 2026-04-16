@@ -54,6 +54,18 @@ export interface StoredAdmin {
   updatedAt: string;
 }
 
+export interface StoredUser {
+  id: string;
+  name: string;
+  email: string;
+  passwordHash: string;
+  role: "admin" | "user";
+  status: "pending" | "active" | "blocked";
+  mustChangePwd: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // ─── Signals ────────────────────────────────────────────
 export async function getSignals(limit = 100): Promise<StoredSignal[]> {
   const data = await kv.get<StoredSignal[]>('signals');
@@ -130,5 +142,65 @@ export async function isReady(): Promise<boolean> {
     return true;
   } catch {
     return false;
+  }
+}
+
+// ─── Users ─────────────────────────────────────────────
+export async function getUsers(): Promise<StoredUser[]> {
+  const data = await kv.get<StoredUser[]>('users');
+  return data || [];
+}
+
+export async function getUserById(id: string): Promise<StoredUser | null> {
+  const users = await getUsers();
+  return users.find(u => u.id === id) || null;
+}
+
+export async function getUserByEmail(email: string): Promise<StoredUser | null> {
+  const users = await getUsers();
+  return users.find(u => u.email.toLowerCase() === email.toLowerCase()) || null;
+}
+
+export async function addUser(user: StoredUser): Promise<StoredUser> {
+  const users = await getUsers();
+  users.push(user);
+  await kv.set('users', users);
+  return user;
+}
+
+export async function updateUser(id: string, updates: Partial<StoredUser>): Promise<StoredUser | null> {
+  const users = await getUsers();
+  const idx = users.findIndex(u => u.id === id);
+  if (idx === -1) return null;
+  users[idx] = { ...users[idx], ...updates, updatedAt: new Date().toISOString() };
+  await kv.set('users', users);
+  return users[idx];
+}
+
+export async function deleteUser(id: string): Promise<boolean> {
+  const users = await getUsers();
+  const filtered = users.filter(u => u.id !== id);
+  if (filtered.length === users.length) return false;
+  await kv.set('users', filtered);
+  return true;
+}
+
+// ─── Migrate Admin to Users ─────────────────────────────
+export async function migrateAdminToUsers(): Promise<void> {
+  const admin = await getAdmin();
+  if (!admin) return;
+  const existing = await getUserByEmail(admin.email);
+  if (!existing) {
+    await addUser({
+      id: admin.id,
+      name: admin.name,
+      email: admin.email,
+      passwordHash: admin.passwordHash,
+      role: "admin",
+      status: "active",
+      mustChangePwd: admin.mustChangePwd,
+      createdAt: admin.createdAt,
+      updatedAt: admin.updatedAt,
+    });
   }
 }
