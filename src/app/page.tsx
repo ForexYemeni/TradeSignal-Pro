@@ -44,7 +44,7 @@ interface Stats {
   topPairs: { pair: string; count: number }[];
 }
 
-type View = "splash" | "login" | "register" | "pending" | "blocked" | "expired" | "main" | "changePwd";
+type View = "login" | "register" | "pending" | "blocked" | "expired" | "main" | "changePwd";
 type Tab = "signals" | "dashboard" | "analyst" | "users" | "account";
 type Filter = "all" | "buy" | "sell" | "active" | "closed";
 
@@ -678,8 +678,8 @@ function SignalCard({ s, idx, isAdmin, onUpdate, onDelete }: {
    MAIN APP
    ═══════════════════════════════════════════════════════════════ */
 export default function HomePage() {
-  /* ── View: splash shows first, then login ── */
-  const [view, setView] = useState<View>("splash");
+  /* ── View: login shows first ── */
+  const [view, setView] = useState<View>("login");
   const [session, setSession] = useState<AdminSession | null>(null);
 
   /* ── Login ── */
@@ -787,12 +787,8 @@ export default function HomePage() {
       } catch { /* ignore */ }
     }
 
-    // Splash screen for 2 seconds, then transition
-    const splashTimer = setTimeout(() => {
-      initDb().then(() => restoreSession());
-    }, 2000);
-
-    return () => clearTimeout(splashTimer);
+    // Start DB init immediately, no splash delay
+    initDb().then(() => restoreSession());
   }, []);
 
   /* ── Fetch Signals ── */
@@ -1102,45 +1098,19 @@ export default function HomePage() {
   const filtered = getFiltered();
 
   /* ═══════════════════════════════════════════════════════════════
-     RENDER: SPLASH SCREEN
-     ═══════════════════════════════════════════════════════════════ */
-  if (view === "splash") {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center splash-fade-in" style={{ background: "#070b14" }}>
-        <div className="glass-panel rounded-3xl p-8 relative premium-glow">
-          {/* Animated chart bars */}
-          <div className="flex items-end justify-center gap-2 h-16 mb-6">
-            <div className="chart-bar" style={{ height: "60%", animationDelay: "0s" }} />
-            <div className="chart-bar" style={{ height: "85%", animationDelay: "0.15s" }} />
-            <div className="chart-bar chart-bar-green" style={{ height: "100%", animationDelay: "0.3s" }} />
-          </div>
-          {/* Check icon overlay */}
-          <div className="absolute top-6 right-6 w-8 h-8 rounded-full gold-gradient flex items-center justify-center">
-            <svg className="w-4 h-4 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
-        </div>
-        <div className="mt-8 text-center">
-          <h1 className="text-2xl font-bold gold-gradient bg-clip-text text-transparent">ForexYemeni VIP</h1>
-        </div>
-      </div>
-    );
-  }
-
-  /* ═══════════════════════════════════════════════════════════════
      RENDER: LOGIN (VIP Premium Design)
      ═══════════════════════════════════════════════════════════════ */
   if (view === "login") {
     if (!dbReady) {
       return (
-        <div className="min-h-screen flex items-center justify-center p-4" style={{ background: "#070b14" }}>
-          <div className="text-center space-y-4 animate-pulse">
-            <div className="w-16 h-16 rounded-2xl gold-gradient flex items-center justify-center mx-auto shadow-lg shadow-amber-500/20">
-              <Loader2 className="w-8 h-8 text-black animate-spin" />
-            </div>
-            <div className="text-white text-sm">جاري تهيئة النظام...</div>
+        <div className="min-h-screen flex flex-col items-center justify-center p-4" style={{ background: "#070b14" }}>
+          <div className="w-20 h-20 rounded-2xl gold-gradient flex items-center justify-center mx-auto shadow-lg shadow-amber-500/25 mb-6 animate-pulse">
+            <svg className="w-10 h-10 text-black" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5zm14 3c0 .6-.4 1-1 1H6c-.6 0-1-.4-1-1v-1h14v1z" />
+            </svg>
           </div>
+          <h2 className="text-xl font-bold text-white mb-2">ForexYemeni</h2>
+          <p className="text-sm" style={{ color: "#FFD700" }}>جاري التحميل...</p>
         </div>
       );
     }
