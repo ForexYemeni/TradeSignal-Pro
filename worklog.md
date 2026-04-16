@@ -81,3 +81,36 @@ Stage Summary:
 - Hit TPs show green glow with checkmark animation
 - Trade close status shown as animated banner (profit green, loss red)
 - Build successful, ready for deployment
+
+---
+Task ID: 3
+Agent: Main Agent
+Task: VIP Premium Redesign - Login, Register, Status Views & Splash Screen
+
+Work Log:
+- Added "splash", "pending", "blocked", "expired" to View type union
+- Added `status?: string` to AdminSession interface
+- Changed default view from "login" to "splash" with 2-second auto-dismiss
+- Updated session restore logic to check role/status (pending/blocked/expired) before entering main view
+- Modified handleLogin to detect pending/blocked/expired flags in API error response and redirect to status views
+- Redesigned splash screen: dark #070b14 background, glass-panel with animated chart bars (gold/gold/green), check icon overlay, "ForexYemeni VIP" gold text
+- Redesigned login view: VIP premium with gold/green gradient blurs, crown SVG logo, gold gradient title "VIP TRADING SIGNALS", glass-morphism input-glass fields (60px height), gold gradient login button, Arabic gold register link
+- Redesigned register view: matching dark bg with blurs, user icon in blue gradient, glass-morphism inputs, white gradient submit button ("طلب اشتراك"), gold login link
+- Added pending status view: blue hourglass icon with gentle pulse, "حسابك قيد المراجعة" heading, VIP welcome subtitle, gold logout button
+- Added blocked status view: red lock icon with red background glow, "حساب محظور" in red, red logout button, red border panel
+- Added expired status view: gold ban icon, "انتهى اشتراكك" in gold, gold logout button
+- Redesigned changePwd view: matching VIP dark bg with blurs, gold gradient inputs, gold gradient submit button
+- All views use consistent max-w-[480px], rounded-3xl glass panels, fadeInUp animation
+- CSS classes used: glass-panel, gold-gradient, input-glass, chart-bar, chart-bar-green, status-pending-icon, splash-fade-in, premium-glow
+- No changes to signal cards, dashboard, analyst, users management, or main app views
+- All existing state variables, handlers, and functionality preserved intact
+- Lint: Clean (no warnings/errors)
+
+Stage Summary:
+- page.tsx: Updated auth views with VIP premium design
+- View type: "splash" | "login" | "register" | "pending" | "blocked" | "expired" | "main" | "changePwd"
+- New user flow: Splash (2s) → Login → (status check) → Main/Status views
+- API integration: pending/blocked detected from error response flags (data.pending, data.blocked)
+- All signal-related components untouched (SignalCard, TpMiniCard, TradeStatusBanner, etc.)
+- Build: Successful
+- Lint: Clean
