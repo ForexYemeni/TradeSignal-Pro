@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserByEmail, addUser, migrateAdminToUsers } from "@/lib/store";
+import { sendPushToAdmins } from "@/lib/push";
 
 export async function POST(request: NextRequest) {
   try {
@@ -35,6 +36,17 @@ export async function POST(request: NextRequest) {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
+
+    // ── Notify admins about new registration ──
+    sendPushToAdmins({
+      title: `👤 مستخدم جديد بانتظار الموافقة`,
+      body: `${name} — ${email.toLowerCase()}`,
+      tag: `new-user-${user.id}`,
+      sound: 'new_signal',
+      requireInteraction: true,
+      urgency: 'high',
+      data: { type: 'new_registration', userName: name, userEmail: email.toLowerCase(), userId: user.id },
+    }).catch(() => {});
 
     return NextResponse.json({
       success: true,

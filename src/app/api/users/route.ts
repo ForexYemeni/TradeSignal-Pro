@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getUsers, updateUser, deleteUser } from "@/lib/store";
+import { getUsers, updateUser, deleteUser, getUserById } from "@/lib/store";
+import { sendPushToAdmins } from "@/lib/push";
 
 export async function GET() {
   try {
@@ -46,6 +47,39 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ success: false, error: "المستخدم غير موجود" }, { status: 404 });
     }
 
+    // ── Notify admins about user status change ──
+    if (action === "approve") {
+      sendPushToAdmins({
+        title: `✅ تم قبول مستخدم`,
+        body: `${user.name} — ${user.email}`,
+        tag: `user-approved-${id}`,
+        sound: 'tp_hit',
+        requireInteraction: false,
+        urgency: 'normal',
+        data: { type: 'user_approved', userName: user.name },
+      }).catch(() => {});
+    } else if (action === "block") {
+      sendPushToAdmins({
+        title: `🚫 تم حظر مستخدم`,
+        body: `${user.name} — ${user.email}`,
+        tag: `user-blocked-${id}`,
+        sound: 'sl_hit',
+        requireInteraction: false,
+        urgency: 'normal',
+        data: { type: 'user_blocked', userName: user.name },
+      }).catch(() => {});
+    } else if (action === "make_admin") {
+      sendPushToAdmins({
+        title: `👑 تم ترقية مستخدم لأدمن`,
+        body: `${user.name} — ${user.email}`,
+        tag: `user-admin-${id}`,
+        sound: 'tp_hit',
+        requireInteraction: false,
+        urgency: 'normal',
+        data: { type: 'user_made_admin', userName: user.name },
+      }).catch(() => {});
+    }
+
     return NextResponse.json({ success: true, user: { id: user.id, name: user.name, email: user.email, role: user.role, status: user.status } });
   } catch (error) {
     console.error("Update user error:", error);
@@ -60,9 +94,24 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ success: false, error: "معرف المستخدم مطلوب" }, { status: 400 });
     }
 
+    // Get user info before deleting for notification
+    const user = await getUserById(id);
     const deleted = await deleteUser(id);
     if (!deleted) {
       return NextResponse.json({ success: false, error: "المستخدم غير موجود" }, { status: 404 });
+    }
+
+    // Notify admins
+    if (user) {
+      sendPushToAdmins({
+        title: `🗑 تم حذف مستخدم`,
+        body: `${user.name} — ${user.email}`,
+        tag: `user-deleted-${id}`,
+        sound: 'sl_hit',
+        requireInteraction: false,
+        urgency: 'normal',
+        data: { type: 'user_deleted', userName: user.name },
+      }).catch(() => {});
     }
 
     return NextResponse.json({ success: true });

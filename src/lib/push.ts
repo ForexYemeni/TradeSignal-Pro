@@ -6,7 +6,7 @@
  */
 
 import webpush from 'web-push';
-import { getPushSubscriptions, PushSubscription } from './store';
+import { getPushSubscriptions, PushSubscription, getUsers } from './store';
 
 // Configure VAPID
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || '';
@@ -126,6 +126,61 @@ export async function sendPushToUser(userId: string, payload: PushPayload): Prom
   } catch (err) {
     console.error(`[Push] Error sending to user ${userId}:`, err);
     return false;
+  }
+}
+
+/**
+ * Send push notification to ADMIN users only
+ */
+export async function sendPushToAdmins(payload: PushPayload): Promise<{ success: number; failed: number }> {
+  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
+    return { success: 0, failed: 0 };
+  }
+
+  try {
+    const [subs, users] = await Promise.all([getPushSubscriptions(), getUsers()]);
+
+    // Get admin user IDs
+    const adminIds = new Set(
+      users.filter(u => u.role === "admin").map(u => u.id)
+    );
+
+    // Filter subscriptions to admins only
+    const adminSubs = subs.filter(s => adminIds.has(s.userId));
+    if (adminSubs.length === 0) return { success: 0, failed: 0 };
+
+    let success = 0;
+    let failed = 0;
+
+    const promises = adminSubs.map(async (sub) => {
+      try {
+        await webpush.sendNotification(
+          { endpoint: sub.endpoint, keys: sub.keys },
+          JSON.stringify({
+            title: payload.title,
+            body: payload.body,
+            icon: payload.icon || '/icon-192x192.png',
+            badge: payload.badge || '/icon-192x192.png',
+            tag: payload.tag || `fy-admin-${Date.now()}`,
+            data: payload.data || {},
+            sound: payload.sound || 'new_signal',
+            requireInteraction: payload.requireInteraction !== false,
+            actions: [{ action: 'open', title: 'فتح التطبيق' }],
+          }),
+          { TTL: 86400, urgency: payload.urgency || 'high' }
+        );
+        success++;
+      } catch (err) {
+        failed++;
+      }
+    });
+
+    await Promise.allSettled(promises);
+    console.log(`[Push] Sent admin notification to ${success}/${adminSubs.length} admins`);
+    return { success, failed };
+  } catch (error) {
+    console.error('[Push] Error sending admin notifications:', error);
+    return { success: 0, failed: 0 };
   }
 }
 
