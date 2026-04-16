@@ -35,8 +35,8 @@ export async function POST(request: NextRequest) {
       stopLoss: parseResult.signal.stopLoss,
       takeProfits: JSON.stringify(parseResult.signal.takeProfits),
       confidence: parseResult.signal.confidence,
-      status: parseResult.signal.signalCategory === "SL_HIT" ? "HIT_SL" :
-              parseResult.signal.signalCategory === "TP_HIT" ? "HIT_TP" : "ACTIVE",
+      status: ["SL_HIT", "REENTRY_SL", "PYRAMID_SL"].includes(parseResult.signal.signalCategory) ? "HIT_SL" :
+              ["TP_HIT", "REENTRY_TP", "PYRAMID_TP"].includes(parseResult.signal.signalCategory) ? "HIT_TP" : "ACTIVE",
       signalCategory: parseResult.signal.signalCategory,
       rawText: parseResult.signal.rawText,
       timeframe: parseResult.signal.timeframe,

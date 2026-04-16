@@ -221,6 +221,9 @@ function parseTPHitAlert(text: string): ParseResult {
 // ═══════════════════════════════════════════════════════════════
 function parseSLHitAlert(text: string): ParseResult {
   const pair = extractPair(text) || "";
+  const slPrice = extractStopLoss(text) || 0;
+  const pnlPoints = extractPnLPoints(text) || 0;
+  const pnlDollar = extractPnLDollar(text) || 0;
   const tpStatusList = extractTPStatusList(text);
   const partialWin = /ربح جزئي/.test(text);
 
@@ -230,7 +233,7 @@ function parseSLHitAlert(text: string): ParseResult {
       pair,
       type: "BUY",
       entry: 0,
-      stopLoss: 0,
+      stopLoss: slPrice,
       takeProfits: [],
       confidence: 0,
       signalCategory: "SL_HIT",
@@ -238,6 +241,9 @@ function parseSLHitAlert(text: string): ParseResult {
       hitTpIndex: -1,
       tpStatusList,
       partialWin,
+      hitPrice: slPrice,
+      pnlPoints,
+      pnlDollar,
       timeframe: "",
       htfTimeframe: "",
       htfTrend: "",
@@ -299,15 +305,18 @@ function parseReentryTPAlert(text: string): ParseResult {
 
 function parseReentrySLAlert(text: string): ParseResult {
   const pair = extractPair(text) || "";
+  const slPrice = extractStopLoss(text) || 0;
+  const pnlPoints = extractPnLPoints(text) || 0;
+  const pnlDollar = extractPnLDollar(text) || 0;
   const partialWin = /ربح جزئي/.test(text);
 
   return {
     success: true,
     signal: {
-      pair, type: "BUY", entry: 0, stopLoss: 0,
+      pair, type: "BUY", entry: 0, stopLoss: slPrice,
       takeProfits: [], confidence: 0,
       signalCategory: "REENTRY_SL", rawText: text,
-      partialWin,
+      partialWin, hitPrice: slPrice, pnlPoints, pnlDollar,
       timeframe: "", htfTimeframe: "", htfTrend: "", smcTrend: "",
       riskData: emptyRiskData(),
     },
@@ -357,15 +366,18 @@ function parsePyramidTPAlert(text: string): ParseResult {
 
 function parsePyramidSLAlert(text: string): ParseResult {
   const pair = extractPair(text) || "";
+  const slPrice = extractStopLoss(text) || 0;
+  const pnlPoints = extractPnLPoints(text) || 0;
+  const pnlDollar = extractPnLDollar(text) || 0;
   const partialWin = /ربح جزئي/.test(text);
 
   return {
     success: true,
     signal: {
-      pair, type: "BUY", entry: 0, stopLoss: 0,
+      pair, type: "BUY", entry: 0, stopLoss: slPrice,
       takeProfits: [], confidence: 0,
       signalCategory: "PYRAMID_SL", rawText: text,
-      partialWin,
+      partialWin, hitPrice: slPrice, pnlPoints, pnlDollar,
       timeframe: "", htfTimeframe: "", htfTrend: "", smcTrend: "",
       riskData: emptyRiskData(),
     },
@@ -445,7 +457,8 @@ function extractTimeframes(text: string): { timeframe: string; htfTimeframe: str
   let htfTimeframe = "";
 
   // Pattern: "📌 XAUUSD │ 15 │ 1س"
-  const tfMatch = text.match(/│\s*(\d+[sdmHWM]?)\s*│\s*(\d+\s*[سدشم]?)\s*│/);
+  // Pattern: "📌 XAUUSD │ 15 │ 1س" (2 separators, not 3)
+  const tfMatch = text.match(/│\s*(\d+[sdmHWM]?)\s*│\s*(\d+\s*[سدشم]?)/);
   if (tfMatch) {
     timeframe = tfMatch[1].trim();
     htfTimeframe = tfMatch[2].trim();
@@ -605,14 +618,17 @@ function extractHitPrice(text: string): number | null {
 }
 
 function extractPnLPoints(text: string): number | null {
-  const match = text.match(/\+([\d,.]+)\s*نقطة/);
+  const match = text.match(/([+-]?[\d,.]+)\s*نقطة/);
   if (match) return parseFloat(match[1].replace(/,/g, ""));
   return null;
 }
 
 function extractPnLDollar(text: string): number | null {
-  const match = text.match(/(?:ربح تقريبي|ربح)[s:]?\s*:\s*\+\$?([\d,.]+)/);
-  if (match) return parseFloat(match[1].replace(/,/g, ""));
+  const match = text.match(/(?:ربح تقريبي|ربح|الخسارة|خسارة)[s:]?\s*[:\-–]?\s*[+-]?\$?([\d,.]+)/);
+  if (match) {
+    const val = parseFloat(match[1].replace(/,/g, ""));
+    return /الخسارة|خسارة/.test(match[0]) && !/\+/.test(match[0]) ? -val : val;
+  }
   return null;
 }
 
