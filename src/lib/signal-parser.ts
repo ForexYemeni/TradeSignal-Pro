@@ -42,6 +42,7 @@ export interface ParsedSignal {
   pnlPoints?: number;
   pnlDollar?: number;
   tpStatusList?: string;
+  totalTPs?: number;
   partialWin?: boolean;
   // For reentry/pyramid
   reentrySignal?: string;
@@ -190,6 +191,7 @@ function parseTPHitAlert(text: string): ParseResult {
   const isFullClose = /إغلاق كامل بالربح/.test(text);
 
   const tpStatusList = extractTPStatusList(text);
+  const totalTPs = extractTotalTPCount(text);
 
   return {
     success: true,
@@ -207,6 +209,7 @@ function parseTPHitAlert(text: string): ParseResult {
       pnlPoints: pnlPoints || 0,
       pnlDollar: pnlDollar || 0,
       tpStatusList,
+      totalTPs: totalTPs || undefined,
       timeframe: "",
       htfTimeframe: "",
       htfTrend: "",
@@ -225,6 +228,7 @@ function parseSLHitAlert(text: string): ParseResult {
   const pnlPoints = extractPnLPoints(text) || 0;
   const pnlDollar = extractPnLDollar(text) || 0;
   const tpStatusList = extractTPStatusList(text);
+  const totalTPs = extractTotalTPCount(text);
   const partialWin = /ربح جزئي/.test(text);
 
   return {
@@ -240,6 +244,7 @@ function parseSLHitAlert(text: string): ParseResult {
       rawText: text,
       hitTpIndex: -1,
       tpStatusList,
+      totalTPs: totalTPs || undefined,
       partialWin,
       hitPrice: slPrice,
       pnlPoints,
@@ -647,6 +652,13 @@ function extractTPStatusList(text: string): string {
     lines.push(match[0].trim());
   }
   return lines.join("\n");
+}
+
+function extractTotalTPCount(text: string): number {
+  // Count total TPs from the status list (both ✅ and ⏳)
+  const regex = /[✅⏳]\s*TP\d+[:\s][\d,.]+/g;
+  const matches = text.match(regex);
+  return matches ? matches.length : 0;
 }
 
 function emptyRiskData(): RiskData {

@@ -46,8 +46,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     if (status === "HIT_TP" && hitTpIndex !== undefined && hitTpIndex >= 0) {
       const tps: { tp: number; rr: number }[] = JSON.parse(String(existing.takeProfits));
-      if (tps[hitTpIndex]) {
-        const tpPrice = tps[hitTpIndex].tp;
+      // hitTpIndex from admin is 0-indexed array position; convert to 1-indexed for consistency with parser
+      const tpArrayIdx = hitTpIndex;
+      const tpDisplayNum = hitTpIndex + 1;
+      if (tps[tpArrayIdx]) {
+        const tpPrice = tps[tpArrayIdx].tp;
         const points = Math.abs(tpPrice - entry);
         let dollars = 0;
 
@@ -55,12 +58,13 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           dollars = points * pipValue * lotSize;
         } else if (balance > 0 && slDistance > 0) {
           const riskAmount = balance * 0.02;
-          dollars = (points / slDistance) * riskAmount * tps[hitTpIndex].rr;
+          dollars = (points / slDistance) * riskAmount * tps[tpArrayIdx].rr;
         }
 
         updateData.pnlPoints = parseFloat(points.toFixed(1));
         updateData.pnlDollars = parseFloat(dollars.toFixed(2));
         updateData.hitPrice = tpPrice;
+        updateData.hitTpIndex = tpDisplayNum; // Store as 1-indexed
       }
     }
 
@@ -88,7 +92,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (status === "HIT_TP") {
       notifyTpHit(
         existing.pair,
-        hitTpIndex ?? 0,
+        (hitTpIndex ?? 0) + 1, // Convert 0-indexed admin input to 1-indexed for notification
         updateData.pnlDollars as number | undefined
       ).catch(() => {});
     } else if (status === "HIT_SL") {

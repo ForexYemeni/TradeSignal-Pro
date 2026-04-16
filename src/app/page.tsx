@@ -31,7 +31,8 @@ interface Signal {
   rawText: string; timeframe: string; htfTimeframe: string;
   htfTrend: string; smcTrend: string; hitTpIndex: number;
   hitPrice?: number; pnlPoints?: number; pnlDollars?: number;
-  partialClose?: boolean; balance?: number; lotSize?: string;
+  partialClose?: boolean; totalTPs?: number;
+  balance?: number; lotSize?: string;
   riskTarget?: number; riskPercent?: number; actualRisk?: number;
   actualRiskPct?: number; slDistance?: number; maxRR?: number;
   instrument?: string; createdAt: string;
@@ -381,8 +382,7 @@ function TradeStatusBanner({ s }: { s: Signal }) {
   const isLoss = s.status === "HIT_SL";
   const isManual = s.status === "MANUAL_CLOSE";
   const hitCount = s.hitTpIndex >= 0 ? s.hitTpIndex : 0;
-  const totalTPs = s.takeProfits?.length || 0;
-
+  const totalTPs = s.totalTPs || s.takeProfits?.length || 0;
   if (s.status === "ACTIVE") return null;
 
   return (
@@ -648,8 +648,7 @@ function ClosedSignalCard({ s, idx, isAdmin, onDelete }: { s: Signal; idx: numbe
   const isLoss = s.status === "HIT_SL";
   const [expanded, setExpanded] = useState(false);
   const hitCount = s.hitTpIndex >= 0 ? s.hitTpIndex : 0;
-  const totalTPs = s.takeProfits?.length || 0;
-  const isBuy = s.type === "BUY";
+  const totalTPs = s.totalTPs || s.takeProfits?.length || 0;  const isBuy = s.type === "BUY";
   const catLabel = catCfg[s.signalCategory]?.label || "مغلقة";
   const pnl = s.pnlDollars ?? 0;
   const points = s.pnlPoints ?? 0;

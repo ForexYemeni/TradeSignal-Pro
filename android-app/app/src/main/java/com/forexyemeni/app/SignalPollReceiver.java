@@ -91,7 +91,7 @@ public class SignalPollReceiver extends BroadcastReceiver {
                             int hitTpIndex = signal.optInt("hitTpIndex", -1);
 
                             if (category.equals("TP_HIT") || category.equals("REENTRY_TP") || category.equals("PYRAMID_TP")) {
-                                String tpNum = "TP" + (hitTpIndex + 1);
+                                String tpNum = "TP" + hitTpIndex;
                                 NotificationHelper.showNotification(context,
                                         "🎯 هدف محقق — " + pair,
                                         tpNum + " تم تحقيقه بنجاح!",

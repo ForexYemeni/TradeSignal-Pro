@@ -48,6 +48,7 @@ export async function POST(request: NextRequest) {
       pnlPoints: parseResult.signal.pnlPoints ?? 0,
       pnlDollars: parseResult.signal.pnlDollar ?? 0,
       tpStatusList: parseResult.signal.tpStatusList ?? "",
+      totalTPs: parseResult.signal.totalTPs,
       partialWin: parseResult.signal.partialWin ?? false,
       balance: parseResult.signal.riskData.balance,
       lotSize: parseResult.signal.riskData.lotSize,

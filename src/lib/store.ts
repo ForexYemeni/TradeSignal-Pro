@@ -32,6 +32,7 @@ export interface StoredSignal {
   pnlPoints?: number;
   pnlDollars?: number;
   partialClose?: boolean;
+  totalTPs?: number;
   balance?: number;
   lotSize?: string;
   riskTarget?: number;

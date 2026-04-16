@@ -216,7 +216,7 @@ export async function notifyNewSignal(pair: string, type: string, entry: number,
  */
 export async function notifyTpHit(pair: string, tpIndex: number, pnl?: number) {
   const title = `🎯 هدف محقق — ${pair}`;
-  const body = pnl ? `TP${tpIndex + 1} تم تحقيقه! ربح: +$${pnl.toFixed(2)}` : `TP${tpIndex + 1} تم تحقيقه بنجاح!`;
+  const body = pnl ? `TP${tpIndex} تم تحقيقه! ربح: +$${pnl.toFixed(2)}` : `TP${tpIndex} تم تحقيقه بنجاح!`;
   return sendPushToAll({
     title,
     body,

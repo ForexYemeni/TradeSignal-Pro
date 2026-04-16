@@ -200,7 +200,7 @@ public class SignalService extends Service {
                     // Check status to determine what kind of notification
                     if ("HIT_TP".equals(status)) {
                         showTpNotification(pair, hitTpIndex);
-                        Log.d(TAG, "NEW TP signal: " + pair + " TP" + (hitTpIndex + 1));
+                        Log.d(TAG, "NEW TP signal: " + pair + " TP" + hitTpIndex);
                     } else if ("HIT_SL".equals(status)) {
                         showSlNotification(pair);
                         Log.d(TAG, "NEW SL signal: " + pair);
@@ -216,7 +216,7 @@ public class SignalService extends Service {
                         // State changed! Determine what changed
                         if ("HIT_TP".equals(status) && !oldState.startsWith("HIT_TP")) {
                             showTpNotification(pair, hitTpIndex);
-                            Log.d(TAG, "TP HIT: " + pair + " TP" + (hitTpIndex + 1) + " from [" + oldState + "]");
+                            Log.d(TAG, "TP HIT: " + pair + " TP" + hitTpIndex + " from [" + oldState + "]");
                         } else if ("HIT_SL".equals(status) && !oldState.startsWith("HIT_SL")) {
                             showSlNotification(pair);
                             Log.d(TAG, "SL HIT: " + pair + " from [" + oldState + "]");
@@ -287,7 +287,7 @@ public class SignalService extends Service {
      * Show "TP Hit" notification with correct TP number
      */
     private void showTpNotification(String pair, int hitTpIndex) {
-        String tpNum = "TP" + (hitTpIndex + 1);
+        String tpNum = "TP" + hitTpIndex;
         NotificationHelper.showNotification(this,
                 "🎯 هدف محقق — " + pair,
                 tpNum + " تم تحقيقه بنجاح!",
