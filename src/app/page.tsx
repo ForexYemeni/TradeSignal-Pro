@@ -453,19 +453,42 @@ export default function HomePage() {
   const [confirmClear, setConfirmClear] = useState(false);
 
   /* ── Session Init: restore from localStorage ── */
+  const [dbReady, setDbReady] = useState(false);
+  const [dbError, setDbError] = useState("");
+
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem("adminSession");
-      if (saved) {
-        const s = JSON.parse(saved);
-        if (s && s.id && s.email) {
-          setSession(s);
-          setView("main");
-          return;
+    // Auto-setup database tables on first load
+    async function initDb() {
+      try {
+        const res = await fetch("/api/setup", { method: "POST" });
+        const data = await res.json();
+        if (data.success) {
+          setDbReady(true);
+        } else {
+          setDbError(data.error || "Database setup failed");
+          setDbReady(true); // still show login so user can see the error
         }
+      } catch (e) {
+        setDbError("Cannot connect to database");
+        setDbReady(true);
       }
-    } catch { /* ignore */ }
-    // default view is "login" — no change needed
+    }
+
+    async function restoreSession() {
+      try {
+        const saved = localStorage.getItem("adminSession");
+        if (saved) {
+          const s = JSON.parse(saved);
+          if (s && s.id && s.email) {
+            setSession(s);
+            setView("main");
+            return;
+          }
+        }
+      } catch { /* ignore */ }
+    }
+
+    initDb().then(() => restoreSession());
   }, []);
 
   /* ── Fetch Signals ── */
@@ -652,6 +675,18 @@ export default function HomePage() {
      RENDER: LOGIN
      ═══════════════════════════════════════════════════════════════ */
   if (view === "login") {
+    if (!dbReady) {
+      return (
+        <div className="min-h-screen flex items-center justify-center p-4" style={{ background: "linear-gradient(135deg, #080d1a 0%, #0f172a 50%, #080d1a 100%)" }}>
+          <div className="text-center space-y-4 animate-pulse">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center mx-auto shadow-lg shadow-amber-500/20">
+              <Radio className="w-8 h-8 text-black" />
+            </div>
+            <div className="text-white text-sm">جاري تهيئة النظام...</div>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="min-h-screen flex items-center justify-center p-4" style={{ background: "linear-gradient(135deg, #080d1a 0%, #0f172a 50%, #080d1a 100%)" }}>
         <div className="w-full max-w-sm animate-[fadeIn_0.4s_ease-out]">
@@ -692,6 +727,11 @@ export default function HomePage() {
               </Button>
             </div>
             <div className="text-center text-[10px] text-slate-600">الإصدار 2.0 | FOREXYEMENI PRO</div>
+            {dbError && (
+              <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2 text-xs text-red-400 text-center">
+                ⚠️ {dbError}
+              </div>
+            )}
           </div>
         </div>
       </div>
