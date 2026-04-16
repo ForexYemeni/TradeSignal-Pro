@@ -91,10 +91,13 @@ public class SignalPollReceiver extends BroadcastReceiver {
                             int hitTpIndex = signal.optInt("hitTpIndex", -1);
 
                             if (category.equals("TP_HIT") || category.equals("REENTRY_TP") || category.equals("PYRAMID_TP")) {
-                                String tpNum = "TP" + hitTpIndex;
+                                String catIcon, catLabel;
+                                if (category.equals("REENTRY_TP")) { catIcon = "♻️"; catLabel = "تعويض"; }
+                                else if (category.equals("PYRAMID_TP")) { catIcon = "🔥"; catLabel = "تعزيز"; }
+                                else { catIcon = "🎯"; catLabel = "هدف"; }
                                 NotificationHelper.showNotification(context,
-                                        "🎯 هدف محقق — " + pair,
-                                        tpNum + " تم تحقيقه بنجاح!",
+                                        catIcon + " " + catLabel + " محقق — " + pair,
+                                        catLabel + " " + hitTpIndex + " تم تحقيقه بنجاح!",
                                         "tp_hit");
                             } else if (category.equals("SL_HIT") || category.equals("REENTRY_SL") || category.equals("PYRAMID_SL")) {
                                 NotificationHelper.showNotification(context,

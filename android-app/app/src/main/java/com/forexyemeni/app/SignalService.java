@@ -199,8 +199,8 @@ public class SignalService extends Service {
                     // Brand new signal (not seen before after initialization)
                     // Check status to determine what kind of notification
                     if ("HIT_TP".equals(status)) {
-                        showTpNotification(pair, hitTpIndex);
-                        Log.d(TAG, "NEW TP signal: " + pair + " TP" + hitTpIndex);
+                        showTpNotification(pair, hitTpIndex, category);
+                        Log.d(TAG, "NEW TP signal: " + pair + " TP" + hitTpIndex + " [" + category + "]");
                     } else if ("HIT_SL".equals(status)) {
                         showSlNotification(pair);
                         Log.d(TAG, "NEW SL signal: " + pair);
@@ -215,19 +215,19 @@ public class SignalService extends Service {
                     if (!state.equals(oldState)) {
                         // State changed! Determine what changed
                         if ("HIT_TP".equals(status) && !oldState.startsWith("HIT_TP")) {
-                            showTpNotification(pair, hitTpIndex);
-                            Log.d(TAG, "TP HIT: " + pair + " TP" + hitTpIndex + " from [" + oldState + "]");
+                            showTpNotification(pair, hitTpIndex, category);
+                            Log.d(TAG, "TP HIT: " + pair + " TP" + hitTpIndex + " [" + category + "] from [" + oldState + "]");
                         } else if ("HIT_SL".equals(status) && !oldState.startsWith("HIT_SL")) {
                             showSlNotification(pair);
                             Log.d(TAG, "SL HIT: " + pair + " from [" + oldState + "]");
                         } else if ("HIT_TP".equals(status) && oldState.startsWith("HIT_TP")) {
                             // Another TP hit (e.g., TP1 -> TP2)
-                            showTpNotification(pair, hitTpIndex);
-                            Log.d(TAG, "NEXT TP HIT: " + pair + " TP" + (hitTpIndex + 1) + " from [" + oldState + "]");
+                            showTpNotification(pair, hitTpIndex, category);
+                            Log.d(TAG, "NEXT TP HIT: " + pair + " TP" + hitTpIndex + " [" + category + "] from [" + oldState + "]");
                         } else {
                             // Other state change - use status to determine type
                             if ("HIT_TP".equals(status)) {
-                                showTpNotification(pair, hitTpIndex);
+                                showTpNotification(pair, hitTpIndex, category);
                             } else if ("HIT_SL".equals(status)) {
                                 showSlNotification(pair);
                             } else {
@@ -286,10 +286,18 @@ public class SignalService extends Service {
     /**
      * Show "TP Hit" notification with correct TP number
      */
-    private void showTpNotification(String pair, int hitTpIndex) {
-        String tpNum = "TP" + hitTpIndex;
+    private void showTpNotification(String pair, int hitTpIndex, String category) {
+        String catIcon, catLabel;
+        if ("REENTRY_TP".equals(category)) {
+            catIcon = "♻️"; catLabel = "تعويض";
+        } else if ("PYRAMID_TP".equals(category)) {
+            catIcon = "🔥"; catLabel = "تعزيز";
+        } else {
+            catIcon = "🎯"; catLabel = "هدف";
+        }
+        String tpNum = catLabel + " " + hitTpIndex;
         NotificationHelper.showNotification(this,
-                "🎯 هدف محقق — " + pair,
+                catIcon + " " + catLabel + " محقق — " + pair,
                 tpNum + " تم تحقيقه بنجاح!",
                 "tp_hit");
     }
