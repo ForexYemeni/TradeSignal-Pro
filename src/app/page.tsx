@@ -1176,21 +1176,19 @@ export default function HomePage() {
         const newSignals: Signal[] = data.signals;
         const newIds = new Set(newSignals.map((s: Signal) => s.id));
         const oldIds = prevIdsRef.current;
-        // Detect new signals - native notifications always fire, audio only if not muted
+        // Detect new signals
+        // Native notifications are handled by SignalService (background) - only play Web Audio here
+        // to avoid duplicate notifications in the APK
         if (oldIds.size > 0) {
           for (const s of newSignals) {
             if (!oldIds.has(s.id)) {
-              // Web Audio (respects mute)
+              // Web Audio only (background service handles native notifications)
               if (!audioMuted) {
                 if (isEntry(s.signalCategory)) playSound(s.type === "BUY" ? "buy" : "sell", audioVol);
                 else if (isTpLike(s.signalCategory)) playSound("tp", audioVol);
                 else if (isSlLike(s.signalCategory)) playSound("sl", audioVol);
                 else playSound("message", audioVol);
               }
-              // Native Android notification (ALWAYS fires, even when muted)
-              if (isEntry(s.signalCategory)) nativeNotify(`📊 إشارة جديدة — ${s.pair}`, `${s.type === "BUY" ? "شراء" : "بيع"} @ ${s.entry}`, s.type === "BUY" ? "buy" : "sell");
-              else if (isTpLike(s.signalCategory)) nativeNotify(`🎯 هدف محقق — ${s.pair}`, `TP${(s.hitTpIndex ?? 0) + 1} تم تحقيقه`, "tp_hit");
-              else if (isSlLike(s.signalCategory)) nativeNotify(`🛑 وقف خسارة — ${s.pair}`, `تم ضرب وقف الخسارة`, "sl_hit");
             }
           }
         }
