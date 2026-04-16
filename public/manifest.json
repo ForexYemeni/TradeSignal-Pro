@@ -10,6 +10,7 @@
   "dir": "rtl",
   "lang": "ar",
   "categories": ["finance", "business"],
+  "gcm_sender_id": "103953800507",
   "icons": [
     {
       "src": "/icon-192x192.png",

@@ -135,6 +135,40 @@ export async function getStats() {
   return { total, active, hitTp, hitSl, winRate, buyCount, sellCount, recentWeek, avgConfidence, topPairs };
 }
 
+// ─── Push Subscriptions ─────────────────────────────────
+export interface PushSubscription {
+  endpoint: string;
+  keys: { p256dh: string; auth: string };
+  userId: string;
+  userAgent: string;
+  createdAt: string;
+}
+
+export async function getPushSubscriptions(): Promise<PushSubscription[]> {
+  const data = await kv.get<PushSubscription[]>('push_subscriptions');
+  return data || [];
+}
+
+export async function addPushSubscription(sub: PushSubscription): Promise<void> {
+  const subs = await getPushSubscriptions();
+  // Remove old subscription for this user (one per user)
+  const filtered = subs.filter(s => s.userId !== sub.userId);
+  filtered.push(sub);
+  await kv.set('push_subscriptions', filtered);
+}
+
+export async function removePushSubscription(endpoint: string): Promise<void> {
+  const subs = await getPushSubscriptions();
+  const filtered = subs.filter(s => s.endpoint !== endpoint);
+  await kv.set('push_subscriptions', filtered);
+}
+
+export async function removePushSubscriptionByUserId(userId: string): Promise<void> {
+  const subs = await getPushSubscriptions();
+  const filtered = subs.filter(s => s.userId !== userId);
+  await kv.set('push_subscriptions', filtered);
+}
+
 // ─── Health Check ───────────────────────────────────────
 export async function isReady(): Promise<boolean> {
   try {

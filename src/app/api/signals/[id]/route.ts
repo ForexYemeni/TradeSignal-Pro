@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSignalById, updateSignal, deleteSignal } from "@/lib/store";
+import { notifyTpHit, notifySlHit } from "@/lib/push";
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -30,17 +31,17 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     // Determine pip value based on pair
     const pair = String(existing.pair || "").toUpperCase();
-    let pipValue = 10; // default for JPY pairs and most forex
+    let pipValue = 10;
     if (pair.includes("XAU") || pair.includes("GOLD")) {
-      pipValue = 1; // Gold: $1 per point per standard lot
+      pipValue = 1;
     } else if (pair.includes("XAG") || pair.includes("SILVER")) {
       pipValue = 50;
     } else if (pair.includes("BTC") || pair.includes("ETH") || pair.includes("CRYPTO")) {
       pipValue = 1;
     } else if (!pair.includes("JPY")) {
-      pipValue = 10; // Major pairs: ~$10 per pip per standard lot
+      pipValue = 10;
     } else {
-      pipValue = 6.5; // JPY pairs
+      pipValue = 6.5;
     }
 
     if (status === "HIT_TP" && hitTpIndex !== undefined && hitTpIndex >= 0) {
@@ -53,7 +54,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         if (lotSize > 0) {
           dollars = points * pipValue * lotSize;
         } else if (balance > 0 && slDistance > 0) {
-          // Estimate: assume 2% risk per trade
           const riskAmount = balance * 0.02;
           dollars = (points / slDistance) * riskAmount * tps[hitTpIndex].rr;
         }
@@ -71,7 +71,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       if (lotSize > 0) {
         dollars = points * pipValue * lotSize;
       } else if (balance > 0) {
-        dollars = balance * 0.02; // Assume 2% risk
+        dollars = balance * 0.02;
       }
 
       updateData.pnlPoints = parseFloat(points.toFixed(1));
@@ -82,6 +82,20 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const signal = await updateSignal(id, updateData);
     if (!signal) {
       return NextResponse.json({ success: false, error: "الإشارة غير موجودة" }, { status: 404 });
+    }
+
+    // ── Send Push Notification on status change ──
+    if (status === "HIT_TP") {
+      notifyTpHit(
+        existing.pair,
+        hitTpIndex ?? 0,
+        updateData.pnlDollars as number | undefined
+      ).catch(() => {});
+    } else if (status === "HIT_SL") {
+      notifySlHit(
+        existing.pair,
+        updateData.pnlDollars as number | undefined
+      ).catch(() => {});
     }
 
     return NextResponse.json({

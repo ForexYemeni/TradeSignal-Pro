@@ -114,3 +114,44 @@ Stage Summary:
 - All signal-related components untouched (SignalCard, TpMiniCard, TradeStatusBanner, etc.)
 - Build: Successful
 - Lint: Clean
+
+---
+Task ID: 4
+Agent: Main Agent
+Task: Implement Web Push Notifications for signals (new signal, TP hit, SL hit)
+
+Work Log:
+- Installed web-push npm package
+- Generated VAPID key pair (public + private)
+- Created /src/lib/push.ts with full push notification system:
+  - sendPushToAll() - broadcast to all subscribers
+  - sendPushToUser() - send to specific user
+  - notifyNewSignal() - helper for new entry signals
+  - notifyTpHit() - helper for take profit notifications
+  - notifySlHit() - helper for stop loss notifications
+- Added PushSubscription interface and CRUD to /src/lib/store.ts
+- Created /api/push/subscribe (POST=subscribe, DELETE=unsubscribe)
+- Created /api/push/vapid (GET public key for client)
+- Updated /api/signals/route.ts POST to send push on new signal creation
+- Updated /api/signals/[id]/route.ts PUT to send push on TP/SL status change
+- Rewrote /public/sw.js (v2) with:
+  - Push event handler with per-type vibration patterns
+  - Notification click handler (focus existing window or open new)
+  - Message handler for audio playback
+- Updated /public/manifest.json with gcm_sender_id for push support
+- Updated page.tsx with:
+  - registerPushNotification() - auto-registers on login/session restore
+  - unregisterPushNotification() - unregisters on logout
+  - urlBase64ToUint8Array() - VAPID key conversion utility
+  - Automatic push registration after successful login
+  - Automatic push registration on session restore
+  - Automatic push unregistration on logout
+- Updated .env.example with VAPID key placeholders
+
+Stage Summary:
+- Push notification system fully integrated
+- Notifications sent automatically on: new signal, TP hit, SL hit
+- Each notification type has unique vibration pattern and sound
+- Works even when app is closed (via Service Worker)
+- VAPID keys need to be set in Vercel env vars for production
+- Build: Successful

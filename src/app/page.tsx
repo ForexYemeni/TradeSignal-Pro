@@ -142,6 +142,98 @@ function playSound(type: "buy" | "sell" | "tp" | "sl" | "message", volume: numbe
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   PUSH NOTIFICATION SYSTEM
+   ═══════════════════════════════════════════════════════════════ */
+
+// Convert base64 to Uint8Array for VAPID key
+function urlBase64ToUint8Array(base64String: string) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
+async function registerPushNotification(userId: string): Promise<boolean> {
+  try {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+      console.warn("[Push] Push not supported");
+      return false;
+    }
+
+    // Check current permission
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") {
+      console.warn("[Push] Notification permission denied");
+      return false;
+    }
+
+    // Get service worker registration
+    const registration = await navigator.serviceWorker.ready;
+
+    // Get VAPID public key from API
+    const vapidRes = await fetch("/api/push/vapid");
+    const vapidData = await vapidRes.json();
+    if (!vapidData.success || !vapidData.publicKey) {
+      console.warn("[Push] Failed to get VAPID key");
+      return false;
+    }
+
+    const applicationServerKey = urlBase64ToUint8Array(vapidData.publicKey);
+
+    // Subscribe to push
+    const subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey,
+    });
+
+    // Send subscription to server
+    const subRes = await fetch("/api/push/subscribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        endpoint: subscription.endpoint,
+        keys: {
+          p256dh: btoa(String.fromCharCode(...new Uint8Array(subscription.getKey("p256dh")!))),
+          auth: btoa(String.fromCharCode(...new Uint8Array(subscription.getKey("auth")!))),
+        },
+        userId,
+      }),
+    });
+
+    const subData = await subRes.json();
+    if (subData.success) {
+      console.log("[Push] Successfully registered for push notifications");
+      return true;
+    }
+    return false;
+  } catch (err) {
+    console.error("[Push] Registration failed:", err);
+    return false;
+  }
+}
+
+async function unregisterPushNotification(endpoint?: string): Promise<void> {
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    const subscription = await registration.pushManager.getSubscription();
+    if (subscription) {
+      await fetch("/api/push/subscribe", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ endpoint: subscription.endpoint }),
+      });
+      await subscription.unsubscribe();
+    }
+  } catch (err) {
+    console.error("[Push] Unregister failed:", err);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
    TINY COMPONENTS
    ═══════════════════════════════════════════════════════════════ */
 function Stars({ r }: { r: number }) {
@@ -1039,6 +1131,8 @@ export default function HomePage() {
               setView("changePwd");
             } else {
               setView("main");
+              // Register push notifications automatically
+              registerPushNotification(s.id).catch(() => {});
             }
             return;
           }
@@ -1161,6 +1255,8 @@ export default function HomePage() {
         setView("expired");
       } else {
         setView("main");
+        // Register push notifications automatically after login
+        registerPushNotification(s.id).catch(() => {});
       }
     } catch { setLoginErr("خطأ في الاتصال بالخادم"); }
     finally { setLoginLoad(false); }
@@ -1190,6 +1286,8 @@ export default function HomePage() {
   }
 
   function handleLogout() {
+    // Unregister push notifications on logout
+    unregisterPushNotification().catch(() => {});
     setSession(null);
     localStorage.removeItem("adminSession");
     setEmail(""); setPwd("");

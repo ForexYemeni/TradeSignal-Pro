@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { addSignal, getSignals, getSignalById, updateSignal, deleteSignal } from "@/lib/store";
 import { parseTradingViewSignal, validateSignal } from "@/lib/signal-parser";
+import { notifyNewSignal, notifyTpHit, notifySlHit } from "@/lib/push";
 
 export async function POST(request: NextRequest) {
   try {
@@ -57,6 +58,24 @@ export async function POST(request: NextRequest) {
 
     await addSignal(signal);
 
+    // ── Send Push Notification for new signals ──
+    // Don't await - send in background
+    if (isEntry(parseResult.signal.signalCategory)) {
+      notifyNewSignal(
+        parseResult.signal.pair,
+        parseResult.signal.type,
+        parseResult.signal.entry,
+        parseResult.signal.timeframe
+      ).catch(() => {});
+    } else if (parseResult.signal.signalCategory === "TP_HIT" || parseResult.signal.signalCategory === "REENTRY_TP" || parseResult.signal.signalCategory === "PYRAMID_TP") {
+      notifyTpHit(
+        parseResult.signal.pair,
+        parseResult.signal.hitTpIndex ?? 0
+      ).catch(() => {});
+    } else if (parseResult.signal.signalCategory === "SL_HIT" || parseResult.signal.signalCategory === "REENTRY_SL" || parseResult.signal.signalCategory === "PYRAMID_SL") {
+      notifySlHit(parseResult.signal.pair).catch(() => {});
+    }
+
     return NextResponse.json({
       success: true,
       signal: { ...signal, takeProfits: JSON.parse(signal.takeProfits) },
@@ -66,6 +85,10 @@ export async function POST(request: NextRequest) {
     console.error("Error processing signal:", error);
     return NextResponse.json({ success: false, error: "خطأ في معالجة الإشارة" }, { status: 500 });
   }
+}
+
+function isEntry(cat: string) {
+  return cat === "ENTRY" || cat === "REENTRY" || cat === "PYRAMID";
 }
 
 export async function GET(request: NextRequest) {
