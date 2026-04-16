@@ -637,132 +637,127 @@ function EntryCard({ s, idx, isAdmin, onUpdate, onDelete }: {
   );
 }
 
-/* ── TP Card (Professional) ── */
-function TpCard({ s, idx, isAdmin, onDelete }: { s: Signal; idx: number; isAdmin: boolean; onDelete: (id: string) => void }) {
-  const cc = catCfg[s.signalCategory];
+/* ── Closed Signal Compact Card (click to expand) ── */
+function ClosedSignalCard({ s, idx, isAdmin, onDelete }: { s: Signal; idx: number; isAdmin: boolean; onDelete: (id: string) => void }) {
+  const isProfit = s.status === "HIT_TP";
+  const isLoss = s.status === "HIT_SL";
   const [expanded, setExpanded] = useState(false);
+  const hitCount = s.hitTpIndex >= 0 ? s.hitTpIndex + 1 : 0;
+  const totalTPs = s.takeProfits?.length || 0;
+  const isBuy = s.type === "BUY";
+  const catLabel = catCfg[s.signalCategory]?.label || "مغلقة";
+  const pnl = s.pnlDollars ?? 0;
+  const points = s.pnlPoints ?? 0;
 
   return (
-    <div className="animate-[fadeInUp_0.35s_ease-out]" style={{ animationDelay: `${idx * 40}ms`, animationFillMode: "both" }}>
-      <Glass className={`overflow-hidden ${cc.border} animate-profit-glow`}>
-        <div className={`h-[3px] bg-gradient-to-l ${cc.accent}`} />
+    <div className="animate-[fadeInUp_0.3s_ease-out]" style={{ animationDelay: `${idx * 30}ms`, animationFillMode: "both" }}>
+      <div className={`rounded-xl border overflow-hidden transition-all duration-300 active:scale-[0.99] ${
+        isProfit
+          ? "bg-gradient-to-r from-emerald-500/[0.08] to-emerald-600/[0.03] border-emerald-500/20"
+          : isLoss
+          ? "bg-gradient-to-r from-red-500/[0.08] to-red-600/[0.03] border-red-500/20"
+          : "bg-white/[0.03] border-white/[0.06]"
+      }`}>
+        {/* Compact Header - Always Visible */}
         <button onClick={() => setExpanded(!expanded)} className="w-full text-right">
-          <div className="p-3.5 space-y-2.5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${s.signalCategory === "REENTRY_TP" ? "bg-cyan-500/15" : s.signalCategory === "PYRAMID_TP" ? "bg-purple-500/15" : "bg-sky-500/15"} shadow-lg`}>
-                  <div className="w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center animate-check-pop">
-                    <svg className="w-3 h-3 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-white text-sm">{s.pair}</span>
-                    <Badge className={`${s.signalCategory === "REENTRY_TP" ? "bg-cyan-500/15 text-cyan-400 border-cyan-500/25" : s.signalCategory === "PYRAMID_TP" ? "bg-purple-500/15 text-purple-400 border-purple-500/25" : "bg-sky-500/15 text-sky-400 border-sky-500/25"} border text-[9px] font-bold px-2 py-0`}>
-                      TP{(s.hitTpIndex ?? 0) + 1}
-                    </Badge>
-                  </div>
-                  <span className={`text-[10px] font-semibold ${s.signalCategory === "REENTRY_TP" ? "text-cyan-400" : s.signalCategory === "PYRAMID_TP" ? "text-purple-400" : "text-sky-400"}`}>{cc.label}</span>
-                </div>
+          <div className="flex items-center justify-between px-3 py-2.5">
+            <div className="flex items-center gap-2.5">
+              {/* Result icon */}
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                isProfit ? "bg-emerald-500/15" : isLoss ? "bg-red-500/15" : "bg-slate-500/15"
+              }`}>
+                {isProfit ? (
+                  <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                ) : isLoss ? (
+                  <svg className="w-4 h-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                ) : (
+                  <ShieldAlert className="w-4 h-4 text-slate-400" />
+                )}
               </div>
-              <div className="flex flex-col items-end gap-1">
-                <div className="text-right">
-                  <div className="text-sm font-extrabold font-mono text-emerald-400">+${s.pnlDollars ?? 0}</div>
-                  <div className="text-[9px] font-mono text-emerald-400/60">{s.pnlPoints ?? 0} نقطة</div>
-                </div>
-                <svg className={`w-3.5 h-3.5 text-slate-600 transition-transform duration-300 ${expanded ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
-            </div>
-            {expanded && (
-              <div className="tp-expand-enter space-y-2">
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="bg-white/[0.03] rounded-xl p-2.5 border border-white/[0.05]">
-                    <div className="text-[9px] text-slate-500 mb-0.5">سعر الهدف</div>
-                    <div className="text-sm font-bold font-mono text-white">{s.hitPrice ?? "—"}</div>
-                  </div>
-                  <div className="bg-emerald-500/[0.06] rounded-xl p-2.5 border border-emerald-500/10">
-                    <div className="text-[9px] text-slate-500 mb-0.5">نوع الإغلاق</div>
-                    <div className="text-sm font-bold text-emerald-400">{s.partialClose ? "جزئي" : "كامل"}</div>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between pt-1 text-[10px]">
-                  <span className="text-slate-500 flex items-center gap-1"><Clock className="w-3 h-3" />{timeAgo(s.createdAt)}</span>
-                  {isAdmin && (
-                    <button onClick={(e) => { e.stopPropagation(); onDelete(s.id); }} className="px-2.5 py-1 rounded-lg text-[10px] font-medium bg-red-500/5 text-red-300/60 border border-red-500/10 active:scale-95 transition-transform">🗑 حذف</button>
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <span className="font-bold text-white text-[13px]">{s.pair}</span>
+                  <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-md ${isBuy ? "bg-emerald-500/15 text-emerald-400" : "bg-red-500/15 text-red-400"}`}>{isBuy ? "BUY" : "SELL"}</span>
+                  {hitCount > 0 && isProfit && (
+                    <span className="text-[8px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded-md font-bold">{hitCount}/{totalTPs} TP</span>
                   )}
                 </div>
-              </div>
-            )}
-          </div>
-        </button>
-      </Glass>
-    </div>
-  );
-}
-
-/* ── SL Card (Professional) ── */
-function SlCard({ s, idx, isAdmin, onDelete }: { s: Signal; idx: number; isAdmin: boolean; onDelete: (id: string) => void }) {
-  const cc = catCfg[s.signalCategory];
-  const [expanded, setExpanded] = useState(false);
-
-  return (
-    <div className="animate-[fadeInUp_0.35s_ease-out]" style={{ animationDelay: `${idx * 40}ms`, animationFillMode: "both" }}>
-      <Glass className={`overflow-hidden ${cc.border} animate-loss-glow`}>
-        <div className={`h-[3px] bg-gradient-to-l ${cc.accent}`} />
-        <button onClick={() => setExpanded(!expanded)} className="w-full text-right">
-          <div className="p-3.5 space-y-2.5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${s.signalCategory === "REENTRY_SL" ? "bg-cyan-500/15" : s.signalCategory === "PYRAMID_SL" ? "bg-purple-500/15" : "bg-red-500/15"} shadow-lg`}>
-                  <ShieldAlert className="w-[18px] h-[18px] text-red-400" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-white text-sm">{s.pair}</span>
-                    {s.partialClose && <Badge className="bg-amber-500/15 text-amber-400 border border-amber-500/25 text-[9px] font-bold px-2 py-0">ربح جزئي</Badge>}
-                  </div>
-                  <span className={`text-[10px] font-semibold ${s.signalCategory === "REENTRY_SL" ? "text-cyan-400" : s.signalCategory === "PYRAMID_SL" ? "text-purple-400" : "text-red-400"}`}>{cc.label}</span>
-                </div>
-              </div>
-              <div className="flex flex-col items-end gap-1">
-                <div className="text-right">
-                  <div className="text-sm font-extrabold font-mono text-red-400">-${Math.abs(s.pnlDollars ?? 0)}</div>
-                  <div className="text-[9px] font-mono text-red-400/60">{s.pnlPoints ?? 0} نقطة</div>
-                </div>
-                <svg className={`w-3.5 h-3.5 text-slate-600 transition-transform duration-300 ${expanded ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                </svg>
+                <span className={`text-[9px] font-medium ${isProfit ? "text-emerald-400/70" : isLoss ? "text-red-400/70" : "text-slate-500"}`}>{catLabel}</span>
               </div>
             </div>
-            {expanded && (
-              <div className="tp-expand-enter space-y-2">
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="bg-white/[0.03] rounded-xl p-2.5 border border-white/[0.05]">
-                    <div className="text-[9px] text-slate-500 mb-0.5">سعر الوقف</div>
-                    <div className="text-sm font-bold font-mono text-red-300">{s.hitPrice ?? "—"}</div>
-                  </div>
-                  <div className="bg-red-500/[0.06] rounded-xl p-2.5 border border-red-500/10">
-                    <div className="text-[9px] text-slate-500 mb-0.5">الخسارة</div>
-                    <div className="text-sm font-bold font-mono text-red-400">
-                      -${Math.abs(s.pnlDollars ?? 0)}
-                    </div>
-                  </div>
+            <div className="flex items-center gap-2.5">
+              {/* PnL badge */}
+              <div className="text-right">
+                <div className={`text-[13px] font-extrabold font-mono ${isProfit ? "text-emerald-400" : "text-red-400"}`}>
+                  {isProfit ? "+" : "-"}${Math.abs(pnl)}
                 </div>
-                <div className="flex items-center justify-between pt-1 text-[10px]">
-                  <span className="text-slate-500 flex items-center gap-1"><Clock className="w-3 h-3" />{timeAgo(s.createdAt)}</span>
-                  {isAdmin && (
-                    <button onClick={(e) => { e.stopPropagation(); onDelete(s.id); }} className="px-2.5 py-1 rounded-lg text-[10px] font-medium bg-red-500/5 text-red-300/60 border border-red-500/10 active:scale-95 transition-transform">🗑 حذف</button>
-                  )}
-                </div>
+                <div className={`text-[8px] font-mono ${isProfit ? "text-emerald-400/50" : "text-red-400/50"}`}>{points} نقطة</div>
               </div>
-            )}
+              {/* Chevron */}
+              <svg className={`w-3.5 h-3.5 text-slate-600 transition-transform duration-300 ${expanded ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
           </div>
         </button>
-      </Glass>
+
+        {/* Expanded Details */}
+        {expanded && (
+          <div className="tp-expand-enter">
+            <div className="border-t border-white/[0.04] mx-3" />
+            <div className="p-3 space-y-2.5">
+              {/* Entry / SL / Hit Price */}
+              <div className="grid grid-cols-3 gap-2">
+                <div className="bg-white/[0.03] rounded-lg p-2 border border-white/[0.05]">
+                  <div className="text-[8px] text-slate-500 mb-0.5">الدخول</div>
+                  <div className="text-[11px] font-bold font-mono text-white">{s.entry}</div>
+                </div>
+                <div className="bg-white/[0.03] rounded-lg p-2 border border-white/[0.05]">
+                  <div className="text-[8px] text-slate-500 mb-0.5">الوقف</div>
+                  <div className="text-[11px] font-bold font-mono text-red-300">{s.stopLoss}</div>
+                </div>
+                <div className={`rounded-lg p-2 border ${isProfit ? "bg-emerald-500/[0.06] border-emerald-500/10" : "bg-red-500/[0.06] border-red-500/10"}`}>
+                  <div className="text-[8px] text-slate-500 mb-0.5">{isProfit ? "الهدف" : "الإغلاق"}</div>
+                  <div className={`text-[11px] font-bold font-mono ${isProfit ? "text-emerald-400" : "text-red-400"}`}>{s.hitPrice ?? "—"}</div>
+                </div>
+              </div>
+
+              {/* TP Targets */}
+              {s.takeProfits?.length > 0 && (
+                <div className="space-y-1">
+                  <div className="text-[9px] text-slate-500 font-medium">الأهداف ({hitCount}/{totalTPs})</div>
+                  <div className="flex gap-1 flex-wrap">
+                    {s.takeProfits.map((tp, i) => {
+                      const hit = s.hitTpIndex >= 0 && s.hitTpIndex >= i;
+                      return (
+                        <div key={i} className={`px-2 py-1 rounded-lg text-[9px] font-mono border ${hit ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/20" : "bg-white/[0.02] text-slate-500 border-white/[0.06] line-through opacity-50"}`}>
+                          TP{i+1}: {tp.tp} ({tp.rr.toFixed(1)}R)
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Risk Info */}
+              {(s.balance || s.lotSize) && (
+                <div className="flex gap-3 text-[9px]">
+                  {s.balance && <div className="flex items-center gap-1"><span className="text-slate-500">الرصيد:</span><span className="font-mono text-slate-300">${Number(s.balance).toLocaleString()}</span></div>}
+                  {s.lotSize && <div className="flex items-center gap-1"><span className="text-slate-500">اللوت:</span><span className="font-mono text-slate-300">{s.lotSize}</span></div>}
+                </div>
+              )}
+
+              {/* Time + Delete */}
+              <div className="flex items-center justify-between pt-1">
+                <span className="text-[9px] text-slate-500 flex items-center gap-1"><Clock className="w-2.5 h-2.5" />{timeAgo(s.createdAt)}</span>
+                {isAdmin && (
+                  <button onClick={(e) => { e.stopPropagation(); onDelete(s.id); }} className="px-2 py-1 rounded-lg text-[9px] font-medium bg-red-500/5 text-red-300/60 border border-red-500/10 active:scale-95 transition-transform">🗑 حذف</button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -1032,8 +1027,8 @@ function SignalCard({ s, idx, isAdmin, onUpdate, onDelete }: {
   onDelete: (id: string) => void;
 }) {
   if (isEntry(s.signalCategory)) return <EntryCard s={s} idx={idx} isAdmin={isAdmin} onUpdate={onUpdate} onDelete={onDelete} />;
-  if (isTpLike(s.signalCategory)) return <TpCard s={s} idx={idx} isAdmin={isAdmin} onDelete={onDelete} />;
-  if (isSlLike(s.signalCategory)) return <SlCard s={s} idx={idx} isAdmin={isAdmin} onDelete={onDelete} />;
+  /* All closed signals (TP/SL) use compact card */
+  if (isTpLike(s.signalCategory) || isSlLike(s.signalCategory)) return <ClosedSignalCard s={s} idx={idx} isAdmin={isAdmin} onDelete={onDelete} />;
   return <EntryCard s={s} idx={idx} isAdmin={isAdmin} onUpdate={onUpdate} onDelete={onDelete} />;
 }
 
@@ -1954,14 +1949,68 @@ export default function HomePage() {
       {/* ── Content ── */}
       <main className="flex-1 px-4 pb-24 pt-3 max-w-lg mx-auto w-full">
 
-        {/* ══════ TAB: SIGNALS ══════ */}
-        {tab === "signals" && (
-          <div className="space-y-3">
-            {/* Filter Chips */}
-            <div className="flex gap-2 overflow-x-auto scrollbar-none pb-1">
+        {/* ══════ TAB: SIGNALS — PREMIUM DESIGN ══════ */}
+        {tab === "signals" && (() => {
+          const activeSignals = filtered.filter(s => isEntry(s.signalCategory) && s.status === "ACTIVE");
+          const closedSignals = filtered.filter(s => !isEntry(s.signalCategory) || s.status !== "ACTIVE");
+          const winClosed = closedSignals.filter(s => s.status === "HIT_TP");
+          const lossClosed = closedSignals.filter(s => s.status === "HIT_SL");
+          const totalClosed = closedSignals.length;
+          const closedWinRate = totalClosed > 0 ? Math.round((winClosed.length / totalClosed) * 100) : 0;
+
+          return (
+          <div className="space-y-4">
+            {/* ── Premium Stats Header ── */}
+            {stats && (
+              <div className="rounded-2xl border border-white/[0.06] overflow-hidden" style={{ background: "linear-gradient(135deg, rgba(255,215,0,0.06) 0%, rgba(255,140,0,0.03) 50%, rgba(255,215,0,0.06) 100%)" }}>
+                <div className="p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-1 h-5 rounded-full bg-gradient-to-b from-amber-400 to-orange-500" />
+                    <span className="text-xs font-bold text-amber-400 tracking-wide">نظرة سريعة</span>
+                  </div>
+                  <div className="grid grid-cols-4 gap-2">
+                    <div className="text-center">
+                      <div className="text-lg font-extrabold text-white">{stats.active}</div>
+                      <div className="text-[9px] text-emerald-400 font-medium">نشطة</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-lg font-extrabold text-white">{stats.total}</div>
+                      <div className="text-[9px] text-slate-400 font-medium">إجمالي</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-lg font-extrabold text-amber-400">{stats.winRate}%</div>
+                      <div className="text-[9px] text-slate-400 font-medium">نسبة الفوز</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-lg font-extrabold text-sky-400">{stats.recentWeek}</div>
+                      <div className="text-[9px] text-slate-400 font-medium">هذا الأسبوع</div>
+                    </div>
+                  </div>
+                  {totalClosed > 0 && (
+                    <div className="mt-3">
+                      <div className="flex items-center justify-between text-[9px] mb-1.5">
+                        <span className="text-emerald-400 font-semibold">ربح {winClosed.length}</span>
+                        <span className="text-red-400 font-semibold">خسارة {lossClosed.length}</span>
+                      </div>
+                      <div className="h-2 rounded-full bg-white/[0.06] overflow-hidden flex">
+                        <div className="bg-gradient-to-l from-emerald-400 to-emerald-500 h-full rounded-r-full transition-all" style={{ width: `${closedWinRate}%` }} />
+                        <div className="bg-gradient-to-r from-red-400 to-red-500 h-full rounded-l-full flex-1" />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ── Filter Chips — Premium Style ── */}
+            <div className="flex gap-2 overflow-x-auto scrollbar-none pb-0.5">
               {filterChips.map(f => (
                 <button key={f.key} onClick={() => setFilter(f.key)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${filter === f.key ? "bg-amber-500/20 text-amber-400 border border-amber-500/30" : "bg-white/[0.04] text-slate-400 border border-white/[0.06] hover:bg-white/[0.06]"}`}>
+                  className={`px-4 py-2 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all active:scale-95 ${
+                    filter === f.key
+                      ? "bg-gradient-to-r from-amber-500/20 to-orange-500/15 text-amber-400 border border-amber-500/30 shadow-lg shadow-amber-500/5"
+                      : "bg-white/[0.03] text-slate-400 border border-white/[0.06] hover:bg-white/[0.06] hover:border-white/[0.1]"
+                  }`}>
                   {f.label}
                 </button>
               ))}
@@ -1970,19 +2019,56 @@ export default function HomePage() {
             {loading && filtered.length === 0 ? (
               <div className="space-y-3">{[1, 2, 3].map(i => <SkeletonCard key={i} />)}</div>
             ) : filtered.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-slate-500">
-                <Bell className="w-10 h-10 mb-3 text-slate-700" />
-                <p className="text-sm">لا توجد إشارات</p>
+              <div className="flex flex-col items-center justify-center py-20 text-slate-500">
+                <div className="w-16 h-16 rounded-2xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center mb-4">
+                  <Activity className="w-7 h-7 text-slate-700" />
+                </div>
+                <p className="text-sm font-semibold text-slate-400">لا توجد إشارات</p>
+                <p className="text-[10px] text-slate-600 mt-1">ستظهر الإشارات الجديدة هنا تلقائياً</p>
               </div>
             ) : (
-              <div className="space-y-3">
-                {filtered.map((s, i) => (
-                  <SignalCard key={s.id} s={s} idx={i} isAdmin={isAdmin} onUpdate={handleUpdate} onDelete={handleDelete} />
-                ))}
-              </div>
+              <>
+                {/* ── Active Signals Section ── */}
+                {activeSignals.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 px-1">
+                      <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                      <span className="text-[11px] font-bold text-emerald-400">الإشارات النشطة</span>
+                      <span className="text-[9px] bg-emerald-500/15 text-emerald-400 px-1.5 py-0.5 rounded-md font-bold">{activeSignals.length}</span>
+                    </div>
+                    <div className="space-y-3">
+                      {activeSignals.map((s, i) => (
+                        <SignalCard key={s.id} s={s} idx={i} isAdmin={isAdmin} onUpdate={handleUpdate} onDelete={handleDelete} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Closed Signals Section ── */}
+                {closedSignals.length > 0 && (
+                  <div className="space-y-2.5">
+                    <div className="flex items-center gap-2 px-1">
+                      <div className="w-2 h-2 rounded-full bg-slate-500" />
+                      <span className="text-[11px] font-bold text-slate-400">الإشارات المغلقة</span>
+                      <span className="text-[9px] bg-white/[0.06] text-slate-400 px-1.5 py-0.5 rounded-md font-bold">{closedSignals.length}</span>
+                      {totalClosed > 0 && (
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${closedWinRate >= 60 ? "bg-emerald-500/15 text-emerald-400" : closedWinRate >= 40 ? "bg-amber-500/15 text-amber-400" : "bg-red-500/15 text-red-400"}`}>
+                          {closedWinRate}%
+                        </span>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      {closedSignals.map((s, i) => (
+                        <SignalCard key={s.id} s={s} idx={i + (activeSignals.length || 0)} isAdmin={isAdmin} onUpdate={handleUpdate} onDelete={handleDelete} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
-        )}
+          );
+        })()}
 
         {/* ══════ TAB: DASHBOARD ══════ */}
         {tab === "dashboard" && (
