@@ -460,7 +460,7 @@ export default function HomePage() {
     // Auto-setup database tables on first load
     async function initDb() {
       try {
-        const res = await fetch("/api/setup", { method: "POST" });
+        const res = await fetch("/api/setup");
         const data = await res.json();
         if (data.success) {
           setDbReady(true);
