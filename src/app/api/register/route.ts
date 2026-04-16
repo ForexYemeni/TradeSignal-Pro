@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getUserByEmail, addUser, migrateAdminToUsers } from "@/lib/store";
+import { getUserByEmail, addUser, migrateAdminToUsers, getAppSettings, getPackageById } from "@/lib/store";
 import { sendPushToAdmins } from "@/lib/push";
 
 export async function POST(request: NextRequest) {
@@ -25,22 +25,43 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "هذا البريد مسجل مسبقا" }, { status: 409 });
     }
 
+    // ── Get app settings for auto-trial ──
+    const settings = await getAppSettings();
+    let trialExpiry: string | null = null;
+    let trialPkgId: string | null = null;
+    let trialPkgName: string | null = null;
+
+    if (settings.freeTrialPackageId) {
+      const trialPkg = await getPackageById(settings.freeTrialPackageId);
+      if (trialPkg && trialPkg.isActive) {
+        trialPkgId = trialPkg.id;
+        trialPkgName = trialPkg.name;
+        const expiry = new Date();
+        expiry.setDate(expiry.getDate() + trialPkg.durationDays);
+        trialExpiry = expiry.toISOString();
+      }
+    }
+
     const user = await addUser({
       id: crypto.randomUUID(),
       name,
       email: email.toLowerCase(),
       passwordHash: password,
       role: "user",
-      status: "pending",
+      status: settings.autoApproveOnRegister ? "active" : "pending",
       mustChangePwd: false,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      subscriptionType: trialExpiry ? "subscriber" : "none",
+      subscriptionExpiry: trialExpiry,
+      packageId: trialPkgId,
+      packageName: trialPkgName,
     });
 
     // ── Notify admins about new registration ──
     sendPushToAdmins({
-      title: `👤 مستخدم جديد بانتظار الموافقة`,
-      body: `${name} — ${email.toLowerCase()}`,
+      title: `👤 مستخدم جديد${settings.autoApproveOnRegister ? " (تم التفعيل)" : " بانتظار الموافقة"}`,
+      body: `${name} — ${email.toLowerCase()}${trialPkgName ? ` | تجربة: ${trialPkgName}` : ""}`,
       tag: `new-user-${user.id}`,
       sound: 'new_signal',
       requireInteraction: true,
@@ -50,12 +71,17 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: "تم إنشاء الحساب بنجاح. في انتظار موافقة الإدارة.",
+      message: settings.autoApproveOnRegister
+        ? `تم إنشاء الحساب وتفعيل الباقة ${trialPkgName || ""} بنجاح!`
+        : "تم إنشاء الحساب بنجاح. في انتظار موافقة الإدارة.",
       user: {
         id: user.id,
         name: user.name,
         email: user.email,
         status: user.status,
+        subscriptionType: user.subscriptionType,
+        subscriptionExpiry: user.subscriptionExpiry,
+        packageName: user.packageName,
       },
     });
   } catch (error) {

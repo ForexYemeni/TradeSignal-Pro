@@ -10,6 +10,7 @@ import {
   Activity, Send, RefreshCw, LogOut, Lock, Mail, Zap, Eye,
   EyeOff, DollarSign, AlertTriangle, Trash2, Loader2, Radio,
   BarChart3, User, Volume2, VolumeX, Bell,
+  Crown, Package, Users, CalendarDays, CheckCircle, XCircle, Settings, ChevronDown,
 } from "lucide-react";
 
 /* ═══════════════════════════════════════════════════════════════
@@ -45,8 +46,11 @@ interface Stats {
 }
 
 type View = "login" | "register" | "pending" | "blocked" | "expired" | "main" | "changePwd";
-type Tab = "signals" | "dashboard" | "analyst" | "users" | "account";
+type Tab = "signals" | "dashboard" | "analyst" | "users" | "packages" | "account";
 type Filter = "all" | "buy" | "sell" | "active" | "closed";
+
+interface SubPackage { id: string; name: string; durationDays: number; price: number; type: string; description: string; isActive: boolean; order: number; }
+interface AppSettingsData { freeTrialPackageId: string | null; autoApproveOnRegister: boolean; }
 
 /* ═══════════════════════════════════════════════════════════════
    CATEGORY CONFIG
@@ -1098,6 +1102,20 @@ export default function HomePage() {
   const [emailRequests, setEmailRequests] = useState<{ id: string; userId: string; userName: string; oldEmail: string; newEmail: string; status: string; createdAt: string }[]>([]);
   const [showEmailReqSection, setShowEmailReqSection] = useState(false);
 
+  /* ── Packages & Settings ── */
+  const [packages, setPackages] = useState<SubPackage[]>([]);
+  const [appSettings, setAppSettings] = useState<AppSettingsData>({ freeTrialPackageId: null, autoApproveOnRegister: true });
+  const [showPkgForm, setShowPkgForm] = useState(false);
+  const [pkgFormName, setPkgFormName] = useState("");
+  const [pkgFormDays, setPkgFormDays] = useState("");
+  const [pkgFormPrice, setPkgFormPrice] = useState("");
+  const [pkgFormType, setPkgFormType] = useState<"free" | "trial" | "paid">("paid");
+  const [pkgFormDesc, setPkgFormDesc] = useState("");
+  const [pkgFormActive, setPkgFormActive] = useState(true);
+  const [pkgLoad, setPkgLoad] = useState(false);
+  const [showAssignPkg, setShowAssignPkg] = useState<string | null>(null);
+  const [assignDays, setAssignDays] = useState("");
+
   /* ── Session Init: restore from localStorage ── */
   const [dbReady, setDbReady] = useState(false);
   const [dbError, setDbError] = useState("");
@@ -1272,6 +1290,9 @@ export default function HomePage() {
       fetchUsers();
       fetchEmailRequests();
     }
+    if (view === "main" && tab === "packages" && isAdmin) {
+      fetchPackages();
+    }
   }, [tab, view]);
 
   /* ── Handlers ── */
@@ -1387,6 +1408,70 @@ export default function HomePage() {
       if (data.success) setUsers(data.users);
     } catch (e) { console.error("Fetch users:", e); }
     finally { setUsersLoad(false); }
+  }
+
+  async function fetchPackages() {
+    try {
+      const [pkgRes, setRes] = await Promise.all([fetch("/api/packages"), fetch("/api/settings")]);
+      const pkgData = await pkgRes.json();
+      const setData = await setRes.json();
+      if (pkgData.success) setPackages(pkgData.packages);
+      if (setData.success) setAppSettings(setData.settings);
+    } catch (e) { console.error("Fetch packages:", e); }
+  }
+
+  async function handleCreatePackage() {
+    if (!pkgFormName || !pkgFormDays) return;
+    setPkgLoad(true);
+    try {
+      const res = await fetch("/api/packages", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: pkgFormName, durationDays: Number(pkgFormDays), price: Number(pkgFormPrice || 0), type: pkgFormType, description: pkgFormDesc, isActive: pkgFormActive }) });
+      const data = await res.json();
+      if (data.success) { setShowPkgForm(false); setPkgFormName(""); setPkgFormDays(""); setPkgFormPrice(""); setPkgFormDesc(""); fetchPackages(); }
+    } catch (e) { console.error("Create package:", e); }
+    finally { setPkgLoad(false); }
+  }
+
+  async function handleDeletePackage(id: string) {
+    try {
+      await fetch("/api/packages", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+      fetchPackages();
+    } catch (e) { console.error("Delete package:", e); }
+  }
+
+  async function handleTogglePackage(id: string, isActive: boolean) {
+    try {
+      await fetch("/api/packages", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, isActive }) });
+      fetchPackages();
+    } catch (e) { console.error("Toggle package:", e); }
+  }
+
+  async function handleSetTrialPkg(pkgId: string) {
+    try {
+      await fetch("/api/settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ freeTrialPackageId: pkgId === appSettings.freeTrialPackageId ? null : pkgId }) });
+      fetchPackages();
+    } catch (e) { console.error("Set trial:", e); }
+  }
+
+  async function handleSetAutoApprove(val: boolean) {
+    try {
+      await fetch("/api/settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ autoApproveOnRegister: val }) });
+      setAppSettings(s => ({ ...s, autoApproveOnRegister: val }));
+    } catch (e) { console.error("Set auto approve:", e); }
+  }
+
+  async function handleAssignPackage(userId: string, packageId: string) {
+    try {
+      await fetch("/api/users", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: userId, action: "assign_package", packageId, days: assignDays ? Number(assignDays) : undefined }) });
+      setShowAssignPkg(null); setAssignDays("");
+      fetchUsers();
+    } catch (e) { console.error("Assign package:", e); }
+  }
+
+  async function handleSetAgency(userId: string) {
+    try {
+      await fetch("/api/users", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: userId, action: "set_agency" }) });
+      fetchUsers();
+    } catch (e) { console.error("Set agency:", e); }
   }
 
   async function handleUserAction(id: string, action: string) {
@@ -1909,6 +1994,7 @@ export default function HomePage() {
     { key: "dashboard", label: "الإحصائيات", icon: <BarChart3 className="w-5 h-5" /> },
     ...(isAdmin ? [{ key: "analyst" as Tab, label: "المحلل", icon: <Send className="w-5 h-5" /> }] : []),
     ...(isAdmin ? [{ key: "users" as Tab, label: "المستخدمين", icon: <User className="w-5 h-5" />, adminOnly: true }] : []),
+    ...(isAdmin ? [{ key: "packages" as Tab, label: "الباقات", icon: <Package className="w-5 h-5" /> }] : []),
     { key: "account", label: "الحساب", icon: <User className="w-5 h-5" /> },
   ];
 
@@ -2194,6 +2280,142 @@ export default function HomePage() {
           </div>
         )}
 
+        {/* ══════ TAB: PACKAGES (Admin) ══════ */}
+        {tab === "packages" && isAdmin && (
+          <div className="space-y-4">
+            {/* ── App Settings Card ── */}
+            <div className="rounded-2xl border border-amber-500/15 overflow-hidden" style={{ background: "linear-gradient(135deg, rgba(255,215,0,0.06) 0%, rgba(255,140,0,0.02) 100%)" }}>
+              <div className="p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <Settings className="w-4 h-4 text-amber-400" />
+                  <span className="text-xs font-bold text-amber-400">إعدادات التسجيل</span>
+                </div>
+                <div className="space-y-2.5">
+                  {/* Auto approve toggle */}
+                  <div className="flex items-center justify-between bg-white/[0.03] rounded-xl p-3 border border-white/[0.05]">
+                    <div>
+                      <div className="text-[11px] font-semibold text-white">تفعيل تلقائي عند التسجيل</div>
+                      <div className="text-[9px] text-slate-500 mt-0.5">يتم تفعيل الحساب والباقة المجانية تلقائياً بدون موافقة</div>
+                    </div>
+                    <button onClick={() => handleSetAutoApprove(!appSettings.autoApproveOnRegister)}
+                      className={`w-11 h-6 rounded-full transition-all duration-300 relative ${appSettings.autoApproveOnRegister ? "bg-amber-500" : "bg-white/10"}`}>
+                      <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-md transition-all duration-300 ${appSettings.autoApproveOnRegister ? "left-[22px]" : "left-0.5"}`} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* ── Packages List ── */}
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                <Package className="w-4 h-4 text-amber-400" />
+                إدارة الباقات
+                <span className="text-[9px] bg-amber-500/15 text-amber-400 px-1.5 py-0.5 rounded-md font-bold">{packages.length}</span>
+              </h2>
+              <button onClick={() => setShowPkgForm(!showPkgForm)}
+                className="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/20 active:scale-95 transition-transform">
+                {showPkgForm ? "إلغاء" : "+ إضافة باقة"}
+              </button>
+            </div>
+
+            {/* ── Create Package Form ── */}
+            {showPkgForm && (
+              <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4 space-y-3 animate-[fadeIn_0.2s_ease-out]">
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="text-[9px] text-slate-500 mb-1 block">اسم الباقة</label>
+                    <Input value={pkgFormName} onChange={e => setPkgFormName(e.target.value)} placeholder="مثال: شهرية VIP"
+                      className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-slate-600 h-9 rounded-lg text-[11px]" dir="rtl" />
+                  </div>
+                  <div>
+                    <label className="text-[9px] text-slate-500 mb-1 block">المدة (أيام)</label>
+                    <Input type="number" value={pkgFormDays} onChange={e => setPkgFormDays(e.target.value)} placeholder="30"
+                      className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-slate-600 h-9 rounded-lg text-[11px]" dir="ltr" />
+                  </div>
+                  <div>
+                    <label className="text-[9px] text-slate-500 mb-1 block">السعر ($)</label>
+                    <Input type="number" value={pkgFormPrice} onChange={e => setPkgFormPrice(e.target.value)} placeholder="0"
+                      className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-slate-600 h-9 rounded-lg text-[11px]" dir="ltr" />
+                  </div>
+                  <div>
+                    <label className="text-[9px] text-slate-500 mb-1 block">النوع</label>
+                    <div className="flex gap-1.5">
+                      {(["free", "trial", "paid"] as const).map(t => (
+                        <button key={t} onClick={() => setPkgFormType(t)}
+                          className={`flex-1 py-2 rounded-lg text-[10px] font-semibold transition-all ${pkgFormType === t ? "bg-amber-500/20 text-amber-400 border border-amber-500/30" : "bg-white/[0.03] text-slate-400 border border-white/[0.06]"}`}>
+                          {t === "free" ? "مجانية" : t === "trial" ? "تجربة" : "مدفوعة"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <Input value={pkgFormDesc} onChange={e => setPkgFormDesc(e.target.value)} placeholder="وصف مختصر للباقة..."
+                  className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-slate-600 h-9 rounded-lg text-[11px]" dir="rtl" />
+                <div className="flex gap-2">
+                  <button onClick={handleCreatePackage} disabled={pkgLoad || !pkgFormName || !pkgFormDays}
+                    className="flex-1 h-9 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-black text-[11px] font-bold disabled:opacity-50 active:scale-[0.98] transition-transform">
+                    {pkgLoad ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "إنشاء الباقة"}
+                  </button>
+                  <button onClick={() => setShowPkgForm(false)} className="px-4 h-9 rounded-xl bg-white/[0.04] text-slate-400 text-[11px]">إلغاء</button>
+                </div>
+              </div>
+            )}
+
+            {/* ── Package Cards ── */}
+            {packages.length === 0 ? (
+              <div className="text-center py-12">
+                <Package className="w-10 h-10 text-slate-700 mx-auto mb-2" />
+                <p className="text-xs text-slate-500">لا توجد باقات بعد. أضف باقة لتشغيل نظام الاشتراكات.</p>
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {packages.map(pkg => {
+                  const isTrial = appSettings.freeTrialPackageId === pkg.id;
+                  return (
+                    <div key={pkg.id} className={`rounded-xl border overflow-hidden transition-all ${isTrial ? "border-amber-500/30 bg-gradient-to-r from-amber-500/[0.08] to-orange-500/[0.03]" : pkg.isActive ? "border-white/[0.06] bg-white/[0.03]" : "border-white/[0.03] bg-white/[0.01] opacity-50"}`}>
+                      <div className="p-3.5">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-sm font-bold text-white">{pkg.name}</span>
+                              {isTrial && <span className="text-[8px] bg-amber-500/25 text-amber-400 px-1.5 py-0.5 rounded-md font-bold animate-pulse">التجربة التلقائية</span>}
+                              {!pkg.isActive && <span className="text-[8px] bg-red-500/15 text-red-400 px-1.5 py-0.5 rounded-md font-bold">معطلة</span>}
+                              <span className={`text-[8px] px-1.5 py-0.5 rounded-md font-bold ${pkg.type === "free" ? "bg-emerald-500/15 text-emerald-400" : pkg.type === "trial" ? "bg-sky-500/15 text-sky-400" : "bg-purple-500/15 text-purple-400"}`}>
+                                {pkg.type === "free" ? "مجانية" : pkg.type === "trial" ? "تجربة" : "مدفوعة"}
+                              </span>
+                            </div>
+                            {pkg.description && <p className="text-[10px] text-slate-500 mt-1">{pkg.description}</p>}
+                            <div className="flex items-center gap-3 mt-2 text-[10px]">
+                              <span className="flex items-center gap-1 text-slate-400"><CalendarDays className="w-3 h-3" />{pkg.durationDays} يوم</span>
+                              <span className="flex items-center gap-1 font-mono font-bold text-amber-400">${pkg.price}</span>
+                            </div>
+                          </div>
+                        </div>
+                        {/* Actions */}
+                        <div className="flex gap-1.5 mt-3 pt-3 border-t border-white/[0.04] flex-wrap">
+                          <button onClick={() => handleSetTrialPkg(pkg.id)}
+                            className={`px-2.5 py-1 rounded-lg text-[9px] font-bold transition-all active:scale-95 ${isTrial ? "bg-amber-500/20 text-amber-400 border border-amber-500/30" : "bg-white/[0.04] text-slate-400 border border-white/[0.06]"}`}>
+                            {isTrial ? "✓ تجربة تلقائية" : "تعيين كتجربة"}
+                          </button>
+                          <button onClick={() => handleTogglePackage(pkg.id, !pkg.isActive)}
+                            className="px-2.5 py-1 rounded-lg text-[9px] font-medium bg-white/[0.04] text-slate-400 border border-white/[0.06] active:scale-95 transition-transform">
+                            {pkg.isActive ? "تعطيل" : "تفعيل"}
+                          </button>
+                          <button onClick={() => handleDeletePackage(pkg.id)}
+                            className="px-2.5 py-1 rounded-lg text-[9px] font-medium bg-red-500/5 text-red-300/60 border border-red-500/10 active:scale-95 transition-transform">
+                            حذف
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ══════ TAB: ACCOUNT ══════ */}
         {tab === "users" && isAdmin && (
           <div className="space-y-4">
@@ -2241,39 +2463,92 @@ export default function HomePage() {
                     ))}
                   </div>
                 )}
-                {/* Active Users */}
-                {users.filter(u => u.status === "active").length > 0 && (
+                {/* Active Users with Subscription Info */}
+                {users.filter(u => u.status === "active").length > 0 && (() => {
+                  const actives = users.filter(u => u.status === "active");
+                  const subscribers = actives.filter(u => u.subscriptionType === "subscriber");
+                  const agency = actives.filter(u => u.subscriptionType === "agency");
+                  const noSub = actives.filter(u => !u.subscriptionType || u.subscriptionType === "none");
+                  return (
                   <div className="mb-3">
                     <div className="flex items-center gap-2 mb-2">
                       <div className="w-2 h-2 rounded-full bg-emerald-400" />
-                      <span className="text-[10px] text-emerald-400 font-bold">مستخدمون نشطون ({users.filter(u => u.status === "active").length})</span>
+                      <span className="text-[10px] text-emerald-400 font-bold">نشطون ({actives.length})</span>
+                      {subscribers.length > 0 && <span className="text-[8px] bg-sky-500/15 text-sky-400 px-1.5 py-0.5 rounded-md">{subscribers.length} مشترك</span>}
+                      {agency.length > 0 && <span className="text-[8px] bg-purple-500/15 text-purple-400 px-1.5 py-0.5 rounded-md">{agency.length} وكالة</span>}
                     </div>
-                    {users.filter(u => u.status === "active").map(u => (
-                      <Glass key={u.id} className="p-3 mb-2">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2.5">
-                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${u.role === "admin" ? "bg-amber-500/15" : "bg-emerald-500/10"}`}>
-                              <User className={`w-4 h-4 ${u.role === "admin" ? "text-amber-400" : "text-emerald-400"}`} />
-                            </div>
-                            <div>
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-xs font-bold text-white">{u.name}</span>
-                                {u.role === "admin" && <span className="text-[8px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded-md font-bold">مدير</span>}
+                    {actives.map(u => {
+                      const isAgency = u.subscriptionType === "agency";
+                      const isSub = u.subscriptionType === "subscriber";
+                      const expDays = u.subscriptionExpiry ? Math.ceil((new Date(u.subscriptionExpiry).getTime() - Date.now()) / 86400000) : null;
+                      return (
+                        <Glass key={u.id} className="p-3 mb-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2.5">
+                              <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${u.role === "admin" ? "bg-amber-500/15" : isAgency ? "bg-purple-500/15" : "bg-emerald-500/10"}`}>
+                                <User className={`w-4 h-4 ${u.role === "admin" ? "text-amber-400" : isAgency ? "text-purple-400" : "text-emerald-400"}`} />
                               </div>
-                              <div className="text-[10px] text-slate-500 font-mono" dir="ltr">{u.email}</div>
+                              <div>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-xs font-bold text-white">{u.name}</span>
+                                  {u.role === "admin" && <span className="text-[8px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded-md font-bold">مدير</span>}
+                                  {isAgency && <span className="text-[8px] bg-purple-500/15 text-purple-400 px-1.5 py-0.5 rounded-md font-bold">وكالة</span>}
+                                  {isSub && <span className="text-[8px] bg-sky-500/15 text-sky-400 px-1.5 py-0.5 rounded-md font-bold">مشترك</span>}
+                                </div>
+                                <div className="text-[10px] text-slate-500 font-mono" dir="ltr">{u.email}</div>
+                                {u.packageName && (
+                                  <div className="flex items-center gap-1.5 mt-1 text-[9px]">
+                                    <span className="text-slate-500">{u.packageName}</span>
+                                    {expDays !== null && (
+                                      <span className={`font-bold ${expDays > 3 ? "text-emerald-400" : expDays > 0 ? "text-amber-400" : "text-red-400"}`}>
+                                        {expDays > 0 ? `${expDays} يوم متبقي` : "منتهي!"}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
-                          <div className="flex items-center gap-1.5">
-                            {u.role !== "admin" && (
-                              <button onClick={() => handleUserAction(u.id, "make_admin")} className="px-2 py-1.5 rounded-lg text-[9px] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/15 active:scale-95 transition-transform">ترقية</button>
-                            )}
-                            <button onClick={() => handleUserAction(u.id, "block")} className="px-2 py-1.5 rounded-lg text-[9px] font-medium bg-red-500/10 text-red-400 border border-red-500/15 active:scale-95 transition-transform">حظر</button>
-                          </div>
-                        </div>
-                      </Glass>
-                    ))}
+                          {/* Action Buttons */}
+                          {u.role !== "admin" && (
+                            <div className="flex gap-1.5 mt-2.5 pt-2.5 border-t border-white/[0.04] flex-wrap">
+                              <button onClick={() => setShowAssignPkg(u.id)}
+                                className="px-2 py-1 rounded-lg text-[9px] font-medium bg-sky-500/10 text-sky-400 border border-sky-500/15 active:scale-95 transition-transform">
+                                تعيين باقة
+                              </button>
+                              <button onClick={() => handleSetAgency(u.id)}
+                                className={`px-2 py-1 rounded-lg text-[9px] font-medium active:scale-95 transition-transform ${isAgency ? "bg-purple-500/20 text-purple-400 border border-purple-500/25" : "bg-purple-500/10 text-purple-400 border border-purple-500/15"}`}>
+                                {isAgency ? "✓ وكالة" : "تحويل لوكالة"}
+                              </button>
+                              {u.role !== "admin" && <button onClick={() => handleUserAction(u.id, "make_admin")} className="px-2 py-1.5 rounded-lg text-[9px] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/15 active:scale-95 transition-transform">ترقية</button>}
+                              <button onClick={() => handleUserAction(u.id, "block")} className="px-2 py-1.5 rounded-lg text-[9px] font-medium bg-red-500/10 text-red-400 border border-red-500/15 active:scale-95 transition-transform">حظر</button>
+                              <button onClick={() => handleDeleteUser(u.id)} className="px-2 py-1.5 rounded-lg text-[9px] font-medium bg-red-500/5 text-red-300/60 border border-red-500/10 active:scale-95 transition-transform">حذف</button>
+                            </div>
+                          )}
+                          {/* Assign Package Dropdown */}
+                          {showAssignPkg === u.id && packages.filter(p => p.isActive).length > 0 && (
+                            <div className="mt-2 p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] space-y-2 animate-[fadeIn_0.2s_ease-out]">
+                              <div className="flex gap-1.5 flex-wrap">
+                                {packages.filter(p => p.isActive).map(pkg => (
+                                  <button key={pkg.id} onClick={() => handleAssignPackage(u.id, pkg.id)}
+                                    className="px-2.5 py-1.5 rounded-lg text-[9px] font-semibold bg-sky-500/10 text-sky-400 border border-sky-500/15 active:scale-95 transition-transform">
+                                    {pkg.name} ({pkg.durationDays}ي)
+                                  </button>
+                                ))}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Input type="number" value={assignDays} onChange={e => setAssignDays(e.target.value)} placeholder="أيام مخصصة (اختياري)"
+                                  className="flex-1 bg-white/[0.04] border-white/[0.08] text-white placeholder:text-slate-600 h-8 rounded-lg text-[10px]" dir="ltr" />
+                                <button onClick={() => setShowAssignPkg(null)} className="px-2 h-8 rounded-lg bg-white/[0.04] text-slate-400 text-[9px]">إلغاء</button>
+                              </div>
+                            </div>
+                          )}
+                        </Glass>
+                      );
+                    })}
                   </div>
-                )}
+                  );
+                })()}
                 {/* Blocked Users */}
                 {users.filter(u => u.status === "blocked").length > 0 && (
                   <div>
@@ -2359,6 +2634,39 @@ export default function HomePage() {
                 </div>
               </div>
             </Glass>
+
+            {/* ── User Subscription Status ── */}
+            {!isAdmin && session.subscriptionType && (
+              <div className={`rounded-2xl border overflow-hidden ${session.subscriptionType === "subscriber" ? "border-sky-500/20" : "border-purple-500/20"}`}
+                style={{ background: session.subscriptionType === "subscriber" ? "linear-gradient(135deg, rgba(56,189,248,0.06) 0%, rgba(56,189,248,0.02) 100%)" : "linear-gradient(135deg, rgba(168,85,247,0.06) 0%, rgba(168,85,247,0.02) 100%)" }}>
+                <div className="p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Crown className={`w-4 h-4 ${session.subscriptionType === "subscriber" ? "text-sky-400" : "text-purple-400"}`} />
+                    <span className={`text-xs font-bold ${session.subscriptionType === "subscriber" ? "text-sky-400" : "text-purple-400"}`}>
+                      {session.subscriptionType === "subscriber" ? "الاشتراك النشط" : "مسجل تحت وكالة"}
+                    </span>
+                  </div>
+                  {session.packageName && (
+                    <div className="flex items-center justify-between bg-white/[0.04] rounded-xl p-3 border border-white/[0.06]">
+                      <div>
+                        <div className="text-[11px] font-bold text-white">{session.packageName}</div>
+                        <div className="text-[9px] text-slate-500 mt-0.5">
+                          {session.subscriptionExpiry ? `تنتهي: ${new Date(session.subscriptionExpiry).toLocaleDateString("ar-SA")}` : "بدون مدة محددة"}
+                        </div>
+                      </div>
+                      {session.subscriptionExpiry && (() => {
+                        const days = Math.ceil((new Date(session.subscriptionExpiry).getTime() - Date.now()) / 86400000);
+                        return (
+                          <div className={`px-3 py-1.5 rounded-xl text-[11px] font-bold ${days > 7 ? "bg-emerald-500/15 text-emerald-400" : days > 0 ? "bg-amber-500/15 text-amber-400" : "bg-red-500/15 text-red-400"}`}>
+                            {days > 0 ? `${days} يوم` : "منتهي!"}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* ── Test Notifications (Admin Only) ── */}
             {isAdmin && (

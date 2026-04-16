@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getUsers, updateUser, deleteUser, getUserById } from "@/lib/store";
+import { getUsers, updateUser, deleteUser, getUserById, getPackageById, enforceSubscriptions } from "@/lib/store";
 import { sendPushToAdmins } from "@/lib/push";
 
 export async function GET() {
   try {
+    await enforceSubscriptions();
     const users = await getUsers();
     return NextResponse.json({ success: true, users });
   } catch (error) {
@@ -14,7 +15,7 @@ export async function GET() {
 
 export async function PUT(request: NextRequest) {
   try {
-    const { id, action } = await request.json();
+    const { id, action, packageId, days, subscriptionType } = await request.json();
 
     if (!id || !action) {
       return NextResponse.json({ success: false, error: "البيانات مطلوبة" }, { status: 400 });
@@ -27,7 +28,7 @@ export async function PUT(request: NextRequest) {
         updates = { status: "active" };
         break;
       case "block":
-        updates = { status: "blocked" };
+        updates = { status: "blocked", subscriptionType: "none", subscriptionExpiry: null, packageId: null, packageName: null };
         break;
       case "unblock":
         updates = { status: "active" };
@@ -38,6 +39,38 @@ export async function PUT(request: NextRequest) {
       case "remove_admin":
         updates = { role: "user" };
         break;
+      case "assign_package": {
+        if (!packageId) return NextResponse.json({ success: false, error: "معرف الباقة مطلوب" }, { status: 400 });
+        const pkg = await getPackageById(packageId);
+        if (!pkg) return NextResponse.json({ success: false, error: "الباقة غير موجودة" }, { status: 404 });
+        const duration = days ?? pkg.durationDays;
+        const expiry = new Date();
+        expiry.setDate(expiry.getDate() + duration);
+        updates = {
+          status: "active",
+          subscriptionType: "subscriber",
+          subscriptionExpiry: expiry.toISOString(),
+          packageId: pkg.id,
+          packageName: pkg.name,
+        };
+        break;
+      }
+      case "set_agency": {
+        updates = {
+          subscriptionType: "agency",
+          status: "active",
+          subscriptionExpiry: null,
+          packageId: null,
+          packageName: "مسجل تحت وكالة",
+        };
+        break;
+      }
+      case "set_subscriber":
+        updates = { subscriptionType: "subscriber" };
+        break;
+      case "remove_subscription":
+        updates = { subscriptionType: "none", subscriptionExpiry: null, packageId: null, packageName: null, status: "expired" };
+        break;
       default:
         return NextResponse.json({ success: false, error: "إجراء غير معروف" }, { status: 400 });
     }
@@ -47,40 +80,24 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ success: false, error: "المستخدم غير موجود" }, { status: 404 });
     }
 
-    // ── Notify admins about user status change ──
+    // ── Notify admins about important actions ──
     if (action === "approve") {
-      sendPushToAdmins({
-        title: `✅ تم قبول مستخدم`,
-        body: `${user.name} — ${user.email}`,
-        tag: `user-approved-${id}`,
-        sound: 'tp_hit',
-        requireInteraction: false,
-        urgency: 'normal',
-        data: { type: 'user_approved', userName: user.name },
-      }).catch(() => {});
+      sendPushToAdmins({ title: "✅ تم قبول مستخدم", body: `${user.name} — ${user.email}`, tag: `user-${id}`, sound: 'tp_hit' }).catch(() => {});
     } else if (action === "block") {
-      sendPushToAdmins({
-        title: `🚫 تم حظر مستخدم`,
-        body: `${user.name} — ${user.email}`,
-        tag: `user-blocked-${id}`,
-        sound: 'sl_hit',
-        requireInteraction: false,
-        urgency: 'normal',
-        data: { type: 'user_blocked', userName: user.name },
-      }).catch(() => {});
-    } else if (action === "make_admin") {
-      sendPushToAdmins({
-        title: `👑 تم ترقية مستخدم لأدمن`,
-        body: `${user.name} — ${user.email}`,
-        tag: `user-admin-${id}`,
-        sound: 'tp_hit',
-        requireInteraction: false,
-        urgency: 'normal',
-        data: { type: 'user_made_admin', userName: user.name },
-      }).catch(() => {});
+      sendPushToAdmins({ title: "🚫 تم حظر مستخدم", body: `${user.name} — ${user.email}`, tag: `user-${id}`, sound: 'sl_hit' }).catch(() => {});
     }
 
-    return NextResponse.json({ success: true, user: { id: user.id, name: user.name, email: user.email, role: user.role, status: user.status } });
+    return NextResponse.json({
+      success: true,
+      user: {
+        id: user.id, name: user.name, email: user.email,
+        role: user.role, status: user.status,
+        subscriptionType: user.subscriptionType,
+        subscriptionExpiry: user.subscriptionExpiry,
+        packageId: user.packageId,
+        packageName: user.packageName,
+      },
+    });
   } catch (error) {
     console.error("Update user error:", error);
     return NextResponse.json({ success: false, error: "خطأ في تحديث المستخدم" }, { status: 500 });
@@ -93,27 +110,14 @@ export async function DELETE(request: NextRequest) {
     if (!id) {
       return NextResponse.json({ success: false, error: "معرف المستخدم مطلوب" }, { status: 400 });
     }
-
-    // Get user info before deleting for notification
     const user = await getUserById(id);
     const deleted = await deleteUser(id);
     if (!deleted) {
       return NextResponse.json({ success: false, error: "المستخدم غير موجود" }, { status: 404 });
     }
-
-    // Notify admins
     if (user) {
-      sendPushToAdmins({
-        title: `🗑 تم حذف مستخدم`,
-        body: `${user.name} — ${user.email}`,
-        tag: `user-deleted-${id}`,
-        sound: 'sl_hit',
-        requireInteraction: false,
-        urgency: 'normal',
-        data: { type: 'user_deleted', userName: user.name },
-      }).catch(() => {});
+      sendPushToAdmins({ title: "🗑 تم حذف مستخدم", body: `${user.name} — ${user.email}`, tag: `user-${id}`, sound: 'sl_hit' }).catch(() => {});
     }
-
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Delete user error:", error);

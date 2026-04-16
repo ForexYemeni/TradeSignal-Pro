@@ -60,10 +60,15 @@ export interface StoredUser {
   email: string;
   passwordHash: string;
   role: "admin" | "user";
-  status: "pending" | "active" | "blocked";
+  status: "pending" | "active" | "blocked" | "expired";
   mustChangePwd: boolean;
   createdAt: string;
   updatedAt: string;
+  /* Subscription fields */
+  subscriptionType: "none" | "subscriber" | "agency";
+  subscriptionExpiry: string | null;
+  packageId: string | null;
+  packageName: string | null;
 }
 
 // ─── Signals ────────────────────────────────────────────
@@ -291,4 +296,96 @@ export async function deleteEmailChangeRequest(id: string): Promise<boolean> {
 export async function getPendingEmailRequestsForUser(userId: string): Promise<EmailChangeRequest | null> {
   const requests = await getEmailChangeRequests();
   return requests.find(r => r.userId === userId && r.status === "pending") || null;
+}
+
+// ─── Subscription Packages ──────────────────────────────
+export interface SubscriptionPackage {
+  id: string;
+  name: string;
+  durationDays: number;
+  price: number;
+  type: "free" | "trial" | "paid";
+  description: string;
+  isActive: boolean;
+  createdAt: string;
+  order: number;
+}
+
+export async function getPackages(): Promise<SubscriptionPackage[]> {
+  const data = await kv.get<SubscriptionPackage[]>('subscription_packages');
+  return (data || []).sort((a, b) => a.order - b.order);
+}
+
+export async function getActivePackages(): Promise<SubscriptionPackage[]> {
+  const pkgs = await getPackages();
+  return pkgs.filter(p => p.isActive);
+}
+
+export async function getPackageById(id: string): Promise<SubscriptionPackage | null> {
+  const pkgs = await getPackages();
+  return pkgs.find(p => p.id === id) || null;
+}
+
+export async function addPackage(pkg: SubscriptionPackage): Promise<SubscriptionPackage> {
+  const pkgs = await getPackages();
+  pkgs.push(pkg);
+  await kv.set('subscription_packages', pkgs);
+  return pkg;
+}
+
+export async function updatePackage(id: string, updates: Partial<SubscriptionPackage>): Promise<SubscriptionPackage | null> {
+  const pkgs = await getPackages();
+  const idx = pkgs.findIndex(p => p.id === id);
+  if (idx === -1) return null;
+  pkgs[idx] = { ...pkgs[idx], ...updates };
+  await kv.set('subscription_packages', pkgs);
+  return pkgs[idx];
+}
+
+export async function deletePackage(id: string): Promise<boolean> {
+  const pkgs = await getPackages();
+  const filtered = pkgs.filter(p => p.id !== id);
+  if (filtered.length === pkgs.length) return false;
+  await kv.set('subscription_packages', filtered);
+  return true;
+}
+
+// ─── App Settings ──────────────────────────────────────
+export interface AppSettings {
+  freeTrialPackageId: string | null;
+  autoApproveOnRegister: boolean;
+}
+
+export async function getAppSettings(): Promise<AppSettings> {
+  const data = await kv.get<AppSettings>('app_settings');
+  return data || { freeTrialPackageId: null, autoApproveOnRegister: true };
+}
+
+export async function updateAppSettings(updates: Partial<AppSettings>): Promise<AppSettings> {
+  const current = await getAppSettings();
+  const updated = { ...current, ...updates };
+  await kv.set('app_settings', updated);
+  return updated;
+}
+
+// ─── Check & Enforce Subscriptions ──────────────────────
+export async function enforceSubscriptions(): Promise<string[]> {
+  const users = await getUsers();
+  const expiredIds: string[] = [];
+  const now = new Date().toISOString();
+  let changed = false;
+  for (const u of users) {
+    if (u.role === "admin") continue;
+    if (u.subscriptionExpiry && u.subscriptionType !== "none" && u.subscriptionExpiry < now) {
+      u.status = "expired";
+      u.subscriptionType = "none";
+      u.packageId = null;
+      u.packageName = null;
+      u.subscriptionExpiry = null;
+      expiredIds.push(u.id);
+      changed = true;
+    }
+  }
+  if (changed) await kv.set('users', users);
+  return expiredIds;
 }
