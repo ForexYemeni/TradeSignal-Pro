@@ -663,6 +663,265 @@ function SlCard({ s, idx, isAdmin, onDelete }: { s: Signal; idx: number; isAdmin
   );
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   PROFESSIONAL CANDLESTICK SPLASH SCREEN
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Individual Candlestick Component */
+function Candle({ x, bodyH, wickTop, wickBot, isGreen, delay, bodyW }: {
+  x: number; bodyH: number; wickTop: number; wickBot: number;
+  isGreen: boolean; delay: number; bodyW: number;
+}) {
+  const totalH = wickTop + bodyH + wickBot;
+  const bodyY = wickTop;
+  const color = isGreen ? "#00E676" : "#FF5252";
+  const glowClass = isGreen ? "splash-candle-green" : "splash-candle-red";
+
+  return (
+    <g style={{ animationDelay: `${delay}ms` }} className={glowClass}>
+      {/* Upper Wick */}
+      <rect
+        x={x + bodyW / 2 - 1}
+        y={0}
+        width={2}
+        height={wickTop}
+        fill={color}
+        opacity={0.7}
+        rx={1}
+        className="splash-wick"
+        style={{ animationDelay: `${delay}ms` }}
+      />
+      {/* Body */}
+      <rect
+        x={x}
+        y={bodyY}
+        width={bodyW}
+        height={bodyH}
+        fill={color}
+        rx={2.5}
+        className="splash-candle"
+        style={{ animationDelay: `${delay + 100}ms` }}
+        opacity={0.9}
+      />
+      {/* Lower Wick */}
+      <rect
+        x={x + bodyW / 2 - 1}
+        y={bodyY + bodyH}
+        width={2}
+        height={wickBot}
+        fill={color}
+        opacity={0.7}
+        rx={1}
+        className="splash-wick"
+        style={{ animationDelay: `${delay + 200}ms` }}
+      />
+    </g>
+  );
+}
+
+function SplashScreen() {
+  /* Candlestick data: [x_offset, bodyHeight, wickTop, wickBottom, isGreen, delay] */
+  const candles: [number, number, number, number, boolean, number][] = [
+    [10,  45, 20, 30, true,  0],
+    [32,  35, 15, 25, true,  120],
+    [54,  55, 25, 20, false, 240],
+    [76,  40, 18, 22, true,  360],
+    [98,  60, 30, 15, true,  480],
+    [120, 30, 12, 35, false, 600],
+    [142, 50, 22, 18, true,  720],
+    [164, 38, 16, 28, false, 840],
+    [186, 65, 28, 12, true,  960],
+    [208, 42, 20, 24, true,  1080],
+    [230, 55, 25, 20, false, 1200],
+    [252, 48, 22, 26, true,  1320],
+  ];
+
+  /* Sparkle positions around the chart */
+  const sparkles = [
+    { x: 60, y: 30, delay: 500, size: 4 },
+    { x: 180, y: 20, delay: 1200, size: 3 },
+    { x: 130, y: 50, delay: 1800, size: 5 },
+    { x: 240, y: 15, delay: 2400, size: 3 },
+    { x: 30, y: 55, delay: 800, size: 4 },
+    { x: 210, y: 60, delay: 1500, size: 3 },
+  ];
+
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden" style={{ background: "linear-gradient(180deg, #050a15 0%, #0a1628 50%, #070b14 100%)" }}>
+      {/* Background ambient glows */}
+      <div className="absolute top-[-15%] right-[-10%] w-80 h-80 rounded-full opacity-[0.07]" style={{ background: "radial-gradient(circle, #FFD700 0%, transparent 70%)", filter: "blur(60px)" }} />
+      <div className="absolute bottom-[-10%] left-[-10%] w-72 h-72 rounded-full opacity-[0.05]" style={{ background: "radial-gradient(circle, #00E676 0%, transparent 70%)", filter: "blur(60px)" }} />
+      <div className="absolute top-[30%] left-[50%] w-60 h-60 rounded-full opacity-[0.04]" style={{ background: "radial-gradient(circle, #FF5252 0%, transparent 70%)", filter: "blur(80px)", transform: "translateX(-50%)" }} />
+
+      {/* Floating particles */}
+      {[...Array(6)].map((_, i) => (
+        <div
+          key={`p-${i}`}
+          className="absolute w-1 h-1 rounded-full"
+          style={{
+            background: i % 2 === 0 ? "#FFD700" : "#00E676",
+            left: `${15 + i * 14}%`,
+            bottom: "10%",
+            opacity: 0,
+            animation: `floatParticles ${3 + i * 0.5}s ease-in-out ${i * 0.7}s infinite`,
+          }}
+        />
+      ))}
+
+      {/* Main content container */}
+      <div className="relative z-10 flex flex-col items-center w-full max-w-[400px] px-6">
+        {/* Logo */}
+        <div className="splash-logo w-20 h-20 rounded-2xl flex items-center justify-center mb-8" style={{ background: "linear-gradient(135deg, #FFD700 0%, #FF8F00 100%)", boxShadow: "0 0 30px rgba(255, 215, 0, 0.2), 0 8px 32px rgba(0,0,0,0.4)" }}>
+          <svg className="w-10 h-10" style={{ color: "#070b14" }} viewBox="0 0 24 24" fill="currentColor">
+            <path d="M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5zm14 3c0 .6-.4 1-1 1H6c-.6 0-1-.4-1-1v-1h14v1z" />
+          </svg>
+        </div>
+
+        {/* App Name */}
+        <div className="splash-text-anim mb-2" style={{ animationDelay: "200ms" }}>
+          <h1 className="text-3xl font-extrabold tracking-wider text-center" style={{ background: "linear-gradient(135deg, #FFD700 0%, #FFFFFF 50%, #FFD700 100%)", backgroundSize: "200% auto", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", animation: "shimmer 3s linear infinite" }}>
+            ForexYemeni
+          </h1>
+        </div>
+        <div className="splash-text-anim mb-10" style={{ animationDelay: "400ms" }}>
+          <p className="text-xs font-semibold tracking-[0.3em] text-center" style={{ color: "#FFD700", opacity: 0.7 }}>
+            VIP TRADING SIGNALS
+          </p>
+        </div>
+
+        {/* Candlestick Chart */}
+        <div className="splash-text-anim w-full" style={{ animationDelay: "500ms" }}>
+          <div className="relative w-full rounded-2xl p-4 pb-5 overflow-hidden" style={{ background: "rgba(10, 18, 40, 0.7)", backdropFilter: "blur(20px)", border: "1px solid rgba(255, 215, 0, 0.08)", boxShadow: "0 0 40px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.03)" }}>
+            {/* Chart header */}
+            <div className="flex items-center justify-between mb-3 px-1">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-emerald-400" style={{ boxShadow: "0 0 8px rgba(0, 230, 118, 0.5)" }} />
+                <span className="text-[10px] font-bold text-emerald-400">LIVE</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-[10px] font-bold text-white/80">XAUUSD</span>
+                <span className="text-[10px] font-mono font-bold" style={{ color: "#00E676" }}>+2.34%</span>
+              </div>
+            </div>
+
+            {/* SVG Candlestick Chart */}
+            <div className="relative w-full" style={{ height: "140px" }}>
+              {/* Grid lines */}
+              {[20, 50, 80, 110].map((y, i) => (
+                <div key={`gl-${i}`} className="absolute left-0 right-0" style={{ top: `${y}px`, height: "1px", background: "rgba(255, 255, 255, 0.03)", animation: `gridLineMove ${3 + i}s ease-in-out ${i * 0.5}s infinite` }} />
+              ))}
+
+              {/* Price labels */}
+              <div className="absolute left-1 top-3 text-[7px] font-mono text-white/20">2,450</div>
+              <div className="absolute left-1 top-[42px] text-[7px] font-mono text-white/20">2,445</div>
+              <div className="absolute left-1 top-[72px] text-[7px] font-mono text-white/20">2,440</div>
+              <div className="absolute left-1 top-[102px] text-[7px] font-mono text-white/20">2,435</div>
+
+              {/* Candlesticks */}
+              <svg
+                className="absolute inset-0 w-full h-full"
+                viewBox="0 0 290 140"
+                preserveAspectRatio="xMidYMid meet"
+              >
+                {candles.map(([cx, bh, wt, wb, green, del], i) => (
+                  <Candle
+                    key={i}
+                    x={cx + 30}
+                    bodyH={bh}
+                    wickTop={wt}
+                    wickBot={wb}
+                    isGreen={green}
+                    delay={del}
+                    bodyW={16}
+                  />
+                ))}
+
+                {/* Moving average line */}
+                <polyline
+                  points="45,75 67,70 89,85 111,72 133,65 155,80 177,68 199,82 221,60 243,70 265,75"
+                  fill="none"
+                  stroke="#FFD700"
+                  strokeWidth="1.5"
+                  strokeDasharray="4 3"
+                  opacity="0.3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+
+              {/* Sparkle effects */}
+              {sparkles.map((sp, i) => (
+                <div
+                  key={`sp-${i}`}
+                  className="absolute splash-sparkle"
+                  style={{
+                    left: `${sp.x}px`,
+                    top: `${sp.y}px`,
+                    width: `${sp.size}px`,
+                    height: `${sp.size}px`,
+                    background: "#FFD700",
+                    borderRadius: "50%",
+                    animationDelay: `${sp.delay}ms`,
+                    boxShadow: `0 0 ${sp.size * 2}px rgba(255, 215, 0, 0.6)`,
+                  }}
+                />
+              ))}
+
+              {/* Current price line */}
+              <div
+                className="absolute right-3"
+                style={{
+                  top: "55px",
+                  height: "1px",
+                  width: "60%",
+                  background: "linear-gradient(90deg, transparent, #FFD700 30%, #FFD700 70%, transparent)",
+                  opacity: 0.2,
+                }}
+              />
+              <div
+                className="absolute right-2 px-1.5 py-0.5 rounded text-[7px] font-mono font-bold"
+                style={{
+                  top: "51px",
+                  background: "#FFD700",
+                  color: "#070b14",
+                  boxShadow: "0 0 10px rgba(255, 215, 0, 0.3)",
+                }}
+              >
+                2,438.50
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Loading Progress */}
+        <div className="splash-text-anim w-full mt-8 space-y-3" style={{ animationDelay: "800ms" }}>
+          <div className="w-full h-[3px] rounded-full overflow-hidden" style={{ background: "rgba(255, 215, 0, 0.1)" }}>
+            <div className="splash-progress-bar h-full rounded-full" style={{ width: "0%" }} />
+          </div>
+          <div className="flex items-center justify-center gap-2">
+            <div className="flex gap-1">
+              {[0, 1, 2].map(i => (
+                <div
+                  key={i}
+                  className="w-1.5 h-1.5 rounded-full"
+                  style={{
+                    background: "#FFD700",
+                    opacity: 0.3,
+                    animation: `gentlePulse 1.5s ease-in-out ${i * 0.3}s infinite`,
+                  }}
+                />
+              ))}
+            </div>
+            <span className="text-[11px] font-medium" style={{ color: "rgba(255, 215, 0, 0.6)" }}>
+              جاري التحميل...
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SignalCard({ s, idx, isAdmin, onUpdate, onDelete }: {
   s: Signal; idx: number; isAdmin: boolean;
   onUpdate: (id: string, status: string, tpIdx?: number) => void;
@@ -788,7 +1047,18 @@ export default function HomePage() {
     }
 
     // Start DB init immediately, no splash delay
-    initDb().then(() => restoreSession());
+    // Add timeout fallback: if API hangs, still show login after 5 seconds
+    const timeoutId = setTimeout(() => {
+      if (!dbReady) {
+        setDbReady(true);
+        setDbError(prev => prev || "Timeout - check connection");
+      }
+    }, 5000);
+    initDb().finally(() => {
+      clearTimeout(timeoutId);
+      restoreSession();
+    });
+    return () => clearTimeout(timeoutId);
   }, []);
 
   /* ── Fetch Signals ── */
@@ -1102,17 +1372,7 @@ export default function HomePage() {
      ═══════════════════════════════════════════════════════════════ */
   if (view === "login") {
     if (!dbReady) {
-      return (
-        <div className="min-h-screen flex flex-col items-center justify-center p-4" style={{ background: "#070b14" }}>
-          <div className="w-20 h-20 rounded-2xl gold-gradient flex items-center justify-center mx-auto shadow-lg shadow-amber-500/25 mb-6 animate-pulse">
-            <svg className="w-10 h-10 text-black" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5zm14 3c0 .6-.4 1-1 1H6c-.6 0-1-.4-1-1v-1h14v1z" />
-            </svg>
-          </div>
-          <h2 className="text-xl font-bold text-white mb-2">ForexYemeni</h2>
-          <p className="text-sm" style={{ color: "#FFD700" }}>جاري التحميل...</p>
-        </div>
-      );
+      return <SplashScreen />;
     }
     return (
       <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" style={{ background: "#070b14" }}>
