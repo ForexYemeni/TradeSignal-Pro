@@ -1,6 +1,14 @@
 package com.forexyemeni.app;
 
 import android.app.Activity;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.content.Context;
+import android.media.AudioAttributes;
+import android.media.RingtoneManager;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
 import android.view.Window;
@@ -16,11 +24,16 @@ import android.net.Uri;
 import android.content.Intent;
 import android.graphics.Color;
 import android.view.KeyEvent;
+import android.webkit.JavascriptInterface;
 
 public class MainActivity extends Activity {
 
     private WebView webView;
     private static final String APP_URL = "https://trade-signal-pro.vercel.app";
+    private static final String CHANNEL_ID = "forexyemeni_signals";
+    private static final String CHANNEL_NAME = "إشارات التداول";
+    private static final int NOTIFICATION_ID = 1001;
+    private int notificationCounter = 1001;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -33,6 +46,9 @@ public class MainActivity extends Activity {
         );
         getWindow().setStatusBarColor(Color.parseColor("#070b14"));
         getWindow().setNavigationBarColor(Color.parseColor("#070b14"));
+
+        // Create notification channel
+        createNotificationChannel();
 
         webView = new WebView(this);
         WebSettings s = webView.getSettings();
@@ -49,9 +65,12 @@ public class MainActivity extends Activity {
         s.setMediaPlaybackRequiresUserGesture(false);
         s.setBuiltInZoomControls(false);
         s.setDisplayZoomControls(false);
-        s.setUserAgentString(s.getUserAgentString() + " ForexYemeni/App/1.1");
+        s.setUserAgentString(s.getUserAgentString() + " ForexYemeni/App/1.2");
         webView.setBackgroundColor(Color.parseColor("#070b14"));
         webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+
+        // Add JavaScript interface for native notifications
+        webView.addJavascriptInterface(new NativeNotificationInterface(this), "AndroidNotify");
 
         webView.setWebViewClient(new AppWebViewClient());
         webView.setWebChromeClient(new WebChromeClient());
@@ -62,6 +81,84 @@ public class MainActivity extends Activity {
             webView.restoreState(savedInstanceState);
         } else {
             webView.loadUrl(APP_URL);
+        }
+    }
+
+    private void createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(
+                CHANNEL_ID,
+                CHANNEL_NAME,
+                NotificationManager.IMPORTANCE_HIGH
+            );
+            channel.setDescription("إشعارات إشارات التداول الجديدة");
+            channel.enableLights(true);
+            channel.setLightColor(Color.parseColor("#FFD700"));
+            channel.enableVibration(true);
+            channel.setVibrationPattern(new long[]{200, 100, 200, 100, 200});
+
+            // Set notification sound
+            Uri soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+            AudioAttributes audioAttributes = new AudioAttributes.Builder()
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                .build();
+            channel.setSound(soundUri, audioAttributes);
+
+            NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            manager.createNotificationChannel(channel);
+        }
+    }
+
+    // ── JavaScript Interface for Native Notifications ──
+    public class NativeNotificationInterface {
+        private Context context;
+
+        public NativeNotificationInterface(Context ctx) {
+            this.context = ctx;
+        }
+
+        @JavascriptInterface
+        public void sendNotification(String title, String body, String soundType) {
+            try {
+                NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+                notificationCounter++;
+
+                // Create intent to open app when notification is tapped
+                Intent intent = new Intent(context, MainActivity.class);
+                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                PendingIntent pendingIntent = PendingIntent.getActivity(
+                    context, 0, intent,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+                );
+
+                // Build notification
+                android.app.Notification.Builder builder;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    builder = new android.app.Notification.Builder(context, CHANNEL_ID);
+                } else {
+                    builder = new android.app.Notification.Builder(context);
+                    builder.setPriority(android.app.Notification.PRIORITY_HIGH);
+                }
+
+                builder.setContentTitle(title)
+                        .setContentText(body)
+                        .setSmallIcon(context.getApplicationInfo().icon)
+                        .setContentIntent(pendingIntent)
+                        .setAutoCancel(true)
+                        .setVibrate(new long[]{200, 100, 200, 100, 200})
+                        .setOnlyAlertOnce(false);
+
+                // Set color
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    builder.setColor(Color.parseColor("#FFD700"));
+                }
+
+                manager.notify(notificationCounter, builder.build());
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
     }
 

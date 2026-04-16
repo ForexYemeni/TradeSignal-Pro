@@ -94,6 +94,18 @@ function isSlLike(c: SignalCategory) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   NATIVE ANDROID NOTIFICATION BRIDGE
+   ═══════════════════════════════════════════════════════════════ */
+function nativeNotify(title: string, body: string, soundType: string) {
+  try {
+    const w = window as unknown as { AndroidNotify?: { sendNotification: (t: string, b: string, s: string) => void } };
+    if (w.AndroidNotify) {
+      w.AndroidNotify.sendNotification(title, body, soundType);
+    }
+  } catch { /* not native */ }
+}
+
+/* ═══════════════════════════════════════════════════════════════
    AUDIO NOTIFICATIONS (Web Audio API)
    ═══════════════════════════════════════════════════════════════ */
 function playTone(freq: number, duration: number, startTime: number, ctx: AudioContext, vol: number) {
@@ -1168,10 +1180,15 @@ export default function HomePage() {
         if (oldIds.size > 0 && !audioMuted) {
           for (const s of newSignals) {
             if (!oldIds.has(s.id)) {
+              // Web Audio
               if (isEntry(s.signalCategory)) playSound(s.type === "BUY" ? "buy" : "sell", audioVol);
               else if (isTpLike(s.signalCategory)) playSound("tp", audioVol);
               else if (isSlLike(s.signalCategory)) playSound("sl", audioVol);
               else playSound("message", audioVol);
+              // Native Android notification
+              if (isEntry(s.signalCategory)) nativeNotify(`📊 إشارة جديدة — ${s.pair}`, `${s.type === "BUY" ? "شراء" : "بيع"} @ ${s.entry}`, "new_signal");
+              else if (isTpLike(s.signalCategory)) nativeNotify(`🎯 هدف محقق — ${s.pair}`, `TP${(s.hitTpIndex ?? 0) + 1} تم تحقيقه`, "tp_hit");
+              else if (isSlLike(s.signalCategory)) nativeNotify(`🛑 وقف خسارة — ${s.pair}`, `تم ضرب وقف الخسارة`, "sl_hit");
             }
           }
         }
