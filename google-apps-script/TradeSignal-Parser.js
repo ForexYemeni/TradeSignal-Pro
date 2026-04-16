@@ -18,7 +18,7 @@
 // ═══════════════════════════════════════════════════════
 //  ⚙️ الإعدادات — غيّر هذه القيم
 // ═══════════════════════════════════════════════════════
-var APP_URL = "https://your-app.vercel.app/api/signals";
+var APP_URL = "https://trade-signal-pro.vercel.app/api/signals";
 var SHEET_NAME = "Signals";
 var SHEET_NAME_LOG = "SignalLog";
 
