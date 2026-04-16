@@ -214,9 +214,16 @@ export async function notifyNewSignal(pair: string, type: string, entry: number,
 /**
  * Helper: Take profit hit notification
  */
-export async function notifyTpHit(pair: string, tpIndex: number, pnl?: number) {
-  const title = `🎯 هدف محقق — ${pair}`;
-  const body = pnl ? `TP${tpIndex} تم تحقيقه! ربح: +$${pnl.toFixed(2)}` : `TP${tpIndex} تم تحقيقه بنجاح!`;
+export async function notifyTpHit(pair: string, tpIndex: number, pnl?: number, category?: string) {
+  // Category-specific labels
+  let catLabel = "هدف";
+  let catIcon = "🎯";
+  if (category === "REENTRY_TP") { catLabel = "تعويض"; catIcon = "♻️"; }
+  else if (category === "PYRAMID_TP") { catLabel = "تعزيز"; catIcon = "🔥"; }
+  const title = `${catIcon} ${catLabel} محقق — ${pair}`;
+  const body = pnl
+    ? `${catLabel} ${tpIndex} تم تحقيقه! ربح: +$${pnl.toFixed(2)}`
+    : `${catLabel} ${tpIndex} تم تحقيقه بنجاح!`;
   return sendPushToAll({
     title,
     body,
@@ -224,7 +231,7 @@ export async function notifyTpHit(pair: string, tpIndex: number, pnl?: number) {
     sound: 'tp_hit',
     requireInteraction: true,
     urgency: 'high',
-    data: { type: 'tp_hit', pair, tpIndex, pnl },
+    data: { type: 'tp_hit', pair, tpIndex, pnl, category },
   });
 }
 

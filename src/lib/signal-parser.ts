@@ -291,9 +291,12 @@ function parseReentrySignal(text: string): ParseResult {
 
 function parseReentryTPAlert(text: string): ParseResult {
   const pair = extractPair(text) || "";
+  const tpNum = extractTPNumber(text);
   const hitPrice = extractHitPrice(text) || 0;
   const pnlPoints = extractPnLPoints(text) || 0;
   const pnlDollar = extractPnLDollar(text) || 0;
+  const tpStatusList = extractTPStatusList(text);
+  const totalTPs = extractTotalTPCount(text);
 
   return {
     success: true,
@@ -301,7 +304,10 @@ function parseReentryTPAlert(text: string): ParseResult {
       pair, type: "BUY", entry: 0, stopLoss: 0,
       takeProfits: [], confidence: 0,
       signalCategory: "REENTRY_TP", rawText: text,
+      hitTpIndex: tpNum,
       hitPrice, pnlPoints, pnlDollar,
+      tpStatusList,
+      totalTPs: totalTPs || undefined,
       timeframe: "", htfTimeframe: "", htfTrend: "", smcTrend: "",
       riskData: emptyRiskData(),
     },
@@ -352,13 +358,19 @@ function parsePyramidSignal(text: string): ParseResult {
 
 function parsePyramidTPAlert(text: string): ParseResult {
   const pair = extractPair(text) || "";
+  const tpNum = extractTPNumber(text);
   const hitPrice = extractHitPrice(text) || 0;
   const pnlPoints = extractPnLPoints(text) || 0;
   const pnlDollar = extractPnLDollar(text) || 0;
+  const tpStatusList = extractTPStatusList(text);
+  const totalTPs = extractTotalTPCount(text);
 
   return {
     success: true,
     signal: {
+      hitTpIndex: tpNum,
+      tpStatusList,
+      totalTPs: totalTPs || undefined,
       pair, type: "BUY", entry: 0, stopLoss: 0,
       takeProfits: [], confidence: 0,
       signalCategory: "PYRAMID_TP", rawText: text,
@@ -617,7 +629,8 @@ function extractSMCTrend(text: string): string {
 }
 
 function extractTPNumber(text: string): number {
-  const match = text.match(/(?:الهدف|تحقق الهدف)\s*(\d+)/);
+  // Match patterns: "تحقق الهدف 1", "الهدف 2", "هدف التعويض 3", "هدف التعزيز 4"
+  const match = text.match(/(?:تحقق\s+)?(?:هدف)\s*(?:التعويض|التعزيز)?\s*(\d+)/);
   if (match) return parseInt(match[1]);
   return -1;
 }

@@ -76,7 +76,9 @@ export async function POST(request: NextRequest) {
     } else if (parseResult.signal.signalCategory === "TP_HIT" || parseResult.signal.signalCategory === "REENTRY_TP" || parseResult.signal.signalCategory === "PYRAMID_TP") {
       notifyTpHit(
         parseResult.signal.pair,
-        parseResult.signal.hitTpIndex ?? 0
+        parseResult.signal.hitTpIndex ?? 0,
+        undefined,
+        parseResult.signal.signalCategory
       ).catch(() => {});
     } else if (parseResult.signal.signalCategory === "SL_HIT" || parseResult.signal.signalCategory === "REENTRY_SL" || parseResult.signal.signalCategory === "PYRAMID_SL") {
       notifySlHit(parseResult.signal.pair).catch(() => {});

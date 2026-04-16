@@ -383,22 +383,28 @@ function TradeStatusBanner({ s }: { s: Signal }) {
   const isManual = s.status === "MANUAL_CLOSE";
   const hitCount = s.hitTpIndex >= 0 ? s.hitTpIndex : 0;
   const totalTPs = s.totalTPs || s.takeProfits?.length || 0;
+  const isReentry = s.signalCategory.startsWith("REENTRY");
+  const isPyramid = s.signalCategory.startsWith("PYRAMID");
   if (s.status === "ACTIVE") return null;
 
+  const c = isReentry
+    ? { bg: "bg-gradient-to-br from-cyan-500/[0.1] to-cyan-600/[0.04] border-cyan-500/25 animate-profit-glow", iconBg: "bg-cyan-500/20", text: "text-cyan-400", badge: "bg-cyan-500/20 text-cyan-400", pill: "text-cyan-400/70 bg-cyan-500/10", sub: "text-cyan-400/60" }
+    : isPyramid
+    ? { bg: "bg-gradient-to-br from-purple-500/[0.1] to-purple-600/[0.04] border-purple-500/25 animate-profit-glow", iconBg: "bg-purple-500/20", text: "text-purple-400", badge: "bg-purple-500/20 text-purple-400", pill: "text-purple-400/70 bg-purple-500/10", sub: "text-purple-400/60" }
+    : isProfit
+    ? { bg: "bg-gradient-to-br from-emerald-500/[0.1] to-emerald-600/[0.04] border-emerald-500/25 animate-profit-glow", iconBg: "bg-emerald-500/20", text: "text-emerald-400", badge: "bg-emerald-500/20 text-emerald-400", pill: "text-emerald-400/70 bg-emerald-500/10", sub: "text-emerald-400/60" }
+    : isLoss
+    ? { bg: "bg-gradient-to-br from-red-500/[0.1] to-red-600/[0.04] border-red-500/25 animate-loss-glow", iconBg: "bg-red-500/20", text: "text-red-400", badge: "bg-red-500/20 text-red-400", pill: "text-red-400/70 bg-red-500/10", sub: "text-red-400/60" }
+    : { bg: "bg-white/[0.03] border-white/[0.06]", iconBg: "bg-slate-500/20", text: "text-slate-400", badge: "bg-slate-500/20 text-slate-400", pill: "text-slate-400/70 bg-slate-500/10", sub: "text-slate-400/60" };
+  const catIcon = isReentry ? "♻️" : isPyramid ? "🔥" : "";
+  const catLabel = isReentry ? "تعويض" : isPyramid ? "تعزيز" : "";
+
   return (
-    <div className={`mt-2.5 rounded-xl p-3 border ${
-      isProfit
-        ? "bg-gradient-to-br from-emerald-500/[0.1] to-emerald-600/[0.04] border-emerald-500/25 animate-profit-glow"
-        : isLoss
-        ? "bg-gradient-to-br from-red-500/[0.1] to-red-600/[0.04] border-red-500/25 animate-loss-glow"
-        : "bg-white/[0.03] border-white/[0.06]"
-    }`}>
+    <div className={`mt-2.5 rounded-xl p-3 border ${c.bg}`}>
       <div className="flex items-center gap-2.5">
-        <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-          isProfit ? "bg-emerald-500/20" : isLoss ? "bg-red-500/20" : "bg-slate-500/20"
-        }`}>
+        <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${c.iconBg}`}>
           {isProfit && (
-            <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <svg className={`w-4 h-4 ${c.text}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
             </svg>
           )}
@@ -415,19 +421,19 @@ function TradeStatusBanner({ s }: { s: Signal }) {
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className={`text-xs font-bold ${isProfit ? "text-emerald-400" : isLoss ? "text-red-400" : "text-slate-400"}`}>
-              {isProfit ? "صفقة رابحة" : isLoss ? "صفقة خاسرة" : "صفقة مغلقة يدويا"}
+            <span className={`text-xs font-bold ${c.text}`}>
+              {catIcon && `${catIcon} `}{isProfit ? (catLabel ? `${catLabel} رابح` : "صفقة رابحة") : isLoss ? (isReentry ? "تعويض خاسر" : isPyramid ? "تعزيز خاسر" : "صفقة خاسرة") : "صفقة مغلقة يدويا"}
             </span>
-            {isProfit && hitCount > 0 && (
-              <span className="text-[9px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded-md font-bold">
-                {hitCount}/{totalTPs} أهداف
+            {isProfit && hitCount > 0 && totalTPs > 0 && (
+              <span className={`text-[9px] ${c.badge} px-1.5 py-0.5 rounded-md font-bold`}>
+                {catIcon} {hitCount}/{totalTPs} {catLabel || "أهداف"}
               </span>
             )}
           </div>
           {isProfit && (s.pnlDollars ?? 0) > 0 && (
-            <div className="text-[11px] font-mono font-bold text-emerald-400 mt-0.5">
+            <div className={`text-[11px] font-mono font-bold ${c.text} mt-0.5`}>
               +${s.pnlDollars}{" "}
-              <span className="text-[9px] font-normal text-emerald-400/60">({s.pnlPoints ?? 0} نقطة)</span>
+              <span className={`text-[9px] font-normal ${c.sub}`}>({s.pnlPoints ?? 0} نقطة)</span>
             </div>
           )}
           {isLoss && (s.pnlDollars ?? 0) !== 0 && (
@@ -444,7 +450,7 @@ function TradeStatusBanner({ s }: { s: Signal }) {
           )}
         </div>
         {isProfit && (
-          <div className="text-[10px] font-bold text-emerald-400/70 bg-emerald-500/10 px-2 py-1 rounded-lg flex-shrink-0">
+          <div className={`text-[10px] font-bold ${c.pill} px-2 py-1 rounded-lg flex-shrink-0`}>
             ربح
           </div>
         )}
@@ -653,25 +659,31 @@ function ClosedSignalCard({ s, idx, isAdmin, onDelete }: { s: Signal; idx: numbe
   const pnl = s.pnlDollars ?? 0;
   const points = s.pnlPoints ?? 0;
 
+  // Category-specific color theme
+  const isReentry = s.signalCategory.startsWith("REENTRY");
+  const isPyramid = s.signalCategory.startsWith("PYRAMID");
+  const catColors = isReentry
+    ? { bg: "bg-gradient-to-r from-cyan-500/[0.08] to-cyan-600/[0.03]", border: "border-cyan-500/20", iconBg: "bg-cyan-500/15", text: "text-cyan-400", badge: "bg-cyan-500/20 text-cyan-400", tpBadge: "bg-cyan-500/15 text-cyan-400 border-cyan-500/20" }
+    : isPyramid
+    ? { bg: "bg-gradient-to-r from-purple-500/[0.08] to-purple-600/[0.03]", border: "border-purple-500/20", iconBg: "bg-purple-500/15", text: "text-purple-400", badge: "bg-purple-500/20 text-purple-400", tpBadge: "bg-purple-500/15 text-purple-400 border-purple-500/20" }
+    : isProfit
+    ? { bg: "bg-gradient-to-r from-emerald-500/[0.08] to-emerald-600/[0.03]", border: "border-emerald-500/20", iconBg: "bg-emerald-500/15", text: "text-emerald-400", badge: "bg-emerald-500/20 text-emerald-400", tpBadge: "bg-emerald-500/15 text-emerald-400 border-emerald-500/20" }
+    : isLoss
+    ? { bg: "bg-gradient-to-r from-red-500/[0.08] to-red-600/[0.03]", border: "border-red-500/20", iconBg: "bg-red-500/15", text: "text-red-400", badge: "bg-red-500/20 text-red-400", tpBadge: "bg-emerald-500/15 text-emerald-400 border-emerald-500/20" }
+    : { bg: "bg-white/[0.03]", border: "border-white/[0.06]", iconBg: "bg-slate-500/15", text: "text-slate-400", badge: "bg-slate-500/20 text-slate-400", tpBadge: "bg-slate-500/10 text-slate-400 border-white/[0.06]" };
+  const catIcon = isReentry ? "♻️" : isPyramid ? "🔥" : isProfit ? "✅" : isLoss ? "❌" : "⊘";
+
   return (
     <div className="animate-[fadeInUp_0.3s_ease-out]" style={{ animationDelay: `${idx * 30}ms`, animationFillMode: "both" }}>
-      <div className={`rounded-xl border overflow-hidden transition-all duration-300 active:scale-[0.99] ${
-        isProfit
-          ? "bg-gradient-to-r from-emerald-500/[0.08] to-emerald-600/[0.03] border-emerald-500/20"
-          : isLoss
-          ? "bg-gradient-to-r from-red-500/[0.08] to-red-600/[0.03] border-red-500/20"
-          : "bg-white/[0.03] border-white/[0.06]"
-      }`}>
+      <div className={`rounded-xl border overflow-hidden transition-all duration-300 active:scale-[0.99] ${catColors.bg} ${catColors.border}`}>
         {/* Compact Header - Always Visible */}
         <button onClick={() => setExpanded(!expanded)} className="w-full text-right">
           <div className="flex items-center justify-between px-3 py-2.5">
             <div className="flex items-center gap-2.5">
               {/* Result icon */}
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                isProfit ? "bg-emerald-500/15" : isLoss ? "bg-red-500/15" : "bg-slate-500/15"
-              }`}>
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${catColors.iconBg}`}>
                 {isProfit ? (
-                  <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                  <svg className={`w-4 h-4 ${catColors.text}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
                 ) : isLoss ? (
                   <svg className="w-4 h-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                 ) : (
@@ -683,19 +695,19 @@ function ClosedSignalCard({ s, idx, isAdmin, onDelete }: { s: Signal; idx: numbe
                   <span className="font-bold text-white text-[13px]">{s.pair}</span>
                   <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-md ${isBuy ? "bg-emerald-500/15 text-emerald-400" : "bg-red-500/15 text-red-400"}`}>{isBuy ? "BUY" : "SELL"}</span>
                   {hitCount > 0 && isProfit && (
-                    <span className="text-[8px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded-md font-bold">{hitCount}/{totalTPs} TP</span>
+                    <span className={`text-[8px] ${catColors.badge} px-1.5 py-0.5 rounded-md font-bold`}>{hitCount}/{totalTPs} {isReentry ? "♻️" : isPyramid ? "🔥" : "TP"}</span>
                   )}
                 </div>
-                <span className={`text-[9px] font-medium ${isProfit ? "text-emerald-400/70" : isLoss ? "text-red-400/70" : "text-slate-500"}`}>{catLabel}</span>
+                <span className={`text-[9px] font-medium ${catColors.text}/70`}>{catIcon} {catLabel}</span>
               </div>
             </div>
             <div className="flex items-center gap-2.5">
               {/* PnL badge */}
               <div className="text-right">
-                <div className={`text-[13px] font-extrabold font-mono ${isProfit ? "text-emerald-400" : "text-red-400"}`}>
+                <div className={`text-[13px] font-extrabold font-mono ${isProfit ? catColors.text : "text-red-400"}`}>
                   {isProfit ? "+" : "-"}${Math.abs(pnl)}
                 </div>
-                <div className={`text-[8px] font-mono ${isProfit ? "text-emerald-400/50" : "text-red-400/50"}`}>{points} نقطة</div>
+                <div className={`text-[8px] font-mono ${isProfit ? catColors.text + "/50" : "text-red-400/50"}`}>{points} نقطة</div>
               </div>
               {/* Chevron */}
               <svg className={`w-3.5 h-3.5 text-slate-600 transition-transform duration-300 ${expanded ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -720,28 +732,35 @@ function ClosedSignalCard({ s, idx, isAdmin, onDelete }: { s: Signal; idx: numbe
                   <div className="text-[8px] text-slate-500 mb-0.5">الوقف</div>
                   <div className="text-[11px] font-bold font-mono text-red-300">{s.stopLoss}</div>
                 </div>
-                <div className={`rounded-lg p-2 border ${isProfit ? "bg-emerald-500/[0.06] border-emerald-500/10" : "bg-red-500/[0.06] border-red-500/10"}`}>
-                  <div className="text-[8px] text-slate-500 mb-0.5">{isProfit ? "الهدف" : "الإغلاق"}</div>
-                  <div className={`text-[11px] font-bold font-mono ${isProfit ? "text-emerald-400" : "text-red-400"}`}>{s.hitPrice ?? "—"}</div>
+                <div className={`rounded-lg p-2 border ${isProfit ? catColors.iconBg + " " + catColors.border : "bg-red-500/[0.06] border-red-500/10"}`}>
+                  <div className="text-[8px] text-slate-500 mb-0.5">{isReentry ? "تعويض" : isPyramid ? "تعزيز" : isProfit ? "الهدف" : "الإغلاق"} {hitCount > 0 && totalTPs > 0 ? `(${hitCount}/${totalTPs})` : ""}</div>
+                  <div className={`text-[11px] font-bold font-mono ${isProfit ? catColors.text : "text-red-400"}`}>{s.hitPrice ?? "—"}</div>
                 </div>
               </div>
 
-              {/* TP Targets */}
-              {s.takeProfits?.length > 0 && (
+              {/* TP Targets or hit info for standalone TP/SL alerts */}
+              {s.takeProfits?.length > 0 ? (
                 <div className="space-y-1">
                   <div className="text-[9px] text-slate-500 font-medium">الأهداف ({hitCount}/{totalTPs})</div>
                   <div className="flex gap-1 flex-wrap">
                     {s.takeProfits.map((tp, i) => {
                       const hit = s.hitTpIndex > 0 && i < s.hitTpIndex;
                       return (
-                        <div key={i} className={`px-2 py-1 rounded-lg text-[9px] font-mono border ${hit ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/20" : "bg-white/[0.02] text-slate-500 border-white/[0.06] line-through opacity-50"}`}>
+                        <div key={i} className={`px-2 py-1 rounded-lg text-[9px] font-mono border ${hit ? catColors.tpBadge : "bg-white/[0.02] text-slate-500 border-white/[0.06] line-through opacity-50"}`}>
                           TP{i+1}: {tp.tp} ({tp.rr.toFixed(1)}R)
                         </div>
                       );
                     })}
                   </div>
                 </div>
-              )}
+              ) : hitCount > 0 && totalTPs > 0 ? (
+                <div className={`px-3 py-2 rounded-lg border ${catColors.tpBadge}`}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold">{catIcon} {isReentry ? "تعويض" : isPyramid ? "تعزيز" : "هدف"} {hitCount} من {totalTPs}</span>
+                    <span className="text-[9px] opacity-70">متبقي {totalTPs - hitCount}</span>
+                  </div>
+                </div>
+              ) : null}
 
               {/* Risk Info */}
               {(s.balance || s.lotSize) && (
