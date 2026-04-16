@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#070b14">
+    <title>ForexYemeni - VIP Signals</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Cairo', 'sans-serif'] },
+                    colors: {
+                        darkBg: '#070b14', 
+                        panelBg: '#0f172a',
+                        buyGreen: '#00E676', 
+                        sellRed: '#FF3D71',
+                        pyrPurple: '#D500F9', 
+                        reentryTeal: '#00E5FF',
+                        adminBlue: '#2979FF', 
+                        premiumGold: '#FFD700'
+                    },
+                    backgroundImage: {
+                        'vip-gradient': 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+                        'gold-gradient': 'linear-gradient(135deg, #FFD700 0%, #FF8F00 100%)',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #070b14; color: #f8fafc; font-family: 'Cairo', sans-serif; -webkit-tap-highlight-color: transparent; overscroll-behavior-y: none; margin: 0; padding: 0; }
+        .h-dvh { height: 100vh; height: 100dvh; }
+        .pt-safe { padding-top: env(safe-area-inset-top, 20px); }
+        .pb-safe { padding-bottom: env(safe-area-inset-bottom, 20px); }
+        ::-webkit-scrollbar { display: none; }
+        * { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        .glass-panel { background: rgba(15, 23, 42, 0.65); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
+        .glass-nav { background: rgba(7, 11, 20, 0.9); backdrop-filter: blur(20px); border-top: 1px solid rgba(255, 255, 255, 0.05); }
+        .input-glass { background: rgba(7, 11, 20, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); transition: all 0.3s ease; }
+        .input-glass:focus-within { border-color: #00E676; box-shadow: 0 0 15px rgba(0, 230, 118, 0.15); }
+        
+        .hide { display: none !important; }
+        .fade-in { animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .chart-bar { width: 6px; border-radius: 4px; background: #FFD700; animation: growBar 1s infinite alternate ease-in-out; }
+        @keyframes growBar { 0% { transform: scaleY(0.3); } 100% { transform: scaleY(1); } }
+        
+        .nav-active { color: #FFD700; text-shadow: 0 0 10px rgba(255, 215, 0, 0.5); transform: translateY(-4px); }
+        .nav-active-admin { color: #2979FF; transform: translateY(-4px); }
+
+        .stat-circle { width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: conic-gradient(#00E676 var(--p), #1e293b 0deg); }
+        .stat-inner { width: 68px; height: 68px; border-radius: 50%; background: #0f172a; display: flex; align-items: center; justify-content: center; }
+
+        .accordion-content { transition: max-height 0.3s ease-in-out, opacity 0.3s ease-in-out; max-height: 0; opacity: 0; overflow: hidden; }
+        .accordion-content.expanded { max-height: 500px; opacity: 1; }
+        .icon-rotate { transform: rotate(180deg); }
+        
+        .code-block { font-family: monospace; background: #05080f; color: #a5b4fc; padding: 15px; border-radius: 12px; overflow-x: auto; font-size: 11px; white-space: pre; border: 1px solid #1e293b; direction: ltr; text-align: left; }
+
+        /* Notification Toast */
+        #notify-container { position: fixed; top: 0; left: 0; right: 0; z-index: 9999; display: flex; flex-direction: column; align-items: center; pointer-events: none; padding-top: env(safe-area-inset-top, 12px); gap: 8px; }
+        .notify-toast { pointer-events: auto; width: 90%; max-width: 420px; padding: 14px 16px; border-radius: 16px; backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; gap: 12px; animation: notifySlideIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; box-shadow: 0 10px 40px rgba(0,0,0,0.6); }
+        .notify-toast.notify-exit { animation: notifySlideOut 0.4s ease-in forwards; }
+        .notify-new { background: linear-gradient(135deg, rgba(0,230,118,0.15), rgba(15,23,42,0.9)); border-color: rgba(0,230,118,0.3); }
+        .notify-tp { background: linear-gradient(135deg, rgba(41,121,255,0.15), rgba(15,23,42,0.9)); border-color: rgba(41,121,255,0.3); }
+        .notify-sl { background: linear-gradient(135deg, rgba(255,61,113,0.15), rgba(15,23,42,0.9)); border-color: rgba(255,61,113,0.3); }
+        .notify-reentry { background: linear-gradient(135deg, rgba(0,229,255,0.15), rgba(15,23,42,0.9)); border-color: rgba(0,229,255,0.3); }
+        .notify-pyramid { background: linear-gradient(135deg, rgba(213,0,249,0.15), rgba(15,23,42,0.9)); border-color: rgba(213,0,249,0.3); }
+        @keyframes notifySlideIn { from { opacity: 0; transform: translateY(-100px) scale(0.9); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        @keyframes notifySlideOut { from { opacity: 1; transform: translateY(0) scale(1); } to { opacity: 0; transform: translateY(-30px) scale(0.95); } }
+        .notify-icon { width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+        .notify-new .notify-icon { background: rgba(0,230,118,0.2); }
+        .notify-tp .notify-icon { background: rgba(41,121,255,0.2); }
+        .notify-sl .notify-icon { background: rgba(255,61,113,0.2); }
+        .notify-reentry .notify-icon { background: rgba(0,229,255,0.2); }
+        .notify-pyramid .notify-icon { background: rgba(213,0,249,0.2); }
+        .notify-text { flex: 1; min-width: 0; }
+        .notify-title { font-size: 13px; font-weight: 800; color: #fff; margin-bottom: 2px; }
+        .notify-desc { font-size: 10px; color: #94a3b8; }
+        .notify-time { font-size: 9px; color: #64748b; white-space: nowrap; }
+    </style>
+</head>
+<body class="w-full overflow-hidden flex justify-center bg-black">
+
+    <div class="w-full h-dvh max-w-[480px] relative overflow-hidden flex flex-col bg-darkBg shadow-[0_0_50px_rgba(0,0,0,1)] mx-auto sm:border-x sm:border-slate-800">
+        
+        <div id="loader-screen" class="absolute inset-0 z-50 bg-darkBg flex flex-col items-center justify-center fade-in">
+            <div class="relative w-28 h-28 rounded-full glass-panel flex items-end justify-center pb-7 gap-2 shadow-[0_0_40px_rgba(255,215,0,0.15)]">
+                <div class="chart-bar h-10" style="animation-delay: 0s"></div>
+                <div class="chart-bar h-14" style="animation-delay: 0.2s"></div>
+                <div class="chart-bar h-20 bg-buyGreen" style="animation-delay: 0.4s"></div>
+                <i id="success-icon" class="fa-solid fa-check-double absolute text-5xl text-buyGreen hide drop-shadow-[0_0_15px_rgba(0,230,118,0.5)]"></i>
+            </div>
+            <h2 id="loader-text" class="mt-8 font-extrabold text-xl text-premiumGold animate-pulse tracking-wider">ForexYemeni VIP</h2>
+            <p id="db-alert-text" class="text-xs text-sellRed mt-2 font-bold hide">يتم استخدام قاعدة بيانات بديلة</p>
+        </div>
+
+        <div id="auth-view" class="flex-1 flex flex-col justify-center px-7 hide fade-in relative w-full h-full">
+            <div class="absolute top-0 right-0 w-72 h-72 bg-premiumGold/5 rounded-full blur-[100px] -z-10"></div>
+            <div class="absolute bottom-0 left-0 w-72 h-72 bg-buyGreen/5 rounded-full blur-[100px] -z-10"></div>
+
+            <div class="mb-12 text-center">
+                <div class="w-24 h-24 bg-gold-gradient rounded-[2rem] flex items-center justify-center mx-auto shadow-[0_10px_30px_rgba(255,215,0,0.3)] mb-6">
+                    <i class="fa-solid fa-crown text-4xl text-darkBg"></i>
+                </div>
+                <h1 class="text-4xl font-black tracking-tight text-white">ForexYemeni</h1>
+                <p class="text-premiumGold text-sm mt-2 font-bold tracking-wide">VIP TRADING SIGNALS</p>
+            </div>
+
+            <div id="login-form" class="space-y-4 w-full">
+                <div class="input-glass rounded-2xl flex items-center px-4 h-[60px]">
+                    <i class="fa-solid fa-envelope text-slate-500 ml-3 text-lg"></i>
+                    <input type="email" id="login-email" placeholder="البريد الإلكتروني" class="w-full bg-transparent border-none outline-none text-white text-base">
+                </div>
+                <div class="input-glass rounded-2xl flex items-center px-4 h-[60px]">
+                    <i class="fa-solid fa-lock text-slate-500 ml-3 text-lg"></i>
+                    <input type="password" id="login-password" placeholder="كلمة المرور" class="w-full bg-transparent border-none outline-none text-white text-base">
+                </div>
+                <p id="login-error" class="text-sellRed text-xs text-center hide font-bold mt-2 leading-relaxed"></p>
+                <button onclick="processAuth('login')" class="w-full bg-gold-gradient text-darkBg font-black py-4 rounded-2xl shadow-[0_10px_25px_rgba(255,215,0,0.2)] mt-4 text-lg active:scale-95 transition-transform">تسجيل الدخول</button>
+                <p class="text-center text-sm text-slate-400 mt-6">ليس لديك اشتراك؟ <button onclick="toggleAuth('register')" class="text-premiumGold font-bold px-2 py-1">أنشئ حسابك الآن</button></p>
+            </div>
+
+            <div id="register-form" class="space-y-4 w-full hide">
+                <div class="input-glass rounded-2xl flex items-center px-4 h-[60px]"><i class="fa-solid fa-user text-slate-500 ml-3"></i><input type="text" id="reg-name" placeholder="الاسم الكامل" class="w-full bg-transparent border-none outline-none text-white text-base"></div>
+                <div class="input-glass rounded-2xl flex items-center px-4 h-[60px]"><i class="fa-solid fa-envelope text-slate-500 ml-3"></i><input type="email" id="reg-email" placeholder="البريد الإلكتروني" class="w-full bg-transparent border-none outline-none text-white text-base"></div>
+                <div class="input-glass rounded-2xl flex items-center px-4 h-[60px]"><i class="fa-solid fa-lock text-slate-500 ml-3"></i><input type="password" id="reg-pass" placeholder="كلمة المرور (6+)" class="w-full bg-transparent border-none outline-none text-white text-base"></div>
+                <button onclick="processAuth('register')" class="w-full bg-white text-darkBg font-black py-4 rounded-2xl shadow-[0_10px_25px_rgba(255,255,255,0.2)] mt-4 text-lg active:scale-95 transition-transform">طلب اشتراك</button>
+                <p class="text-center text-sm text-slate-400 mt-6">لديك حساب؟ <button onclick="toggleAuth('login')" class="text-white font-bold px-2 py-1">سجل دخولك</button></p>
+            </div>
+        </div>
+
+        <div id="pending-view" class="flex-1 flex flex-col justify-center items-center px-8 hide fade-in relative w-full h-full text-center">
+            <div class="w-24 h-24 rounded-full bg-adminBlue/10 flex items-center justify-center mb-6 border border-adminBlue/30"><i class="fa-solid fa-hourglass-half text-5xl text-adminBlue animate-pulse"></i></div>
+            <h2 class="text-2xl font-black mb-3 text-white">حسابك قيد المراجعة</h2>
+            <p class="text-slate-400 text-sm mb-10 leading-relaxed">أهلاً بك في نادي الـ VIP. اشتراكك الآن قيد المعالجة من قبل الإدارة.</p>
+            <button onclick="logout()" class="w-full glass-panel text-white font-bold py-4 rounded-2xl">تسجيل الخروج</button>
+        </div>
+
+        <div id="expired-view" class="flex-1 flex flex-col justify-center items-center px-8 hide fade-in relative w-full h-full text-center">
+            <div class="w-24 h-24 rounded-full bg-premiumGold/10 flex items-center justify-center mb-6 border border-premiumGold/30"><i class="fa-solid fa-ban text-5xl text-premiumGold"></i></div>
+            <h2 class="text-2xl font-black mb-3 text-white">انتهى اشتراكك</h2>
+            <p class="text-slate-400 text-sm mb-10 leading-relaxed">عذراً، انتهت صلاحية اشتراكك في الباقة المدفوعة. يرجى التجديد.</p>
+            <button onclick="logout()" class="w-full bg-premiumGold text-darkBg font-bold py-4 rounded-2xl shadow-[0_10px_25px_rgba(255,215,0,0.3)]">تسجيل الخروج</button>
+        </div>
+
+        <div id="blocked-view" class="flex-1 flex flex-col justify-center items-center px-8 hide fade-in relative w-full h-full text-center">
+            <div class="absolute inset-0 bg-sellRed/5 z-0"></div>
+            <div class="w-24 h-24 rounded-full bg-sellRed/10 flex items-center justify-center mb-6 border border-sellRed/30 relative z-10 shadow-[0_0_30px_rgba(255,61,113,0.3)]"><i class="fa-solid fa-lock text-5xl text-sellRed"></i></div>
+            <h2 class="text-3xl font-black mb-3 text-sellRed relative z-10">حساب محظور</h2>
+            <p class="text-slate-300 text-sm mb-10 leading-relaxed relative z-10">عذراً، لقد تم حظر هذا الحساب من قبل الإدارة.</p>
+            <button onclick="logout()" class="w-full bg-sellRed text-white font-black py-4 rounded-2xl shadow-[0_10px_25px_rgba(255,61,113,0.3)] relative z-10 active:scale-95">تسجيل الخروج</button>
+        </div>
+
+        <div id="user-view" class="flex-1 flex flex-col hide w-full h-full relative">
+            <header class="pt-safe pb-4 px-5 glass-panel border-0 z-20 rounded-b-[2rem]">
+                <div class="flex justify-between items-center mb-5 mt-2">
+                    <div>
+                        <h2 class="text-2xl font-black tracking-wide text-white">المنصة <span class="text-premiumGold">VIP</span></h2>
+                        <p class="text-[10px] text-buyGreen flex items-center gap-1 mt-1 font-bold"><span class="w-1.5 h-1.5 rounded-full bg-buyGreen animate-pulse shadow-[0_0_5px_#00E676]"></span> متصل بالسوق الحقيقي</p>
+                    </div>
+                    <div class="text-left bg-darkBg/50 px-3 py-1.5 rounded-xl border border-white/5">
+                        <p class="text-[9px] text-slate-400">ينتهي الاشتراك:</p>
+                        <p class="text-xs font-black text-premiumGold" id="user-expire-date">--</p>
+                    </div>
+                </div>
+                <div id="user-filters-header" class="flex gap-2 overflow-x-auto pb-2 pr-1 custom-scrollbar">
+                    <button onclick="filterSignals('All')" class="px-5 py-2 rounded-xl bg-premiumGold text-darkBg text-xs font-black whitespace-nowrap shadow-[0_5px_15px_rgba(255,215,0,0.2)] transition-all">الكل</button>
+                    <button onclick="filterSignals('Main')" class="px-5 py-2 rounded-xl bg-slate-800/80 text-white text-xs font-bold whitespace-nowrap border border-white/5 transition-all">الأساسية</button>
+                    <button onclick="filterSignals('Pyramiding')" class="px-5 py-2 rounded-xl bg-slate-800/80 text-white text-xs font-bold whitespace-nowrap border border-white/5 transition-all">التعزيز 🔥</button>
+                    <button onclick="filterSignals('Reentry')" class="px-5 py-2 rounded-xl bg-slate-800/80 text-white text-xs font-bold whitespace-nowrap border border-white/5 transition-all">التعويض ♻️</button>
+                </div>
+                <h3 id="user-stats-header" class="text-xl font-black text-white hide mb-1">سجل الأداء والإحصائيات</h3>
+                <h3 id="user-settings-header" class="text-xl font-black text-white hide mb-1">الإعدادات وتأمين الحساب</h3>
+            </header>
+            
+            <div class="flex-1 overflow-hidden relative">
+                <div id="user-tab-signals" class="h-full overflow-y-auto p-5 space-y-5 pb-[100px] fade-in" id="signals-container"></div>
+                
+                <div id="user-tab-stats" class="h-full overflow-y-auto p-5 pb-[100px] hide fade-in">
+                    <div class="glass-panel p-5 rounded-3xl mb-5 flex items-center justify-between bg-vip-gradient">
+                        <div><p class="text-xs text-slate-400 font-bold mb-1">نسبة النجاح العامة</p><p class="text-3xl font-black text-white" id="stat-winrate">0%</p></div>
+                        <div class="stat-circle shadow-[0_0_20px_rgba(0,230,118,0.2)]" id="stat-circle-ui" style="--p: 0%;"><div class="stat-inner"><i class="fa-solid fa-trophy text-2xl text-premiumGold"></i></div></div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4 mb-6">
+                        <div class="glass-panel p-4 rounded-3xl border-t-2 border-buyGreen"><p class="text-[10px] text-slate-400 font-bold">صفقات رابحة</p><p class="text-2xl font-black text-buyGreen mt-1" id="stat-wins">0</p></div>
+                        <div class="glass-panel p-4 rounded-3xl border-t-2 border-sellRed"><p class="text-[10px] text-slate-400 font-bold">صفقات خاسرة</p><p class="text-2xl font-black text-sellRed mt-1" id="stat-losses">0</p></div>
+                        <div class="glass-panel p-4 rounded-3xl border-t-2 border-adminBlue"><p class="text-[10px] text-slate-400 font-bold">إجمالي المغلقة</p><p class="text-2xl font-black text-white mt-1" id="stat-total">0</p></div>
+                        <div class="glass-panel p-4 rounded-3xl border-t-2 border-premiumGold"><p class="text-[10px] text-slate-400 font-bold">أهداف محققة 🎯</p><p class="text-2xl font-black text-premiumGold mt-1" id="stat-tps">0</p></div>
+                    </div>
+                    <h3 class="font-bold text-sm text-white mb-3 pl-2 flex items-center gap-2"><i class="fa-solid fa-clock-rotate-left text-slate-400"></i> أرشيف الصفقات المغلقة</h3>
+                    <div class="space-y-3" id="user-history-list"></div>
+                </div>
+
+                <div id="user-tab-settings" class="h-full overflow-y-auto p-5 pb-[100px] hide fade-in">
+                    <div class="glass-panel p-5 rounded-3xl space-y-4 mb-6 border-t border-white/5">
+                        <h3 class="font-bold text-sm text-premiumGold mb-2"><i class="fa-solid fa-key mr-2"></i> تأمين الحساب وتغيير المرور</h3>
+                        <input type="password" id="user-old-pass" placeholder="كلمة المرور الحالية" class="w-full bg-darkBg/80 rounded-xl px-4 h-[50px] text-sm text-white outline-none border border-white/5">
+                        <input type="password" id="user-new-pass" placeholder="كلمة المرور الجديدة" class="w-full bg-darkBg/80 rounded-xl px-4 h-[50px] text-sm text-white outline-none border border-white/5">
+                        <button onclick="userChangePassword()" class="w-full bg-white text-darkBg py-3.5 rounded-xl font-black text-sm active:scale-95 transition-transform">تحديث بيانات المرور</button>
+                    </div>
+                    <div class="glass-panel p-5 rounded-3xl space-y-4 border-t border-adminBlue/20">
+                        <h3 class="font-bold text-sm text-adminBlue mb-2"><i class="fa-solid fa-envelope mr-2"></i> طلب تغيير البريد الإلكتروني</h3>
+                        <input type="email" id="user-new-email" placeholder="البريد الإلكتروني الجديد" class="w-full bg-darkBg/80 rounded-xl px-4 h-[50px] text-sm text-white outline-none border border-white/5">
+                        <button onclick="userRequestEmailChange()" class="w-full bg-adminBlue py-3.5 rounded-xl text-white font-black text-sm active:scale-95 transition-transform">إرسال طلب التغيير</button>
+                    </div>
+                    <div id="user-pending-request" class="glass-panel p-5 rounded-3xl mt-6 border border-buyGreen/30 bg-buyGreen/5 hide">
+                        <h3 class="font-bold text-sm text-buyGreen mb-2"><i class="fa-solid fa-check-circle mr-2"></i> تمت الموافقة على طلبك!</h3>
+                        <input type="password" id="user-confirm-pass-email" placeholder="كلمة المرور لاعتماد البريد" class="w-full bg-darkBg rounded-xl px-4 h-[50px] text-sm text-white outline-none border border-white/10 mb-3">
+                        <button onclick="userApplyEmailChange()" class="w-full bg-buyGreen text-darkBg py-3.5 rounded-xl font-black text-sm shadow-[0_5px_15px_rgba(0,230,118,0.2)] active:scale-95 transition-transform">تطبيق الآن</button>
+                    </div>
+                </div>
+            </div>
+            
+            <nav class="absolute bottom-0 left-0 w-full glass-nav pb-safe pt-2 flex justify-around items-center h-[85px] z-30 rounded-t-3xl">
+                <div onclick="switchUserTab('signals')" id="nav-u-signals" class="nav-active flex flex-col items-center justify-center w-20 h-full cursor-pointer transition-all"><i class="fa-solid fa-chart-line text-2xl mb-1"></i><span class="text-[10px] font-black">المنصة</span></div>
+                <div onclick="switchUserTab('stats')" id="nav-u-stats" class="text-slate-500 hover:text-white transition-all flex flex-col items-center justify-center w-20 h-full cursor-pointer"><i class="fa-solid fa-chart-pie text-2xl mb-1"></i><span class="text-[10px] font-bold">السجل</span></div>
+                <div onclick="switchUserTab('settings')" id="nav-u-settings" class="text-slate-500 hover:text-white transition-all flex flex-col items-center justify-center w-20 h-full cursor-pointer"><i class="fa-solid fa-shield-halved text-2xl mb-1"></i><span class="text-[10px] font-bold">الحماية</span></div>
+                <div onclick="logout()" class="text-slate-500 hover:text-sellRed transition-all flex flex-col items-center justify-center w-20 h-full cursor-pointer"><i class="fa-solid fa-right-from-bracket text-2xl mb-1"></i><span class="text-[10px] font-bold">خروج</span></div>
+            </nav>
+        </div>
+
+        <div id="admin-view" class="flex-1 flex flex-col hide w-full h-full relative">
+            <header class="pt-safe pb-3 px-5 bg-panelBg border-b border-white/5 z-20 shadow-lg">
+                <h2 class="text-xl font-black text-adminBlue mt-4 mb-4 tracking-wide flex items-center gap-2"><i class="fa-solid fa-user-tie text-white/50"></i> Admin Panel</h2>
+                <div class="flex gap-2 overflow-x-auto text-xs font-bold text-slate-400 pb-1 w-full hide-scrollbar">
+                    <button onclick="switchAdminTab('signals')" id="tab-btn-signals" class="px-4 py-2.5 bg-adminBlue/10 text-adminBlue rounded-xl whitespace-nowrap transition-colors">النشطة</button>
+                    <button onclick="switchAdminTab('add')" id="tab-btn-add" class="px-4 py-2.5 hover:bg-white/5 rounded-xl whitespace-nowrap transition-colors">إضافة</button>
+                    <button onclick="switchAdminTab('users')" id="tab-btn-users" class="px-4 py-2.5 hover:bg-white/5 rounded-xl whitespace-nowrap transition-colors">الأعضاء</button>
+                    <button onclick="switchAdminTab('history')" id="tab-btn-history" class="px-4 py-2.5 hover:bg-white/5 rounded-xl whitespace-nowrap transition-colors">السجل</button>
+                    <button onclick="switchAdminTab('database')" id="tab-btn-database" class="px-4 py-2.5 hover:bg-white/5 rounded-xl whitespace-nowrap transition-colors text-premiumGold border border-premiumGold/30 bg-premiumGold/5"><i class="fa-solid fa-database mr-1"></i> داتا بيس</button>
+                    <button onclick="switchAdminTab('settings')" id="tab-btn-settings" class="px-4 py-2.5 hover:bg-white/5 rounded-xl whitespace-nowrap transition-colors"><i class="fa-solid fa-gear"></i></button>
+                </div>
+            </header>
+
+            <div class="flex-1 overflow-hidden relative">
+                <div id="admin-tab-signals" class="h-full overflow-y-auto p-5 pb-[100px] fade-in">
+                    <div class="glass-panel p-4 rounded-2xl text-center border-t border-adminBlue/30 mb-5 flex justify-around">
+                        <div><p class="text-[10px] text-slate-400 mb-1">النشطة الآن</p><p class="text-2xl font-black text-adminBlue" id="admin-active-count">0</p></div>
+                        <div><p class="text-[10px] text-slate-400 mb-1">المشتركين (VIP)</p><p class="text-2xl font-black text-buyGreen" id="admin-users-count-top">0</p></div>
+                    </div>
+                    <div class="space-y-5" id="admin-signals-list"></div>
+                </div>
+
+                <div id="admin-tab-add" class="h-full overflow-y-auto p-5 pb-[100px] hide fade-in">
+                    <form onsubmit="event.preventDefault(); publishSignal();" class="space-y-4 w-full">
+                        <div class="glass-panel p-6 rounded-3xl space-y-4 shadow-xl">
+                            <input type="text" id="sig-pair" placeholder="الزوج (مثال: XAUUSD)" required class="w-full bg-darkBg/80 rounded-xl px-4 h-[50px] text-sm text-white outline-none border border-white/5 focus:border-adminBlue font-bold">
+                            <div class="grid grid-cols-2 gap-3">
+                                <select id="sig-cat" class="bg-darkBg/80 rounded-xl px-4 h-[50px] text-sm text-white outline-none border border-white/5 font-bold"><option value="Main">أساسية</option><option value="Pyramiding">تعزيز 🔥</option><option value="Reentry">تعويض ♻️</option></select>
+                                <select id="sig-type" class="bg-darkBg/80 rounded-xl px-4 h-[50px] text-sm text-white outline-none border border-white/5 font-bold"><option value="BUY">شراء 🟢</option><option value="SELL">بيع 🔴</option></select>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <input type="number" step="any" id="sig-entry" placeholder="الدخول" required class="bg-darkBg/80 rounded-xl px-4 h-[50px] text-sm text-white outline-none border border-white/5 font-bold">
+                                <input type="number" step="any" id="sig-sl" placeholder="الوقف" required class="bg-darkBg/80 rounded-xl px-4 h-[50px] text-sm text-white outline-none border border-white/5 border-b-sellRed/50 font-bold">
+                            </div>
+                            <input type="text" id="sig-tp" placeholder="الأهداف (افصل بفاصلة ,)" required class="w-full bg-darkBg/80 rounded-xl px-4 h-[50px] text-sm text-white outline-none border border-white/5 border-b-buyGreen/50 font-bold">
+                            <input type="number" id="sig-lot" placeholder="اللوت" step="0.01" class="w-full bg-darkBg/80 rounded-xl px-4 h-[50px] text-sm text-white outline-none border border-white/5 font-bold">
+                        </div>
+                        <button type="submit" class="w-full bg-adminBlue py-4 rounded-2xl text-white font-black text-lg shadow-[0_10px_30px_rgba(41,121,255,0.3)] mt-2 active:scale-95 transition-transform">إرسال التوصية</button>
+                    </form>
+                </div>
+
+                <div id="admin-tab-users" class="h-full overflow-y-auto p-5 pb-[100px] hide fade-in">
+                    <h3 class="text-sm font-black text-white mb-4">تحكم شامل بالمشتركين</h3>
+                    <div class="space-y-4" id="admin-users-list"></div>
+                </div>
+
+                <div id="admin-tab-history" class="h-full overflow-y-auto p-5 pb-[100px] hide fade-in">
+                    <div class="flex justify-between items-center mb-4 pl-2">
+                        <h3 class="text-sm font-bold text-white flex items-center gap-2"><i class="fa-solid fa-box-archive text-slate-400"></i> أرشيف الصفقات</h3>
+                        <button onclick="deleteAllHistory()" class="bg-sellRed/20 text-sellRed text-xs px-3 py-1.5 rounded-lg font-bold hover:bg-sellRed hover:text-white transition-colors active:scale-95"><i class="fa-solid fa-trash-can mr-1"></i> حذف الكل</button>
+                    </div>
+                    <div class="space-y-3" id="admin-history-list"></div>
+                </div>
+
+                <div id="admin-tab-database" class="h-full overflow-y-auto p-5 pb-[100px] hide fade-in">
+                    <div class="glass-panel p-5 rounded-3xl space-y-4 mb-6 border-t-2 border-premiumGold">
+                        <h3 class="font-black text-base text-premiumGold mb-1"><i class="fa-solid fa-database mr-2"></i> استنساخ قاعدة البيانات</h3>
+                        <p class="text-[10px] text-slate-400 mb-4 leading-relaxed">لربط التطبيق بمشروع Firebase جديد، انسخ كود الـ <code>firebaseConfig</code> بالكامل من منصة فايربيس والصقه هنا.</p>
+                        <textarea id="db-config-input" oninput="updateScriptCodeLive()" placeholder="الصق كود firebaseConfig هنا بالكامل..." class="w-full bg-darkBg/80 rounded-xl p-4 h-[160px] text-xs text-white outline-none border border-white/5 border-l-2 border-premiumGold custom-scrollbar text-left" dir="ltr"></textarea>
+                        <button onclick="testAndSaveNewDB()" class="w-full bg-premiumGold text-darkBg py-3.5 rounded-xl font-black text-sm active:scale-95 transition-transform shadow-[0_5px_15px_rgba(255,215,0,0.2)] mt-2"><i class="fa-solid fa-plug-circle-check mr-2"></i> استخراج واختبار الاتصال</button>
+                        <button onclick="resetDefaultDB()" class="w-full bg-sellRed/10 text-sellRed py-2.5 rounded-xl font-bold text-xs mt-2 border border-sellRed/20"><i class="fa-solid fa-rotate-left mr-2"></i> استعادة القاعدة الافتراضية</button>
+                    </div>
+
+                    <div class="glass-panel p-5 rounded-3xl border-t border-buyGreen/30">
+                        <h3 class="font-black text-sm text-buyGreen mb-2"><i class="fa-solid fa-robot mr-2"></i> كود السكربت الذكي (الجديد)</h3>
+                        <p class="text-[10px] text-slate-400 mb-3">هذا السكربت المطور يتعرف على الزوج تلقائياً حتى وإن اختلفت صيغة رسالة TradingView. انسخه وضعه في Google Apps Script.</p>
+                        <textarea id="apps-script-code" readonly class="code-block w-full h-[250px] resize-none custom-scrollbar outline-none"></textarea>
+                        <button onclick="copyScriptCode()" class="w-full bg-slate-700 text-white py-3 rounded-xl font-bold text-xs mt-3 hover:bg-buyGreen hover:text-darkBg transition-colors"><i class="fa-regular fa-copy mr-2"></i> نسخ السكربت</button>
+                    </div>
+                </div>
+
+                <div id="admin-tab-settings" class="h-full overflow-y-auto p-5 pb-[100px] hide fade-in">
+                    <div class="glass-panel p-5 rounded-3xl space-y-4 mb-6 border-t-2 border-adminBlue/50">
+                        <h3 class="font-black text-sm text-adminBlue mb-2"><i class="fa-solid fa-shield-halved mr-2"></i> بيانات الإدارة العليا</h3>
+                        <input type="password" id="adm-old-pass" placeholder="كلمة المرور الحالية للتأكيد" class="w-full bg-darkBg/80 rounded-xl px-4 h-[50px] text-sm text-white outline-none border border-white/5">
+                        <div class="grid grid-cols-2 gap-3 mt-2">
+                            <input type="email" id="adm-new-email" placeholder="البريد الجديد" class="bg-darkBg/80 rounded-xl px-4 h-[50px] text-sm text-white outline-none border border-white/5">
+                            <input type="password" id="adm-new-pass" placeholder="المرور الجديدة" class="bg-darkBg/80 rounded-xl px-4 h-[50px] text-sm text-white outline-none border border-white/5">
+                        </div>
+                        <button onclick="adminUpdateCredentials()" class="w-full bg-adminBlue py-3.5 rounded-xl text-white font-black text-sm active:scale-95 transition-transform">حفظ التغييرات</button>
+                    </div>
+                    <h3 class="text-sm font-black text-white mb-3 flex items-center gap-2"><i class="fa-solid fa-envelope-open-text text-buyGreen"></i> طلبات تغيير بريد الأعضاء</h3>
+                    <div class="space-y-3" id="admin-email-requests"></div>
+                </div>
+            </div>
+
+            <nav class="absolute bottom-0 left-0 w-full glass-nav pb-safe pt-2 flex justify-around items-center h-[85px] z-30 rounded-t-3xl">
+                <button onclick="logout()" class="text-sellRed text-sm font-bold flex flex-col items-center justify-center w-full h-full gap-1 active:scale-95 transition-transform">
+                    <i class="fa-solid fa-power-off text-2xl"></i> إنهاء الجلسة
+                </button>
+            </nav>
+        </div>
+    </div>
+
+    <div id="notify-container"></div>
+
+    <script>
+const SoundFX = {
+    ctx: null,
+    enabled: true,
+    _getCtx() {
+        if (!this.ctx) { try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) { return null; } }
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+        return this.ctx;
+    },
+    _playTone(freq, duration, type = 'sine', vol = 0.3) {
+        const ctx = this._getCtx(); if (!ctx) return;
+        try {
+            const osc = ctx.createOscillator(); const gain = ctx.createGain();
+            osc.type = type; osc.frequency.setValueAtTime(freq, ctx.currentTime);
+            gain.gain.setValueAtTime(vol, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+            osc.connect(gain); gain.connect(ctx.destination);
+            osc.start(ctx.currentTime); osc.stop(ctx.currentTime + duration);
+        } catch(e) {}
+    },
+    newSignal() { if (!this.enabled) return; this._playTone(523.25,0.15,'sine',0.3); setTimeout(()=>this._playTone(659.25,0.15,'sine',0.3),150); setTimeout(()=>this._playTone(783.99,0.25,'sine',0.4),300); },
+    tpHit() { if (!this.enabled) return; this._playTone(880,0.1,'sine',0.35); setTimeout(()=>this._playTone(1046.50,0.1,'sine',0.35),100); setTimeout(()=>this._playTone(1318.51,0.2,'sine',0.4),200); setTimeout(()=>this._playTone(1567.98,0.3,'sine',0.3),400); },
+    slHit() { if (!this.enabled) return; this._playTone(220,0.3,'sawtooth',0.25); setTimeout(()=>this._playTone(185,0.3,'sawtooth',0.2),250); setTimeout(()=>this._playTone(165,0.4,'square',0.2),500); },
+    reentry() { if (!this.enabled) return; this._playTone(440,0.12,'sine',0.3); setTimeout(()=>this._playTone(554.37,0.12,'sine',0.3),120); setTimeout(()=>this._playTone(659.25,0.2,'sine',0.35),240); },
+    pyramid() { if (!this.enabled) return; this._playTone(329.63,0.12,'square',0.25); setTimeout(()=>this._playTone(440,0.12,'square',0.25),120); setTimeout(()=>this._playTone(554.37,0.12,'square',0.3),240); setTimeout(()=>this._playTone(659.25,0.25,'square',0.35),360); },
+    fullClose() { if (!this.enabled) return; this._playTone(523.25,0.1,'sine',0.3); setTimeout(()=>this._playTone(659.25,0.1,'sine',0.3),100); setTimeout(()=>this._playTone(783.99,0.1,'sine',0.3),200); setTimeout(()=>this._playTone(1046.50,0.1,'sine',0.35),300); setTimeout(()=>this._playTone(1318.51,0.15,'sine',0.35),400); setTimeout(()=>this._playTone(1567.98,0.3,'sine',0.4),550); }
+};
+
+const NotifySystem = {
+    container: null,
+    activeCount: 0,
+    init() { this.container = document.getElementById('notify-container'); },
+    show(type, title, desc) {
+        if (!this.container) this.init();
+        const icons = { new:'\u{1F195}', tp:'\u2705', sl:'\u274C', reentry:'\u267B\uFE0F', pyramid:'\u{1F525}', fullClose:'\u{1F3C6}', jump:'\u{1F680}' };
+        const icon = icons[type] || '\u{1F514}';
+        const time = new Date().toLocaleTimeString('ar-YE',{hour:'2-digit',minute:'2-digit'});
+        const toast = document.createElement('div');
+        toast.className = `notify-toast notify-${type}`;
+        toast.innerHTML = `<div class="notify-icon">${icon}</div><div class="notify-text"><div class="notify-title">${title}</div><div class="notify-desc">${desc}</div></div><div class="notify-time">${time}</div>`;
+        this.container.appendChild(toast);
+        this.activeCount++;
+        setTimeout(()=>{toast.classList.add('notify-exit');setTimeout(()=>{if(toast.parentNode)toast.parentNode.removeChild(toast);this.activeCount=Math.max(0,this.activeCount-1);},400);},5000);
+        if(navigator.vibrate){const p={new:[100,50,100],tp:[50,50,50,100],sl:[200,100,200],reentry:[100,100],pyramid:[150,100,150],fullClose:[50,50,50,50,100,100]};navigator.vibrate(p[type]||[100]);}
+        const soundMap={new:'newSignal',tp:'tpHit',sl:'slHit',reentry:'reentry',pyramid:'pyramid',fullClose:'fullClose',jump:'tpHit'};
+        if(SoundFX[soundMap[type]])SoundFX[soundMap[type]]();
+    }
+};
+
+document.addEventListener('DOMContentLoaded',()=>{NotifySystem.init();});
+
+window.SignalTracker = {
+    _knownSignals: {},
+    detect(signalsArray) {
+        if(!signalsArray||!Array.isArray(signalsArray))return;
+        for(const s of signalsArray) {
+            const prev=this._knownSignals[s.id];
+            const current={status:s.status||'active',tpReached:s.tpReached||0,sl:s.sl||false,category:s.category||'Main',pair:s.pair||'',type:s.type||'BUY',tp:s.tp?s.tp.length:0};
+            if(!prev){this._knownSignals[s.id]=current;if(current.category==='Reentry'){NotifySystem.show('reentry','\u267B\uFE0F \u0635\u0641\u0642\u0629 \u062A\u0639\u0648\u064A\u0636 \u062C\u062F\u064A\u062F\u0629',`${s.pair} ${s.type==='BUY'?'\u0634\u0631\u0627\u0621':'\u0628\u064A\u0639'}`);}else if(current.category==='Pyramiding'){NotifySystem.show('pyramid','\u{1F525} \u0635\u0641\u0642\u0629 \u062A\u0639\u0632\u064A\u0632 \u062C\u062F\u064A\u062F\u0629',`${s.pair} ${s.type==='BUY'?'\u0634\u0631\u0627\u0621':'\u0628\u064A\u0639'}`);}else{NotifySystem.show('new','\u{1F195} \u0625\u0634\u0627\u0631\u0629 \u062C\u062F\u064A\u062F\u0629!',`${s.pair} ${s.type==='BUY'?'\u{1F7E2} \u0634\u0631\u0627\u0621':'\u{1F534} \u0628\u064A\u0639'} \u2014 \u0627\u0644\u062F\u062E\u0648\u0644: ${s.entry}`);}}else{if(prev.status!=='sl'&&current.status==='sl'){NotifySystem.show('sl','\u274C \u0636\u0631\u0628 \u0648\u0642\u0641 \u0627\u0644\u062E\u0633\u0627\u0631\u0629',`${s.pair} \u2014 \u0627\u0644\u062E\u0633\u0627\u0631\u0629: -$${s.loss||'0'}`);}if(current.tpReached>prev.tpReached){const newTp=current.tpReached;const tpPrice=s.tp?s.tp[newTp-1]:'?';const totalTps=s.tp?s.tp.length:0;if(newTp>=totalTps&&totalTps>0){NotifySystem.show('fullClose','\u{1F3C6} \u0625\u063A\u0644\u0627\u0642 \u0643\u0627\u0645\u0644 \u0628\u0627\u0644\u0631\u0628\u062D!',`${s.pair} \u2014 \u062C\u0645\u064A\u0639 \u0627\u0644\u0623\u0647\u062F\u0627\u0641 \u0645\u062D\u0642\u0642\u0629 (${totalTps}/${totalTps})`);}else{NotifySystem.show('tp',`\u2705 \u062A\u062D\u0642\u0642 \u0627\u0644\u0647\u062F\u0641 ${newTp}`,`${s.pair} \u2014 \u0627\u0644\u0647\u062F\u0641: ${tpPrice} (TP${newTp}/${totalTps})`);}}this._knownSignals[s.id]=current;}}
+    }
+};
+    </script>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updatePassword, updateEmail, EmailAuthProvider, reauthenticateWithCredential } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+        import { getFirestore, collection, onSnapshot, query, orderBy, doc, deleteDoc, getDoc, setDoc, updateDoc, addDoc, serverTimestamp, Timestamp, where, getDocs } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+
+        let firebaseConfig = {
+            apiKey: "AIzaSyDBrGgMnrq5EVNN09itvq0lCezIyewzSwI",
+            authDomain: "forexyemeni-single.firebaseapp.com",
+            projectId: "forexyemeni-single",
+            storageBucket: "forexyemeni-single.firebasestorage.app",
+            messagingSenderId: "721049539558",
+            appId: "1:721049539558:web:58eb206efa928b925ebc27"
+        };
+
+        const customDbSaved = localStorage.getItem('forexyemeni_custom_db');
+        if (customDbSaved) {
+            try { 
+                firebaseConfig = JSON.parse(customDbSaved); 
+                document.getElementById('db-alert-text').classList.remove('hide');
+            } catch(e) {}
+        }
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        let ADMIN_EMAIL = 'mhmdlybdhshay@gmail.com'; 
+        let currentUserRole = 'guest';
+        let currentUserIdReq = null;
+        window.globalActiveSignals = [];
+        window.globalClosedSignals = [];
+
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                showLoader("جاري المصادقة...");
+                if (user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+                    currentUserRole = 'admin'; hideLoader('admin'); initAppContent(); updateScriptCodeLive(); return;
+                }
+                try {
+                    const userDoc = await getDoc(doc(db, "users", user.uid)); 
+                    if (userDoc.exists()) {
+                        const userData = userDoc.data();
+                        if (userData.status === 'blocked') { hideLoaderError(); switchView('blocked-view'); return; }
+                        if (userData.status === 'pending') { hideLoaderError(); switchView('pending-view'); return; }
+                        
+                        if (userData.status === 'active') {
+                            if (userData.expireAt && userData.expireAt.toDate() < new Date()) {
+                                await updateDoc(doc(db, "users", user.uid), { status: 'expired' });
+                                hideLoaderError(); switchView('expired-view'); return;
+                            } else {
+                                currentUserRole = 'user';
+                                if(userData.expireAt) document.getElementById('user-expire-date').innerText = userData.expireAt.toDate().toLocaleDateString('ar-YE');
+                                hideLoader('user'); initAppContent();
+                            }
+                        } else { hideLoaderError(); switchView('expired-view'); }
+                    } else {
+                        let tempName = window.tempRegName || 'مستخدم';
+                        await setDoc(doc(db, "users", user.uid), { email: user.email, name: tempName, status: 'pending', joined: serverTimestamp() });
+                        hideLoaderError(); switchView('pending-view');
+                    }
+                } catch (e) { alert("خطأ في الاتصال"); logout(); }
+            } else { switchView('auth-view'); document.getElementById('loader-screen').classList.add('hide'); }
+        });
+
+        window.processAuth = async (action) => {
+            const err = document.getElementById('login-error'); err.classList.add('hide');
+            if(action === 'login') {
+                const em = document.getElementById('login-email').value.trim(); const pw = document.getElementById('login-password').value.trim();
+                if(!em || !pw) { err.innerText = "أدخل البيانات"; err.classList.remove('hide'); return; }
+                showLoader("تسجيل الدخول...");
+                try { await signInWithEmailAndPassword(auth, em, pw); } 
+                catch (e) { hideLoaderError(); err.innerHTML = `البريد غير مسجل أو كلمة المرور خاطئة.<br><button onclick="toggleAuth('register')" class="text-premiumGold mt-2 font-bold underline">أنشئ حساباً جديداً</button>`; err.classList.remove('hide'); }
+            } else {
+                const em = document.getElementById('reg-email').value.trim(); const pw = document.getElementById('reg-pass').value.trim(); const nm = document.getElementById('reg-name').value.trim();
+                if(!em || !pw) return alert("أدخل البيانات");
+                showLoader("إنشاء الحساب...");
+                try {
+                    window.tempRegName = nm; 
+                    const cred = await createUserWithEmailAndPassword(auth, em, pw);
+                    await setDoc(doc(db, "users", cred.user.uid), { name: nm, email: em, status: 'pending', joined: serverTimestamp() });
+                } catch (e) { hideLoaderError(); alert(e.code==='auth/email-already-in-use'?"البريد مسجل مسبقاً!":e.message); }
+            }
+        };
+        window.logout = () => signOut(auth);
+
+        function initAppContent() {
+            onSnapshot(query(collection(db, "signals"), orderBy("timestamp", "desc")), (snap) => {
+                const active = []; const closed = [];
+                snap.forEach(d => {
+                    let s = {id: d.id, ...d.data()};
+                    let isClosed = s.status === 'sl' || s.status === 'closed' || (s.tpReached > 0 && s.tpReached === (s.tp?s.tp.length:0));
+                    if(isClosed) closed.push(s); else active.push(s);
+                });
+                
+                window.globalActiveSignals = active;
+                window.globalClosedSignals = closed; 
+                
+                if(currentUserRole === 'user') {
+                    renderUserActiveSignalsHTML(active, document.getElementById('user-tab-signals'));
+                    calculateAndRenderStats(closed);
+                }
+                if(currentUserRole === 'admin') {
+                    renderAdminSignals(active, 'admin-signals-list');
+                    renderCompactHistory(closed, 'admin-history-list', true);
+                    const countEl = document.getElementById('admin-active-count');
+                    if(countEl) countEl.innerText = active.length;
+                }
+                
+                // \u{1F514} Sound & Notification Detection
+                SignalTracker.detect(active);
+                SignalTracker.detect(closed);
+            });
+
+            if(currentUserRole === 'admin') {
+                onSnapshot(collection(db, "users"), (snap) => {
+                    let activeCount = 0; let html = ''; const list = []; snap.forEach(d => list.push({uid: d.id, ...d.data()}));
+                    list.sort((a, b) => { const order = { 'pending': 1, 'active': 2, 'expired': 3, 'blocked': 4 }; return (order[a.status] || 5) - (order[b.status] || 5); });
+
+                    list.forEach(u => {
+                        if(u.status === 'active') activeCount++;
+                        let badge = '', btns = '';
+                        let giftBtns = `<button onclick="giftUser('${u.uid}', 7)" class="bg-adminBlue/20 text-adminBlue text-[10px] px-2 py-1.5 rounded font-bold hover:bg-adminBlue hover:text-white transition-colors">إهداء أسبوع</button><button onclick="giftUser('${u.uid}', 30)" class="bg-premiumGold/20 text-premiumGold text-[10px] px-2 py-1.5 rounded font-bold hover:bg-premiumGold hover:text-darkBg transition-colors">إهداء شهر</button>`;
+
+                        if(u.status === 'pending') { badge = `<span class="bg-adminBlue/20 text-adminBlue px-2 py-0.5 rounded text-[10px] font-bold">بانتظار الموافقة</span>`; btns = `<div class="flex gap-2 justify-end mt-3">${giftBtns}<button onclick="blockUser('${u.uid}')" class="bg-slate-700 text-white text-[10px] px-3 py-1.5 rounded font-bold hover:bg-sellRed">حظر 🚫</button></div>`;
+                        } else if (u.status === 'active') { let exp = u.expireAt ? (u.expireAt.toDate ? u.expireAt.toDate().toLocaleDateString('ar-YE') : new Date(u.expireAt).toLocaleDateString('ar-YE')) : 'مفتوح'; badge = `<span class="bg-buyGreen/20 text-buyGreen px-2 py-0.5 rounded text-[10px] font-bold">نشط - ${exp}</span>`; btns = `<div class="flex gap-2 justify-end mt-3">${giftBtns}<button onclick="blockUser('${u.uid}')" class="bg-slate-700 text-white text-[10px] px-3 py-1.5 rounded font-bold hover:bg-sellRed">حظر 🚫</button></div>`;
+                        } else if (u.status === 'blocked') { badge = `<span class="bg-sellRed/20 text-sellRed px-2 py-0.5 rounded text-[10px] font-bold">محظور 🚫</span>`; btns = `<div class="flex gap-2 justify-end mt-3"><button onclick="unblockUser('${u.uid}')" class="bg-buyGreen/20 text-buyGreen text-[10px] px-3 py-1.5 rounded font-bold hover:bg-buyGreen hover:text-darkBg">فك الحظر ✅</button></div>`;
+                        } else { badge = `<span class="bg-slate-700 text-slate-300 px-2 py-0.5 rounded text-[10px] font-bold">منتهي</span>`; btns = `<div class="flex gap-2 justify-end mt-3">${giftBtns}<button onclick="blockUser('${u.uid}')" class="bg-slate-700 text-white text-[10px] px-3 py-1.5 rounded font-bold hover:bg-sellRed">حظر 🚫</button></div>`; }
+
+                        html += `<div class="glass-panel p-4 rounded-3xl border-t border-white/5 mb-4 shadow-lg"><div class="flex justify-between items-start"><div><p class="font-bold text-sm text-white">${u.name || 'مستخدم'}</p><p class="text-[10px] text-slate-400 mb-2">${u.email}</p>${badge}</div><button onclick="deleteUser('${u.uid}')" class="bg-sellRed/10 text-sellRed w-8 h-8 rounded-full hover:bg-sellRed hover:text-white transition-colors"><i class="fa-solid fa-trash text-xs"></i></button></div><div class="border-t border-white/5 mt-3 pt-1">${btns}</div></div>`;
+                    });
+                    const countTopEl = document.getElementById('admin-users-count-top'); if(countTopEl) countTopEl.innerText = activeCount;
+                    const listEl = document.getElementById('admin-users-list'); if(listEl) listEl.innerHTML = html || '<p class="text-xs text-slate-500 text-center">لا يوجد مستخدمين</p>';
+                });
+            }
+        }
+
+        // --- Database Extraction Tool ---
+        window.testAndSaveNewDB = async () => {
+            const rawText = document.getElementById('db-config-input').value;
+            if(!rawText) return alert("الرجاء لصق كود الـ firebaseConfig أولاً.");
+
+            const keys = ['apiKey', 'authDomain', 'projectId', 'storageBucket', 'messagingSenderId', 'appId'];
+            const config = {};
+            keys.forEach(k => {
+                const rx = new RegExp(k + '\\s*:\\s*["\']([^"\']+)["\']');
+                const m = rawText.match(rx);
+                if(m) config[k] = m[1];
+            });
+
+            if(!config.apiKey || !config.projectId) return alert("لم يتم التعرف على المفاتيح! تأكد من نسخ الكود كاملاً.");
+
+            showLoader("جاري اختبار الاتصال...");
+            try {
+                const testApp = initializeApp(config, "TempApp_" + Date.now());
+                const testDb = getFirestore(testApp);
+                await getDoc(doc(testDb, "system", "test_connection")); 
+            } catch(e) {
+                if(!e.code || e.code !== 'permission-denied') { hideLoaderError(); return alert("فشل الاتصال: " + e.message); }
+            }
+            hideLoader('admin');
+            if(confirm("✅ تم استخراج المفاتيح والاتصال بنجاح!\n\nهل تريد حفظها لتطبيقك حالياً؟")) {
+                localStorage.setItem('forexyemeni_custom_db', JSON.stringify(config));
+                window.location.reload();
+            }
+        };
+
+        window.resetDefaultDB = () => {
+            if(confirm("العودة للقاعدة الأصلية؟")) { localStorage.removeItem('forexyemeni_custom_db'); window.location.reload(); }
+        };
+
+        // --- The Smart Google Apps Script Generator ---
+        window.updateScriptCodeLive = () => {
+            const rawText = document.getElementById('db-config-input') ? document.getElementById('db-config-input').value : "";
+            let currentPid = firebaseConfig.projectId;
+            if (rawText) { const m = rawText.match(/projectId\s*:\s*["']([^"']+)["']/); if (m) currentPid = m[1]; }
+            
+            const scriptText = `// ==========================================
+// ⚙️ إعدادات المشروع
+// ==========================================
+const PROJECT_ID = "${currentPid}"; 
+
+function doPost(e) {
+  try {
+    let rawText = e.postData.contents;
+    processAlert(rawText);
+    return ContentService.createTextOutput("Success");
+  } catch (error) {
+    return ContentService.createTextOutput("Error: " + error.message);
+  }
+}
+
+// 🧠 محرك التحليل الذكي الجديد (يقرأ أي صيغة)
+function processAlert(text) {
+  const url = \`https://firestore.googleapis.com/v1/projects/\${PROJECT_ID}/databases/(default)/documents/signals\`;
+
+  let category = "Main";
+  if (text.includes("تعزيز") || text.includes("🔥")) category = "Pyramiding";
+  if (text.includes("تعويض") || text.includes("♻️")) category = "Reentry";
+
+  // استخراج الزوج الذكي (سواء بوجود دبوس أو بدون)
+  let pairMatch = text.match(/📌\\s*([A-Z0-9]+)/) || text.match(/\\b([A-Z]{5,10})\\b/);
+  let pair = pairMatch ? pairMatch[1] : null;
+
+  if(!pair) return; // لا يمكننا فعل شيء بلا زوج
+
+  if (text.includes("تحقق") || text.includes("الهدف") || text.includes("إغلاق كامل") || text.includes("✅")) {
+    let tpMatch = text.match(/(?:الهدف|هدف|TP)\\s*(\\d+)/i);
+    let tpNum = tpMatch ? parseInt(tpMatch[1]) : 1;
+    updateSignal(pair, category, { tpReached: tpNum });
+    return;
+  }
+
+  if (text.includes("ضرب الوقف") || text.includes("ضرب وقف") || text.includes("❌") || text.includes("SL")) {
+    updateSignal(pair, category, { status: "sl" });
+    return;
+  }
+
+  let type = (text.includes("بيع") || text.includes("🔻") || text.includes("SELL")) ? "SELL" : "BUY";
+  let entryMatch = text.match(/(?:الدخول|الدخول:)\\s*([0-9.]+)/);
+  let slMatch = text.match(/(?:الوقف|الوقف\\s*:)\\s*([0-9.]+)/);
+  let lotMatch = text.match(/(?:اللوت|اللوت\\s*:)\\s*([0-9.]+)/);
+
+  let entry = entryMatch ? entryMatch[1] : "0";
+  let sl = slMatch ? slMatch[1] : "0";
+  let lot = lotMatch ? lotMatch[1] : "0.10";
+
+  let tpArray = [];
+  let tpRegex = /(?:TP\\d+|🎯)\\s*:\\s*([0-9.]+)/g;
+  let match;
+  while ((match = tpRegex.exec(text)) !== null) { tpArray.push({ stringValue: match[1] }); }
+
+  let payload = {
+    fields: {
+      pair: { stringValue: pair }, type: { stringValue: type }, category: { stringValue: category },
+      entry: { stringValue: entry }, sl: { stringValue: sl }, lot: { stringValue: lot },
+      tp: { arrayValue: { values: tpArray } }, tpReached: { integerValue: "0" },
+      status: { stringValue: "active" }, timestamp: { timestampValue: new Date().toISOString() }
+    }
+  };
+  UrlFetchApp.fetch(url, { method: 'post', contentType: 'application/json', payload: JSON.stringify(payload), muteHttpExceptions: true });
+}
+
+function updateSignal(pair, category, updates) {
+  let url = \`https://firestore.googleapis.com/v1/projects/\${PROJECT_ID}/databases/(default)/documents/signals?pageSize=50\`;
+  let response = UrlFetchApp.fetch(url, { method: 'get', muteHttpExceptions: true });
+  let result = JSON.parse(response.getContentText());
+  let docs = result.documents || [];
+
+  docs.sort((a, b) => new Date(b.fields.timestamp.timestampValue) - new Date(a.fields.timestamp.timestampValue));
+  
+  // بحث ذكي يتغاضى عن خطأ القسم لو أمكن
+  let targetDoc = docs.find(d => d.fields.pair.stringValue === pair && d.fields.status.stringValue === "active" && d.fields.category.stringValue === category);
+  if(!targetDoc) targetDoc = docs.find(d => d.fields.pair.stringValue === pair && d.fields.status.stringValue === "active");
+
+  if (targetDoc) {
+    let fields = {}; let mask = [];
+    if (updates.tpReached !== undefined) {
+      fields.tpReached = { integerValue: updates.tpReached.toString() }; mask.push("updateMask.fieldPaths=tpReached");
+      if (updates.tpReached >= targetDoc.fields.tp.arrayValue.values.length) {
+        fields.status = { stringValue: "closed" }; mask.push("updateMask.fieldPaths=status");
+      }
+    }
+    if (updates.status !== undefined) {
+      fields.status = { stringValue: updates.status }; mask.push("updateMask.fieldPaths=status");
+    }
+    let updateUrl = \`https://firestore.googleapis.com/v1/\${targetDoc.name}?\` + mask.join("&");
+    UrlFetchApp.fetch(updateUrl, { method: 'PATCH', contentType: 'application/json', payload: JSON.stringify({ fields: fields }), muteHttpExceptions: true });
+  }
+}`;
+            const scriptBox = document.getElementById('apps-script-code');
+            if(scriptBox) scriptBox.value = scriptText;
+        };
+
+        window.copyScriptCode = () => {
+            const scriptBox = document.getElementById('apps-script-code');
+            scriptBox.select(); document.execCommand("copy"); alert("تم نسخ الكود بنجاح!");
+        };
+
+        // Stats UI logic
+        function calculateAndRenderStats(closedSignals) {
+            let wins = 0, losses = 0, tpsHit = 0; let totalClosed = closedSignals.length;
+            closedSignals.forEach(s => { if(s.tpReached > 0) tpsHit += s.tpReached; let isWin = s.status === 'closed' || s.tpReached > 0; if(isWin) wins++; else if(s.status === 'sl') losses++; });
+            let winRate = totalClosed > 0 ? Math.round((wins / totalClosed) * 100) : 0;
+            document.getElementById('stat-winrate').innerText = winRate + '%'; document.getElementById('stat-circle-ui').style.setProperty('--p', winRate + '%');
+            document.getElementById('stat-wins').innerText = wins; document.getElementById('stat-losses').innerText = losses; document.getElementById('stat-total').innerText = totalClosed; document.getElementById('stat-tps').innerText = tpsHit;
+            renderCompactHistory(closedSignals, 'user-history-list', false);
+        }
+
+        function renderCompactHistory(list, elementId, isAdmin) {
+            let html = '';
+            list.forEach(s => {
+                let isWin = s.status === 'closed' || s.tpReached > 0; let col = isWin ? 'buyGreen' : 'sellRed';
+                let tStr = s.timestamp ? (s.timestamp.toDate ? s.timestamp.toDate().toLocaleDateString('ar-YE') : new Date(s.timestamp).toLocaleDateString('ar-YE')) : '';
+                let resTxt = isWin ? `ربح (${s.tpReached}) 🏆` : 'ضرب الوقف ❌'; let lbl = s.category === 'Main' ? 'أساسية' : s.category === 'Pyramiding' ? 'تعزيز 🔥' : 'تعويض ♻️';
+                let tpsHtml = (s.tp || []).map((t, i) => { let isHit = s.tpReached > i; let c = isHit ? 'buyGreen' : 'slate-600'; return `<div class="flex justify-between text-[11px] mb-1"><span class="text-${c}">TP${i+1} ${isHit?'✅':''}</span><span class="text-white">${t}</span></div>`; }).join('');
+                let adminDel = isAdmin ? `<button onclick="delSig('${s.id}')" class="mt-3 w-full bg-sellRed/10 text-sellRed text-xs py-2 rounded-lg font-bold hover:bg-sellRed hover:text-white transition-colors"><i class="fa-solid fa-trash"></i> مسح من الأرشيف نهائياً</button>` : '';
+
+                html += `<div class="glass-panel p-4 rounded-2xl mb-3 cursor-pointer border-r-4 border-${col} transition-all shadow-md" onclick="toggleExpand('${s.id}')"><div class="flex justify-between items-center"><div><span class="font-black text-white text-sm">${s.pair}</span><span class="text-[9px] text-slate-400 mr-2">${tStr}</span></div><div class="flex items-center gap-3"><span class="text-[10px] font-bold text-${col} bg-${col}/10 px-2 py-0.5 rounded">${resTxt}</span><i class="fa-solid fa-chevron-down text-slate-500 text-xs transition-transform" id="icon-${s.id}"></i></div></div><div id="details-${s.id}" class="accordion-content mt-0 pt-0 border-t border-transparent"><div class="grid grid-cols-2 gap-2 mt-3 mb-2"><div class="bg-darkBg/50 p-2 rounded-xl text-center"><p class="text-[9px] text-slate-400">الدخول</p><p class="text-sm font-bold text-white">${s.entry}</p></div><div class="bg-darkBg/50 p-2 rounded-xl text-center"><p class="text-[9px] text-slate-400">الوقف</p><p class="text-sm font-bold text-white">${s.sl}</p></div></div><div class="bg-darkBg/30 p-2 rounded-xl mb-2">${tpsHtml}</div><div class="flex justify-between items-center text-[10px] text-slate-400 font-bold px-1"><span>النوع: ${s.type==='SELL'?'بيع 🔴':'شراء 🟢'}</span><span>القسم: ${lbl}</span></div>${adminDel}</div></div>`;
+            });
+            document.getElementById(elementId).innerHTML = html || '<p class="text-xs text-slate-500 text-center py-4">الأرشيف فارغ</p>';
+        }
+
+        window.toggleExpand = (id) => {
+            const el = document.getElementById('details-'+id); const ic = document.getElementById('icon-'+id);
+            if(el.classList.contains('expanded')) { el.classList.remove('expanded'); el.classList.replace('mt-3', 'mt-0'); el.classList.replace('pt-3', 'pt-0'); el.classList.replace('border-white/5', 'border-transparent'); ic.classList.remove('icon-rotate'); } 
+            else { el.classList.add('expanded'); el.classList.replace('mt-0', 'mt-3'); el.classList.replace('pt-0', 'pt-3'); el.classList.replace('border-transparent', 'border-white/5'); ic.classList.add('icon-rotate'); }
+        };
+
+        window.publishSignal = async () => { const pair = document.getElementById('sig-pair').value; const category = document.getElementById('sig-cat').value; const type = document.getElementById('sig-type').value; const entry = document.getElementById('sig-entry').value; const sl = document.getElementById('sig-sl').value; const tp = document.getElementById('sig-tp').value.split(',').map(v=>v.trim()); const lot = document.getElementById('sig-lot').value; showLoader("جاري النشر..."); try { await addDoc(collection(db, "signals"), { pair, category, type, entry, sl, tp, lot, tpReached: 0, status: 'active', timestamp: serverTimestamp() }); ['sig-pair','sig-entry','sig-sl','sig-tp'].forEach(id => document.getElementById(id).value=''); hideLoader('admin'); switchAdminTab('signals'); } catch(e) { alert("خطأ: "+e.message); hideLoaderError(); } };
+        window.hitTarget = async (id, currentReached) => { if(confirm(`تأكيد تحقيق الهدف ${currentReached + 1}؟`)) await updateDoc(doc(db, "signals", id), { tpReached: currentReached + 1 }); };
+        window.closeOnProfit = async (id, reached) => { if(confirm(`إغلاق الصفقة كلياً على ربح (${reached} أهداف)؟`)) await updateDoc(doc(db, "signals", id), { status: 'closed' }); };
+        window.hitSL = async (id) => { if(confirm("تأكيد ضرب الوقف للخسارة؟")) await updateDoc(doc(db, "signals", id), { status: 'sl' }); };
+        window.delSig = async (id) => { if(confirm("حذف الإشارة نهائياً من النظام؟")) await deleteDoc(doc(db, "signals", id)); };
+        window.deleteAllHistory = async () => { if(window.globalClosedSignals.length === 0) return alert("لا يوجد سجل لحذفه."); if(confirm("تنبيه ⚠️: مسح كافة سجل الإشارات المغلقة بالكامل؟ (لا يمكن التراجع)")) { showLoader("جاري تنظيف السيرفر..."); try { for(let sig of window.globalClosedSignals) { await deleteDoc(doc(db, "signals", sig.id)); } hideLoader('admin'); } catch(e) { alert("حدث خطأ: " + e.message); hideLoaderError(); } } };
+        window.giftUser = async (uid, days) => { showLoader("إضافة هدية..."); try { const userDoc = await getDoc(doc(db, "users", uid)); let exp = new Date(); if (userDoc.exists()) { let d = userDoc.data(); if (d.status === 'active' && d.expireAt && d.expireAt.toDate) { if (d.expireAt.toDate() > exp) exp = d.expireAt.toDate(); } } exp.setDate(exp.getDate() + days); await updateDoc(doc(db, "users", uid), { status: 'active', plan: 'VIP', expireAt: Timestamp.fromDate(exp) }); hideLoaderError(); } catch (e) { alert(e.message); hideLoaderError(); } };
+        window.blockUser = async (uid) => { if(confirm("تأكيد الحظر؟ سيطرد فوراً.")) await updateDoc(doc(db, "users", uid), { status: 'blocked' }); };
+        window.unblockUser = async (uid) => { await updateDoc(doc(db, "users", uid), { status: 'expired' }); alert("تم الفك، الحساب 'منتهي'."); };
+        window.deleteUser = async (uid) => { if(confirm("⚠️ حذف المستخدم بشكل نهائي يمسح بياناته بالكامل. تأكيد؟")) await deleteDoc(doc(db, "users", uid)); };
+        window.apprvReq = async (id) => { await updateDoc(doc(db, "email_requests", id), {status: 'approved'}); };
+        window.rejReq = async (id) => { await deleteDoc(doc(db, "email_requests", id)); };
+        window.adminUpdateCredentials = async () => { const o = document.getElementById('adm-old-pass').value; const e = document.getElementById('adm-new-email').value; const p = document.getElementById('adm-new-pass').value; if(!o) return alert("أدخل المرور الحالية"); showLoader("تحديث..."); try { const cred = EmailAuthProvider.credential(auth.currentUser.email, o); await reauthenticateWithCredential(auth.currentUser, cred); if(p.length>=6) await updatePassword(auth.currentUser, p); if(e) { await updateEmail(auth.currentUser, e); ADMIN_EMAIL = e; } alert("تم التحديث بنجاح!"); document.getElementById('adm-old-pass').value=''; document.getElementById('adm-new-pass').value=''; hideLoader('admin'); } catch(x) { alert("خطأ بكلمة المرور الحالية"); hideLoaderError(); } };
+        window.userChangePassword = async () => { const o = document.getElementById('user-old-pass').value; const p = document.getElementById('user-new-pass').value; if(!o||p.length<6) return alert("بيانات غير صحيحة"); showLoader("تحديث..."); try { const cred = EmailAuthProvider.credential(auth.currentUser.email, o); await reauthenticateWithCredential(auth.currentUser, cred); await updatePassword(auth.currentUser, p); alert("تم تغيير كلمة المرور بنجاح!"); document.getElementById('user-old-pass').value=''; document.getElementById('user-new-pass').value=''; hideLoader('user'); } catch(x) { alert("تأكد من كلمة المرور الحالية"); hideLoaderError(); } };
+        window.userRequestEmailChange = async () => { const e = document.getElementById('user-new-email').value; if(!e||!e.includes('@')) return alert("بريد خاطئ"); showLoader("فحص..."); try { const snap = await getDocs(query(collection(db, "users"), where("email", "==", e))); if(!snap.empty) { hideLoaderError(); return alert("البريد مستخدم مسبقاً."); } await addDoc(collection(db, "email_requests"), { uid: auth.currentUser.uid, oldEmail: auth.currentUser.email, newEmail: e, status: 'pending', ts: serverTimestamp() }); alert("تم إرسال الطلب للإدارة."); document.getElementById('user-new-email').value=''; hideLoader('user'); } catch(x) { alert(x.message); hideLoaderError(); } };
+        window.userApplyEmailChange = async () => { if(!currentUserIdReq) return; const p = document.getElementById('user-confirm-pass-email').value; if(!p) return alert("أدخل كلمة المرور"); showLoader("تطبيق..."); try { const cred = EmailAuthProvider.credential(auth.currentUser.email, p); await reauthenticateWithCredential(auth.currentUser, cred); await updateEmail(auth.currentUser, currentUserIdReq.newEmail); await updateDoc(doc(db, "users", auth.currentUser.uid), { email: currentUserIdReq.newEmail }); await deleteDoc(doc(db, "email_requests", currentUserIdReq.id)); alert("تم تغيير البريد بنجاح!"); hideLoader('user'); } catch(x) { alert("تأكد من كلمة المرور"); hideLoaderError(); } };
+
+        function buildCardHtml(s, isAdmin) {
+            const color = s.category === 'Pyramiding' ? 'pyrPurple' : s.category === 'Reentry' ? 'reentryTeal' : (s.type === 'SELL' ? 'sellRed' : 'buyGreen');
+            const lbl = s.category === 'Main' ? 'أساسية' : s.category === 'Pyramiding' ? 'تعزيز 🔥' : 'تعويض ♻️';
+            let tStr = s.timestamp ? (s.timestamp.toDate ? s.timestamp.toDate().toLocaleTimeString('ar-YE', {hour: '2-digit', minute:'2-digit'}) : new Date(s.timestamp).toLocaleTimeString('ar-YE', {hour: '2-digit', minute:'2-digit'})) : 'الآن';
+            let reached = s.tpReached || 0; let tpCount = s.tp ? s.tp.length : 0;
+            let adminBtns = '';
+            if(isAdmin) {
+                adminBtns = `<div class="flex flex-col gap-2 mt-4 relative z-20"><div class="flex gap-2">`;
+                if(reached < tpCount) adminBtns += `<button onclick="hitTarget('${s.id}', ${reached})" class="flex-1 bg-buyGreen/20 text-buyGreen text-xs py-2.5 rounded-xl font-bold hover:bg-buyGreen hover:text-darkBg transition-colors">✅ تحقيق هدف ${reached + 1}</button>`;
+                if(reached > 0) adminBtns += `<button onclick="closeOnProfit('${s.id}', ${reached})" class="flex-1 bg-premiumGold/20 text-premiumGold text-xs py-2.5 rounded-xl font-bold hover:bg-premiumGold hover:text-darkBg transition-colors">🔒 إغلاق بربح</button>`;
+                adminBtns += `</div><div class="flex gap-2"><button onclick="hitSL('${s.id}')" class="flex-1 bg-sellRed/20 text-sellRed text-xs py-2.5 rounded-xl font-bold hover:bg-sellRed hover:text-white transition-colors">❌ ضرب الوقف</button><button onclick="delSig('${s.id}')" class="bg-white/5 text-slate-400 px-4 rounded-xl hover:text-sellRed transition-colors"><i class="fa-solid fa-trash"></i></button></div></div>`;
+            }
+            let tpsHtml = (s.tp || []).map((t, i) => {
+                let isHit = reached > i; let bgClass = isHit ? `bg-buyGreen shadow-[0_0_10px_rgba(0,230,118,0.3)]` : `bg-darkBg/50`;
+                let text1 = isHit ? `text-darkBg` : `text-${color}`; let text2 = isHit ? `text-darkBg` : `text-white`;
+                return `<div class="${bgClass} p-3 rounded-xl flex justify-between px-4 text-xs items-center border border-${color}/10 transition-all"><span class="${text1} font-bold">TP${i+1} ${isHit?'<i class="fa-solid fa-check ml-1"></i>':''}</span><span class="${text2} font-black">${t}</span></div>`;
+            }).join('');
+            return `<div class="glass-panel rounded-[2rem] p-6 fade-in relative overflow-hidden border-t-2 border-${color}/50 mb-5 shadow-[0_15px_30px_rgba(0,0,0,0.3)]"><div class="absolute top-0 right-0 w-32 h-32 bg-${color}/10 rounded-full blur-2xl -z-0"></div><div class="flex justify-between items-start mb-6 relative z-0"><div><div class="flex items-center gap-2 mb-1"><h3 class="text-2xl font-black text-white tracking-wide">${s.pair}</h3><span class="bg-${color}/20 text-${color} px-2 py-0.5 rounded text-[10px] font-black">${lbl}</span></div><span class="text-[11px] text-slate-400 font-bold">${tStr}</span></div><span class="text-${s.type==='SELL'?'sellRed':'buyGreen'} font-black text-sm bg-white/5 px-4 py-1.5 rounded-full border border-white/10 shadow-lg">${s.type === 'SELL' ? 'بيع 🔴' : 'شراء 🟢'}</span></div><div class="grid grid-cols-2 gap-4 mb-5 relative z-0"><div class="bg-darkBg/80 p-3.5 rounded-2xl text-center border border-white/5 relative"><span class="absolute top-2 right-2 text-[10px] text-slate-500 font-bold">${s.lot||'0.00'} L</span><p class="text-[11px] text-slate-400 mb-1 font-bold">الدخول 🔵</p><p class="font-black text-white text-xl">${s.entry}</p></div><div class="bg-sellRed/10 p-3.5 rounded-2xl text-center border border-sellRed/20"><p class="text-[11px] text-sellRed mb-1 font-bold">الوقف 🔴</p><p class="font-black text-sellRed text-xl">${s.sl}</p></div></div><div class="grid grid-cols-2 gap-2 relative z-0">${tpsHtml}</div>${adminBtns}</div>`;
+        }
+
+        function renderUserActiveSignalsHTML(list, container) { container.innerHTML = ''; let count = 0; list.forEach(s => { container.innerHTML += buildCardHtml(s, false); count++; }); if(count === 0) container.innerHTML = '<div class="text-center mt-20"><i class="fa-solid fa-mug-hot text-5xl text-slate-700 mb-4"></i><p class="text-slate-400 font-bold">السوق هادئ، لا توجد صفقات نشطة</p></div>'; }
+        function renderAdminSignals(list) { const container = document.getElementById('admin-signals-list'); container.innerHTML = list.length === 0 ? '<p class="text-center text-slate-500 mt-10">لا توجد إشارات نشطة</p>' : ''; list.forEach(s => { container.innerHTML += buildCardHtml(s, true); }); }
+        window.filterSignals = function(cat) { document.querySelectorAll('#user-filters-header button').forEach(btn => { const isActive = btn.getAttribute('onclick').includes(cat); btn.className = isActive ? "px-5 py-2 rounded-xl bg-premiumGold text-darkBg text-xs font-black whitespace-nowrap shadow-[0_5px_15px_rgba(255,215,0,0.2)]" : "px-5 py-2 rounded-xl bg-slate-800/80 text-white text-xs font-bold whitespace-nowrap border border-white/5"; }); const list = cat === 'All' ? window.globalActiveSignals : window.globalActiveSignals.filter(s => s.category === cat); renderUserActiveSignalsHTML(list, document.getElementById('user-tab-signals')); }
+
+        function switchView(id) { ['auth-view', 'pending-view', 'expired-view', 'blocked-view', 'user-view', 'admin-view'].forEach(v => document.getElementById(v)?.classList.add('hide')); document.getElementById(id).classList.remove('hide'); }
+        window.switchUserTab = (tab) => { ['signals','stats','settings'].forEach(t => document.getElementById(`user-tab-${t}`).classList.add('hide')); document.getElementById(`user-tab-${tab}`).classList.remove('hide'); document.getElementById('user-filters-header').classList.toggle('hide', tab!=='signals'); document.getElementById('user-stats-header').classList.toggle('hide', tab!=='stats'); document.getElementById('user-settings-header').classList.toggle('hide', tab!=='settings'); ['signals','stats','settings'].forEach(t => { document.getElementById(`nav-u-${t}`).className = t===tab ? "nav-active flex flex-col items-center justify-center w-20 h-full cursor-pointer transition-all" : "text-slate-500 hover:text-white transition-all flex flex-col items-center justify-center w-20 h-full cursor-pointer"; }); };
+        window.switchAdminTab = (tab) => { ['signals', 'add', 'users', 'history', 'database', 'settings'].forEach(t => { document.getElementById(`admin-tab-${t}`).classList.add('hide'); document.getElementById(`tab-btn-${t}`).className = 'px-4 py-2.5 hover:bg-white/5 rounded-xl whitespace-nowrap transition-colors text-slate-400'; }); document.getElementById(`admin-tab-${tab}`).classList.remove('hide'); document.getElementById(`tab-btn-${tab}`).className = 'px-4 py-2.5 bg-adminBlue/10 text-adminBlue rounded-xl whitespace-nowrap transition-colors'; if(tab === 'database') { document.getElementById('tab-btn-database').className = 'px-4 py-2.5 bg-premiumGold/10 text-premiumGold rounded-xl whitespace-nowrap border border-premiumGold/30'; } };
+        window.toggleAuth = (t) => { document.getElementById('login-form').classList.toggle('hide', t==='register'); document.getElementById('register-form').classList.toggle('hide', t==='login'); };
+        
+        function showLoader(txt) { const ls = document.getElementById('loader-screen'); ls.classList.remove('hide'); document.getElementById('loader-text').innerText = txt; document.getElementById('success-icon').classList.add('hide'); document.querySelectorAll('.chart-bar').forEach(b => b.classList.remove('hide')); }
+        function hideLoader(role) { document.querySelectorAll('.chart-bar').forEach(b => b.classList.add('hide')); document.getElementById('success-icon').classList.remove('hide'); document.getElementById('loader-text').innerText = "تم بنجاح"; setTimeout(() => { document.getElementById('loader-screen').classList.add('hide'); if(role) switchView(role === 'admin' ? 'admin-view' : 'user-view'); }, 600); }
+        function hideLoaderError() { document.getElementById('loader-screen').classList.add('hide'); }
+    </script>
+</body>
+</html>

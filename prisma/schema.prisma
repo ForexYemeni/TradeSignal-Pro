@@ -1,0 +1,55 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Signal {
+  id             String   @id @default(cuid())
+  pair           String
+  type           String   @default("BUY")
+  entry          Float    @default(0)
+  stopLoss       Float    @default(0)
+  takeProfits    String   @default("[]")
+  confidence     Int      @default(0)
+  status         String   @default("ACTIVE")
+  signalCategory String   @default("ENTRY")
+  rawText        String   @default("")
+  timeframe      String   @default("")
+  htfTimeframe   String   @default("")
+  htfTrend       String   @default("")
+  smcTrend       String   @default("")
+  hitTpIndex     Int      @default(-1)
+  hitPrice       Float?   @default(0)
+  pnlPoints      Float?   @default(0)
+  pnlDollars     Float?   @default(0)
+  partialClose   Boolean? @default(false)
+  balance        Float?   @default(0)
+  lotSize        String?  @default("")
+  riskTarget     Float?   @default(0)
+  riskPercent    Float?   @default(0)
+  actualRisk     Float?   @default(0)
+  actualRiskPct  Float?   @default(0)
+  slDistance     Float?   @default(0)
+  maxRR          Float?   @default(0)
+  instrument     String?  @default("")
+  createdAt      DateTime @default(now())
+
+  @@index([status])
+  @@index([pair])
+  @@index([signalCategory])
+  @@index([createdAt])
+}
+
+model Admin {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  passwordHash  String
+  name          String   @default("مدير النظام")
+  mustChangePwd Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
