@@ -1035,6 +1035,7 @@ if inReentry
 
     if reentryTPReached > reentryLastAlert
         alert(buildReentryTPAlert(reentryTPReached), alert.freq_once_per_bar)
+        reentryLastAlert := reentryTPReached
 
     if reentryTPReached == reentryTargets
         if inStatWindow and not reentryCounted
@@ -1046,7 +1047,6 @@ if inReentry
         array.clear(reentryTPLbls)
         array.clear(reentryTPPrices)
         array.clear(reentryTPStatus)
-        reentryLastAlert := reentryTPReached
 
     bool reentrySLHit = (isBuyReentry and low <= reentrySL) or (not isBuyReentry and high >= reentrySL)
     if reentrySLHit and not reentrySLSent
