@@ -1088,6 +1088,7 @@ export default function HomePage() {
   const [audioMuted, setAudioMuted] = useState(false);
   const [audioVol, setAudioVol] = useState(0.7);
   const prevIdsRef = useRef<Set<string>>(new Set());
+  const prevStateRef = useRef<Map<string, { hitTpIndex: number; status: string }>>(new Map());
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -1209,23 +1210,37 @@ export default function HomePage() {
         const newSignals: Signal[] = data.signals;
         const newIds = new Set(newSignals.map((s: Signal) => s.id));
         const oldIds = prevIdsRef.current;
-        // Detect new signals
-        // Native notifications are handled by SignalService (background) - only play Web Audio here
-        // to avoid duplicate notifications in the APK
+        const oldStates = prevStateRef.current;
+        // Detect new signals AND state changes (TP hits, SL hits)
         if (oldIds.size > 0) {
           for (const s of newSignals) {
             if (!oldIds.has(s.id)) {
-              // Web Audio only (background service handles native notifications)
+              // Brand new signal — play sound based on category
               if (!audioMuted) {
                 if (isEntry(s.signalCategory)) playSound(s.type === "BUY" ? "buy" : "sell", audioVol);
                 else if (isTpLike(s.signalCategory)) playSound("tp", audioVol);
                 else if (isSlLike(s.signalCategory)) playSound("sl", audioVol);
                 else playSound("message", audioVol);
               }
+            } else {
+              // Existing signal — detect TP/SL state changes
+              const prev = oldStates.get(s.id);
+              if (prev) {
+                const tpChanged = s.hitTpIndex !== prev.hitTpIndex && s.hitTpIndex > prev.hitTpIndex;
+                const slChanged = prev.status === "ACTIVE" && s.status === "HIT_SL";
+                if (tpChanged && !audioMuted) playSound("tp", audioVol);
+                else if (slChanged && !audioMuted) playSound("sl", audioVol);
+              }
             }
           }
         }
+        // Save current state for next comparison
         prevIdsRef.current = newIds;
+        const stateMap = new Map<string, { hitTpIndex: number; status: string }>();
+        for (const s of newSignals) {
+          stateMap.set(s.id, { hitTpIndex: s.hitTpIndex, status: s.status });
+        }
+        prevStateRef.current = stateMap;
         setSignals(newSignals);
       }
     } catch (e) { console.error("Fetch signals:", e); }

@@ -94,10 +94,10 @@ export async function POST(request: NextRequest) {
       const rawText = parseResult.signal.rawText.trim();
       const isDuplicate = existing.some(s => {
         if (s.rawText.trim() === rawText) return true;
-        // Also check same pair + category within 5 minutes
-        if (String(s.pair).toUpperCase() === String(parseResult.signal.pair).toUpperCase() && s.signalCategory === cat) {
-          const age = Date.now() - new Date(s.createdAt).getTime();
-          if (age < 5 * 60 * 1000) return true;
+        // Only deduplicate against ACTIVE signals with same pair + category
+        // Closed signals (HIT_TP, HIT_SL, MANUAL_CLOSE) should NOT block new entries
+        if (s.status === "ACTIVE" && String(s.pair).toUpperCase() === String(parseResult.signal.pair).toUpperCase() && s.signalCategory === cat) {
+          return true;
         }
         return false;
       });
