@@ -613,7 +613,7 @@ function testFullWin() {
   
   var results = [];
   results.push(testBuySignal());
-  for (var i = 1; i <= 10; i++) results.push(testTP["" + i] ? null : sendToApp(buildTPHitText(i)));
+  for (var i = 1; i <= 10; i++) results.push(sendToApp(buildTPHitText(i)));
   Logger.log("انتهى السيناريو - إجمالي الربح: +$99.0");
   return { success: true, message: "صفقة كاملة - 10 أهداف", totalProfit: 99.0 };
 }
