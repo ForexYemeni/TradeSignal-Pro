@@ -224,7 +224,9 @@ async function handleUpdateSignal(parsed: any) {
     // Keep ACTIVE for partial TP hits, only set HIT_TP on last/full close
     updateData.status = isLastTP ? "HIT_TP" : "ACTIVE";
     updateData.hitTpIndex = tpNum;
-    updateData.signalCategory = parentCat === "REENTRY" ? "REENTRY_TP" : parentCat === "PYRAMID" ? "PYRAMID_TP" : "TP_HIT";
+    // Do NOT change signalCategory — keep original (ENTRY/REENTRY/PYRAMID)
+    // so subsequent TP hits can still find this parent signal
+    // signalCategory stays as parentCat (the original entry type)
 
     if (tpArrayIdx >= 0 && tps[tpArrayIdx]) {
       const tpPrice = tps[tpArrayIdx].tp;
@@ -259,7 +261,7 @@ async function handleUpdateSignal(parsed: any) {
     else if (balance > 0) dollars = balance * 0.02;
 
     updateData.status = "HIT_SL";
-    updateData.signalCategory = parentCat === "REENTRY" ? "REENTRY_SL" : parentCat === "PYRAMID" ? "PYRAMID_SL" : "SL_HIT";
+    // Do NOT change signalCategory — keep original entry type
     updateData.hitPrice = parsed.hitPrice || stopLoss;
     updateData.pnlPoints = parsed.pnlPoints || parseFloat(points.toFixed(1));
     updateData.pnlDollars = parsed.pnlDollar || parseFloat((-dollars).toFixed(2));
