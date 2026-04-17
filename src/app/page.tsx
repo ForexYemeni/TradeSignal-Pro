@@ -260,7 +260,7 @@ function Stars({ r }: { r: number }) {
   return (
     <div className="flex items-center gap-0.5">
       {Array.from({ length: 5 }).map((_, i) => (
-        <Star key={i} className={`w-3.5 h-3.5 ${i < r ? "fill-amber-400 text-amber-400" : "text-slate-700"}`} />
+        <Star key={i} className={`w-3.5 h-3.5 ${i < r ? "fill-amber-400 text-amber-400" : "text-muted-foreground"}`} />
       ))}
     </div>
   );
@@ -433,13 +433,13 @@ function TpMiniCard({ tp, index, isHit, isLastHit, entry, type }: {
               </div>
             ) : (
               <div className="w-6 h-6 rounded-full bg-muted/60 flex items-center justify-center">
-                <span className="text-[9px] text-slate-500 font-bold">{index + 1}</span>
+                <span className="text-[9px] text-muted-foreground font-bold">{index + 1}</span>
               </div>
             )}
             <div>
               <div className="flex items-center gap-1.5">
-                <span className={`text-xs font-bold font-mono ${isHit ? "text-emerald-300" : "text-slate-300"}`}>{tp.tp}</span>
-                <span className={`text-[8px] font-mono px-1.5 py-0.5 rounded-md ${isHit ? "bg-emerald-500/20 text-emerald-400" : "bg-muted/60 text-slate-500"}`}>
+                <span className={`text-xs font-bold font-mono ${isHit ? "text-emerald-300" : "text-foreground/80"}`}>{tp.tp}</span>
+                <span className={`text-[8px] font-mono px-1.5 py-0.5 rounded-md ${isHit ? "bg-emerald-500/20 text-emerald-400" : "bg-muted/60 text-muted-foreground"}`}>
                   {direction}{diff}
                 </span>
               </div>
@@ -450,7 +450,7 @@ function TpMiniCard({ tp, index, isHit, isLastHit, entry, type }: {
               {tp.rr.toFixed(2)}
             </div>
             {!isHit && (
-              <svg className={`w-3.5 h-3.5 text-slate-600 transition-transform duration-300 ${expanded ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <svg className={`w-3.5 h-3.5 text-muted-foreground transition-transform duration-300 ${expanded ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
               </svg>
             )}
@@ -465,10 +465,10 @@ function TpMiniCard({ tp, index, isHit, isLastHit, entry, type }: {
       {expanded && (
         <div className="tp-expand-enter mt-1 mx-2 mb-1 p-3 rounded-xl bg-muted/30 border border-border space-y-2">
           <div className="grid grid-cols-2 gap-2 text-[11px]">
-            <div className="flex justify-between"><span className="text-slate-500">سعر الهدف</span><span className="font-mono font-bold text-foreground">{tp.tp}</span></div>
-            <div className="flex justify-between"><span className="text-slate-500">المسافة</span><span className="font-mono text-slate-300">{direction}{diff} نقطة</span></div>
-            <div className="flex justify-between"><span className="text-slate-500">R:R</span><span className="font-mono font-semibold text-amber-400">{tp.rr.toFixed(2)}</span></div>
-            <div className="flex justify-between"><span className="text-slate-500">نسبة التحرك</span><span className="font-mono text-slate-300">{pctFromEntry}%</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">سعر الهدف</span><span className="font-mono font-bold text-foreground">{tp.tp}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">المسافة</span><span className="font-mono text-foreground/80">{direction}{diff} نقطة</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">R:R</span><span className="font-mono font-semibold text-amber-400">{tp.rr.toFixed(2)}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">نسبة التحرك</span><span className="font-mono text-foreground/80">{pctFromEntry}%</span></div>
           </div>
           {isHit && (
             <div className="flex items-center gap-2 pt-1.5 border-t border-emerald-500/10">
@@ -479,7 +479,7 @@ function TpMiniCard({ tp, index, isHit, isLastHit, entry, type }: {
           {!isHit && (
             <div className="flex items-center gap-2 pt-1.5 border-t border-border">
               <div className="w-1.5 h-1.5 rounded-full bg-slate-600" />
-              <span className="text-[10px] text-slate-500">في انتظار التحقيق</span>
+              <span className="text-[10px] text-muted-foreground">في انتظار التحقيق</span>
             </div>
           )}
         </div>
@@ -508,7 +508,7 @@ function TradeStatusBanner({ s }: { s: Signal }) {
     ? { bg: "bg-gradient-to-br from-emerald-500/[0.1] to-emerald-600/[0.04] border-emerald-500/25 animate-profit-glow", iconBg: "bg-emerald-500/20", text: "text-emerald-400", badge: "bg-emerald-500/20 text-emerald-400", pill: "text-emerald-400/70 bg-emerald-500/10", sub: "text-emerald-400/60" }
     : isLoss
     ? { bg: "bg-gradient-to-br from-red-500/[0.1] to-red-600/[0.04] border-red-500/25 animate-loss-glow", iconBg: "bg-red-500/20", text: "text-red-400", badge: "bg-red-500/20 text-red-400", pill: "text-red-400/70 bg-red-500/10", sub: "text-red-400/60" }
-    : { bg: "bg-muted/50 border-border", iconBg: "bg-slate-500/20", text: "text-slate-400", badge: "bg-slate-500/20 text-slate-400", pill: "text-slate-400/70 bg-slate-500/10", sub: "text-slate-400/60" };
+    : { bg: "bg-muted/50 border-border", iconBg: "bg-slate-500/20", text: "text-muted-foreground", badge: "bg-muted text-muted-foreground", pill: "text-muted-foreground/70 bg-muted/80", sub: "text-muted-foreground/60" };
   const catIcon = isReentry ? "♻️" : isPyramid ? "🔥" : "";
   const catLabel = isReentry ? "تعويض" : isPyramid ? "تعزيز" : "";
 
@@ -527,7 +527,7 @@ function TradeStatusBanner({ s }: { s: Signal }) {
             </svg>
           )}
           {isManual && (
-            <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           )}
@@ -556,7 +556,7 @@ function TradeStatusBanner({ s }: { s: Signal }) {
             </div>
           )}
           {isManual && (
-            <div className="text-[10px] text-slate-500 mt-0.5">
+            <div className="text-[10px] text-muted-foreground mt-0.5">
               تم إغلاق الصفقة يدويا
               {hitCount > 0 && ` بعد تحقيق ${hitCount} هدف`}
             </div>
@@ -611,10 +611,10 @@ function EntryCard({ s, idx, isAdmin, onUpdate, onDelete }: {
               <div>
                 <div className="flex items-center gap-2">
                   <span className="font-extrabold text-foreground text-[15px] tracking-wide">{s.pair}</span>
-                  {s.timeframe && <span className="text-[9px] bg-muted text-slate-400 px-1.5 py-0.5 rounded-md font-medium">{s.timeframe}</span>}
-                  {s.htfTimeframe && <span className="text-[9px] bg-muted text-slate-400 px-1.5 py-0.5 rounded-md font-medium">{s.htfTimeframe}</span>}
+                  {s.timeframe && <span className="text-[9px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded-md font-medium">{s.timeframe}</span>}
+                  {s.htfTimeframe && <span className="text-[9px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded-md font-medium">{s.htfTimeframe}</span>}
                 </div>
-                <span className="text-[10px] text-slate-500 font-medium">{typeLabel}</span>
+                <span className="text-[10px] text-muted-foreground font-medium">{typeLabel}</span>
               </div>
             </div>
             <div className="flex flex-col items-end gap-1.5">
@@ -627,7 +627,7 @@ function EntryCard({ s, idx, isAdmin, onUpdate, onDelete }: {
                   </div>
                 )}
                 {isClosed && (
-                  <Badge className={`${s.status === "HIT_TP" ? "bg-emerald-500/10 text-emerald-400" : s.status === "HIT_SL" ? "bg-red-500/10 text-red-400" : "bg-slate-500/10 text-slate-400"} border-0 text-[8px] font-semibold px-2`}>
+                  <Badge className={`${s.status === "HIT_TP" ? "bg-emerald-500/10 text-emerald-400" : s.status === "HIT_SL" ? "bg-red-500/10 text-red-400" : "bg-muted/80 text-muted-foreground"} border-0 text-[8px] font-semibold px-2`}>
                     {s.status === "HIT_TP" ? "مغلقة بربح" : s.status === "HIT_SL" ? "مغلقة بخسارة" : "مغلقة"}
                   </Badge>
                 )}
@@ -645,14 +645,14 @@ function EntryCard({ s, idx, isAdmin, onUpdate, onDelete }: {
                     <Radio className="w-3 h-3 text-emerald-400/50 animate-pulse" />
                     <span className="text-[9px] text-emerald-400/60">مباشر</span>
                   </div>
-                  <div className="flex items-center gap-1 text-[9px] text-slate-500">
+                  <div className="flex items-center gap-1 text-[9px] text-muted-foreground">
                     <Timer className="w-2.5 h-2.5" />
                     <span>{countdown}</span>
                   </div>
                 </>
               )}
             </div>
-            <span className="text-[10px] text-slate-500 flex items-center gap-1"><Clock className="w-3 h-3" />{timeAgo(s.createdAt)}</span>
+            <span className="text-[10px] text-muted-foreground flex items-center gap-1"><Clock className="w-3 h-3" />{timeAgo(s.createdAt)}</span>
           </div>
 
           {/* ── Entry / SL Price Boxes ── */}
@@ -660,7 +660,7 @@ function EntryCard({ s, idx, isAdmin, onUpdate, onDelete }: {
             <div className={`rounded-xl p-3 border transition-all duration-300 ${isBuy ? "bg-gradient-to-br from-emerald-500/[0.06] to-emerald-600/[0.02] border-emerald-500/15" : "bg-gradient-to-br from-red-500/[0.06] to-red-600/[0.02] border-red-500/15"}`}>
               <div className="flex items-center gap-1.5 mb-1.5">
                 <Activity className={`w-3 h-3 ${isBuy ? "text-emerald-400" : "text-red-400"}`} />
-                <span className="text-[9px] text-slate-400 font-medium">سعر الدخول</span>
+                <span className="text-[9px] text-muted-foreground font-medium">سعر الدخول</span>
               </div>
               <div className={`text-[15px] font-extrabold font-mono ${isBuy ? "text-emerald-300" : "text-red-300"}`}>{s.entry}</div>
             </div>
@@ -670,7 +670,7 @@ function EntryCard({ s, idx, isAdmin, onUpdate, onDelete }: {
                 <span className="text-[9px] text-red-300 font-medium">وقف الخسارة</span>
               </div>
               <div className="text-[15px] font-extrabold font-mono text-red-400">{s.stopLoss}</div>
-              <div className="text-[8px] text-slate-500 mt-1 font-mono">{s.slDistance || Math.abs(s.entry - s.stopLoss).toFixed(1)} نقطة</div>
+              <div className="text-[8px] text-muted-foreground mt-1 font-mono">{s.slDistance || Math.abs(s.entry - s.stopLoss).toFixed(1)} نقطة</div>
             </div>
           </div>
 
@@ -678,17 +678,17 @@ function EntryCard({ s, idx, isAdmin, onUpdate, onDelete }: {
           {(s.balance || s.lotSize || s.riskTarget) && (
             <>
               <Div />
-              <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mb-1.5">
+              <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground mb-1.5">
                 <DollarSign className="w-3.5 h-3.5 text-amber-400" />
-                <span className="font-bold text-slate-300">إدارة المخاطر</span>
+                <span className="font-bold text-foreground/80">إدارة المخاطر</span>
               </div>
               <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[11px]">
-                {s.balance && <div className="flex items-center justify-between"><span className="text-slate-500">الرصيد</span><span className="font-mono text-slate-200 font-semibold">${Number(s.balance).toLocaleString()}</span></div>}
-                {s.lotSize && <div className="flex items-center justify-between"><span className="text-slate-500">اللوت</span><span className="font-mono text-slate-200 font-semibold">{s.lotSize}</span></div>}
-                {s.riskTarget && <div className="flex items-center justify-between"><span className="text-slate-500">الخطر</span><span className="font-mono text-slate-200">${s.riskTarget}{s.riskPercent ? ` (${s.riskPercent}%)` : ""}</span></div>}
-                {s.actualRisk && <div className="flex items-center justify-between"><span className="text-slate-500">فعلي</span><span className="font-mono text-slate-200">${s.actualRisk}{s.actualRiskPct ? ` (${s.actualRiskPct}%)` : ""}</span></div>}
-                {s.maxRR && <div className="flex items-center justify-between"><span className="text-slate-500">R:R أقصى</span><span className="font-mono text-amber-400 font-bold">1:{s.maxRR}</span></div>}
-                {s.instrument && <div className="flex items-center justify-between"><span className="text-slate-500">الأداة</span><span className="text-slate-200">{s.instrument}</span></div>}
+                {s.balance && <div className="flex items-center justify-between"><span className="text-muted-foreground">الرصيد</span><span className="font-mono text-foreground font-semibold">${Number(s.balance).toLocaleString()}</span></div>}
+                {s.lotSize && <div className="flex items-center justify-between"><span className="text-muted-foreground">اللوت</span><span className="font-mono text-foreground font-semibold">{s.lotSize}</span></div>}
+                {s.riskTarget && <div className="flex items-center justify-between"><span className="text-muted-foreground">الخطر</span><span className="font-mono text-foreground">${s.riskTarget}{s.riskPercent ? ` (${s.riskPercent}%)` : ""}</span></div>}
+                {s.actualRisk && <div className="flex items-center justify-between"><span className="text-muted-foreground">فعلي</span><span className="font-mono text-foreground">${s.actualRisk}{s.actualRiskPct ? ` (${s.actualRiskPct}%)` : ""}</span></div>}
+                {s.maxRR && <div className="flex items-center justify-between"><span className="text-muted-foreground">R:R أقصى</span><span className="font-mono text-amber-400 font-bold">1:{s.maxRR}</span></div>}
+                {s.instrument && <div className="flex items-center justify-between"><span className="text-muted-foreground">الأداة</span><span className="text-foreground">{s.instrument}</span></div>}
               </div>
             </>
           )}
@@ -700,14 +700,14 @@ function EntryCard({ s, idx, isAdmin, onUpdate, onDelete }: {
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-1.5">
                   <Target className="w-3.5 h-3.5 text-amber-400" />
-                  <span className="text-[10px] text-slate-300 font-bold">الأهداف</span>
+                  <span className="text-[10px] text-foreground/80 font-bold">الأهداف</span>
                   {hitCount > 0 && (
                     <span className="text-[9px] bg-emerald-500/15 text-emerald-400 px-1.5 py-0.5 rounded-md font-bold ml-1">
                       {hitCount}/{s.takeProfits.length}
                     </span>
                   )}
                 </div>
-                <span className="text-[9px] text-slate-600 font-mono">R:R</span>
+                <span className="text-[9px] text-muted-foreground font-mono">R:R</span>
               </div>
               <div className="space-y-1.5">
                 {s.takeProfits.map((tp, i) => (
@@ -732,18 +732,18 @@ function EntryCard({ s, idx, isAdmin, onUpdate, onDelete }: {
               <div className="flex items-center gap-3 text-[11px]">
                 {s.htfTrend && (
                   <div className="flex items-center gap-1.5">
-                    <Activity className="w-3 h-3 text-slate-500" />
-                    <span className="text-slate-500">{s.htfTimeframe || "HTF"}:</span>
-                    <span className={`font-semibold ${s.htfTrend === "صاعد" ? "text-emerald-400" : s.htfTrend === "هابط" ? "text-red-400" : "text-slate-400"}`}>
+                    <Activity className="w-3 h-3 text-muted-foreground" />
+                    <span className="text-muted-foreground">{s.htfTimeframe || "HTF"}:</span>
+                    <span className={`font-semibold ${s.htfTrend === "صاعد" ? "text-emerald-400" : s.htfTrend === "هابط" ? "text-red-400" : "text-muted-foreground"}`}>
                       {s.htfTrend}{s.htfTrend === "صاعد" ? " 🐂" : s.htfTrend === "هابط" ? " 🐻" : ""}
                     </span>
                   </div>
                 )}
                 {s.smcTrend && (
                   <div className="flex items-center gap-1.5">
-                    <Zap className="w-3 h-3 text-slate-500" />
-                    <span className="text-slate-500">SMC:</span>
-                    <span className={`font-semibold ${s.smcTrend === "صاعد" ? "text-emerald-400" : s.smcTrend === "هابط" ? "text-red-400" : "text-slate-400"}`}>{s.smcTrend}</span>
+                    <Zap className="w-3 h-3 text-muted-foreground" />
+                    <span className="text-muted-foreground">SMC:</span>
+                    <span className={`font-semibold ${s.smcTrend === "صاعد" ? "text-emerald-400" : s.smcTrend === "هابط" ? "text-red-400" : "text-muted-foreground"}`}>{s.smcTrend}</span>
                   </div>
                 )}
               </div>
@@ -762,7 +762,7 @@ function EntryCard({ s, idx, isAdmin, onUpdate, onDelete }: {
                   <button key={i} onClick={() => onUpdate(s.id, "HIT_TP", i)} className="px-2.5 py-1 rounded-lg text-[10px] font-medium bg-sky-500/10 text-sky-400 border border-sky-500/15 active:scale-95 transition-transform hover:bg-sky-500/20">TP{i + 1} ✅</button>
                 ))}
                 <button onClick={() => onUpdate(s.id, "HIT_SL")} className="px-2.5 py-1 rounded-lg text-[10px] font-medium bg-red-500/10 text-red-400 border border-red-500/15 active:scale-95 transition-transform hover:bg-red-500/20">وقف ❌</button>
-                <button onClick={() => onUpdate(s.id, "MANUAL_CLOSE")} className="px-2.5 py-1 rounded-lg text-[10px] font-medium bg-muted/60 text-slate-400 border border-border active:scale-95 transition-transform hover:bg-muted/80">إغلاق</button>
+                <button onClick={() => onUpdate(s.id, "MANUAL_CLOSE")} className="px-2.5 py-1 rounded-lg text-[10px] font-medium bg-muted/60 text-muted-foreground border border-border active:scale-95 transition-transform hover:bg-muted/80">إغلاق</button>
                 <button onClick={() => onDelete(s.id)} className="px-2.5 py-1 rounded-lg text-[10px] font-medium bg-red-500/5 text-red-300/60 border border-red-500/10 active:scale-95 transition-transform hover:bg-red-500/10">🗑</button>
               </div>
             </>
@@ -796,7 +796,7 @@ function ClosedSignalCard({ s, idx, isAdmin, onDelete }: { s: Signal; idx: numbe
     ? { bg: "bg-gradient-to-r from-emerald-500/[0.08] to-emerald-600/[0.03]", border: "border-emerald-500/20", iconBg: "bg-emerald-500/15", text: "text-emerald-400", badge: "bg-emerald-500/20 text-emerald-400", tpBadge: "bg-emerald-500/15 text-emerald-400 border-emerald-500/20" }
     : isLoss
     ? { bg: "bg-gradient-to-r from-red-500/[0.08] to-red-600/[0.03]", border: "border-red-500/20", iconBg: "bg-red-500/15", text: "text-red-400", badge: "bg-red-500/20 text-red-400", tpBadge: "bg-emerald-500/15 text-emerald-400 border-emerald-500/20" }
-    : { bg: "bg-muted/50", border: "border-border", iconBg: "bg-slate-500/15", text: "text-slate-400", badge: "bg-slate-500/20 text-slate-400", tpBadge: "bg-slate-500/10 text-slate-400 border-border" };
+    : { bg: "bg-muted/50", border: "border-border", iconBg: "bg-muted", text: "text-muted-foreground", badge: "bg-muted text-muted-foreground", tpBadge: "bg-muted/80 text-muted-foreground border-border" };
   const catIcon = isReentry ? "♻️" : isPyramid ? "🔥" : isPartialWin ? "⚡" : isProfit ? "✅" : isLoss ? "❌" : "⊘";
 
   return (
@@ -813,7 +813,7 @@ function ClosedSignalCard({ s, idx, isAdmin, onDelete }: { s: Signal; idx: numbe
                 ) : isLoss ? (
                   <svg className="w-4 h-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                 ) : (
-                  <ShieldAlert className="w-4 h-4 text-slate-400" />
+                  <ShieldAlert className="w-4 h-4 text-muted-foreground" />
                 )}
               </div>
               <div>
@@ -836,7 +836,7 @@ function ClosedSignalCard({ s, idx, isAdmin, onDelete }: { s: Signal; idx: numbe
                 <div className={`text-[8px] font-mono ${isProfit ? catColors.text + "/50" : "text-red-400/50"}`}>{points >= 0 ? "+" : ""}{points} نقطة</div>
               </div>
               {/* Chevron */}
-              <svg className={`w-3.5 h-3.5 text-slate-600 transition-transform duration-300 ${expanded ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <svg className={`w-3.5 h-3.5 text-muted-foreground transition-transform duration-300 ${expanded ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
               </svg>
             </div>
@@ -851,15 +851,15 @@ function ClosedSignalCard({ s, idx, isAdmin, onDelete }: { s: Signal; idx: numbe
               {/* Entry / SL / Hit Price */}
               <div className="grid grid-cols-3 gap-2">
                 <div className="bg-muted/50 rounded-lg p-2 border border-border">
-                  <div className="text-[8px] text-slate-500 mb-0.5">الدخول</div>
+                  <div className="text-[8px] text-muted-foreground mb-0.5">الدخول</div>
                   <div className="text-[11px] font-bold font-mono text-foreground">{s.entry}</div>
                 </div>
                 <div className="bg-muted/50 rounded-lg p-2 border border-border">
-                  <div className="text-[8px] text-slate-500 mb-0.5">الوقف</div>
+                  <div className="text-[8px] text-muted-foreground mb-0.5">الوقف</div>
                   <div className="text-[11px] font-bold font-mono text-red-300">{s.stopLoss}</div>
                 </div>
                 <div className={`rounded-lg p-2 border ${isProfit ? catColors.iconBg + " " + catColors.border : "bg-red-500/[0.06] border-red-500/10"}`}>
-                  <div className="text-[8px] text-slate-500 mb-0.5">{isReentry ? "تعويض" : isPyramid ? "تعزيز" : isProfit ? "الهدف" : "الإغلاق"} {hitCount > 0 && totalTPs > 0 ? `(${hitCount}/${totalTPs})` : ""}</div>
+                  <div className="text-[8px] text-muted-foreground mb-0.5">{isReentry ? "تعويض" : isPyramid ? "تعزيز" : isProfit ? "الهدف" : "الإغلاق"} {hitCount > 0 && totalTPs > 0 ? `(${hitCount}/${totalTPs})` : ""}</div>
                   <div className={`text-[11px] font-bold font-mono ${isProfit ? catColors.text : "text-red-400"}`}>{s.hitPrice ?? "—"}</div>
                 </div>
               </div>
@@ -867,12 +867,12 @@ function ClosedSignalCard({ s, idx, isAdmin, onDelete }: { s: Signal; idx: numbe
               {/* TP Targets or hit info for standalone TP/SL alerts */}
               {s.takeProfits?.length > 0 ? (
                 <div className="space-y-1">
-                  <div className="text-[9px] text-slate-500 font-medium">الأهداف ({hitCount}/{totalTPs})</div>
+                  <div className="text-[9px] text-muted-foreground font-medium">الأهداف ({hitCount}/{totalTPs})</div>
                   <div className="flex gap-1 flex-wrap">
                     {s.takeProfits.map((tp, i) => {
                       const hit = s.hitTpIndex > 0 && i < s.hitTpIndex;
                       return (
-                        <div key={i} className={`px-2 py-1 rounded-lg text-[9px] font-mono border ${hit ? catColors.tpBadge : "bg-muted/30 text-slate-500 border-border line-through opacity-50"}`}>
+                        <div key={i} className={`px-2 py-1 rounded-lg text-[9px] font-mono border ${hit ? catColors.tpBadge : "bg-muted/30 text-muted-foreground border-border line-through opacity-50"}`}>
                           TP{i+1}: {tp.tp} ({tp.rr.toFixed(1)}R)
                         </div>
                       );
@@ -891,14 +891,14 @@ function ClosedSignalCard({ s, idx, isAdmin, onDelete }: { s: Signal; idx: numbe
               {/* Risk Info */}
               {(s.balance || s.lotSize) && (
                 <div className="flex gap-3 text-[9px]">
-                  {s.balance && <div className="flex items-center gap-1"><span className="text-slate-500">الرصيد:</span><span className="font-mono text-slate-300">${Number(s.balance).toLocaleString()}</span></div>}
-                  {s.lotSize && <div className="flex items-center gap-1"><span className="text-slate-500">اللوت:</span><span className="font-mono text-slate-300">{s.lotSize}</span></div>}
+                  {s.balance && <div className="flex items-center gap-1"><span className="text-muted-foreground">الرصيد:</span><span className="font-mono text-foreground/80">${Number(s.balance).toLocaleString()}</span></div>}
+                  {s.lotSize && <div className="flex items-center gap-1"><span className="text-muted-foreground">اللوت:</span><span className="font-mono text-foreground/80">{s.lotSize}</span></div>}
                 </div>
               )}
 
               {/* Time + Delete */}
               <div className="flex items-center justify-between pt-1">
-                <span className="text-[9px] text-slate-500 flex items-center gap-1"><Clock className="w-2.5 h-2.5" />{timeAgo(s.createdAt)}</span>
+                <span className="text-[9px] text-muted-foreground flex items-center gap-1"><Clock className="w-2.5 h-2.5" />{timeAgo(s.createdAt)}</span>
                 {isAdmin && (
                   <button onClick={(e) => { e.stopPropagation(); onDelete(s.id); }} className="px-2 py-1 rounded-lg text-[9px] font-medium bg-red-500/5 text-red-300/60 border border-red-500/10 active:scale-95 transition-transform">🗑 حذف</button>
                 )}
@@ -1880,7 +1880,7 @@ export default function HomePage() {
       return <SplashScreen />;
     }
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" style={{ background: "#070b14" }}>
+      <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-background">
         {/* Background gradient blurs */}
         <div className="absolute top-[-20%] left-[-10%] w-72 h-72 rounded-full opacity-20" style={{ background: "radial-gradient(circle, #FFD700 0%, transparent 70%)", filter: "blur(80px)" }} />
         <div className="absolute bottom-[-15%] right-[-10%] w-64 h-64 rounded-full opacity-15" style={{ background: "radial-gradient(circle, #00E676 0%, transparent 70%)", filter: "blur(80px)" }} />
@@ -1904,7 +1904,7 @@ export default function HomePage() {
             <div className="space-y-4">
               {/* Email */}
               <div className="input-glass rounded-2xl px-4 h-[60px] flex items-center gap-3">
-                <Mail className="w-5 h-5 text-slate-500 flex-shrink-0" />
+                <Mail className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                 <input
                   type="email"
                   value={email}
@@ -1918,7 +1918,7 @@ export default function HomePage() {
 
               {/* Password */}
               <div className="input-glass rounded-2xl px-4 h-[60px] flex items-center gap-3">
-                <Lock className="w-5 h-5 text-slate-500 flex-shrink-0" />
+                <Lock className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                 <input
                   type={showPwd ? "text" : "password"}
                   value={pwd}
@@ -1928,7 +1928,7 @@ export default function HomePage() {
                   dir="ltr"
                   onKeyDown={e => e.key === "Enter" && handleLogin()}
                 />
-                <button type="button" onClick={() => setShowPwd(!showPwd)} className="text-slate-500 hover:text-slate-300 transition-colors">
+                <button type="button" onClick={() => setShowPwd(!showPwd)} className="text-muted-foreground hover:text-foreground/80 transition-colors">
                   {showPwd ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
@@ -1960,7 +1960,7 @@ export default function HomePage() {
             </div>
 
             {/* Version & DB Error */}
-            <div className="text-center text-[10px] text-slate-700">الإصدار 2.0 | FOREXYEMENI VIP</div>
+            <div className="text-center text-[10px] text-muted-foreground">الإصدار 2.0 | FOREXYEMENI VIP</div>
             {dbError && (
               <div className="bg-red-500/10 border border-red-500/20 rounded-2xl px-4 py-3 text-xs text-red-400 text-center">
                 ⚠️ {dbError}
@@ -1977,7 +1977,7 @@ export default function HomePage() {
      ═══════════════════════════════════════════════════════════════ */
   if (view === "register") {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" style={{ background: "#070b14" }}>
+      <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-background">
         {/* Background gradient blurs */}
         <div className="absolute top-[-20%] left-[-10%] w-72 h-72 rounded-full opacity-20" style={{ background: "radial-gradient(circle, #FFD700 0%, transparent 70%)", filter: "blur(80px)" }} />
         <div className="absolute bottom-[-15%] right-[-10%] w-64 h-64 rounded-full opacity-15" style={{ background: "radial-gradient(circle, #00E676 0%, transparent 70%)", filter: "blur(80px)" }} />
@@ -1991,7 +1991,7 @@ export default function HomePage() {
               </div>
               <div className="text-center">
                 <h2 className="text-2xl font-extrabold text-foreground">إنشاء حساب جديد</h2>
-                <p className="text-xs text-slate-400 mt-1.5">سجل الآن وانتظر موافقة الإدارة</p>
+                <p className="text-xs text-muted-foreground mt-1.5">سجل الآن وانتظر موافقة الإدارة</p>
               </div>
             </div>
 
@@ -1999,7 +1999,7 @@ export default function HomePage() {
             <div className="space-y-4">
               {/* Full Name */}
               <div className="input-glass rounded-2xl px-4 h-[60px] flex items-center gap-3">
-                <User className="w-5 h-5 text-slate-500 flex-shrink-0" />
+                <User className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                 <input
                   value={regName}
                   onChange={e => setRegName(e.target.value)}
@@ -2011,7 +2011,7 @@ export default function HomePage() {
 
               {/* Email */}
               <div className="input-glass rounded-2xl px-4 h-[60px] flex items-center gap-3">
-                <Mail className="w-5 h-5 text-slate-500 flex-shrink-0" />
+                <Mail className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                 <input
                   type="email"
                   value={regEmail}
@@ -2024,7 +2024,7 @@ export default function HomePage() {
 
               {/* Password */}
               <div className="input-glass rounded-2xl px-4 h-[60px] flex items-center gap-3">
-                <Lock className="w-5 h-5 text-slate-500 flex-shrink-0" />
+                <Lock className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                 <input
                   type="password"
                   value={regPwd}
@@ -2077,7 +2077,7 @@ export default function HomePage() {
      ═══════════════════════════════════════════════════════════════ */
   if (view === "pending") {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" style={{ background: "#070b14" }}>
+      <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-background">
         <div className="absolute top-[-20%] left-[-10%] w-72 h-72 rounded-full opacity-20" style={{ background: "radial-gradient(circle, #FFD700 0%, transparent 70%)", filter: "blur(80px)" }} />
         <div className="absolute bottom-[-15%] right-[-10%] w-64 h-64 rounded-full opacity-15" style={{ background: "radial-gradient(circle, #00E676 0%, transparent 70%)", filter: "blur(80px)" }} />
 
@@ -2090,7 +2090,7 @@ export default function HomePage() {
               </div>
               <div>
                 <h2 className="text-2xl font-extrabold text-foreground">حسابك قيد المراجعة</h2>
-                <p className="text-sm text-slate-400 mt-3 leading-relaxed">
+                <p className="text-sm text-muted-foreground mt-3 leading-relaxed">
                   أهلاً بك في نادي الـ VIP! حسابك قيد المراجعة من قبل الإدارة.
                   <br />
                   سيتم إشعارك فور تفعيل حسابك.
@@ -2115,7 +2115,7 @@ export default function HomePage() {
      ═══════════════════════════════════════════════════════════════ */
   if (view === "blocked") {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" style={{ background: "#070b14" }}>
+      <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-background">
         <div className="absolute top-[-20%] right-[-10%] w-72 h-72 rounded-full opacity-25" style={{ background: "radial-gradient(circle, #EF4444 0%, transparent 70%)", filter: "blur(80px)" }} />
 
         <div className="w-full max-w-[480px] animate-[fadeInUp_0.5s_ease-out] relative z-10">
@@ -2127,7 +2127,7 @@ export default function HomePage() {
               </div>
               <div>
                 <h2 className="text-2xl font-extrabold text-red-400">حساب محظور</h2>
-                <p className="text-sm text-slate-400 mt-3 leading-relaxed">
+                <p className="text-sm text-muted-foreground mt-3 leading-relaxed">
                   تم حظر حسابك من قبل الإدارة.
                   <br />
                   يرجى التواصل مع الدعم الفني للحصول على المساعدة.
@@ -2152,7 +2152,7 @@ export default function HomePage() {
      ═══════════════════════════════════════════════════════════════ */
   if (view === "expired") {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" style={{ background: "#070b14" }}>
+      <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-background">
         <div className="absolute top-[-20%] left-[-10%] w-72 h-72 rounded-full opacity-20" style={{ background: "radial-gradient(circle, #FFD700 0%, transparent 70%)", filter: "blur(80px)" }} />
         <div className="absolute bottom-[-15%] right-[-10%] w-64 h-64 rounded-full opacity-15" style={{ background: "radial-gradient(circle, #00E676 0%, transparent 70%)", filter: "blur(80px)" }} />
 
@@ -2167,7 +2167,7 @@ export default function HomePage() {
               </div>
               <div>
                 <h2 className="text-2xl font-extrabold" style={{ color: "#FFD700" }}>انتهى اشتراكك</h2>
-                <p className="text-sm text-slate-400 mt-3 leading-relaxed">
+                <p className="text-sm text-muted-foreground mt-3 leading-relaxed">
                   انتهت مدة اشتراكك في نادي الـ VIP.
                   <br />
                   يرجى التواصل مع الإدارة لتجديد الاشتراك.
@@ -2192,7 +2192,7 @@ export default function HomePage() {
      ═══════════════════════════════════════════════════════════════ */
   if (view === "changePwd") {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" style={{ background: "#070b14" }}>
+      <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-background">
         <div className="absolute top-[-20%] left-[-10%] w-72 h-72 rounded-full opacity-20" style={{ background: "radial-gradient(circle, #FFD700 0%, transparent 70%)", filter: "blur(80px)" }} />
         <div className="absolute bottom-[-15%] right-[-10%] w-64 h-64 rounded-full opacity-15" style={{ background: "radial-gradient(circle, #00E676 0%, transparent 70%)", filter: "blur(80px)" }} />
 
@@ -2204,27 +2204,27 @@ export default function HomePage() {
               </div>
               <div className="text-center">
                 <h2 className="text-xl font-extrabold text-foreground">تغيير بيانات الحساب</h2>
-                <p className="text-xs text-slate-400 mt-1.5">يجب تغيير البريد وكلمة المرور للمتابعة</p>
+                <p className="text-xs text-muted-foreground mt-1.5">يجب تغيير البريد وكلمة المرور للمتابعة</p>
               </div>
             </div>
             <div className="space-y-4">
               <div className="input-glass rounded-2xl px-4 h-[60px] flex items-center gap-3">
-                <Lock className="w-5 h-5 text-slate-500 flex-shrink-0" />
+                <Lock className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                 <input type="password" value={cpCur} onChange={e => setCpCur(e.target.value)} placeholder="كلمة المرور الحالية"
                   className="flex-1 bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground text-sm" dir="ltr" />
               </div>
               <div className="input-glass rounded-2xl px-4 h-[60px] flex items-center gap-3">
-                <Mail className="w-5 h-5 text-slate-500 flex-shrink-0" />
+                <Mail className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                 <input type="email" value={cpEmail} onChange={e => setCpEmail(e.target.value)} placeholder="البريد الإلكتروني الجديد"
                   className="flex-1 bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground text-sm" dir="ltr" />
               </div>
               <div className="input-glass rounded-2xl px-4 h-[60px] flex items-center gap-3">
-                <Lock className="w-5 h-5 text-slate-500 flex-shrink-0" />
+                <Lock className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                 <input type="password" value={cpNew} onChange={e => setCpNew(e.target.value)} placeholder="كلمة المرور الجديدة"
                   className="flex-1 bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground text-sm" dir="ltr" />
               </div>
               <div className="input-glass rounded-2xl px-4 h-[60px] flex items-center gap-3">
-                <Lock className="w-5 h-5 text-slate-500 flex-shrink-0" />
+                <Lock className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                 <input type="password" value={cpConf} onChange={e => setCpConf(e.target.value)} placeholder="تأكيد كلمة المرور"
                   className="flex-1 bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground text-sm" dir="ltr" />
               </div>
@@ -2309,10 +2309,10 @@ export default function HomePage() {
         {/* Audio Volume (show when not muted) */}
         {!audioMuted && (
           <div className="px-4 pb-2 flex items-center gap-2">
-            <Volume2 className="w-3 h-3 text-slate-500" />
+            <Volume2 className="w-3 h-3 text-muted-foreground" />
             <input type="range" min="0" max="100" value={audioVol * 100} onChange={e => setAudioVol(Number(e.target.value) / 100)}
               className="flex-1 h-1 accent-amber-500 bg-white/[0.1] rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-amber-500" />
-            <span className="text-[10px] text-slate-500 w-8 text-center">{Math.round(audioVol * 100)}%</span>
+            <span className="text-[10px] text-muted-foreground w-8 text-center">{Math.round(audioVol * 100)}%</span>
           </div>
         )}
       </header>
@@ -2373,7 +2373,7 @@ export default function HomePage() {
                     <h1 className="text-xl font-extrabold text-foreground mt-1">
                       {isAdmin ? "مرحباً، المدير" : `${greeting}، ${session?.name?.split(" ")[0] || ""}`}
                     </h1>
-                    <p className="text-[11px] text-slate-400 mt-1">
+                    <p className="text-[11px] text-muted-foreground mt-1">
                       {isAdmin
                         ? `${totalActiveUsers} مستخدم نشط • ${activeSignals.length} إشارة مفتوحة`
                         : `لديك ${activeSignals.length} إشارة نشطة حالياً`
@@ -2398,7 +2398,7 @@ export default function HomePage() {
                     <div className={`text-lg font-extrabold ${todayPnl >= 0 ? "text-emerald-400" : "text-red-400"}`}>
                       {todayPnl >= 0 ? "+" : ""}{todayPnl > 0 ? `$${todayPnl}` : todayPnl < 0 ? `-$${Math.abs(todayPnl)}` : "$0"}
                     </div>
-                    <div className="text-[9px] text-slate-500 font-medium">أرباح اليوم</div>
+                    <div className="text-[9px] text-muted-foreground font-medium">أرباح اليوم</div>
                   </div>
                 </div>
               </div>
@@ -2410,7 +2410,7 @@ export default function HomePage() {
                 <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                 <span className="text-[10px] text-emerald-400 font-semibold">مباشر</span>
               </div>
-              <span className="text-[10px] text-slate-500">آخر تحديث: {new Date().toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" })}</span>
+              <span className="text-[10px] text-muted-foreground">آخر تحديث: {new Date().toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" })}</span>
             </div>
 
             {/* ── Active Signals Summary (if any) ── */}
@@ -2442,10 +2442,10 @@ export default function HomePage() {
                               <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${isBuy ? "bg-emerald-500/15 text-emerald-400" : "bg-red-500/15 text-red-400"}`}>
                                 {isBuy ? "شراء" : "بيع"}
                               </span>
-                              {s.timeframe && <span className="text-[8px] bg-muted text-slate-500 px-1 py-0.5 rounded-md">{s.timeframe}</span>}
+                              {s.timeframe && <span className="text-[8px] bg-muted text-muted-foreground px-1 py-0.5 rounded-md">{s.timeframe}</span>}
                             </div>
                             <div className="flex items-center gap-3 mt-1 text-[10px]">
-                              <span className="text-slate-400">دخول: <span className="font-mono font-semibold text-slate-200">{s.entry}</span></span>
+                              <span className="text-muted-foreground">دخول: <span className="font-mono font-semibold text-foreground">{s.entry}</span></span>
                               <span className="text-red-400/60">وقف: <span className="font-mono font-semibold text-red-300">{s.stopLoss}</span></span>
                             </div>
                           </div>
@@ -2454,7 +2454,7 @@ export default function HomePage() {
                               <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                               <span className="text-[8px] text-emerald-400 font-semibold">نشطة</span>
                             </div>
-                            <span className="text-[9px] text-slate-600">{timeAgo(s.createdAt)}</span>
+                            <span className="text-[9px] text-muted-foreground">{timeAgo(s.createdAt)}</span>
                           </div>
                         </div>
                       </div>
@@ -2477,7 +2477,7 @@ export default function HomePage() {
                   <div className="relative">
                     <div className="flex items-center gap-1.5 mb-2">
                       <Trophy className="w-3.5 h-3.5 text-amber-400" />
-                      <span className="text-[10px] text-slate-400 font-medium">نسبة الفوز</span>
+                      <span className="text-[10px] text-muted-foreground font-medium">نسبة الفوز</span>
                     </div>
                     <div className={`text-2xl font-extrabold ${stats && stats.winRate >= 60 ? "text-emerald-400" : stats && stats.winRate >= 40 ? "text-amber-400" : "text-red-400"}`}>
                       {stats ? `${stats.winRate}%` : "—"}
@@ -2494,12 +2494,12 @@ export default function HomePage() {
                   <div className="relative">
                     <div className="flex items-center gap-1.5 mb-2">
                       <DollarSign className="w-3.5 h-3.5 text-amber-400" />
-                      <span className="text-[10px] text-slate-400 font-medium">إجمالي الأرباح</span>
+                      <span className="text-[10px] text-muted-foreground font-medium">إجمالي الأرباح</span>
                     </div>
                     <div className={`text-2xl font-extrabold ${totalPnl >= 0 ? "text-emerald-400" : "text-red-400"}`}>
                       {totalPnl >= 0 ? "+" : ""}{totalPnl > 0 ? `$${totalPnl.toLocaleString()}` : totalPnl < 0 ? `-$${Math.abs(totalPnl).toLocaleString()}` : "$0"}
                     </div>
-                    <div className="text-[10px] text-slate-500 mt-1 font-mono">{totalPoints >= 0 ? "+" : ""}{totalPoints} نقطة</div>
+                    <div className="text-[10px] text-muted-foreground mt-1 font-mono">{totalPoints >= 0 ? "+" : ""}{totalPoints} نقطة</div>
                   </div>
                 </Glass>
 
@@ -2507,11 +2507,11 @@ export default function HomePage() {
                 <Glass className="p-3.5">
                   <div className="flex items-center gap-1.5 mb-2">
                     <Flame className="w-3.5 h-3.5 text-orange-400" />
-                    <span className="text-[10px] text-slate-400 font-medium">سلسلة الأرباح</span>
+                    <span className="text-[10px] text-muted-foreground font-medium">سلسلة الأرباح</span>
                   </div>
                   <div className="flex items-end gap-1.5">
-                    <span className={`text-2xl font-extrabold ${streak >= 3 ? "text-orange-400" : streak > 0 ? "text-amber-400" : "text-slate-500"}`}>{streak}</span>
-                    <span className="text-[10px] text-slate-500 mb-1">صفقات</span>
+                    <span className={`text-2xl font-extrabold ${streak >= 3 ? "text-orange-400" : streak > 0 ? "text-amber-400" : "text-muted-foreground"}`}>{streak}</span>
+                    <span className="text-[10px] text-muted-foreground mb-1">صفقات</span>
                   </div>
                   {streak >= 3 && <div className="text-[9px] text-orange-400/70 mt-1">أداء ممتاز!</div>}
                 </Glass>
@@ -2520,37 +2520,37 @@ export default function HomePage() {
                 <Glass className="p-3.5">
                   <div className="flex items-center gap-1.5 mb-2">
                     <PieChart className="w-3.5 h-3.5 text-sky-400" />
-                    <span className="text-[10px] text-slate-400 font-medium">أداء الأسبوع</span>
+                    <span className="text-[10px] text-muted-foreground font-medium">أداء الأسبوع</span>
                   </div>
                   <div className="flex items-end gap-1.5">
                     <span className="text-2xl font-extrabold text-sky-400">{weeklyWinRate}%</span>
                   </div>
-                  <div className="text-[10px] text-slate-500 mt-1">{weeklySignals.filter(s => s.status !== "ACTIVE").length} صفقة مغلقة</div>
+                  <div className="text-[10px] text-muted-foreground mt-1">{weeklySignals.filter(s => s.status !== "ACTIVE").length} صفقة مغلقة</div>
                 </Glass>
 
                 {/* Total Trades */}
                 <Glass className="p-3.5">
                   <div className="flex items-center gap-1.5 mb-2">
                     <Hash className="w-3.5 h-3.5 text-purple-400" />
-                    <span className="text-[10px] text-slate-400 font-medium">إجمالي الصفقات</span>
+                    <span className="text-[10px] text-muted-foreground font-medium">إجمالي الصفقات</span>
                   </div>
                   <div className="flex items-end gap-1.5">
                     <span className="text-2xl font-extrabold text-purple-400">{stats?.total || 0}</span>
                   </div>
-                  <div className="text-[10px] text-slate-500 mt-1">{stats?.active || 0} نشطة</div>
+                  <div className="text-[10px] text-muted-foreground mt-1">{stats?.active || 0} نشطة</div>
                 </Glass>
 
                 {/* Avg Confidence */}
                 <Glass className="p-3.5">
                   <div className="flex items-center gap-1.5 mb-2">
                     <Star className="w-3.5 h-3.5 text-amber-400" />
-                    <span className="text-[10px] text-slate-400 font-medium">متوسط الثقة</span>
+                    <span className="text-[10px] text-muted-foreground font-medium">متوسط الثقة</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-2xl font-extrabold text-amber-400">{stats?.avgConfidence || 0}</span>
                     <Stars r={Math.round(stats?.avgConfidence || 0)} />
                   </div>
-                  <div className="text-[10px] text-slate-500 mt-1">من 5 نجوم</div>
+                  <div className="text-[10px] text-muted-foreground mt-1">من 5 نجوم</div>
                 </Glass>
               </div>
             </div>
@@ -2565,7 +2565,7 @@ export default function HomePage() {
                   </div>
                   <div className="flex items-center gap-2 text-[10px]">
                     <span className="text-emerald-400 font-semibold">{stats.hitTp} ربح</span>
-                    <span className="text-slate-600">|</span>
+                    <span className="text-muted-foreground">|</span>
                     <span className="text-red-400 font-semibold">{stats.hitSl} خسارة</span>
                   </div>
                 </div>
@@ -2611,13 +2611,13 @@ export default function HomePage() {
                       {session.packageName && (
                         <div className="bg-muted/60 rounded-xl p-3 border border-border flex items-center justify-between">
                           <div>
-                            <div className="text-[10px] text-slate-500">الباقة</div>
+                            <div className="text-[10px] text-muted-foreground">الباقة</div>
                             <div className="text-[13px] font-bold text-foreground">{session.packageName}</div>
                           </div>
                           {session.subscriptionExpiry && (
                             <div className="text-left">
-                              <div className="text-[10px] text-slate-500">الانتهاء</div>
-                              <div className="text-[11px] font-semibold text-slate-300">{new Date(session.subscriptionExpiry).toLocaleDateString("ar-SA", { month: "short", day: "numeric" })}</div>
+                              <div className="text-[10px] text-muted-foreground">الانتهاء</div>
+                              <div className="text-[11px] font-semibold text-foreground/80">{new Date(session.subscriptionExpiry).toLocaleDateString("ar-SA", { month: "short", day: "numeric" })}</div>
                             </div>
                           )}
                         </div>
@@ -2634,8 +2634,8 @@ export default function HomePage() {
                     </div>
                   ) : (
                     <div className="text-center py-3">
-                      <div className="text-xs text-slate-500">لا يوجد اشتراك نشط</div>
-                      <div className="text-[10px] text-slate-600 mt-1">تواصل مع الإدارة للاشتراك</div>
+                      <div className="text-xs text-muted-foreground">لا يوجد اشتراك نشط</div>
+                      <div className="text-[10px] text-muted-foreground mt-1">تواصل مع الإدارة للاشتراك</div>
                     </div>
                   )}
                 </div>
@@ -2653,17 +2653,17 @@ export default function HomePage() {
                   <button onClick={() => setTab("users")} className="rounded-2xl border border-border bg-muted/50 p-3 text-center active:scale-95 transition-transform">
                     <Users className="w-5 h-5 text-sky-400 mx-auto mb-1.5" />
                     <div className="text-lg font-extrabold text-foreground">{totalActiveUsers}</div>
-                    <div className="text-[9px] text-slate-500 font-medium">مستخدم نشط</div>
+                    <div className="text-[9px] text-muted-foreground font-medium">مستخدم نشط</div>
                   </button>
                   <button onClick={() => setTab("packages")} className="rounded-2xl border border-border bg-muted/50 p-3 text-center active:scale-95 transition-transform">
                     <Wallet className="w-5 h-5 text-emerald-400 mx-auto mb-1.5" />
                     <div className="text-lg font-extrabold text-foreground">{totalSubscribers}</div>
-                    <div className="text-[9px] text-slate-500 font-medium">مشترك</div>
+                    <div className="text-[9px] text-muted-foreground font-medium">مشترك</div>
                   </button>
                   <button onClick={() => setTab("signals")} className="rounded-2xl border border-border bg-muted/50 p-3 text-center active:scale-95 transition-transform">
                     <Activity className="w-5 h-5 text-amber-400 mx-auto mb-1.5" />
                     <div className="text-lg font-extrabold text-foreground">{activeSignals.length}</div>
-                    <div className="text-[9px] text-slate-500 font-medium">إشارة مفتوحة</div>
+                    <div className="text-[9px] text-muted-foreground font-medium">إشارة مفتوحة</div>
                   </button>
                 </div>
               </div>
@@ -2683,14 +2683,14 @@ export default function HomePage() {
                     const maxCount = stats.topPairs[0].count;
                     return (
                       <div key={i} className="flex items-center gap-2.5">
-                        <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-bold ${i === 0 ? "bg-amber-500/15 text-amber-400" : i === 1 ? "bg-slate-400/10 text-slate-300" : i === 2 ? "bg-orange-500/10 text-orange-400" : "bg-muted/60 text-slate-500"}`}>
+                        <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-bold ${i === 0 ? "bg-amber-500/15 text-amber-400" : i === 1 ? "bg-muted/80 text-foreground/80" : i === 2 ? "bg-orange-500/10 text-orange-400" : "bg-muted/60 text-muted-foreground"}`}>
                           {i + 1}
                         </div>
                         <span className="text-xs font-semibold text-foreground w-20 truncate">{p.pair}</span>
                         <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
                           <div className="h-full rounded-full bg-gradient-to-l from-amber-500 to-orange-500 transition-all duration-500" style={{ width: `${(p.count / maxCount) * 100}%` }} />
                         </div>
-                        <span className="text-[10px] font-mono text-slate-400 w-6 text-left">{p.count}</span>
+                        <span className="text-[10px] font-mono text-muted-foreground w-6 text-left">{p.count}</span>
                       </div>
                     );
                   })}
@@ -2728,13 +2728,13 @@ export default function HomePage() {
                             <span className="text-xs font-bold text-foreground">{s.pair}</span>
                             <span className={`text-[8px] font-bold px-1 py-0.5 rounded ${isBuy ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"}`}>{isBuy ? "BUY" : "SELL"}</span>
                           </div>
-                          <span className="text-[9px] text-slate-500">{timeAgo(s.createdAt)}</span>
+                          <span className="text-[9px] text-muted-foreground">{timeAgo(s.createdAt)}</span>
                         </div>
                         <div className="text-right">
                           <div className={`text-[12px] font-extrabold font-mono ${isProfit ? "text-emerald-400" : "text-red-400"}`}>
                             {isProfit ? "+" : "-"}${Math.abs(s.pnlDollars ?? 0)}
                           </div>
-                          <div className="text-[8px] text-slate-600 font-mono">{s.pnlPoints ?? 0} pts</div>
+                          <div className="text-[8px] text-muted-foreground font-mono">{s.pnlPoints ?? 0} pts</div>
                         </div>
                       </div>
                     );
@@ -2774,7 +2774,7 @@ export default function HomePage() {
             <div className="text-center py-2">
               <div className="inline-flex items-center gap-1.5 bg-muted/50 rounded-full px-4 py-2 border border-border">
                 <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                <span className="text-[10px] text-slate-400">
+                <span className="text-[10px] text-muted-foreground">
                   {stats && stats.winRate >= 70
                     ? "أداء استثنائي! استمر بنفس المستوى"
                     : stats && stats.winRate >= 50
@@ -2835,15 +2835,15 @@ export default function HomePage() {
                     </div>
                     <div className="text-center">
                       <div className="text-lg font-extrabold text-foreground">{stats.total}</div>
-                      <div className="text-[9px] text-slate-400 font-medium">إجمالي</div>
+                      <div className="text-[9px] text-muted-foreground font-medium">إجمالي</div>
                     </div>
                     <div className="text-center">
                       <div className="text-lg font-extrabold text-amber-400">{stats.winRate}%</div>
-                      <div className="text-[9px] text-slate-400 font-medium">نسبة الفوز</div>
+                      <div className="text-[9px] text-muted-foreground font-medium">نسبة الفوز</div>
                     </div>
                     <div className="text-center">
                       <div className="text-lg font-extrabold text-sky-400">{stats.recentWeek}</div>
-                      <div className="text-[9px] text-slate-400 font-medium">هذا الأسبوع</div>
+                      <div className="text-[9px] text-muted-foreground font-medium">هذا الأسبوع</div>
                     </div>
                   </div>
                   {totalClosed > 0 && (
@@ -2869,7 +2869,7 @@ export default function HomePage() {
                   className={`px-4 py-2 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all active:scale-95 ${
                     filter === f.key
                       ? "bg-gradient-to-r from-amber-500/20 to-orange-500/15 text-amber-400 border border-amber-500/30 shadow-lg shadow-amber-500/5"
-                      : "bg-muted/50 text-slate-400 border border-border hover:bg-muted hover:border-border"
+                      : "bg-muted/50 text-muted-foreground border border-border hover:bg-muted hover:border-border"
                   }`}>
                   {f.label}
                 </button>
@@ -2879,12 +2879,12 @@ export default function HomePage() {
             {loading && filtered.length === 0 ? (
               <div className="space-y-3">{[1, 2, 3].map(i => <SkeletonCard key={i} />)}</div>
             ) : filtered.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 text-slate-500">
+              <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
                 <div className="w-16 h-16 rounded-2xl bg-muted/50 border border-border flex items-center justify-center mb-4">
-                  <Activity className="w-7 h-7 text-slate-700" />
+                  <Activity className="w-7 h-7 text-muted-foreground" />
                 </div>
-                <p className="text-sm font-semibold text-slate-400">لا توجد إشارات</p>
-                <p className="text-[10px] text-slate-600 mt-1">ستظهر الإشارات الجديدة هنا تلقائياً</p>
+                <p className="text-sm font-semibold text-muted-foreground">لا توجد إشارات</p>
+                <p className="text-[10px] text-muted-foreground mt-1">ستظهر الإشارات الجديدة هنا تلقائياً</p>
               </div>
             ) : (
               <>
@@ -2911,8 +2911,8 @@ export default function HomePage() {
                   <div className="space-y-2.5">
                     <div className="flex items-center gap-2 px-1">
                       <div className="w-2 h-2 rounded-full bg-slate-500" />
-                      <span className="text-[11px] font-bold text-slate-400">الإشارات المغلقة</span>
-                      <span className="text-[9px] bg-muted text-slate-400 px-1.5 py-0.5 rounded-md font-bold">{closedSignals.length}</span>
+                      <span className="text-[11px] font-bold text-muted-foreground">الإشارات المغلقة</span>
+                      <span className="text-[9px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded-md font-bold">{closedSignals.length}</span>
                       {totalClosed > 0 && (
                         <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${closedWinRate >= 60 ? "bg-emerald-500/15 text-emerald-400" : closedWinRate >= 40 ? "bg-amber-500/15 text-amber-400" : "bg-red-500/15 text-red-400"}`}>
                           {closedWinRate}%
@@ -2950,26 +2950,26 @@ export default function HomePage() {
                 {/* Stats Grid */}
                 <div className="grid grid-cols-2 gap-3">
                   <Glass className="p-3.5">
-                    <div className="text-[10px] text-slate-500 mb-1">إجمالي الإشارات</div>
+                    <div className="text-[10px] text-muted-foreground mb-1">إجمالي الإشارات</div>
                     <div className="text-xl font-bold text-foreground">{stats.total}</div>
                   </Glass>
                   <Glass className="p-3.5">
-                    <div className="text-[10px] text-slate-500 mb-1">نشطة</div>
+                    <div className="text-[10px] text-muted-foreground mb-1">نشطة</div>
                     <div className="text-xl font-bold text-emerald-400">{stats.active}</div>
                   </Glass>
                   <Glass className="p-3.5">
-                    <div className="text-[10px] text-slate-500 mb-1">نسبة الفوز</div>
+                    <div className="text-[10px] text-muted-foreground mb-1">نسبة الفوز</div>
                     <div className="text-xl font-bold text-amber-400">{stats.winRate}%</div>
                   </Glass>
                   <Glass className="p-3.5">
-                    <div className="text-[10px] text-slate-500 mb-1">هذه الأسبوع</div>
+                    <div className="text-[10px] text-muted-foreground mb-1">هذه الأسبوع</div>
                     <div className="text-xl font-bold text-sky-400">{stats.recentWeek}</div>
                   </Glass>
                   <Glass className="p-3.5">
-                    <div className="text-[10px] text-slate-500 mb-1">شراء / بيع</div>
+                    <div className="text-[10px] text-muted-foreground mb-1">شراء / بيع</div>
                     <div className="flex items-center gap-2 mt-1">
                       <span className="text-sm font-bold text-emerald-400">{stats.buyCount}</span>
-                      <span className="text-slate-600">/</span>
+                      <span className="text-muted-foreground">/</span>
                       <span className="text-sm font-bold text-red-400">{stats.sellCount}</span>
                     </div>
                     <div className="mt-1.5 h-1.5 rounded-full bg-muted overflow-hidden flex">
@@ -2978,7 +2978,7 @@ export default function HomePage() {
                     </div>
                   </Glass>
                   <Glass className="p-3.5">
-                    <div className="text-[10px] text-slate-500 mb-1">متوسط الثقة</div>
+                    <div className="text-[10px] text-muted-foreground mb-1">متوسط الثقة</div>
                     <div className="flex items-center gap-2 mt-1">
                       <span className="text-xl font-bold text-amber-400">{stats.avgConfidence}</span>
                       <Stars r={Math.round(stats.avgConfidence)} />
@@ -2988,7 +2988,7 @@ export default function HomePage() {
 
                 {/* Win/Loss */}
                 <Glass className="p-4">
-                  <div className="text-xs font-semibold text-slate-300 mb-3 flex items-center gap-1.5"><Target className="w-3.5 h-3.5 text-amber-400" />نتائج الصفقات</div>
+                  <div className="text-xs font-semibold text-foreground/80 mb-3 flex items-center gap-1.5"><Target className="w-3.5 h-3.5 text-amber-400" />نتائج الصفقات</div>
                   <div className="flex items-center gap-3">
                     <div className="flex-1">
                       <div className="flex items-center justify-between text-[10px] mb-1">
@@ -3008,18 +3008,18 @@ export default function HomePage() {
                 {/* Top Pairs */}
                 {stats.topPairs?.length > 0 && (
                   <Glass className="p-4">
-                    <div className="text-xs font-semibold text-slate-300 mb-3 flex items-center gap-1.5"><Activity className="w-3.5 h-3.5 text-amber-400" />الأزواج الأكثر تداولاً</div>
+                    <div className="text-xs font-semibold text-foreground/80 mb-3 flex items-center gap-1.5"><Activity className="w-3.5 h-3.5 text-amber-400" />الأزواج الأكثر تداولاً</div>
                     <div className="space-y-2">
                       {stats.topPairs.map((p, i) => {
                         const maxCount = stats.topPairs[0].count;
                         return (
                           <div key={i} className="flex items-center gap-2">
-                            <span className="text-[10px] text-slate-500 w-5 text-center">{i + 1}</span>
+                            <span className="text-[10px] text-muted-foreground w-5 text-center">{i + 1}</span>
                             <span className="text-xs font-semibold text-foreground w-20 truncate">{p.pair}</span>
                             <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
                               <div className="h-full rounded-full bg-gradient-to-l from-amber-500 to-orange-500 transition-all" style={{ width: `${(p.count / maxCount) * 100}%` }} />
                             </div>
-                            <span className="text-[10px] font-mono text-slate-400 w-8 text-left">{p.count}</span>
+                            <span className="text-[10px] font-mono text-muted-foreground w-8 text-left">{p.count}</span>
                           </div>
                         );
                       })}
@@ -3035,7 +3035,7 @@ export default function HomePage() {
         {tab === "analyst" && (
           <div className="space-y-4">
             <Glass className="p-4 space-y-3">
-              <div className="text-xs font-semibold text-slate-300 flex items-center gap-1.5"><Send className="w-3.5 h-3.5 text-amber-400" />تحليل إشارة يدوي</div>
+              <div className="text-xs font-semibold text-foreground/80 flex items-center gap-1.5"><Send className="w-3.5 h-3.5 text-amber-400" />تحليل إشارة يدوي</div>
               <Textarea value={rawText} onChange={e => setRawText(e.target.value)}
                 placeholder="الصق نص الإشارة من TradingView هنا..."
                 className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground min-h-[140px] text-xs rounded-xl resize-none" dir="rtl" />
@@ -3056,7 +3056,7 @@ export default function HomePage() {
 
             {parseResult && (
               <div className="animate-[fadeInUp_0.3s_ease-out]">
-                <div className="text-xs text-slate-500 mb-2 flex items-center gap-1.5"><Zap className="w-3 h-3 text-amber-400" />نتيجة التحليل</div>
+                <div className="text-xs text-muted-foreground mb-2 flex items-center gap-1.5"><Zap className="w-3 h-3 text-amber-400" />نتيجة التحليل</div>
                 <SignalCard s={parseResult} idx={0} isAdmin={false} onUpdate={() => {}} onDelete={() => {}} />
               </div>
             )}
@@ -3078,7 +3078,7 @@ export default function HomePage() {
                   <div className="flex items-center justify-between bg-muted/50 rounded-xl p-3 border border-border">
                     <div>
                       <div className="text-[11px] font-semibold text-foreground">تفعيل تلقائي عند التسجيل</div>
-                      <div className="text-[9px] text-slate-500 mt-0.5">يتم تفعيل الحساب والباقة المجانية تلقائياً بدون موافقة</div>
+                      <div className="text-[9px] text-muted-foreground mt-0.5">يتم تفعيل الحساب والباقة المجانية تلقائياً بدون موافقة</div>
                     </div>
                     <button onClick={() => handleSetAutoApprove(!appSettings.autoApproveOnRegister)}
                       className={`w-11 h-6 rounded-full transition-all duration-300 relative ${appSettings.autoApproveOnRegister ? "bg-amber-500" : "bg-white/10"}`}>
@@ -3107,26 +3107,26 @@ export default function HomePage() {
               <div className="rounded-2xl border border-border bg-muted/50 p-4 space-y-3 animate-[fadeIn_0.2s_ease-out]">
                 <div className="grid grid-cols-2 gap-2.5">
                   <div>
-                    <label className="text-[9px] text-slate-500 mb-1 block">اسم الباقة</label>
+                    <label className="text-[9px] text-muted-foreground mb-1 block">اسم الباقة</label>
                     <Input value={pkgFormName} onChange={e => setPkgFormName(e.target.value)} placeholder="مثال: شهرية VIP"
                       className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-9 rounded-lg text-[11px]" dir="rtl" />
                   </div>
                   <div>
-                    <label className="text-[9px] text-slate-500 mb-1 block">المدة (أيام)</label>
+                    <label className="text-[9px] text-muted-foreground mb-1 block">المدة (أيام)</label>
                     <Input type="number" value={pkgFormDays} onChange={e => setPkgFormDays(e.target.value)} placeholder="30"
                       className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-9 rounded-lg text-[11px]" dir="ltr" />
                   </div>
                   <div>
-                    <label className="text-[9px] text-slate-500 mb-1 block">السعر ($)</label>
+                    <label className="text-[9px] text-muted-foreground mb-1 block">السعر ($)</label>
                     <Input type="number" value={pkgFormPrice} onChange={e => setPkgFormPrice(e.target.value)} placeholder="0"
                       className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-9 rounded-lg text-[11px]" dir="ltr" />
                   </div>
                   <div>
-                    <label className="text-[9px] text-slate-500 mb-1 block">النوع</label>
+                    <label className="text-[9px] text-muted-foreground mb-1 block">النوع</label>
                     <div className="flex gap-1.5">
                       {(["free", "trial", "paid"] as const).map(t => (
                         <button key={t} onClick={() => setPkgFormType(t)}
-                          className={`flex-1 py-2 rounded-lg text-[10px] font-semibold transition-all ${pkgFormType === t ? "bg-amber-500/20 text-amber-400 border border-amber-500/30" : "bg-muted/50 text-slate-400 border border-border"}`}>
+                          className={`flex-1 py-2 rounded-lg text-[10px] font-semibold transition-all ${pkgFormType === t ? "bg-amber-500/20 text-amber-400 border border-amber-500/30" : "bg-muted/50 text-muted-foreground border border-border"}`}>
                           {t === "free" ? "مجانية" : t === "trial" ? "تجربة" : "مدفوعة"}
                         </button>
                       ))}
@@ -3140,7 +3140,7 @@ export default function HomePage() {
                     className="flex-1 h-9 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-black text-[11px] font-bold disabled:opacity-50 active:scale-[0.98] transition-transform">
                     {pkgLoad ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "إنشاء الباقة"}
                   </button>
-                  <button onClick={() => setShowPkgForm(false)} className="px-4 h-9 rounded-xl bg-muted/60 text-slate-400 text-[11px]">إلغاء</button>
+                  <button onClick={() => setShowPkgForm(false)} className="px-4 h-9 rounded-xl bg-muted/60 text-muted-foreground text-[11px]">إلغاء</button>
                 </div>
               </div>
             )}
@@ -3148,8 +3148,8 @@ export default function HomePage() {
             {/* ── Package Cards ── */}
             {packages.length === 0 ? (
               <div className="text-center py-12">
-                <Package className="w-10 h-10 text-slate-700 mx-auto mb-2" />
-                <p className="text-xs text-slate-500">لا توجد باقات بعد. أضف باقة لتشغيل نظام الاشتراكات.</p>
+                <Package className="w-10 h-10 text-muted-foreground mx-auto mb-2" />
+                <p className="text-xs text-muted-foreground">لا توجد باقات بعد. أضف باقة لتشغيل نظام الاشتراكات.</p>
               </div>
             ) : (
               <div className="space-y-2.5">
@@ -3168,9 +3168,9 @@ export default function HomePage() {
                                 {pkg.type === "free" ? "مجانية" : pkg.type === "trial" ? "تجربة" : "مدفوعة"}
                               </span>
                             </div>
-                            {pkg.description && <p className="text-[10px] text-slate-500 mt-1">{pkg.description}</p>}
+                            {pkg.description && <p className="text-[10px] text-muted-foreground mt-1">{pkg.description}</p>}
                             <div className="flex items-center gap-3 mt-2 text-[10px]">
-                              <span className="flex items-center gap-1 text-slate-400"><CalendarDays className="w-3 h-3" />{pkg.durationDays} يوم</span>
+                              <span className="flex items-center gap-1 text-muted-foreground"><CalendarDays className="w-3 h-3" />{pkg.durationDays} يوم</span>
                               <span className="flex items-center gap-1 font-mono font-bold text-amber-400">${pkg.price}</span>
                             </div>
                           </div>
@@ -3178,11 +3178,11 @@ export default function HomePage() {
                         {/* Actions */}
                         <div className="flex gap-1.5 mt-3 pt-3 border-t border-border flex-wrap">
                           <button onClick={() => handleSetTrialPkg(pkg.id)}
-                            className={`px-2.5 py-1 rounded-lg text-[9px] font-bold transition-all active:scale-95 ${isTrial ? "bg-amber-500/20 text-amber-400 border border-amber-500/30" : "bg-muted/60 text-slate-400 border border-border"}`}>
+                            className={`px-2.5 py-1 rounded-lg text-[9px] font-bold transition-all active:scale-95 ${isTrial ? "bg-amber-500/20 text-amber-400 border border-amber-500/30" : "bg-muted/60 text-muted-foreground border border-border"}`}>
                             {isTrial ? "✓ تجربة تلقائية" : "تعيين كتجربة"}
                           </button>
                           <button onClick={() => handleTogglePackage(pkg.id, !pkg.isActive)}
-                            className="px-2.5 py-1 rounded-lg text-[9px] font-medium bg-muted/60 text-slate-400 border border-border active:scale-95 transition-transform">
+                            className="px-2.5 py-1 rounded-lg text-[9px] font-medium bg-muted/60 text-muted-foreground border border-border active:scale-95 transition-transform">
                             {pkg.isActive ? "تعطيل" : "تفعيل"}
                           </button>
                           <button onClick={() => handleDeletePackage(pkg.id)}
@@ -3204,16 +3204,16 @@ export default function HomePage() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-bold text-foreground flex items-center gap-2"><User className="w-4 h-4 text-amber-400" />إدارة المستخدمين</h2>
-              <button onClick={fetchUsers} className="px-3 py-1.5 rounded-lg text-[10px] font-medium bg-muted/60 text-slate-400 border border-border active:scale-95 transition-transform hover:bg-muted/80">
+              <button onClick={fetchUsers} className="px-3 py-1.5 rounded-lg text-[10px] font-medium bg-muted/60 text-muted-foreground border border-border active:scale-95 transition-transform hover:bg-muted/80">
                 تحديث
               </button>
             </div>
             {usersLoad && <div className="space-y-3"><SkeletonCard /><SkeletonCard /></div>}
             {!usersLoad && users.length === 0 && (
               <Glass className="p-6 text-center">
-                <User className="w-8 h-8 text-slate-600 mx-auto mb-2" />
-                <p className="text-xs text-slate-500">لا يوجد مستخدمين بعد</p>
-                <p className="text-[10px] text-slate-600 mt-1">المستخدمون الجدد سيظهرون هنا بعد التسجيل</p>
+                <User className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                <p className="text-xs text-muted-foreground">لا يوجد مستخدمين بعد</p>
+                <p className="text-[10px] text-muted-foreground mt-1">المستخدمون الجدد سيظهرون هنا بعد التسجيل</p>
               </Glass>
             )}
             {!usersLoad && users.length > 0 && (
@@ -3234,7 +3234,7 @@ export default function HomePage() {
                             </div>
                             <div>
                               <div className="text-xs font-bold text-foreground">{u.name}</div>
-                              <div className="text-[10px] text-slate-500 font-mono" dir="ltr">{u.email}</div>
+                              <div className="text-[10px] text-muted-foreground font-mono" dir="ltr">{u.email}</div>
                             </div>
                           </div>
                           <div className="flex items-center gap-1.5">
@@ -3278,10 +3278,10 @@ export default function HomePage() {
                                   {isAgency && <span className="text-[8px] bg-purple-500/15 text-purple-400 px-1.5 py-0.5 rounded-md font-bold">وكالة</span>}
                                   {isSub && <span className="text-[8px] bg-sky-500/15 text-sky-400 px-1.5 py-0.5 rounded-md font-bold">مشترك</span>}
                                 </div>
-                                <div className="text-[10px] text-slate-500 font-mono" dir="ltr">{u.email}</div>
+                                <div className="text-[10px] text-muted-foreground font-mono" dir="ltr">{u.email}</div>
                                 {u.packageName && (
                                   <div className="flex items-center gap-1.5 mt-1 text-[9px]">
-                                    <span className="text-slate-500">{u.packageName}</span>
+                                    <span className="text-muted-foreground">{u.packageName}</span>
                                     {expDays !== null && (
                                       <span className={`font-bold ${expDays > 3 ? "text-emerald-400" : expDays > 0 ? "text-amber-400" : "text-red-400"}`}>
                                         {expDays > 0 ? `${expDays} يوم متبقي` : "منتهي!"}
@@ -3322,7 +3322,7 @@ export default function HomePage() {
                               <div className="flex items-center gap-2">
                                 <Input type="number" value={assignDays} onChange={e => setAssignDays(e.target.value)} placeholder="أيام مخصصة (اختياري)"
                                   className="flex-1 bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-8 rounded-lg text-[10px]" dir="ltr" />
-                                <button onClick={() => setShowAssignPkg(null)} className="px-2 h-8 rounded-lg bg-muted/60 text-slate-400 text-[9px]">إلغاء</button>
+                                <button onClick={() => setShowAssignPkg(null)} className="px-2 h-8 rounded-lg bg-muted/60 text-muted-foreground text-[9px]">إلغاء</button>
                               </div>
                             </div>
                           )}
@@ -3348,7 +3348,7 @@ export default function HomePage() {
                             </div>
                             <div>
                               <div className="text-xs font-bold text-foreground">{u.name}</div>
-                              <div className="text-[10px] text-slate-500 font-mono" dir="ltr">{u.email}</div>
+                              <div className="text-[10px] text-muted-foreground font-mono" dir="ltr">{u.email}</div>
                             </div>
                           </div>
                           <div className="flex items-center gap-1.5">
@@ -3370,10 +3370,10 @@ export default function HomePage() {
                     <Mail className="w-3.5 h-3.5 text-sky-400" />
                     <span className="text-[10px] text-sky-400 font-bold">طلبات تغيير البريد</span>
                   </div>
-                  <button onClick={fetchEmailRequests} className="text-[9px] text-slate-500 hover:text-slate-300">تحديث</button>
+                  <button onClick={fetchEmailRequests} className="text-[9px] text-muted-foreground hover:text-foreground/80">تحديث</button>
                 </div>
                 {emailRequests.filter(r => r.status === "pending").length === 0 && (
-                  <div className="text-[10px] text-slate-600 text-center py-2">لا توجد طلبات معلقة</div>
+                  <div className="text-[10px] text-muted-foreground text-center py-2">لا توجد طلبات معلقة</div>
                 )}
                 {emailRequests.filter(r => r.status === "pending").map(r => (
                   <Glass key={r.id} className="p-3 mb-2 border-sky-500/15">
@@ -3383,9 +3383,9 @@ export default function HomePage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="text-[11px] font-bold text-foreground">{r.userName}</div>
-                        <div className="text-[9px] text-slate-500">
+                        <div className="text-[9px] text-muted-foreground">
                           <span className="line-through" dir="ltr">{r.oldEmail}</span>
-                          <span className="mx-1.5 text-slate-600">→</span>
+                          <span className="mx-1.5 text-muted-foreground">→</span>
                           <span className="text-sky-400" dir="ltr">{r.newEmail}</span>
                         </div>
                       </div>
@@ -3413,7 +3413,7 @@ export default function HomePage() {
                     <span className="font-bold text-foreground text-sm">{session.name}</span>
                     {isAdmin && <span className="text-[8px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded-md font-bold">مدير</span>}
                   </div>
-                  <div className="text-xs text-slate-400" dir="ltr">{session.email}</div>
+                  <div className="text-xs text-muted-foreground" dir="ltr">{session.email}</div>
                 </div>
               </div>
             </Glass>
@@ -3421,7 +3421,7 @@ export default function HomePage() {
             {/* ── User Subscription Status ── */}
             {!isAdmin && (
               <Glass className="p-4 space-y-3">
-                <div className="flex items-center gap-2 text-sm font-bold text-slate-300">
+                <div className="flex items-center gap-2 text-sm font-bold text-foreground/80">
                   <Crown className="w-4 h-4 text-amber-400" />
                   حالة الاشتراك
                 </div>
@@ -3437,26 +3437,26 @@ export default function HomePage() {
                       <div className="bg-muted/60 rounded-xl p-3 border border-border space-y-2">
                         <div className="flex items-center justify-between">
                           <div>
-                            <div className="text-[10px] text-slate-500">نوع الباقة</div>
+                            <div className="text-[10px] text-muted-foreground">نوع الباقة</div>
                             <div className="text-[13px] font-bold text-foreground mt-0.5">{session.packageName}</div>
                           </div>
                           {session.subscriptionExpiry && (() => {
                             const days = Math.ceil((new Date(session.subscriptionExpiry).getTime() - Date.now()) / 86400000);
                             return (
                               <div className="text-center">
-                                <div className="text-[10px] text-slate-500">المتبقية</div>
+                                <div className="text-[10px] text-muted-foreground">المتبقية</div>
                                 <div className={`text-lg font-extrabold mt-0.5 ${days > 7 ? "text-emerald-400" : days > 3 ? "text-amber-400" : "text-red-400"}`}>
                                   {days > 0 ? days : 0}
                                 </div>
-                                <div className="text-[9px] text-slate-500">يوم</div>
+                                <div className="text-[9px] text-muted-foreground">يوم</div>
                               </div>
                             );
                           })()}
                         </div>
                         {session.subscriptionExpiry && (
                           <div className="pt-2 border-t border-border">
-                            <div className="text-[10px] text-slate-500">تاريخ الانتهاء</div>
-                            <div className="text-[12px] font-semibold text-slate-300 mt-0.5">{new Date(session.subscriptionExpiry).toLocaleDateString("ar-SA", { year: "numeric", month: "long", day: "numeric" })}</div>
+                            <div className="text-[10px] text-muted-foreground">تاريخ الانتهاء</div>
+                            <div className="text-[12px] font-semibold text-foreground/80 mt-0.5">{new Date(session.subscriptionExpiry).toLocaleDateString("ar-SA", { year: "numeric", month: "long", day: "numeric" })}</div>
                           </div>
                         )}
                       </div>
@@ -3464,8 +3464,8 @@ export default function HomePage() {
                   </div>
                 ) : (
                   <div className="text-center py-2">
-                    <div className="text-xs text-slate-500">لا يوجد اشتراك نشط حالياً</div>
-                    <div className="text-[10px] text-slate-600 mt-1">تواصل مع الإدارة للاشتراك في إحدى الباقات</div>
+                    <div className="text-xs text-muted-foreground">لا يوجد اشتراك نشط حالياً</div>
+                    <div className="text-[10px] text-muted-foreground mt-1">تواصل مع الإدارة للاشتراك في إحدى الباقات</div>
                   </div>
                 )}
               </Glass>
@@ -3474,11 +3474,11 @@ export default function HomePage() {
             {/* ── Test Notifications (Admin Only) ── */}
             {isAdmin && (
             <Glass className="p-4 space-y-3">
-              <div className="flex items-center gap-2 text-sm font-bold text-slate-300">
+              <div className="flex items-center gap-2 text-sm font-bold text-foreground/80">
                 <Bell className="w-4 h-4 text-amber-400" />
                 اختبار الإشعارات
               </div>
-              <div className="text-[10px] text-slate-500">
+              <div className="text-[10px] text-muted-foreground">
                 اضغط على أي زر لتجربة الإشعار والصوت
               </div>
               <div className="grid grid-cols-2 gap-2">
@@ -3526,13 +3526,13 @@ export default function HomePage() {
             {/* ── USER: Request Email Change ── */}
             {!isAdmin && (
               <Glass className="overflow-hidden">
-                <button onClick={() => setShowEmailReqSection(!showEmailReqSection)} className="w-full p-4 flex items-center justify-between text-sm text-slate-300 hover:bg-muted/30 transition-colors">
+                <button onClick={() => setShowEmailReqSection(!showEmailReqSection)} className="w-full p-4 flex items-center justify-between text-sm text-foreground/80 hover:bg-muted/30 transition-colors">
                   <span className="flex items-center gap-2"><Mail className="w-4 h-4 text-sky-400" />طلب تغيير البريد الإلكتروني</span>
                   <ChevronIcon open={showEmailReqSection} />
                 </button>
                 {showEmailReqSection && (
                   <div className="px-4 pb-4 space-y-3 animate-[fadeIn_0.2s_ease-out]">
-                    <div className="text-[10px] text-slate-500 bg-muted/30 rounded-lg p-2">
+                    <div className="text-[10px] text-muted-foreground bg-muted/30 rounded-lg p-2">
                       لتغيير بريدك الإلكتروني، أرسل طلبا وانتظر موافقة الإدارة
                     </div>
                     <Input type="email" value={emailReqNew} onChange={e => setEmailReqNew(e.target.value)} placeholder="البريد الإلكتروني الجديد"
@@ -3552,7 +3552,7 @@ export default function HomePage() {
 
             {/* Change Password (both admin and user) */}
             <Glass className="overflow-hidden">
-              <button onClick={() => setShowCp(!showCp)} className="w-full p-4 flex items-center justify-between text-sm text-slate-300 hover:bg-muted/30 transition-colors">
+              <button onClick={() => setShowCp(!showCp)} className="w-full p-4 flex items-center justify-between text-sm text-foreground/80 hover:bg-muted/30 transition-colors">
                 <span className="flex items-center gap-2"><Lock className="w-4 h-4 text-amber-400" />تغيير كلمة المرور</span>
                 <ChevronIcon open={showCp} />
               </button>
@@ -3599,7 +3599,7 @@ export default function HomePage() {
                     <div className="text-xs text-red-400 text-center">هل أنت متأكد من حذف جميع الإشارات؟</div>
                     <div className="flex gap-2">
                       <Button onClick={handleClearAll} className="flex-1 h-10 rounded-xl bg-red-500/15 text-red-400 border border-red-500/25 text-xs font-semibold">نعم، احذف</Button>
-                      <Button onClick={() => setConfirmClear(false)} className="flex-1 h-10 rounded-xl bg-muted/60 text-slate-400 border border-border text-xs">إلغاء</Button>
+                      <Button onClick={() => setConfirmClear(false)} className="flex-1 h-10 rounded-xl bg-muted/60 text-muted-foreground border border-border text-xs">إلغاء</Button>
                     </div>
                   </div>
                 )}
@@ -3621,7 +3621,7 @@ export default function HomePage() {
         <div className="max-w-lg mx-auto flex">
           {tabs.map(t => (
             <button key={t.key} onClick={() => setTab(t.key)}
-              className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 relative transition-colors ${tab === t.key ? "text-amber-400" : "text-slate-500"}`}>
+              className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 relative transition-colors ${tab === t.key ? "text-amber-400" : "text-muted-foreground"}`}>
               {t.icon}
               <span className="text-[10px] font-medium">{t.label}</span>
               {tab === t.key && <div className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full bg-gradient-to-r from-amber-400 to-orange-500" />}
@@ -3641,7 +3641,7 @@ export default function HomePage() {
 /* Chevron icon for expandable sections */
 function ChevronIcon({ open }: { open: boolean }) {
   return (
-    <svg className={`w-4 h-4 text-slate-500 transition-transform duration-200 ${open ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <svg className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${open ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
     </svg>
   );

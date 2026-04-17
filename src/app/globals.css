@@ -45,37 +45,39 @@
 
 :root {
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  /* Warm white background - easy on the eyes */
+  --background: #fafaf9;
+  --foreground: #1c1917;
+  /* Cards slightly warmer */
+  --card: #ffffff;
+  --card-foreground: #1c1917;
+  --popover: #ffffff;
+  --popover-foreground: #1c1917;
+  --primary: #292524;
+  --primary-foreground: #fafaf9;
+  --secondary: #f5f5f4;
+  --secondary-foreground: #292524;
+  --muted: #e7e5e4;
+  --muted-foreground: #78716c;
+  --accent: #fef3c7;
+  --accent-foreground: #92400e;
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --border: #e7e5e4;
+  --input: #e7e5e4;
+  --ring: #d6d3d1;
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar: #ffffff;
+  --sidebar-foreground: #1c1917;
+  --sidebar-primary: #292524;
+  --sidebar-primary-foreground: #fafaf9;
+  --sidebar-accent: #f5f5f4;
+  --sidebar-accent-foreground: #292524;
+  --sidebar-border: #e7e5e4;
+  --sidebar-ring: #d6d3d1;
 }
 
 .dark {
@@ -409,11 +411,11 @@ html, body {
 :root:not(.dark) .glass-panel {
   background: rgba(255, 255, 255, 0.85);
   border: 1px solid rgba(0, 0, 0, 0.08);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
 }
 
 :root:not(.dark) .glass-nav {
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.92);
   border-top: 1px solid rgba(0, 0, 0, 0.06);
 }
 
@@ -423,12 +425,64 @@ html, body {
 }
 
 :root:not(.dark) .input-glass:focus-within {
-  border-color: #FFD700;
-  box-shadow: 0 0 15px rgba(255, 215, 0, 0.15);
+  border-color: #b45309;
+  box-shadow: 0 0 15px rgba(180, 83, 9, 0.12);
 }
 
 :root:not(.dark) .vip-gradient {
   background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+}
+
+/* Light mode glow adjustments */
+:root:not(.dark) .animate-profit-glow {
+  box-shadow: 0 2px 12px rgba(16, 185, 129, 0.15);
+}
+
+:root:not(.dark) .animate-loss-glow {
+  box-shadow: 0 2px 12px rgba(239, 68, 68, 0.15);
+}
+
+:root:not(.dark) .animate-glow-pulse {
+  box-shadow: 0 2px 10px rgba(16, 185, 129, 0.12);
+}
+
+/* Light mode TP/SL badges - slightly more opaque */
+:root:not(.dark) .bg-emerald-500\/10 {
+  background: rgba(16, 185, 129, 0.12);
+}
+
+:root:not(.dark) .bg-red-500\/10 {
+  background: rgba(239, 68, 68, 0.08);
+}
+
+:root:not(.dark) .bg-amber-500\/15 {
+  background: rgba(245, 158, 11, 0.12);
+}
+
+/* Light mode border adjustments for signal cards */
+:root:not(.dark) .border-emerald-500\/25 {
+  border-color: rgba(16, 185, 129, 0.35);
+}
+
+:root:not(.dark) .border-red-500\/25 {
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+/* Light mode button adjustments */
+:root:not(.dark) .bg-emerald-500\/15 {
+  background: rgba(16, 185, 129, 0.1);
+}
+
+:root:not(.dark) .bg-red-500\/15 {
+  background: rgba(239, 68, 68, 0.08);
+}
+
+:root:not(.dark) .bg-sky-500\/15 {
+  background: rgba(14, 165, 233, 0.1);
+}
+
+:root:not(.dark) .bg-purple-500\/15 {
+  background: rgba(168, 85, 247, 0.1);
 }
 
 /* ═══ New Animation Keyframes ═══ */
