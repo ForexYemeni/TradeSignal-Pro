@@ -192,16 +192,21 @@ public class SignalService extends Service {
                 String type = signal.optString("type", "BUY");
                 double entry = signal.optDouble("entry", 0);
 
+                // Determine event type from BOTH status AND category
+                boolean isTpHit = "HIT_TP".equals(status) || "TP_HIT".equals(category)
+                        || "REENTRY_TP".equals(category) || "PYRAMID_TP".equals(category);
+                boolean isSlHit = "HIT_SL".equals(status) || "SL_HIT".equals(category)
+                        || "REENTRY_SL".equals(category) || "PYRAMID_SL".equals(category);
+
                 if (isFirstRun) {
                     // FIRST RUN: silently record all signals, do NOT notify
                     Log.d(TAG, "FIRST RUN - silently tracking: " + pair + " [" + state + "]");
                 } else if (!knownStates.containsKey(id)) {
                     // Brand new signal (not seen before after initialization)
-                    // Check status to determine what kind of notification
-                    if ("HIT_TP".equals(status)) {
+                    if (isTpHit) {
                         showTpNotification(pair, hitTpIndex, category);
                         Log.d(TAG, "NEW TP signal: " + pair + " TP" + hitTpIndex + " [" + category + "]");
-                    } else if ("HIT_SL".equals(status)) {
+                    } else if (isSlHit) {
                         showSlNotification(pair);
                         Log.d(TAG, "NEW SL signal: " + pair);
                     } else {
@@ -214,25 +219,15 @@ public class SignalService extends Service {
                     String oldState = knownStates.get(id);
                     if (!state.equals(oldState)) {
                         // State changed! Determine what changed
-                        if ("HIT_TP".equals(status) && !oldState.startsWith("HIT_TP")) {
+                        // Check category change to detect partial TP hits (status stays ACTIVE)
+                        if (isTpHit) {
                             showTpNotification(pair, hitTpIndex, category);
                             Log.d(TAG, "TP HIT: " + pair + " TP" + hitTpIndex + " [" + category + "] from [" + oldState + "]");
-                        } else if ("HIT_SL".equals(status) && !oldState.startsWith("HIT_SL")) {
+                        } else if (isSlHit) {
                             showSlNotification(pair);
                             Log.d(TAG, "SL HIT: " + pair + " from [" + oldState + "]");
-                        } else if ("HIT_TP".equals(status) && oldState.startsWith("HIT_TP")) {
-                            // Another TP hit (e.g., TP1 -> TP2)
-                            showTpNotification(pair, hitTpIndex, category);
-                            Log.d(TAG, "NEXT TP HIT: " + pair + " TP" + hitTpIndex + " [" + category + "] from [" + oldState + "]");
                         } else {
-                            // Other state change - use status to determine type
-                            if ("HIT_TP".equals(status)) {
-                                showTpNotification(pair, hitTpIndex, category);
-                            } else if ("HIT_SL".equals(status)) {
-                                showSlNotification(pair);
-                            } else {
-                                showNewSignalNotification(pair, type, entry);
-                            }
+                            showNewSignalNotification(pair, type, entry);
                             Log.d(TAG, "STATE CHANGED: " + pair + " from [" + oldState + "] to [" + state + "]");
                         }
                         notifiedCount++;
