@@ -31,7 +31,7 @@ interface Signal {
   rawText: string; timeframe: string; htfTimeframe: string;
   htfTrend: string; smcTrend: string; hitTpIndex: number;
   hitPrice?: number; pnlPoints?: number; pnlDollars?: number;
-  partialWin?: boolean; totalTPs?: number;
+  partialClose?: boolean; totalTPs?: number;
   balance?: number; lotSize?: string;
   riskTarget?: number; riskPercent?: number; actualRisk?: number;
   actualRiskPct?: number; slDistance?: number; maxRR?: number;
@@ -293,9 +293,8 @@ function SkeletonCard() {
    ═══════════════════════════════════════════════════════════════ */
 
 /* ── Expandable TP Mini-Card ── */
-function TpMiniCard({ tp, index, isHit, isLastHit, entry, type, isAdmin, onUpdate, signalId }: {
+function TpMiniCard({ tp, index, isHit, isLastHit, entry, type }: {
   tp: TakeProfit; index: number; isHit: boolean; isLastHit: boolean; entry: number; type: "BUY" | "SELL";
-  isAdmin?: boolean; onUpdate?: (id: string, status: string, tpIdx?: number) => void; signalId?: string;
 }) {
   const [expanded, setExpanded] = useState(false);
   const diff = Math.abs(tp.tp - entry).toFixed(1);
@@ -335,21 +334,19 @@ function TpMiniCard({ tp, index, isHit, isLastHit, entry, type, isAdmin, onUpdat
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {/* Admin: inline TP hit button */}
-            {isAdmin && !isHit && onUpdate && signalId && (
-              <button
-                onClick={(e) => { e.stopPropagation(); onUpdate(signalId, "HIT_TP", index); }}
-                className="px-2 py-1 rounded-lg text-[9px] font-bold bg-sky-500/15 text-sky-400 border border-sky-500/25 active:scale-95 transition-transform hover:bg-sky-500/25"
-              >
-                TP{index + 1} ✅
-              </button>
-            )}
             <div className={`text-[10px] font-mono font-semibold px-2 py-0.5 rounded-lg ${isHit ? "bg-emerald-500/15 text-emerald-400" : "bg-amber-500/[0.08] text-amber-400/70"}`}>
               {tp.rr.toFixed(2)}
             </div>
-            <svg className={`w-3.5 h-3.5 ${isHit ? "text-emerald-500/60" : "text-slate-600"} transition-transform duration-300 ${expanded ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-            </svg>
+            {!isHit && (
+              <svg className={`w-3.5 h-3.5 text-slate-600 transition-transform duration-300 ${expanded ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            )}
+            {isHit && (
+              <svg className={`w-3.5 h-3.5 text-emerald-500/60 transition-transform duration-300 ${expanded ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            )}
           </div>
         </div>
       </button>
@@ -386,8 +383,8 @@ function TradeStatusBanner({ s }: { s: Signal }) {
   const isManual = s.status === "MANUAL_CLOSE";
   const hitCount = s.hitTpIndex >= 0 ? s.hitTpIndex : 0;
   const totalTPs = s.totalTPs || s.takeProfits?.length || 0;
-  const isReentry = (s.signalCategory || "").startsWith("REENTRY");
-  const isPyramid = (s.signalCategory || "").startsWith("PYRAMID");
+  const isReentry = s.signalCategory.startsWith("REENTRY");
+  const isPyramid = s.signalCategory.startsWith("PYRAMID");
   if (s.status === "ACTIVE") return null;
 
   const c = isReentry
@@ -597,9 +594,6 @@ function EntryCard({ s, idx, isAdmin, onUpdate, onDelete }: {
                     isLastHit={s.hitTpIndex - 1 === i}
                     entry={s.entry}
                     type={s.type}
-                    isAdmin={isAdmin}
-                    onUpdate={onUpdate}
-                    signalId={s.id}
                   />
                 ))}
               </div>
@@ -634,11 +628,14 @@ function EntryCard({ s, idx, isAdmin, onUpdate, onDelete }: {
           {/* ── Trade Close Status Banner ── */}
           <TradeStatusBanner s={s} />
 
-          {/* ── Admin Actions (SL + Close + Delete — TP buttons are inline on each target) ── */}
+          {/* ── Admin Actions ── */}
           {isAdmin && s.status === "ACTIVE" && (
             <>
               <Div />
               <div className="flex flex-wrap gap-1.5">
+                {s.takeProfits?.map((_, i) => (
+                  <button key={i} onClick={() => onUpdate(s.id, "HIT_TP", i)} className="px-2.5 py-1 rounded-lg text-[10px] font-medium bg-sky-500/10 text-sky-400 border border-sky-500/15 active:scale-95 transition-transform hover:bg-sky-500/20">TP{i + 1} ✅</button>
+                ))}
                 <button onClick={() => onUpdate(s.id, "HIT_SL")} className="px-2.5 py-1 rounded-lg text-[10px] font-medium bg-red-500/10 text-red-400 border border-red-500/15 active:scale-95 transition-transform hover:bg-red-500/20">وقف ❌</button>
                 <button onClick={() => onUpdate(s.id, "MANUAL_CLOSE")} className="px-2.5 py-1 rounded-lg text-[10px] font-medium bg-white/[0.04] text-slate-400 border border-white/[0.06] active:scale-95 transition-transform hover:bg-white/[0.08]">إغلاق</button>
                 <button onClick={() => onDelete(s.id)} className="px-2.5 py-1 rounded-lg text-[10px] font-medium bg-red-500/5 text-red-300/60 border border-red-500/10 active:scale-95 transition-transform hover:bg-red-500/10">🗑</button>
@@ -663,8 +660,8 @@ function ClosedSignalCard({ s, idx, isAdmin, onDelete }: { s: Signal; idx: numbe
   const points = s.pnlPoints ?? 0;
 
   // Category-specific color theme
-  const isReentry = (s.signalCategory || "").startsWith("REENTRY");
-  const isPyramid = (s.signalCategory || "").startsWith("PYRAMID");
+  const isReentry = s.signalCategory.startsWith("REENTRY");
+  const isPyramid = s.signalCategory.startsWith("PYRAMID");
   const catColors = isReentry
     ? { bg: "bg-gradient-to-r from-cyan-500/[0.08] to-cyan-600/[0.03]", border: "border-cyan-500/20", iconBg: "bg-cyan-500/15", text: "text-cyan-400", badge: "bg-cyan-500/20 text-cyan-400", tpBadge: "bg-cyan-500/15 text-cyan-400 border-cyan-500/20" }
     : isPyramid
@@ -1052,7 +1049,10 @@ function SignalCard({ s, idx, isAdmin, onUpdate, onDelete }: {
   onUpdate: (id: string, status: string, tpIdx?: number) => void;
   onDelete: (id: string) => void;
 }) {
-  // All signals now use EntryCard — TP/SL updates are reflected in-place on the parent card
+  /* Closed signals (status !== ACTIVE) use compact card — whether category is ENTRY or TP/SL */
+  if (s.status !== "ACTIVE") return <ClosedSignalCard s={s} idx={idx} isAdmin={isAdmin} onDelete={onDelete} />;
+  /* Active entry signals use full card */
+  if (isEntry(s.signalCategory)) return <EntryCard s={s} idx={idx} isAdmin={isAdmin} onUpdate={onUpdate} onDelete={onDelete} />;
   return <EntryCard s={s} idx={idx} isAdmin={isAdmin} onUpdate={onUpdate} onDelete={onDelete} />;
 }
 
@@ -1088,7 +1088,6 @@ export default function HomePage() {
   const [audioMuted, setAudioMuted] = useState(false);
   const [audioVol, setAudioVol] = useState(0.7);
   const prevIdsRef = useRef<Set<string>>(new Set());
-  const prevStateRef = useRef<Map<string, { hitTpIndex: number; status: string }>>(new Map());
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -1210,43 +1209,23 @@ export default function HomePage() {
         const newSignals: Signal[] = data.signals;
         const newIds = new Set(newSignals.map((s: Signal) => s.id));
         const oldIds = prevIdsRef.current;
-        const oldStates = prevStateRef.current;
-
+        // Detect new signals
+        // Native notifications are handled by SignalService (background) - only play Web Audio here
+        // to avoid duplicate notifications in the APK
         if (oldIds.size > 0) {
           for (const s of newSignals) {
             if (!oldIds.has(s.id)) {
-              // New signal — play sound based on category
+              // Web Audio only (background service handles native notifications)
               if (!audioMuted) {
                 if (isEntry(s.signalCategory)) playSound(s.type === "BUY" ? "buy" : "sell", audioVol);
                 else if (isTpLike(s.signalCategory)) playSound("tp", audioVol);
                 else if (isSlLike(s.signalCategory)) playSound("sl", audioVol);
                 else playSound("message", audioVol);
               }
-            } else {
-              // Existing signal — detect updates (TP hit, SL hit, status change)
-              const prev = oldStates.get(s.id);
-              if (prev) {
-                const tpChanged = s.hitTpIndex !== prev.hitTpIndex && s.hitTpIndex > prev.hitTpIndex;
-                const slChanged = prev.status === "ACTIVE" && s.status === "HIT_SL";
-                const fullClose = prev.status === "ACTIVE" && s.status === "HIT_TP";
-                if (tpChanged && !audioMuted) {
-                  playSound("tp", audioVol);
-                } else if ((slChanged || fullClose) && !audioMuted) {
-                  playSound(slChanged ? "sl" : "tp", audioVol);
-                }
-              }
             }
           }
         }
-
-        // Save current state for next comparison
         prevIdsRef.current = newIds;
-        const stateMap = new Map<string, { hitTpIndex: number; status: string }>();
-        for (const s of newSignals) {
-          stateMap.set(s.id, { hitTpIndex: s.hitTpIndex, status: s.status });
-        }
-        prevStateRef.current = stateMap;
-
         setSignals(newSignals);
       }
     } catch (e) { console.error("Fetch signals:", e); }
@@ -2170,18 +2149,53 @@ export default function HomePage() {
               <span className="text-[10px] text-slate-500">آخر تحديث: {new Date().toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" })}</span>
             </div>
 
-            {/* ── Active Signals — Full Cards with Live TP/SL Updates ── */}
+            {/* ── Active Signals Summary (if any) ── */}
             {activeSignals.length > 0 && (
               <div>
-                <div className="flex items-center gap-2 mb-3 px-1">
-                  <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  <span className="text-[11px] font-bold text-emerald-400">الإشارات النشطة</span>
-                  <span className="text-[9px] bg-emerald-500/15 text-emerald-400 px-1.5 py-0.5 rounded-md font-bold">{activeSignals.length}</span>
+                <div className="flex items-center justify-between mb-3 px-1">
+                  <div className="flex items-center gap-2">
+                    <div className="w-1 h-5 rounded-full bg-gradient-to-b from-amber-400 to-orange-500" />
+                    <span className="text-xs font-bold text-white">الإشارات النشطة</span>
+                    <span className="text-[9px] bg-amber-500/15 text-amber-400 px-1.5 py-0.5 rounded-md font-bold">{activeSignals.length}</span>
+                  </div>
+                  <button onClick={() => setTab("signals")} className="text-[10px] text-amber-400 font-medium flex items-center gap-0.5 hover:text-amber-300 transition-colors">
+                    عرض الكل <ArrowUpRight className="w-3 h-3" />
+                  </button>
                 </div>
-                <div className="space-y-3">
-                  {activeSignals.map((s, i) => (
-                    <SignalCard key={s.id} s={s} idx={i} isAdmin={isAdmin} onUpdate={handleUpdate} onDelete={handleDelete} />
-                  ))}
+                <div className="space-y-2">
+                  {activeSignals.slice(0, 3).map((s, i) => {
+                    const ac = entryAccent(s);
+                    const isBuy = s.type === "BUY";
+                    return (
+                      <div key={s.id} className="animate-[fadeInUp_0.3s_ease-out]" style={{ animationDelay: `${i * 60}ms`, animationFillMode: "both" }}>
+                        <div className={`rounded-2xl border ${ac.border} bg-white/[0.03] p-3 flex items-center gap-3 active:scale-[0.99] transition-transform cursor-pointer`} onClick={() => setTab("signals")}>
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${ac.bg}`}>
+                            {isBuy ? <TrendingUp className={`w-5 h-5 ${ac.text}`} /> : <TrendingDown className={`w-5 h-5 ${ac.text}`} />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-white text-sm">{s.pair}</span>
+                              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${isBuy ? "bg-emerald-500/15 text-emerald-400" : "bg-red-500/15 text-red-400"}`}>
+                                {isBuy ? "شراء" : "بيع"}
+                              </span>
+                              {s.timeframe && <span className="text-[8px] bg-white/[0.06] text-slate-500 px-1 py-0.5 rounded-md">{s.timeframe}</span>}
+                            </div>
+                            <div className="flex items-center gap-3 mt-1 text-[10px]">
+                              <span className="text-slate-400">دخول: <span className="font-mono font-semibold text-slate-200">{s.entry}</span></span>
+                              <span className="text-red-400/60">وقف: <span className="font-mono font-semibold text-red-300">{s.stopLoss}</span></span>
+                            </div>
+                          </div>
+                          <div className="flex flex-col items-end gap-1">
+                            <div className="flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                              <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                              <span className="text-[8px] text-emerald-400 font-semibold">نشطة</span>
+                            </div>
+                            <span className="text-[9px] text-slate-600">{timeAgo(s.createdAt)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -2420,18 +2434,47 @@ export default function HomePage() {
               </Glass>
             )}
 
-            {/* ── Recent Activity — Full Closed Signal Cards ── */}
+            {/* ── Recent Activity (Last 5 Closed Signals) ── */}
             {closedSignals.length > 0 && (
               <div>
-                <div className="flex items-center gap-2 mb-3 px-1">
-                  <div className="w-2 h-2 rounded-full bg-slate-500" />
-                  <span className="text-[11px] font-bold text-slate-400">آخر النتائج</span>
-                  <span className="text-[9px] bg-white/[0.06] text-slate-400 px-1.5 py-0.5 rounded-md font-bold">{Math.min(closedSignals.length, 5)}</span>
+                <div className="flex items-center justify-between mb-3 px-1">
+                  <div className="flex items-center gap-2">
+                    <div className="w-1 h-5 rounded-full bg-gradient-to-b from-emerald-400 to-red-500" />
+                    <span className="text-xs font-bold text-white">آخر النتائج</span>
+                  </div>
+                  <button onClick={() => setTab("signals")} className="text-[10px] text-amber-400 font-medium flex items-center gap-0.5 hover:text-amber-300 transition-colors">
+                    الكل <ArrowUpRight className="w-3 h-3" />
+                  </button>
                 </div>
-                <div className="space-y-3">
-                  {closedSignals.slice(0, 5).map((s, i) => (
-                    <SignalCard key={s.id} s={s} idx={i} isAdmin={isAdmin} onUpdate={handleUpdate} onDelete={handleDelete} />
-                  ))}
+                <div className="space-y-1.5">
+                  {closedSignals.slice(0, 5).map((s, i) => {
+                    const isProfit = s.status === "HIT_TP";
+                    const isBuy = s.type === "BUY";
+                    return (
+                      <div key={s.id} className="flex items-center gap-3 rounded-xl px-3 py-2.5 border border-white/[0.04] bg-white/[0.02] animate-[fadeInUp_0.25s_ease-out]" style={{ animationDelay: `${i * 50}ms`, animationFillMode: "both" }}>
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isProfit ? "bg-emerald-500/10" : "bg-red-500/10"}`}>
+                          {isProfit ? (
+                            <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                          ) : (
+                            <svg className="w-4 h-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-bold text-white">{s.pair}</span>
+                            <span className={`text-[8px] font-bold px-1 py-0.5 rounded ${isBuy ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"}`}>{isBuy ? "BUY" : "SELL"}</span>
+                          </div>
+                          <span className="text-[9px] text-slate-500">{timeAgo(s.createdAt)}</span>
+                        </div>
+                        <div className="text-right">
+                          <div className={`text-[12px] font-extrabold font-mono ${isProfit ? "text-emerald-400" : "text-red-400"}`}>
+                            {isProfit ? "+" : "-"}${Math.abs(s.pnlDollars ?? 0)}
+                          </div>
+                          <div className="text-[8px] text-slate-600 font-mono">{s.pnlPoints ?? 0} pts</div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -2483,9 +2526,8 @@ export default function HomePage() {
 
         {/* ══════ TAB: SIGNALS — PREMIUM DESIGN ══════ */}
         {tab === "signals" && (() => {
-          // Only show entry-type signals (TP/SL updates are now reflected in-place on parent)
-          const activeSignals = filtered.filter(s => s.status === "ACTIVE");
-          const closedSignals = filtered.filter(s => s.status !== "ACTIVE");
+          const activeSignals = filtered.filter(s => isEntry(s.signalCategory) && s.status === "ACTIVE");
+          const closedSignals = filtered.filter(s => !isEntry(s.signalCategory) || s.status !== "ACTIVE");
           const winClosed = closedSignals.filter(s => s.status === "HIT_TP");
           const lossClosed = closedSignals.filter(s => s.status === "HIT_SL");
           const totalClosed = closedSignals.length;
