@@ -253,4 +253,4 @@ export async function notifySlHit(pair: string, pnl?: number) {
 }
 
 // Export the public VAPID key for client-side use
-export { VAPID_PUBLIC_KEY };
+export const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || '';

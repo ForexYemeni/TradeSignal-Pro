@@ -31,7 +31,8 @@ export interface StoredSignal {
   hitPrice?: number;
   pnlPoints?: number;
   pnlDollars?: number;
-  partialClose?: boolean;
+  partialWin?: boolean;
+  tpStatusList?: string;
   totalTPs?: number;
   balance?: number;
   lotSize?: string;
@@ -79,10 +80,12 @@ export async function getSignals(limit = 100): Promise<StoredSignal[]> {
 }
 
 export async function addSignal(signal: StoredSignal): Promise<StoredSignal> {
-  const signals = await getSignals(9999);
-  signals.unshift(signal);
-  await kv.set('signals', signals.slice(0, 1000));
-  return signal;
+  return withLock('signals', async () => {
+    const signals = await getSignals(9999);
+    signals.unshift(signal);
+    await kv.set('signals', signals.slice(0, 1000));
+    return signal;
+  });
 }
 
 export async function getSignalById(id: string): Promise<StoredSignal | null> {
@@ -91,20 +94,43 @@ export async function getSignalById(id: string): Promise<StoredSignal | null> {
 }
 
 export async function updateSignal(id: string, updates: Partial<StoredSignal>): Promise<StoredSignal | null> {
-  const signals = await getSignals(9999);
-  const idx = signals.findIndex(s => s.id === id);
-  if (idx === -1) return null;
-  signals[idx] = { ...signals[idx], ...updates };
-  await kv.set('signals', signals);
-  return signals[idx];
+  return withLock('signals', async () => {
+    const signals = await getSignals(9999);
+    const idx = signals.findIndex(s => s.id === id);
+    if (idx === -1) return null;
+    signals[idx] = { ...signals[idx], ...updates };
+    await kv.set('signals', signals);
+    return signals[idx];
+  });
 }
 
 export async function deleteSignal(id: string): Promise<boolean> {
-  const signals = await getSignals(9999);
-  const filtered = signals.filter(s => s.id !== id);
-  if (filtered.length === signals.length) return false;
-  await kv.set('signals', filtered);
-  return true;
+  return withLock('signals', async () => {
+    const signals = await getSignals(9999);
+    const filtered = signals.filter(s => s.id !== id);
+    if (filtered.length === signals.length) return false;
+    await kv.set('signals', filtered);
+    return true;
+  });
+}
+
+// ─── Distributed Lock (prevents race conditions) ───
+async function withLock<T>(resource: string, fn: () => Promise<T>, retries = 3): Promise<T> {
+  const lockKey = `lock:${resource}`;
+  for (let i = 0; i < retries; i++) {
+    const acquired = await kv.set(lockKey, '1', { nx: true, ex: 5 });
+    if (acquired) {
+      try {
+        return await fn();
+      } finally {
+        await kv.del(lockKey);
+      }
+    }
+    // Wait before retry (100ms, 200ms, 300ms)
+    await new Promise(r => setTimeout(r, 100 * (i + 1)));
+  }
+  // If lock can't be acquired, proceed anyway (last resort)
+  return fn();
 }
 
 // ─── Admin ──────────────────────────────────────────────

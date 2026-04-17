@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { addSignal, getSignals, updateSignal } from "@/lib/store";
 import { parseTradingViewSignal, validateSignal } from "@/lib/signal-parser";
 import { notifyNewSignal, notifyTpHit, notifySlHit } from "@/lib/push";
+import { notifySignalEvent } from "./stream/route";
 
 export async function POST(request: NextRequest) {
   try {
@@ -82,12 +83,15 @@ export async function POST(request: NextRequest) {
 
     await addSignal(signal);
 
+    // Notify SSE subscribers about new signal
+    notifySignalEvent({ type: "signal", pair: parseResult.signal.pair, signalType: cat, timestamp: Date.now() });
+
     // Push notification for new entries
     if (isEntry(cat)) {
       notifyNewSignal(parseResult.signal.pair, parseResult.signal.type, parseResult.signal.entry, parseResult.signal.timeframe).catch(() => {});
     }
 
-    return NextResponse.json({ success: true, signal: { ...signal, takeProfits: JSON.parse(signal.takeProfits) }, warnings: parseResult.warnings });
+    return NextResponse.json({ success: true, signal: { ...signal, takeProfits: (() => { try { return JSON.parse(signal.takeProfits); } catch { return []; } })() }, warnings: parseResult.warnings });
   } catch (error) {
     console.error("Error processing signal:", error);
     return NextResponse.json({ success: false, error: "خطأ في معالجة الإشارة" }, { status: 500 });
@@ -128,7 +132,8 @@ async function handleUpdateSignal(parsed: any) {
   const slDist = Number(parent.slDistance) || Math.abs(entry - stopLoss);
   const lotSize = parent.lotSize ? parseFloat(String(parent.lotSize)) : 0;
   const balance = Number(parent.balance) || 0;
-  const tps: { tp: number; rr: number }[] = JSON.parse(String(parent.takeProfits || "[]"));
+  let tps: { tp: number; rr: number }[] = [];
+  try { tps = JSON.parse(String(parent.takeProfits || "[]")); } catch { tps = []; }
 
   // Pip value
   let pipVal = 10;
@@ -191,7 +196,15 @@ async function handleUpdateSignal(parsed: any) {
   const updated = await updateSignal(parent.id, updateData);
   if (!updated) return null;
 
-  return { ...updated, takeProfits: JSON.parse(updated.takeProfits) };
+  // Notify SSE subscribers about the update
+  const eventType = (parsed.signalCategory === "TP_HIT" || parsed.signalCategory === "REENTRY_TP" || parsed.signalCategory === "PYRAMID_TP") ? "tp_hit"
+    : (parsed.signalCategory === "SL_HIT" || parsed.signalCategory === "REENTRY_SL" || parsed.signalCategory === "PYRAMID_SL") ? "sl_hit"
+    : "signal";
+  notifySignalEvent({ type: eventType, pair: parsed.pair, signalType: parsed.signalCategory, tpIndex: parsed.hitTpIndex, timestamp: Date.now() });
+
+  let parsedTps: { tp: number; rr: number }[] = [];
+  try { parsedTps = JSON.parse(updated.takeProfits); } catch { parsedTps = []; }
+  return { ...updated, takeProfits: parsedTps };
 }
 
 function isEntry(cat: string) {
@@ -211,7 +224,11 @@ export async function GET(request: NextRequest) {
     const signals = await getSignals(limit);
     return NextResponse.json({
       success: true,
-      signals: signals.map(s => ({ ...s, takeProfits: JSON.parse(s.takeProfits) })),
+      signals: signals.map(s => {
+        let tps: { tp: number; rr: number }[] = [];
+        try { tps = JSON.parse(s.takeProfits); } catch { tps = []; }
+        return { ...s, takeProfits: tps };
+      }),
     });
   } catch (error) {
     console.error("Error fetching signals:", error);

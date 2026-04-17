@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSignalById, updateSignal, deleteSignal } from "@/lib/store";
 import { notifyTpHit, notifySlHit } from "@/lib/push";
+import { notifySignalEvent } from "../stream/route";
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -45,7 +46,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     if (status === "HIT_TP" && hitTpIndex !== undefined && hitTpIndex >= 0) {
-      const tps: { tp: number; rr: number }[] = JSON.parse(String(existing.takeProfits));
+      let tps: { tp: number; rr: number }[] = [];
+      try { tps = JSON.parse(String(existing.takeProfits)); } catch { tps = []; }
       // hitTpIndex from admin is 0-indexed array position; convert to 1-indexed for consistency with parser
       const tpArrayIdx = hitTpIndex;
       const tpDisplayNum = hitTpIndex + 1;
@@ -114,9 +116,22 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       ).catch(() => {});
     }
 
+    // Notify SSE subscribers
+    if (status === "HIT_TP" || status === "HIT_SL") {
+      notifySignalEvent({
+        type: status === "HIT_TP" ? "tp_hit" : "sl_hit",
+        pair: existing.pair,
+        signalType: status,
+        tpIndex: updateData.hitTpIndex as number | undefined,
+        timestamp: Date.now(),
+      });
+    }
+
+    let parsedTps: { tp: number; rr: number }[] = [];
+    try { parsedTps = JSON.parse(signal.takeProfits); } catch { parsedTps = []; }
     return NextResponse.json({
       success: true,
-      signal: { ...signal, takeProfits: JSON.parse(signal.takeProfits) },
+      signal: { ...signal, takeProfits: parsedTps },
     });
   } catch (error) {
     console.error("Error updating signal:", error);

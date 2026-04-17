@@ -31,7 +31,7 @@ interface Signal {
   rawText: string; timeframe: string; htfTimeframe: string;
   htfTrend: string; smcTrend: string; hitTpIndex: number;
   hitPrice?: number; pnlPoints?: number; pnlDollars?: number;
-  partialClose?: boolean; totalTPs?: number;
+  partialWin?: boolean; totalTPs?: number;
   balance?: number; lotSize?: string;
   riskTarget?: number; riskPercent?: number; actualRisk?: number;
   actualRiskPct?: number; slDistance?: number; maxRR?: number;
