@@ -405,3 +405,108 @@ html, body {
 .premium-glow {
   box-shadow: 0 0 40px rgba(255, 215, 0, 0.15);
 }
+
+/* ═══ Light Mode Overrides ═══ */
+.light body,
+html.light body {
+  background-color: #f8fafc !important;
+  color: #1e293b !important;
+}
+
+html.light input:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 30px #ffffff inset !important;
+  -webkit-text-fill-color: #1e293b !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+html.light .glass-panel {
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+html.light .glass-nav {
+  background: rgba(255, 255, 255, 0.9);
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+html.light .input-glass {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+html.light .input-glass:focus-within {
+  border-color: #FFD700;
+  box-shadow: 0 0 15px rgba(255, 215, 0, 0.15);
+}
+
+html.light .vip-gradient {
+  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+}
+
+/* ═══ New Animation Keyframes ═══ */
+
+/* Slide in from right (RTL) */
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(60px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.animate-slide-in-right { animation: slideInRight 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+/* Status change pulse */
+@keyframes statusPulse {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.03); }
+  100% { transform: scale(1); }
+}
+.animate-status-pulse { animation: statusPulse 0.6s ease-out; }
+
+/* New signal glow */
+@keyframes newSignalGlow {
+  0% { box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.4); }
+  70% { box-shadow: 0 0 0 10px rgba(255, 215, 0, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 215, 0, 0); }
+}
+.animate-new-signal-glow { animation: newSignalGlow 1s ease-out; }
+
+/* Confetti falling */
+@keyframes confettiFall {
+  0% { transform: translateY(-100vh) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+}
+
+/* Pull to refresh indicator */
+@keyframes pullSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Splash tip fade */
+@keyframes tipFade {
+  0%, 100% { opacity: 0; transform: translateY(8px); }
+  10%, 90% { opacity: 1; transform: translateY(0); }
+}
+.animate-tip-fade { animation: tipFade 2s ease-in-out; }
+
+/* TP hit pulse (emerald) */
+@keyframes tpHitPulse {
+  0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
+  50% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+.animate-tp-hit-pulse { animation: tpHitPulse 0.6s ease-out; }
+
+/* SL hit pulse (red) */
+@keyframes slHitPulse {
+  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5); }
+  50% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+.animate-sl-hit-pulse { animation: slHitPulse 0.6s ease-out; }
+
+/* Online status pulse */
+@keyframes onlinePulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.animate-online-pulse { animation: onlinePulse 2s ease-in-out infinite; }

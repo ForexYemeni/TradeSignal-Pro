@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useTheme } from "next-themes";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +13,7 @@ import {
   BarChart3, User, Volume2, VolumeX, Bell,
   Crown, Package, Users, CalendarDays, CheckCircle, XCircle, Settings, ChevronDown,
   Home, Flame, Trophy, ArrowUpRight, ArrowDownRight, Hash, Globe, PieChart, Sparkles, Timer, TrendingUpIcon, CircleDot, Gavel, Banknote, Wallet, Percent,
+  Sun, Moon, Wifi, WifiOff,
 } from "lucide-react";
 
 /* ═══════════════════════════════════════════════════════════════
@@ -289,6 +291,116 @@ function SkeletonCard() {
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   COUNTDOWN HELPER
+   ═══════════════════════════════════════════════════════════════ */
+function formatCountdown(createdAt: string): string {
+  const diff = Date.now() - new Date(createdAt).getTime();
+  const totalMinutes = Math.floor(diff / 60000);
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  if (h > 0) return `${h}س ${m}د`;
+  return `${m}د`;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CONFETTI COMPONENT
+   ═══════════════════════════════════════════════════════════════ */
+function Confetti({ show }: { show: boolean }) {
+  const particles = useMemo(() =>
+    Array.from({ length: 40 }).map((_, i) => ({
+      id: i,
+      left: `${Math.random() * 100}%`,
+      color: ["#FFD700", "#10b981", "#ffffff", "#FF8F00", "#06b6d4"][Math.floor(Math.random() * 5)],
+      delay: `${Math.random() * 0.5}s`,
+      duration: `${1.5 + Math.random() * 1}s`,
+      width: `${4 + Math.random() * 6}px`,
+      height: `${8 + Math.random() * 10}px`,
+    })), []);
+
+  if (!show) return null;
+  return (
+    <div className="fixed inset-0 pointer-events-none z-[100]" style={{ overflow: "hidden" }}>
+      {particles.map(p => (
+        <div
+          key={p.id}
+          className="absolute rounded-sm"
+          style={{
+            left: p.left,
+            top: "-20px",
+            width: p.width,
+            height: p.height,
+            backgroundColor: p.color,
+            animation: `confettiFall ${p.duration} ease-out ${p.delay} forwards`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ONLINE STATUS HOOK
+   ═══════════════════════════════════════════════════════════════ */
+function useOnlineStatus() {
+  const [isOnline, setIsOnline] = useState(() => typeof navigator !== "undefined" ? navigator.onLine : true);
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+  return isOnline;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   PULL TO REFRESH HOOK
+   ═══════════════════════════════════════════════════════════════ */
+function usePullToRefresh(onRefresh: () => Promise<void>) {
+  const [pullDistance, setPullDistance] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const startYRef = useRef(0);
+  const pullingRef = useRef(false);
+  const THRESHOLD = 80;
+
+  const onTouchStart = useCallback((e: React.TouchEvent) => {
+    if (isRefreshing) return;
+    const target = e.currentTarget as HTMLElement;
+    if (target.scrollTop <= 0) {
+      startYRef.current = e.touches[0].clientY;
+      pullingRef.current = true;
+    }
+  }, [isRefreshing]);
+
+  const onTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!pullingRef.current || isRefreshing) return;
+    const currentY = e.touches[0].clientY;
+    const diff = currentY - startYRef.current;
+    if (diff > 0) {
+      setPullDistance(Math.min(diff * 0.5, 120));
+    }
+  }, [isRefreshing]);
+
+  const onTouchEnd = useCallback(async () => {
+    if (!pullingRef.current || isRefreshing) return;
+    pullingRef.current = false;
+    if (pullDistance >= THRESHOLD) {
+      setIsRefreshing(true);
+      setPullDistance(0);
+      try { await onRefresh(); } catch { /* ignore */ }
+      setIsRefreshing(false);
+    } else {
+      setPullDistance(0);
+    }
+  }, [pullDistance, isRefreshing, onRefresh]);
+
+  return { pullDistance, isRefreshing, onTouchStart, onTouchMove, onTouchEnd };
+}
+
+/* ═══════════════════════════════════════════════════════════════
    SIGNAL CARDS — PROFESSIONAL EDITION
    ═══════════════════════════════════════════════════════════════ */
 
@@ -473,6 +585,12 @@ function EntryCard({ s, idx, isAdmin, onUpdate, onDelete }: {
 }) {
   const ac = entryAccent(s);
   const isBuy = s.type === "BUY";
+  const [countdown, setCountdown] = useState(formatCountdown(s.createdAt));
+  useEffect(() => {
+    if (s.status !== "ACTIVE") return;
+    const iv = setInterval(() => setCountdown(formatCountdown(s.createdAt)), 60000);
+    return () => clearInterval(iv);
+  }, [s.createdAt, s.status]);
   const typeLabel = s.signalCategory === "REENTRY" ? "إعادة دخول" : s.signalCategory === "PYRAMID" ? "تدرج" : isBuy ? "شراء" : "بيع";
   const isClosed = s.status !== "ACTIVE";
   const hitCount = s.hitTpIndex >= 0 ? s.hitTpIndex : 0;
@@ -522,10 +640,16 @@ function EntryCard({ s, idx, isAdmin, onUpdate, onDelete }: {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               {s.status === "ACTIVE" && (
-                <div className="flex items-center gap-1">
-                  <Radio className="w-3 h-3 text-emerald-400/50 animate-pulse" />
-                  <span className="text-[9px] text-emerald-400/60">مباشر</span>
-                </div>
+                <>
+                  <div className="flex items-center gap-1">
+                    <Radio className="w-3 h-3 text-emerald-400/50 animate-pulse" />
+                    <span className="text-[9px] text-emerald-400/60">مباشر</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-[9px] text-slate-500">
+                    <Timer className="w-2.5 h-2.5" />
+                    <span>{countdown}</span>
+                  </div>
+                </>
               )}
             </div>
             <span className="text-[10px] text-slate-500 flex items-center gap-1"><Clock className="w-3 h-3" />{timeAgo(s.createdAt)}</span>
@@ -844,6 +968,28 @@ function Candle({ x, bodyH, wickTop, wickBot, isGreen, delay, bodyW }: {
 }
 
 function SplashScreen() {
+  const [tipIndex, setTipIndex] = useState(0);
+  const [loadStatus, setLoadStatus] = useState(0);
+  const tips = [
+    "تتبع إشاراتك في الوقت الحقيقي",
+    "إدارة المخاطر هي مفتاح النجاح",
+    "لا تتجاوز 2% من رصيدك في صفقة واحدة",
+  ];
+  const statusTexts = [
+    "جاري الاتصال بالخادم...",
+    "جاري تحميل البيانات...",
+    "جاري تجهيز الواجهة...",
+  ];
+
+  useEffect(() => {
+    const tipInterval = setInterval(() => {
+      setTipIndex(prev => (prev + 1) % tips.length);
+    }, 2000);
+    const statusInterval = setInterval(() => {
+      setLoadStatus(prev => (prev + 1) % statusTexts.length);
+    }, 1000);
+    return () => { clearInterval(tipInterval); clearInterval(statusInterval); };
+  }, [tips.length, statusTexts.length]);
   /* Candlestick data: [x_offset, bodyHeight, wickTop, wickBottom, isGreen, delay] */
   const candles: [number, number, number, number, boolean, number][] = [
     [10,  45, 20, 30, true,  0],
@@ -1019,6 +1165,12 @@ function SplashScreen() {
 
         {/* Loading Progress */}
         <div className="splash-text-anim w-full mt-8 space-y-3" style={{ animationDelay: "800ms" }}>
+          {/* Rotating Tips */}
+          <div className="h-5 flex items-center justify-center overflow-hidden">
+            <p key={tipIndex} className="text-[10px] font-medium animate-tip-fade" style={{ color: "rgba(255, 215, 0, 0.7)" }}>
+              💡 {tips[tipIndex]}
+            </p>
+          </div>
           <div className="w-full h-[3px] rounded-full overflow-hidden" style={{ background: "rgba(255, 215, 0, 0.1)" }}>
             <div className="splash-progress-bar h-full rounded-full" style={{ width: "0%" }} />
           </div>
@@ -1037,7 +1189,7 @@ function SplashScreen() {
               ))}
             </div>
             <span className="text-[11px] font-medium" style={{ color: "rgba(255, 215, 0, 0.6)" }}>
-              جاري التحميل...
+              {statusTexts[loadStatus]}
             </span>
           </div>
         </div>
@@ -1062,6 +1214,14 @@ function SignalCard({ s, idx, isAdmin, onUpdate, onDelete }: {
    MAIN APP
    ═══════════════════════════════════════════════════════════════ */
 export default function HomePage() {
+  /* ── Theme ── */
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
+  /* ── Online Status ── */
+  const isOnline = useOnlineStatus();
+
   /* ── View: login shows first ── */
   const [view, setView] = useState<View>("login");
   const [session, setSession] = useState<AdminSession | null>(null);
@@ -1093,6 +1253,11 @@ export default function HomePage() {
   const prevStateRef = useRef<Map<string, { hitTpIndex: number; status: string }>>(new Map());
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  /* ── Confetti / Win Streak ── */
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [winStreakCount, setWinStreakCount] = useState(0);
+  const prevStreakRef = useRef<number>(0);
 
   /* ── Analyst ── */
   const [rawText, setRawText] = useState("");
@@ -1141,6 +1306,12 @@ export default function HomePage() {
   /* ── Session Init: restore from localStorage ── */
   const [dbReady, setDbReady] = useState(false);
   const [dbError, setDbError] = useState("");
+
+  /* ── Track new signal IDs for slide-in animation ── */
+  const newSignalIdsRef = useRef<Set<string>>(new Set());
+
+  /* ── Track status change signals for pulse animation ── */
+  const statusChangeIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     // Auto-setup database tables on first load
@@ -1262,6 +1433,17 @@ export default function HomePage() {
           stateMap.set(s.id, { hitTpIndex: s.hitTpIndex, status: s.status });
         }
         prevStateRef.current = stateMap;
+        // Track new signal IDs for slide-in animation
+        for (const s of newSignals) {
+          if (!oldIds.has(s.id)) {
+            newSignalIdsRef.current.add(s.id);
+          } else {
+            const prev = oldStates.get(s.id);
+            if (prev && (prev.status !== s.status || prev.hitTpIndex !== s.hitTpIndex)) {
+              statusChangeIdsRef.current.add(s.id);
+            }
+          }
+        }
         setSignals(newSignals);
       }
     } catch (e) { console.error("Fetch signals:", e); }
@@ -1274,6 +1456,12 @@ export default function HomePage() {
       if (data.success) setStats(data.stats);
     } catch (e) { console.error("Fetch stats:", e); }
   }, []);
+
+  /* ── Pull to refresh (for signals tab) ── */
+  const handlePullRefresh = useCallback(async () => {
+    await Promise.all([fetchSignals(), fetchStats()]);
+  }, [fetchSignals, fetchStats]);
+  const pullRefresh = usePullToRefresh(handlePullRefresh);
 
   /* ── Auto-refresh + Real-time updates ── */
   const lastCheckTimeRef = useRef<number>(Date.now());
@@ -1338,6 +1526,24 @@ export default function HomePage() {
     setLoading(true);
     Promise.all([fetchSignals(), fetchStats()]).finally(() => setLoading(false));
   }, [refreshKey]);
+
+  /* ── Win Streak Detection & Confetti ── */
+  useEffect(() => {
+    if (signals.length === 0) return;
+    const closed = signals.filter(s => s.status !== "ACTIVE");
+    const sorted = [...closed].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    let streak = 0;
+    for (const s of sorted) {
+      if (s.status === "HIT_TP") streak++;
+      else break;
+    }
+    if (streak >= 3 && prevStreakRef.current < 3) {
+      setShowConfetti(true);
+      setWinStreakCount(streak);
+      setTimeout(() => setShowConfetti(false), 2500);
+    }
+    prevStreakRef.current = streak;
+  }, [signals]);
 
   /* ── Load users when admin switches to users tab ── */
   useEffect(() => {
@@ -2056,16 +2262,38 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "linear-gradient(135deg, #080d1a 0%, #0f172a 50%, #080d1a 100%)" }}>
+      {/* ── Confetti ── */}
+      <Confetti show={showConfetti} />
+      {showConfetti && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[101] animate-[fadeInUp_0.4s_ease-out]">
+          <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-black px-4 py-2 rounded-xl text-xs font-bold shadow-lg">
+            🔥 سلسلة ربح ممتازة! ({winStreakCount} صفقات)
+          </div>
+        </div>
+      )}
+
       {/* ── Header ── */}
-      <header className="sticky top-0 z-40 border-b border-white/[0.06] bg-[#080d1a]/80 backdrop-blur-lg">
+      <header className="sticky top-0 z-40 border-b border-white/[0.06] bg-[#080d1a]/80 backdrop-blur-lg dark:bg-[#080d1a]/80">
         <div className="flex items-center justify-between px-4 h-14">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
               <Radio className="w-4 h-4 text-black" />
             </div>
-            <span className="font-bold text-white text-sm tracking-wide">ForexYemeni</span>
+            <div className="flex flex-col">
+              <span className="font-bold text-white text-sm tracking-wide">ForexYemeni</span>
+              <div className="flex items-center gap-1 -mt-0.5">
+                <div className={`w-1.5 h-1.5 rounded-full ${isOnline ? "bg-emerald-400 animate-online-pulse" : "bg-red-400"}`} />
+                <span className={`text-[9px] ${isOnline ? "text-emerald-400" : "text-red-400"}`}>{isOnline ? "متصل" : "غير متصل"}</span>
+              </div>
+            </div>
           </div>
           <div className="flex items-center gap-2">
+            {/* Theme Toggle */}
+            {mounted && (
+              <button onClick={() => setTheme(theme === "dark" ? "light" : "dark")} className="w-8 h-8 rounded-lg bg-white/[0.05] flex items-center justify-center text-slate-400 hover:text-white transition-colors">
+                {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+              </button>
+            )}
             {/* Audio Controls */}
             <button onClick={() => setAudioMuted(!audioMuted)} className="w-8 h-8 rounded-lg bg-white/[0.05] flex items-center justify-center text-slate-400 hover:text-white transition-colors">
               {audioMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
@@ -2570,7 +2798,28 @@ export default function HomePage() {
           const closedWinRate = totalClosed > 0 ? Math.round((winClosed.length / totalClosed) * 100) : 0;
 
           return (
-          <div className="space-y-4">
+          <div
+            className="space-y-4"
+            onTouchStart={pullRefresh.onTouchStart}
+            onTouchMove={pullRefresh.onTouchMove}
+            onTouchEnd={pullRefresh.onTouchEnd}
+            style={{ position: "relative" }}
+          >
+            {/* ── Pull to Refresh Indicator ── */}
+            {pullRefresh.isRefreshing && (
+              <div className="flex justify-center py-3">
+                <div className="w-6 h-6 rounded-full border-2 border-amber-500 border-t-transparent" style={{ animation: "pullSpin 0.8s linear infinite" }} />
+              </div>
+            )}
+            {pullRefresh.pullDistance > 0 && !pullRefresh.isRefreshing && (
+              <div className="flex justify-center" style={{ height: pullRefresh.pullDistance, overflow: "hidden" }}>
+                <div className="flex flex-col items-center justify-center">
+                  <div className="w-6 h-6 rounded-full border-2 border-amber-500 border-t-transparent" style={{ animation: "pullSpin 0.8s linear infinite", opacity: pullRefresh.pullDistance >= 40 ? 1 : 0.5 }} />
+                  <span className="text-[9px] text-amber-400 mt-1">{pullRefresh.pullDistance >= 40 ? "أفلت للتحديث" : "اسحب للتحديث"}</span>
+                </div>
+              </div>
+            )}
+
             {/* ── Premium Stats Header ── */}
             {stats && (
               <div className="rounded-2xl border border-white/[0.06] overflow-hidden" style={{ background: "linear-gradient(135deg, rgba(255,215,0,0.06) 0%, rgba(255,140,0,0.03) 50%, rgba(255,215,0,0.06) 100%)" }}>
@@ -2649,7 +2898,9 @@ export default function HomePage() {
                     </div>
                     <div className="space-y-3">
                       {activeSignals.map((s, i) => (
-                        <SignalCard key={s.id} s={s} idx={i} isAdmin={isAdmin} onUpdate={handleUpdate} onDelete={handleDelete} />
+                        <div key={s.id} className={newSignalIdsRef.current.has(s.id) ? "animate-slide-in-right animate-new-signal-glow" : ""}>
+                          <SignalCard s={s} idx={i} isAdmin={isAdmin} onUpdate={handleUpdate} onDelete={handleDelete} />
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -2669,9 +2920,17 @@ export default function HomePage() {
                       )}
                     </div>
                     <div className="space-y-2">
-                      {closedSignals.map((s, i) => (
-                        <SignalCard key={s.id} s={s} idx={i + (activeSignals.length || 0)} isAdmin={isAdmin} onUpdate={handleUpdate} onDelete={handleDelete} />
-                      ))}
+                      {closedSignals.map((s, i) => {
+                        const isNew = newSignalIdsRef.current.has(s.id);
+                        const isStatusChange = statusChangeIdsRef.current.has(s.id);
+                        const isTpHit = s.status === "HIT_TP";
+                        const isSlHit = s.status === "HIT_SL";
+                        return (
+                          <div key={s.id} className={`${isNew ? "animate-slide-in-right" : ""} ${isStatusChange ? (isTpHit ? "animate-tp-hit-pulse" : isSlHit ? "animate-sl-hit-pulse" : "animate-status-pulse") : ""}`}>
+                            <SignalCard s={s} idx={i + (activeSignals.length || 0)} isAdmin={isAdmin} onUpdate={handleUpdate} onDelete={handleDelete} />
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -3358,7 +3617,7 @@ export default function HomePage() {
       </main>
 
       {/* ── Bottom Navigation ── */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/[0.06] bg-[#080d1a]/90 backdrop-blur-lg safe-area-bottom">
+      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/[0.06] bg-[#080d1a]/90 dark:bg-[#080d1a]/90 backdrop-blur-lg safe-area-bottom">
         <div className="max-w-lg mx-auto flex">
           {tabs.map(t => (
             <button key={t.key} onClick={() => setTab(t.key)}
