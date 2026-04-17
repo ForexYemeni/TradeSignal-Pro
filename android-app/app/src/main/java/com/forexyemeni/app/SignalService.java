@@ -25,21 +25,18 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * SignalService v3 - Foreground Service for real-time signal monitoring
- * - Polls every 5 seconds for new signals AND status changes (TP/SL hits)
+ * SignalService v4 - Foreground Service for real-time signal monitoring
+ * - Polls every 5 seconds for new signals AND status changes
  * - Tracks full signal state: id -> "status|category|hitTpIndex"
- * - On FIRST RUN: silently records all existing signals (NO notifications)
- * - On STATE CHANGE: uses STATUS (not category) to determine notification type
- *   - ACTIVE + ENTRY category -> "new signal" notification
- *   - HIT_TP status -> "TP hit" notification (with correct TP number)
- *   - HIT_SL status -> "SL hit" notification
+ * - FIRST RUN: silently records all signals (NO notifications)
+ * - STATE CHANGE: detects TP/SL hits by comparing hitTpIndex
  */
 public class SignalService extends Service {
 
     private static final String TAG = "SignalService";
     private static final String PREFS_NAME = "forexyemeni_signal_prefs";
-    private static final String KEY_KNOWN_STATES = "known_signal_states";
-    private static final String KEY_INITIALIZED = "service_initialized_v3";
+    private static final String KEY_KNOWN_STATES = "service_signal_states";
+    private static final String KEY_INITIALIZED = "service_initialized_v4";
     private static final String API_URL = "https://trade-signal-pro.vercel.app/api/signals";
     private static final String CHANNEL_ID = "forexyemeni_service";
     private static final int NOTIFICATION_ID = 9999;
@@ -76,7 +73,7 @@ public class SignalService extends Service {
         };
 
         handler.post(pollRunnable);
-        Log.d(TAG, "SignalService v3 started - polling every 5s");
+        Log.d(TAG, "SignalService v4 started - polling every 5s");
     }
 
     @Override
@@ -136,18 +133,13 @@ public class SignalService extends Service {
         return builder.build();
     }
 
-    /**
-     * Fetch latest signals and compare with known states
-     * FIRST RUN: silently save all existing signals (no notifications)
-     * SUBSEQUENT RUNS: detect new signals AND status changes
-     */
     private void checkSignals() {
         try {
             URL url = new URL(API_URL + "?limit=10");
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("GET");
             conn.setRequestProperty("Content-Type", "application/json");
-            conn.setRequestProperty("User-Agent", "ForexYemeni/App/4.2");
+            conn.setRequestProperty("User-Agent", "ForexYemeni/App/4.4");
             conn.setConnectTimeout(8000);
             conn.setReadTimeout(8000);
 
@@ -168,13 +160,8 @@ public class SignalService extends Service {
             JSONArray signals = json.optJSONArray("signals");
             if (signals == null || signals.length() == 0) return;
 
-            // Check if this is the FIRST run (never initialized before)
             boolean isFirstRun = !isInitialized();
-
-            // Load known states: id -> "status|category|hitTpIndex"
             Map<String, String> knownStates = loadKnownStates();
-
-            // Track new states to save
             Map<String, String> newStates = new HashMap<>();
             int notifiedCount = 0;
 
@@ -185,49 +172,44 @@ public class SignalService extends Service {
                 String category = signal.optString("signalCategory", "ENTRY");
                 int hitTpIndex = signal.optInt("hitTpIndex", -1);
 
-                // Create state key: "status|category|hitTpIndex"
                 String state = status + "|" + category + "|" + hitTpIndex;
 
                 String pair = signal.optString("pair", "N/A");
                 String type = signal.optString("type", "BUY");
                 double entry = signal.optDouble("entry", 0);
 
-                // Determine event type from BOTH status AND category
                 boolean isTpHit = "HIT_TP".equals(status) || "TP_HIT".equals(category)
                         || "REENTRY_TP".equals(category) || "PYRAMID_TP".equals(category);
                 boolean isSlHit = "HIT_SL".equals(status) || "SL_HIT".equals(category)
                         || "REENTRY_SL".equals(category) || "PYRAMID_SL".equals(category);
 
                 if (isFirstRun) {
-                    // FIRST RUN: silently record all signals, do NOT notify
-                    Log.d(TAG, "FIRST RUN - silently tracking: " + pair + " [" + state + "]");
+                    Log.d(TAG, "FIRST RUN - tracking: " + pair + " [" + state + "]");
                 } else if (!knownStates.containsKey(id)) {
-                    // Brand new signal (not seen before after initialization)
+                    // Brand new signal
                     if (isTpHit) {
                         showTpNotification(pair, hitTpIndex, category);
-                        Log.d(TAG, "NEW TP signal: " + pair + " TP" + hitTpIndex + " [" + category + "]");
+                        Log.d(TAG, "NEW TP: " + pair + " TP" + hitTpIndex);
                     } else if (isSlHit) {
                         showSlNotification(pair);
-                        Log.d(TAG, "NEW SL signal: " + pair);
+                        Log.d(TAG, "NEW SL: " + pair);
                     } else {
-                        showNewSignalNotification(pair, type, entry);
-                        Log.d(TAG, "NEW signal: " + pair + " (" + category + ")");
+                        showEntryNotification(pair, type, entry);
+                        Log.d(TAG, "NEW ENTRY: " + pair);
                     }
                     notifiedCount++;
                 } else {
-                    // Existing signal - check if state changed
+                    // Existing signal - detect state change
                     String oldState = knownStates.get(id);
                     if (!state.equals(oldState)) {
-                        // State changed! Determine what changed
-                        // Check category change to detect partial TP hits (status stays ACTIVE)
                         if (isTpHit) {
                             showTpNotification(pair, hitTpIndex, category);
-                            Log.d(TAG, "TP HIT: " + pair + " TP" + hitTpIndex + " [" + category + "] from [" + oldState + "]");
+                            Log.d(TAG, "TP HIT: " + pair + " TP" + hitTpIndex + " from [" + oldState + "]");
                         } else if (isSlHit) {
                             showSlNotification(pair);
                             Log.d(TAG, "SL HIT: " + pair + " from [" + oldState + "]");
                         } else {
-                            showNewSignalNotification(pair, type, entry);
+                            showEntryNotification(pair, type, entry);
                             Log.d(TAG, "STATE CHANGED: " + pair + " from [" + oldState + "] to [" + state + "]");
                         }
                         notifiedCount++;
@@ -237,20 +219,17 @@ public class SignalService extends Service {
                 newStates.put(id, state);
             }
 
-            // Mark as initialized after first poll completes
             if (isFirstRun) {
                 markInitialized();
-                Log.d(TAG, "Service initialized with " + newStates.size() + " existing signals (no notifications sent)");
+                Log.d(TAG, "Initialized with " + newStates.size() + " signals (no notifications sent)");
             }
 
-            // Save new states (keep max 50)
             saveKnownStates(newStates, 50);
 
             if (notifiedCount > 0) {
                 NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
                 if (nm != null) {
                     nm.notify(NOTIFICATION_ID, buildServiceNotification(notifiedCount + " إشعارات جديدة"));
-                    // Reset service notification after 5 seconds
                     handler.postDelayed(new Runnable() {
                         @Override
                         public void run() {
@@ -267,10 +246,7 @@ public class SignalService extends Service {
         }
     }
 
-    /**
-     * Show "New Signal" notification (BUY or SELL)
-     */
-    private void showNewSignalNotification(String pair, String type, double entry) {
+    private void showEntryNotification(String pair, String type, double entry) {
         String typeAr = type.equals("BUY") ? "شراء" : "بيع";
         NotificationHelper.showNotification(this,
                 "📊 إشارة جديدة — " + pair,
@@ -278,9 +254,6 @@ public class SignalService extends Service {
                 type.equals("BUY") ? "buy" : "sell");
     }
 
-    /**
-     * Show "TP Hit" notification with correct TP number
-     */
     private void showTpNotification(String pair, int hitTpIndex, String category) {
         String catIcon, catLabel;
         if ("REENTRY_TP".equals(category)) {
@@ -290,16 +263,12 @@ public class SignalService extends Service {
         } else {
             catIcon = "🎯"; catLabel = "هدف";
         }
-        String tpNum = catLabel + " " + hitTpIndex;
         NotificationHelper.showNotification(this,
                 catIcon + " " + catLabel + " محقق — " + pair,
-                tpNum + " تم تحقيقه بنجاح!",
+                catLabel + " " + hitTpIndex + " تم تحقيقه بنجاح!",
                 "tp_hit");
     }
 
-    /**
-     * Show "SL Hit" notification
-     */
     private void showSlNotification(String pair) {
         NotificationHelper.showNotification(this,
                 "🛑 وقف خسارة — " + pair,
@@ -307,10 +276,6 @@ public class SignalService extends Service {
                 "sl_hit");
     }
 
-    /**
-     * Check if service has been initialized before
-     * First run = no saved states and never initialized
-     */
     private boolean isInitialized() {
         try {
             android.content.SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
@@ -320,9 +285,6 @@ public class SignalService extends Service {
         }
     }
 
-    /**
-     * Mark service as initialized - won't send notifications for existing signals
-     */
     private void markInitialized() {
         try {
             android.content.SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
@@ -332,10 +294,6 @@ public class SignalService extends Service {
         }
     }
 
-    /**
-     * Load known signal states from SharedPreferences
-     * Format: "id1=state1,id2=state2,..."
-     */
     private Map<String, String> loadKnownStates() {
         Map<String, String> states = new HashMap<>();
         try {
@@ -356,11 +314,6 @@ public class SignalService extends Service {
         return states;
     }
 
-    /**
-     * Save signal states to SharedPreferences
-     * Format: "id1=state1,id2=state2,..."
-     * Keeps only the last 'maxEntries' signals
-     */
     private void saveKnownStates(Map<String, String> states, int maxEntries) {
         try {
             android.content.SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
