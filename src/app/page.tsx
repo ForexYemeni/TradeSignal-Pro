@@ -266,25 +266,25 @@ function Stars({ r }: { r: number }) {
   );
 }
 
-function Div() { return <div className="border-t border-white/[0.04] my-2.5" />; }
+function Div() { return <div className="border-t border-border my-2.5" />; }
 
 function Glass({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <div className={`rounded-2xl border border-white/[0.06] bg-white/[0.03] backdrop-blur-sm ${className}`}>{children}</div>;
+  return <div className={`rounded-2xl border border-border bg-muted/50 backdrop-blur-sm ${className}`}>{children}</div>;
 }
 
 function SkeletonCard() {
   return (
-    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4 space-y-3 animate-pulse">
+    <div className="rounded-2xl border border-border bg-muted/50 p-4 space-y-3 animate-pulse">
       <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-white/[0.06]" />
+        <div className="w-8 h-8 rounded-lg bg-muted" />
         <div className="space-y-1.5 flex-1">
-          <div className="h-3.5 w-24 rounded bg-white/[0.06]" />
-          <div className="h-2.5 w-16 rounded bg-white/[0.04]" />
+          <div className="h-3.5 w-24 rounded bg-muted" />
+          <div className="h-2.5 w-16 rounded bg-muted/60" />
         </div>
       </div>
       <div className="grid grid-cols-2 gap-2">
-        <div className="h-14 rounded-xl bg-white/[0.04]" />
-        <div className="h-14 rounded-xl bg-white/[0.04]" />
+        <div className="h-14 rounded-xl bg-muted/60" />
+        <div className="h-14 rounded-xl bg-muted/60" />
       </div>
     </div>
   );
@@ -420,7 +420,7 @@ function TpMiniCard({ tp, index, isHit, isLastHit, entry, type }: {
         className={`w-full text-right transition-all duration-300 active:scale-[0.98] rounded-xl border ${
           isHit
             ? `bg-gradient-to-br from-emerald-500/[0.12] to-emerald-600/[0.06] border-emerald-500/30 ${isLastHit ? "animate-glow-pulse" : ""}`
-            : "bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.04] hover:border-white/[0.1]"
+            : "bg-muted/30 border-border hover:bg-muted/60 hover:border-border"
         }`}
       >
         <div className="flex items-center justify-between px-3 py-2">
@@ -432,14 +432,14 @@ function TpMiniCard({ tp, index, isHit, isLastHit, entry, type }: {
                 </svg>
               </div>
             ) : (
-              <div className="w-6 h-6 rounded-full bg-white/[0.04] flex items-center justify-center">
+              <div className="w-6 h-6 rounded-full bg-muted/60 flex items-center justify-center">
                 <span className="text-[9px] text-slate-500 font-bold">{index + 1}</span>
               </div>
             )}
             <div>
               <div className="flex items-center gap-1.5">
                 <span className={`text-xs font-bold font-mono ${isHit ? "text-emerald-300" : "text-slate-300"}`}>{tp.tp}</span>
-                <span className={`text-[8px] font-mono px-1.5 py-0.5 rounded-md ${isHit ? "bg-emerald-500/20 text-emerald-400" : "bg-white/[0.04] text-slate-500"}`}>
+                <span className={`text-[8px] font-mono px-1.5 py-0.5 rounded-md ${isHit ? "bg-emerald-500/20 text-emerald-400" : "bg-muted/60 text-slate-500"}`}>
                   {direction}{diff}
                 </span>
               </div>
@@ -463,9 +463,9 @@ function TpMiniCard({ tp, index, isHit, isLastHit, entry, type }: {
         </div>
       </button>
       {expanded && (
-        <div className="tp-expand-enter mt-1 mx-2 mb-1 p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] space-y-2">
+        <div className="tp-expand-enter mt-1 mx-2 mb-1 p-3 rounded-xl bg-muted/30 border border-border space-y-2">
           <div className="grid grid-cols-2 gap-2 text-[11px]">
-            <div className="flex justify-between"><span className="text-slate-500">سعر الهدف</span><span className="font-mono font-bold text-white">{tp.tp}</span></div>
+            <div className="flex justify-between"><span className="text-slate-500">سعر الهدف</span><span className="font-mono font-bold text-foreground">{tp.tp}</span></div>
             <div className="flex justify-between"><span className="text-slate-500">المسافة</span><span className="font-mono text-slate-300">{direction}{diff} نقطة</span></div>
             <div className="flex justify-between"><span className="text-slate-500">R:R</span><span className="font-mono font-semibold text-amber-400">{tp.rr.toFixed(2)}</span></div>
             <div className="flex justify-between"><span className="text-slate-500">نسبة التحرك</span><span className="font-mono text-slate-300">{pctFromEntry}%</span></div>
@@ -477,7 +477,7 @@ function TpMiniCard({ tp, index, isHit, isLastHit, entry, type }: {
             </div>
           )}
           {!isHit && (
-            <div className="flex items-center gap-2 pt-1.5 border-t border-white/[0.04]">
+            <div className="flex items-center gap-2 pt-1.5 border-t border-border">
               <div className="w-1.5 h-1.5 rounded-full bg-slate-600" />
               <span className="text-[10px] text-slate-500">في انتظار التحقيق</span>
             </div>
@@ -508,7 +508,7 @@ function TradeStatusBanner({ s }: { s: Signal }) {
     ? { bg: "bg-gradient-to-br from-emerald-500/[0.1] to-emerald-600/[0.04] border-emerald-500/25 animate-profit-glow", iconBg: "bg-emerald-500/20", text: "text-emerald-400", badge: "bg-emerald-500/20 text-emerald-400", pill: "text-emerald-400/70 bg-emerald-500/10", sub: "text-emerald-400/60" }
     : isLoss
     ? { bg: "bg-gradient-to-br from-red-500/[0.1] to-red-600/[0.04] border-red-500/25 animate-loss-glow", iconBg: "bg-red-500/20", text: "text-red-400", badge: "bg-red-500/20 text-red-400", pill: "text-red-400/70 bg-red-500/10", sub: "text-red-400/60" }
-    : { bg: "bg-white/[0.03] border-white/[0.06]", iconBg: "bg-slate-500/20", text: "text-slate-400", badge: "bg-slate-500/20 text-slate-400", pill: "text-slate-400/70 bg-slate-500/10", sub: "text-slate-400/60" };
+    : { bg: "bg-muted/50 border-border", iconBg: "bg-slate-500/20", text: "text-slate-400", badge: "bg-slate-500/20 text-slate-400", pill: "text-slate-400/70 bg-slate-500/10", sub: "text-slate-400/60" };
   const catIcon = isReentry ? "♻️" : isPyramid ? "🔥" : "";
   const catLabel = isReentry ? "تعويض" : isPyramid ? "تعزيز" : "";
 
@@ -610,9 +610,9 @@ function EntryCard({ s, idx, isAdmin, onUpdate, onDelete }: {
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="font-extrabold text-white text-[15px] tracking-wide">{s.pair}</span>
-                  {s.timeframe && <span className="text-[9px] bg-white/[0.06] text-slate-400 px-1.5 py-0.5 rounded-md font-medium">{s.timeframe}</span>}
-                  {s.htfTimeframe && <span className="text-[9px] bg-white/[0.06] text-slate-400 px-1.5 py-0.5 rounded-md font-medium">{s.htfTimeframe}</span>}
+                  <span className="font-extrabold text-foreground text-[15px] tracking-wide">{s.pair}</span>
+                  {s.timeframe && <span className="text-[9px] bg-muted text-slate-400 px-1.5 py-0.5 rounded-md font-medium">{s.timeframe}</span>}
+                  {s.htfTimeframe && <span className="text-[9px] bg-muted text-slate-400 px-1.5 py-0.5 rounded-md font-medium">{s.htfTimeframe}</span>}
                 </div>
                 <span className="text-[10px] text-slate-500 font-medium">{typeLabel}</span>
               </div>
@@ -762,7 +762,7 @@ function EntryCard({ s, idx, isAdmin, onUpdate, onDelete }: {
                   <button key={i} onClick={() => onUpdate(s.id, "HIT_TP", i)} className="px-2.5 py-1 rounded-lg text-[10px] font-medium bg-sky-500/10 text-sky-400 border border-sky-500/15 active:scale-95 transition-transform hover:bg-sky-500/20">TP{i + 1} ✅</button>
                 ))}
                 <button onClick={() => onUpdate(s.id, "HIT_SL")} className="px-2.5 py-1 rounded-lg text-[10px] font-medium bg-red-500/10 text-red-400 border border-red-500/15 active:scale-95 transition-transform hover:bg-red-500/20">وقف ❌</button>
-                <button onClick={() => onUpdate(s.id, "MANUAL_CLOSE")} className="px-2.5 py-1 rounded-lg text-[10px] font-medium bg-white/[0.04] text-slate-400 border border-white/[0.06] active:scale-95 transition-transform hover:bg-white/[0.08]">إغلاق</button>
+                <button onClick={() => onUpdate(s.id, "MANUAL_CLOSE")} className="px-2.5 py-1 rounded-lg text-[10px] font-medium bg-muted/60 text-slate-400 border border-border active:scale-95 transition-transform hover:bg-muted/80">إغلاق</button>
                 <button onClick={() => onDelete(s.id)} className="px-2.5 py-1 rounded-lg text-[10px] font-medium bg-red-500/5 text-red-300/60 border border-red-500/10 active:scale-95 transition-transform hover:bg-red-500/10">🗑</button>
               </div>
             </>
@@ -796,7 +796,7 @@ function ClosedSignalCard({ s, idx, isAdmin, onDelete }: { s: Signal; idx: numbe
     ? { bg: "bg-gradient-to-r from-emerald-500/[0.08] to-emerald-600/[0.03]", border: "border-emerald-500/20", iconBg: "bg-emerald-500/15", text: "text-emerald-400", badge: "bg-emerald-500/20 text-emerald-400", tpBadge: "bg-emerald-500/15 text-emerald-400 border-emerald-500/20" }
     : isLoss
     ? { bg: "bg-gradient-to-r from-red-500/[0.08] to-red-600/[0.03]", border: "border-red-500/20", iconBg: "bg-red-500/15", text: "text-red-400", badge: "bg-red-500/20 text-red-400", tpBadge: "bg-emerald-500/15 text-emerald-400 border-emerald-500/20" }
-    : { bg: "bg-white/[0.03]", border: "border-white/[0.06]", iconBg: "bg-slate-500/15", text: "text-slate-400", badge: "bg-slate-500/20 text-slate-400", tpBadge: "bg-slate-500/10 text-slate-400 border-white/[0.06]" };
+    : { bg: "bg-muted/50", border: "border-border", iconBg: "bg-slate-500/15", text: "text-slate-400", badge: "bg-slate-500/20 text-slate-400", tpBadge: "bg-slate-500/10 text-slate-400 border-border" };
   const catIcon = isReentry ? "♻️" : isPyramid ? "🔥" : isPartialWin ? "⚡" : isProfit ? "✅" : isLoss ? "❌" : "⊘";
 
   return (
@@ -818,7 +818,7 @@ function ClosedSignalCard({ s, idx, isAdmin, onDelete }: { s: Signal; idx: numbe
               </div>
               <div>
                 <div className="flex items-center gap-1.5">
-                  <span className="font-bold text-white text-[13px]">{s.pair}</span>
+                  <span className="font-bold text-foreground text-[13px]">{s.pair}</span>
                   <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-md ${isBuy ? "bg-emerald-500/15 text-emerald-400" : "bg-red-500/15 text-red-400"}`}>{isBuy ? "BUY" : "SELL"}</span>
                   {hitCount > 0 && isProfit && (
                     <span className={`text-[8px] ${catColors.badge} px-1.5 py-0.5 rounded-md font-bold`}>{hitCount}/{totalTPs} {isReentry ? "♻️" : isPyramid ? "🔥" : "TP"}</span>
@@ -846,15 +846,15 @@ function ClosedSignalCard({ s, idx, isAdmin, onDelete }: { s: Signal; idx: numbe
         {/* Expanded Details */}
         {expanded && (
           <div className="tp-expand-enter">
-            <div className="border-t border-white/[0.04] mx-3" />
+            <div className="border-t border-border mx-3" />
             <div className="p-3 space-y-2.5">
               {/* Entry / SL / Hit Price */}
               <div className="grid grid-cols-3 gap-2">
-                <div className="bg-white/[0.03] rounded-lg p-2 border border-white/[0.05]">
+                <div className="bg-muted/50 rounded-lg p-2 border border-border">
                   <div className="text-[8px] text-slate-500 mb-0.5">الدخول</div>
-                  <div className="text-[11px] font-bold font-mono text-white">{s.entry}</div>
+                  <div className="text-[11px] font-bold font-mono text-foreground">{s.entry}</div>
                 </div>
-                <div className="bg-white/[0.03] rounded-lg p-2 border border-white/[0.05]">
+                <div className="bg-muted/50 rounded-lg p-2 border border-border">
                   <div className="text-[8px] text-slate-500 mb-0.5">الوقف</div>
                   <div className="text-[11px] font-bold font-mono text-red-300">{s.stopLoss}</div>
                 </div>
@@ -872,7 +872,7 @@ function ClosedSignalCard({ s, idx, isAdmin, onDelete }: { s: Signal; idx: numbe
                     {s.takeProfits.map((tp, i) => {
                       const hit = s.hitTpIndex > 0 && i < s.hitTpIndex;
                       return (
-                        <div key={i} className={`px-2 py-1 rounded-lg text-[9px] font-mono border ${hit ? catColors.tpBadge : "bg-white/[0.02] text-slate-500 border-white/[0.06] line-through opacity-50"}`}>
+                        <div key={i} className={`px-2 py-1 rounded-lg text-[9px] font-mono border ${hit ? catColors.tpBadge : "bg-muted/30 text-slate-500 border-border line-through opacity-50"}`}>
                           TP{i+1}: {tp.tp} ({tp.rr.toFixed(1)}R)
                         </div>
                       );
@@ -1886,7 +1886,7 @@ export default function HomePage() {
         <div className="absolute bottom-[-15%] right-[-10%] w-64 h-64 rounded-full opacity-15" style={{ background: "radial-gradient(circle, #00E676 0%, transparent 70%)", filter: "blur(80px)" }} />
 
         <div className="w-full max-w-[480px] animate-[fadeInUp_0.5s_ease-out] relative z-10">
-          <div className="backdrop-blur-2xl bg-white/[0.03] border border-white/[0.08] shadow-2xl rounded-3xl p-8 space-y-7">
+          <div className="backdrop-blur-2xl bg-muted/50 border border-border shadow-2xl rounded-3xl p-8 space-y-7">
             {/* Logo & Title */}
             <div className="flex flex-col items-center gap-4">
               <div className="w-20 h-20 rounded-2xl gold-gradient flex items-center justify-center shadow-lg shadow-amber-500/25">
@@ -1895,7 +1895,7 @@ export default function HomePage() {
                 </svg>
               </div>
               <div className="text-center">
-                <h1 className="text-2xl font-extrabold text-white tracking-wide">ForexYemeni</h1>
+                <h1 className="text-2xl font-extrabold text-foreground tracking-wide">ForexYemeni</h1>
                 <p className="text-sm font-bold mt-1.5" style={{ color: "#FFD700" }}>VIP TRADING SIGNALS</p>
               </div>
             </div>
@@ -1910,7 +1910,7 @@ export default function HomePage() {
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                   placeholder="البريد الإلكتروني"
-                  className="flex-1 bg-transparent border-none outline-none text-white placeholder:text-slate-600 text-sm"
+                  className="flex-1 bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground text-sm"
                   dir="ltr"
                   onKeyDown={e => e.key === "Enter" && handleLogin()}
                 />
@@ -1924,7 +1924,7 @@ export default function HomePage() {
                   value={pwd}
                   onChange={e => setPwd(e.target.value)}
                   placeholder="كلمة المرور"
-                  className="flex-1 bg-transparent border-none outline-none text-white placeholder:text-slate-600 text-sm"
+                  className="flex-1 bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground text-sm"
                   dir="ltr"
                   onKeyDown={e => e.key === "Enter" && handleLogin()}
                 />
@@ -1983,14 +1983,14 @@ export default function HomePage() {
         <div className="absolute bottom-[-15%] right-[-10%] w-64 h-64 rounded-full opacity-15" style={{ background: "radial-gradient(circle, #00E676 0%, transparent 70%)", filter: "blur(80px)" }} />
 
         <div className="w-full max-w-[480px] animate-[fadeInUp_0.5s_ease-out] relative z-10">
-          <div className="backdrop-blur-2xl bg-white/[0.03] border border-white/[0.08] shadow-2xl rounded-3xl p-8 space-y-7">
+          <div className="backdrop-blur-2xl bg-muted/50 border border-border shadow-2xl rounded-3xl p-8 space-y-7">
             {/* Icon & Title */}
             <div className="flex flex-col items-center gap-4">
               <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-sky-400 to-blue-600 flex items-center justify-center shadow-lg shadow-sky-500/25">
-                <User className="w-10 h-10 text-white" />
+                <User className="w-10 h-10 text-foreground" />
               </div>
               <div className="text-center">
-                <h2 className="text-2xl font-extrabold text-white">إنشاء حساب جديد</h2>
+                <h2 className="text-2xl font-extrabold text-foreground">إنشاء حساب جديد</h2>
                 <p className="text-xs text-slate-400 mt-1.5">سجل الآن وانتظر موافقة الإدارة</p>
               </div>
             </div>
@@ -2004,7 +2004,7 @@ export default function HomePage() {
                   value={regName}
                   onChange={e => setRegName(e.target.value)}
                   placeholder="الاسم الكامل"
-                  className="flex-1 bg-transparent border-none outline-none text-white placeholder:text-slate-600 text-sm"
+                  className="flex-1 bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground text-sm"
                   dir="rtl"
                 />
               </div>
@@ -2017,7 +2017,7 @@ export default function HomePage() {
                   value={regEmail}
                   onChange={e => setRegEmail(e.target.value)}
                   placeholder="البريد الإلكتروني"
-                  className="flex-1 bg-transparent border-none outline-none text-white placeholder:text-slate-600 text-sm"
+                  className="flex-1 bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground text-sm"
                   dir="ltr"
                 />
               </div>
@@ -2030,7 +2030,7 @@ export default function HomePage() {
                   value={regPwd}
                   onChange={e => setRegPwd(e.target.value)}
                   placeholder="كلمة المرور (6 أحرف على الأقل)"
-                  className="flex-1 bg-transparent border-none outline-none text-white placeholder:text-slate-600 text-sm"
+                  className="flex-1 bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground text-sm"
                   dir="ltr"
                   onKeyDown={e => e.key === "Enter" && handleRegister()}
                 />
@@ -2082,14 +2082,14 @@ export default function HomePage() {
         <div className="absolute bottom-[-15%] right-[-10%] w-64 h-64 rounded-full opacity-15" style={{ background: "radial-gradient(circle, #00E676 0%, transparent 70%)", filter: "blur(80px)" }} />
 
         <div className="w-full max-w-[480px] animate-[fadeInUp_0.5s_ease-out] relative z-10">
-          <div className="backdrop-blur-2xl bg-white/[0.03] border border-white/[0.08] shadow-2xl rounded-3xl p-8 space-y-7 text-center">
+          <div className="backdrop-blur-2xl bg-muted/50 border border-border shadow-2xl rounded-3xl p-8 space-y-7 text-center">
             {/* Hourglass Icon */}
             <div className="flex flex-col items-center gap-4">
               <div className="w-20 h-20 rounded-2xl bg-sky-500/15 flex items-center justify-center status-pending-icon">
                 <Clock className="w-10 h-10 text-sky-400" />
               </div>
               <div>
-                <h2 className="text-2xl font-extrabold text-white">حسابك قيد المراجعة</h2>
+                <h2 className="text-2xl font-extrabold text-foreground">حسابك قيد المراجعة</h2>
                 <p className="text-sm text-slate-400 mt-3 leading-relaxed">
                   أهلاً بك في نادي الـ VIP! حسابك قيد المراجعة من قبل الإدارة.
                   <br />
@@ -2119,7 +2119,7 @@ export default function HomePage() {
         <div className="absolute top-[-20%] right-[-10%] w-72 h-72 rounded-full opacity-25" style={{ background: "radial-gradient(circle, #EF4444 0%, transparent 70%)", filter: "blur(80px)" }} />
 
         <div className="w-full max-w-[480px] animate-[fadeInUp_0.5s_ease-out] relative z-10">
-          <div className="backdrop-blur-2xl bg-white/[0.03] border border-red-500/15 shadow-2xl rounded-3xl p-8 space-y-7 text-center">
+          <div className="backdrop-blur-2xl bg-muted/50 border border-red-500/15 shadow-2xl rounded-3xl p-8 space-y-7 text-center">
             {/* Lock Icon */}
             <div className="flex flex-col items-center gap-4">
               <div className="w-20 h-20 rounded-2xl bg-red-500/15 flex items-center justify-center status-pending-icon">
@@ -2157,7 +2157,7 @@ export default function HomePage() {
         <div className="absolute bottom-[-15%] right-[-10%] w-64 h-64 rounded-full opacity-15" style={{ background: "radial-gradient(circle, #00E676 0%, transparent 70%)", filter: "blur(80px)" }} />
 
         <div className="w-full max-w-[480px] animate-[fadeInUp_0.5s_ease-out] relative z-10">
-          <div className="backdrop-blur-2xl bg-white/[0.03] border border-white/[0.08] shadow-2xl rounded-3xl p-8 space-y-7 text-center">
+          <div className="backdrop-blur-2xl bg-muted/50 border border-border shadow-2xl rounded-3xl p-8 space-y-7 text-center">
             {/* Ban Icon */}
             <div className="flex flex-col items-center gap-4">
               <div className="w-20 h-20 rounded-2xl gold-gradient flex items-center justify-center status-pending-icon">
@@ -2197,13 +2197,13 @@ export default function HomePage() {
         <div className="absolute bottom-[-15%] right-[-10%] w-64 h-64 rounded-full opacity-15" style={{ background: "radial-gradient(circle, #00E676 0%, transparent 70%)", filter: "blur(80px)" }} />
 
         <div className="w-full max-w-[480px] animate-[fadeInUp_0.5s_ease-out] relative z-10">
-          <div className="backdrop-blur-2xl bg-white/[0.03] border border-white/[0.08] shadow-2xl rounded-3xl p-8 space-y-6">
+          <div className="backdrop-blur-2xl bg-muted/50 border border-border shadow-2xl rounded-3xl p-8 space-y-6">
             <div className="flex flex-col items-center gap-4">
               <div className="w-20 h-20 rounded-2xl gold-gradient flex items-center justify-center shadow-lg shadow-amber-500/25">
                 <AlertTriangle className="w-10 h-10 text-black" />
               </div>
               <div className="text-center">
-                <h2 className="text-xl font-extrabold text-white">تغيير بيانات الحساب</h2>
+                <h2 className="text-xl font-extrabold text-foreground">تغيير بيانات الحساب</h2>
                 <p className="text-xs text-slate-400 mt-1.5">يجب تغيير البريد وكلمة المرور للمتابعة</p>
               </div>
             </div>
@@ -2211,22 +2211,22 @@ export default function HomePage() {
               <div className="input-glass rounded-2xl px-4 h-[60px] flex items-center gap-3">
                 <Lock className="w-5 h-5 text-slate-500 flex-shrink-0" />
                 <input type="password" value={cpCur} onChange={e => setCpCur(e.target.value)} placeholder="كلمة المرور الحالية"
-                  className="flex-1 bg-transparent border-none outline-none text-white placeholder:text-slate-600 text-sm" dir="ltr" />
+                  className="flex-1 bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground text-sm" dir="ltr" />
               </div>
               <div className="input-glass rounded-2xl px-4 h-[60px] flex items-center gap-3">
                 <Mail className="w-5 h-5 text-slate-500 flex-shrink-0" />
                 <input type="email" value={cpEmail} onChange={e => setCpEmail(e.target.value)} placeholder="البريد الإلكتروني الجديد"
-                  className="flex-1 bg-transparent border-none outline-none text-white placeholder:text-slate-600 text-sm" dir="ltr" />
+                  className="flex-1 bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground text-sm" dir="ltr" />
               </div>
               <div className="input-glass rounded-2xl px-4 h-[60px] flex items-center gap-3">
                 <Lock className="w-5 h-5 text-slate-500 flex-shrink-0" />
                 <input type="password" value={cpNew} onChange={e => setCpNew(e.target.value)} placeholder="كلمة المرور الجديدة"
-                  className="flex-1 bg-transparent border-none outline-none text-white placeholder:text-slate-600 text-sm" dir="ltr" />
+                  className="flex-1 bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground text-sm" dir="ltr" />
               </div>
               <div className="input-glass rounded-2xl px-4 h-[60px] flex items-center gap-3">
                 <Lock className="w-5 h-5 text-slate-500 flex-shrink-0" />
                 <input type="password" value={cpConf} onChange={e => setCpConf(e.target.value)} placeholder="تأكيد كلمة المرور"
-                  className="flex-1 bg-transparent border-none outline-none text-white placeholder:text-slate-600 text-sm" dir="ltr" />
+                  className="flex-1 bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground text-sm" dir="ltr" />
               </div>
               {cpErr && <div className="bg-red-500/10 border border-red-500/20 rounded-2xl px-4 py-3 text-[12px] text-red-400 text-center">{cpErr}</div>}
               <button onClick={handleChangePwd} disabled={cpLoad}
@@ -2273,14 +2273,14 @@ export default function HomePage() {
       )}
 
       {/* ── Header ── */}
-      <header className="sticky top-0 z-40 border-b border-white/[0.06] bg-[#080d1a]/80 backdrop-blur-lg dark:bg-[#080d1a]/80">
+      <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-lg">
         <div className="flex items-center justify-between px-4 h-14">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
               <Radio className="w-4 h-4 text-black" />
             </div>
             <div className="flex flex-col">
-              <span className="font-bold text-white text-sm tracking-wide">ForexYemeni</span>
+              <span className="font-bold text-foreground text-sm tracking-wide">ForexYemeni</span>
               <div className="flex items-center gap-1 -mt-0.5">
                 <div className={`w-1.5 h-1.5 rounded-full ${isOnline ? "bg-emerald-400 animate-online-pulse" : "bg-red-400"}`} />
                 <span className={`text-[9px] ${isOnline ? "text-emerald-400" : "text-red-400"}`}>{isOnline ? "متصل" : "غير متصل"}</span>
@@ -2290,18 +2290,18 @@ export default function HomePage() {
           <div className="flex items-center gap-2">
             {/* Theme Toggle */}
             {mounted && (
-              <button onClick={() => setTheme(theme === "dark" ? "light" : "dark")} className="w-8 h-8 rounded-lg bg-white/[0.05] flex items-center justify-center text-slate-400 hover:text-white transition-colors">
+              <button onClick={() => setTheme(theme === "dark" ? "light" : "dark")} className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
                 {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
               </button>
             )}
             {/* Audio Controls */}
-            <button onClick={() => setAudioMuted(!audioMuted)} className="w-8 h-8 rounded-lg bg-white/[0.05] flex items-center justify-center text-slate-400 hover:text-white transition-colors">
+            <button onClick={() => setAudioMuted(!audioMuted)} className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
               {audioMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
             </button>
-            <button onClick={() => setRefreshKey(k => k + 1)} className="w-8 h-8 rounded-lg bg-white/[0.05] flex items-center justify-center text-slate-400 hover:text-white transition-colors active:scale-90">
+            <button onClick={() => setRefreshKey(k => k + 1)} className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors active:scale-90">
               <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
             </button>
-            <button onClick={handleLogout} className="w-8 h-8 rounded-lg bg-white/[0.05] flex items-center justify-center text-slate-400 hover:text-red-400 transition-colors">
+            <button onClick={handleLogout} className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-muted-foreground hover:text-red-400 transition-colors">
               <LogOut className="w-4 h-4" />
             </button>
           </div>
@@ -2370,7 +2370,7 @@ export default function HomePage() {
                 <div className="flex items-start justify-between mb-4">
                   <div>
                     <div className="text-[11px] text-amber-400/70 font-medium">{currentDay}</div>
-                    <h1 className="text-xl font-extrabold text-white mt-1">
+                    <h1 className="text-xl font-extrabold text-foreground mt-1">
                       {isAdmin ? "مرحباً، المدير" : `${greeting}، ${session?.name?.split(" ")[0] || ""}`}
                     </h1>
                     <p className="text-[11px] text-slate-400 mt-1">
@@ -2386,15 +2386,15 @@ export default function HomePage() {
                 </div>
                 {/* Quick Stats Row */}
                 <div className="grid grid-cols-3 gap-2">
-                  <div className="bg-black/20 backdrop-blur-sm rounded-xl p-2.5 text-center border border-white/[0.06]">
+                  <div className="bg-black/20 backdrop-blur-sm rounded-xl p-2.5 text-center border border-border">
                     <div className="text-lg font-extrabold text-emerald-400">{todayWins}</div>
                     <div className="text-[9px] text-emerald-400/70 font-medium">ربح اليوم</div>
                   </div>
-                  <div className="bg-black/20 backdrop-blur-sm rounded-xl p-2.5 text-center border border-white/[0.06]">
+                  <div className="bg-black/20 backdrop-blur-sm rounded-xl p-2.5 text-center border border-border">
                     <div className="text-lg font-extrabold text-red-400">{todayLosses}</div>
                     <div className="text-[9px] text-red-400/70 font-medium">خسارة اليوم</div>
                   </div>
-                  <div className="bg-black/20 backdrop-blur-sm rounded-xl p-2.5 text-center border border-white/[0.06]">
+                  <div className="bg-black/20 backdrop-blur-sm rounded-xl p-2.5 text-center border border-border">
                     <div className={`text-lg font-extrabold ${todayPnl >= 0 ? "text-emerald-400" : "text-red-400"}`}>
                       {todayPnl >= 0 ? "+" : ""}{todayPnl > 0 ? `$${todayPnl}` : todayPnl < 0 ? `-$${Math.abs(todayPnl)}` : "$0"}
                     </div>
@@ -2419,7 +2419,7 @@ export default function HomePage() {
                 <div className="flex items-center justify-between mb-3 px-1">
                   <div className="flex items-center gap-2">
                     <div className="w-1 h-5 rounded-full bg-gradient-to-b from-amber-400 to-orange-500" />
-                    <span className="text-xs font-bold text-white">الإشارات النشطة</span>
+                    <span className="text-xs font-bold text-foreground">الإشارات النشطة</span>
                     <span className="text-[9px] bg-amber-500/15 text-amber-400 px-1.5 py-0.5 rounded-md font-bold">{activeSignals.length}</span>
                   </div>
                   <button onClick={() => setTab("signals")} className="text-[10px] text-amber-400 font-medium flex items-center gap-0.5 hover:text-amber-300 transition-colors">
@@ -2432,17 +2432,17 @@ export default function HomePage() {
                     const isBuy = s.type === "BUY";
                     return (
                       <div key={s.id} className="animate-[fadeInUp_0.3s_ease-out]" style={{ animationDelay: `${i * 60}ms`, animationFillMode: "both" }}>
-                        <div className={`rounded-2xl border ${ac.border} bg-white/[0.03] p-3 flex items-center gap-3 active:scale-[0.99] transition-transform cursor-pointer`} onClick={() => setTab("signals")}>
+                        <div className={`rounded-2xl border ${ac.border} bg-muted/50 p-3 flex items-center gap-3 active:scale-[0.99] transition-transform cursor-pointer`} onClick={() => setTab("signals")}>
                           <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${ac.bg}`}>
                             {isBuy ? <TrendingUp className={`w-5 h-5 ${ac.text}`} /> : <TrendingDown className={`w-5 h-5 ${ac.text}`} />}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
-                              <span className="font-bold text-white text-sm">{s.pair}</span>
+                              <span className="font-bold text-foreground text-sm">{s.pair}</span>
                               <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${isBuy ? "bg-emerald-500/15 text-emerald-400" : "bg-red-500/15 text-red-400"}`}>
                                 {isBuy ? "شراء" : "بيع"}
                               </span>
-                              {s.timeframe && <span className="text-[8px] bg-white/[0.06] text-slate-500 px-1 py-0.5 rounded-md">{s.timeframe}</span>}
+                              {s.timeframe && <span className="text-[8px] bg-muted text-slate-500 px-1 py-0.5 rounded-md">{s.timeframe}</span>}
                             </div>
                             <div className="flex items-center gap-3 mt-1 text-[10px]">
                               <span className="text-slate-400">دخول: <span className="font-mono font-semibold text-slate-200">{s.entry}</span></span>
@@ -2468,7 +2468,7 @@ export default function HomePage() {
             <div>
               <div className="flex items-center gap-2 mb-3 px-1">
                 <div className="w-1 h-5 rounded-full bg-gradient-to-b from-sky-400 to-blue-500" />
-                <span className="text-xs font-bold text-white">الأداء العام</span>
+                <span className="text-xs font-bold text-foreground">الأداء العام</span>
               </div>
               <div className="grid grid-cols-2 gap-2.5">
                 {/* Win Rate */}
@@ -2482,7 +2482,7 @@ export default function HomePage() {
                     <div className={`text-2xl font-extrabold ${stats && stats.winRate >= 60 ? "text-emerald-400" : stats && stats.winRate >= 40 ? "text-amber-400" : "text-red-400"}`}>
                       {stats ? `${stats.winRate}%` : "—"}
                     </div>
-                    <div className="mt-1.5 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+                    <div className="mt-1.5 h-1.5 rounded-full bg-muted overflow-hidden">
                       {stats && <div className="h-full rounded-full bg-gradient-to-l from-emerald-500 to-emerald-400 transition-all duration-500" style={{ width: `${stats.winRate}%` }} />}
                     </div>
                   </div>
@@ -2561,7 +2561,7 @@ export default function HomePage() {
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-1.5">
                     <Target className="w-3.5 h-3.5 text-amber-400" />
-                    <span className="text-xs font-bold text-white">نتائج الصفقات</span>
+                    <span className="text-xs font-bold text-foreground">نتائج الصفقات</span>
                   </div>
                   <div className="flex items-center gap-2 text-[10px]">
                     <span className="text-emerald-400 font-semibold">{stats.hitTp} ربح</span>
@@ -2569,7 +2569,7 @@ export default function HomePage() {
                     <span className="text-red-400 font-semibold">{stats.hitSl} خسارة</span>
                   </div>
                 </div>
-                <div className="h-4 rounded-2xl bg-white/[0.06] overflow-hidden flex">
+                <div className="h-4 rounded-2xl bg-muted overflow-hidden flex">
                   <div className="bg-gradient-to-l from-emerald-400 to-emerald-500 h-full rounded-r-2xl transition-all duration-700 flex items-center justify-center"
                     style={{ width: `${(stats.hitTp / (stats.hitTp + stats.hitSl)) * 100}%` }}>
                     {(stats.hitTp / (stats.hitTp + stats.hitSl)) * 100 > 15 && (
@@ -2592,7 +2592,7 @@ export default function HomePage() {
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                       <Crown className="w-4 h-4 text-amber-400" />
-                      <span className="text-xs font-bold text-white">حالة الاشتراك</span>
+                      <span className="text-xs font-bold text-foreground">حالة الاشتراك</span>
                     </div>
                     {session?.subscriptionType && session.subscriptionType !== "none" && (
                       <div className={`px-2.5 py-1 rounded-xl text-[10px] font-bold ${subDaysLeft && subDaysLeft > 7 ? "bg-emerald-500/15 text-emerald-400" : subDaysLeft && subDaysLeft > 0 ? "bg-amber-500/15 text-amber-400" : "bg-red-500/15 text-red-400"}`}>
@@ -2609,10 +2609,10 @@ export default function HomePage() {
                         </span>
                       </div>
                       {session.packageName && (
-                        <div className="bg-white/[0.04] rounded-xl p-3 border border-white/[0.06] flex items-center justify-between">
+                        <div className="bg-muted/60 rounded-xl p-3 border border-border flex items-center justify-between">
                           <div>
                             <div className="text-[10px] text-slate-500">الباقة</div>
-                            <div className="text-[13px] font-bold text-white">{session.packageName}</div>
+                            <div className="text-[13px] font-bold text-foreground">{session.packageName}</div>
                           </div>
                           {session.subscriptionExpiry && (
                             <div className="text-left">
@@ -2625,7 +2625,7 @@ export default function HomePage() {
                       {/* Expiry progress bar */}
                       {subDaysLeft !== null && subDaysLeft > 0 && (
                         <div className="mt-1">
-                          <div className="h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+                          <div className="h-1.5 rounded-full bg-muted overflow-hidden">
                             <div className={`h-full rounded-full transition-all duration-500 ${subDaysLeft > 14 ? "bg-emerald-500" : subDaysLeft > 7 ? "bg-amber-500" : "bg-red-500"}`}
                               style={{ width: `${Math.min(100, (subDaysLeft / 30) * 100)}%` }} />
                           </div>
@@ -2647,22 +2647,22 @@ export default function HomePage() {
               <div>
                 <div className="flex items-center gap-2 mb-3 px-1">
                   <div className="w-1 h-5 rounded-full bg-gradient-to-b from-purple-400 to-pink-500" />
-                  <span className="text-xs font-bold text-white">إدارة سريعة</span>
+                  <span className="text-xs font-bold text-foreground">إدارة سريعة</span>
                 </div>
                 <div className="grid grid-cols-3 gap-2">
-                  <button onClick={() => setTab("users")} className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-3 text-center active:scale-95 transition-transform">
+                  <button onClick={() => setTab("users")} className="rounded-2xl border border-border bg-muted/50 p-3 text-center active:scale-95 transition-transform">
                     <Users className="w-5 h-5 text-sky-400 mx-auto mb-1.5" />
-                    <div className="text-lg font-extrabold text-white">{totalActiveUsers}</div>
+                    <div className="text-lg font-extrabold text-foreground">{totalActiveUsers}</div>
                     <div className="text-[9px] text-slate-500 font-medium">مستخدم نشط</div>
                   </button>
-                  <button onClick={() => setTab("packages")} className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-3 text-center active:scale-95 transition-transform">
+                  <button onClick={() => setTab("packages")} className="rounded-2xl border border-border bg-muted/50 p-3 text-center active:scale-95 transition-transform">
                     <Wallet className="w-5 h-5 text-emerald-400 mx-auto mb-1.5" />
-                    <div className="text-lg font-extrabold text-white">{totalSubscribers}</div>
+                    <div className="text-lg font-extrabold text-foreground">{totalSubscribers}</div>
                     <div className="text-[9px] text-slate-500 font-medium">مشترك</div>
                   </button>
-                  <button onClick={() => setTab("signals")} className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-3 text-center active:scale-95 transition-transform">
+                  <button onClick={() => setTab("signals")} className="rounded-2xl border border-border bg-muted/50 p-3 text-center active:scale-95 transition-transform">
                     <Activity className="w-5 h-5 text-amber-400 mx-auto mb-1.5" />
-                    <div className="text-lg font-extrabold text-white">{activeSignals.length}</div>
+                    <div className="text-lg font-extrabold text-foreground">{activeSignals.length}</div>
                     <div className="text-[9px] text-slate-500 font-medium">إشارة مفتوحة</div>
                   </button>
                 </div>
@@ -2675,7 +2675,7 @@ export default function HomePage() {
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-1.5">
                     <Globe className="w-3.5 h-3.5 text-amber-400" />
-                    <span className="text-xs font-bold text-white">الأزواج الأكثر تداولاً</span>
+                    <span className="text-xs font-bold text-foreground">الأزواج الأكثر تداولاً</span>
                   </div>
                 </div>
                 <div className="space-y-2.5">
@@ -2683,11 +2683,11 @@ export default function HomePage() {
                     const maxCount = stats.topPairs[0].count;
                     return (
                       <div key={i} className="flex items-center gap-2.5">
-                        <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-bold ${i === 0 ? "bg-amber-500/15 text-amber-400" : i === 1 ? "bg-slate-400/10 text-slate-300" : i === 2 ? "bg-orange-500/10 text-orange-400" : "bg-white/[0.04] text-slate-500"}`}>
+                        <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-bold ${i === 0 ? "bg-amber-500/15 text-amber-400" : i === 1 ? "bg-slate-400/10 text-slate-300" : i === 2 ? "bg-orange-500/10 text-orange-400" : "bg-muted/60 text-slate-500"}`}>
                           {i + 1}
                         </div>
-                        <span className="text-xs font-semibold text-white w-20 truncate">{p.pair}</span>
-                        <div className="flex-1 h-2 rounded-full bg-white/[0.06] overflow-hidden">
+                        <span className="text-xs font-semibold text-foreground w-20 truncate">{p.pair}</span>
+                        <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
                           <div className="h-full rounded-full bg-gradient-to-l from-amber-500 to-orange-500 transition-all duration-500" style={{ width: `${(p.count / maxCount) * 100}%` }} />
                         </div>
                         <span className="text-[10px] font-mono text-slate-400 w-6 text-left">{p.count}</span>
@@ -2704,7 +2704,7 @@ export default function HomePage() {
                 <div className="flex items-center justify-between mb-3 px-1">
                   <div className="flex items-center gap-2">
                     <div className="w-1 h-5 rounded-full bg-gradient-to-b from-emerald-400 to-red-500" />
-                    <span className="text-xs font-bold text-white">آخر النتائج</span>
+                    <span className="text-xs font-bold text-foreground">آخر النتائج</span>
                   </div>
                   <button onClick={() => setTab("signals")} className="text-[10px] text-amber-400 font-medium flex items-center gap-0.5 hover:text-amber-300 transition-colors">
                     الكل <ArrowUpRight className="w-3 h-3" />
@@ -2715,7 +2715,7 @@ export default function HomePage() {
                     const isProfit = s.status === "HIT_TP";
                     const isBuy = s.type === "BUY";
                     return (
-                      <div key={s.id} className="flex items-center gap-3 rounded-xl px-3 py-2.5 border border-white/[0.04] bg-white/[0.02] animate-[fadeInUp_0.25s_ease-out]" style={{ animationDelay: `${i * 50}ms`, animationFillMode: "both" }}>
+                      <div key={s.id} className="flex items-center gap-3 rounded-xl px-3 py-2.5 border border-border bg-muted/30 animate-[fadeInUp_0.25s_ease-out]" style={{ animationDelay: `${i * 50}ms`, animationFillMode: "both" }}>
                         <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isProfit ? "bg-emerald-500/10" : "bg-red-500/10"}`}>
                           {isProfit ? (
                             <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
@@ -2725,7 +2725,7 @@ export default function HomePage() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5">
-                            <span className="text-xs font-bold text-white">{s.pair}</span>
+                            <span className="text-xs font-bold text-foreground">{s.pair}</span>
                             <span className={`text-[8px] font-bold px-1 py-0.5 rounded ${isBuy ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"}`}>{isBuy ? "BUY" : "SELL"}</span>
                           </div>
                           <span className="text-[9px] text-slate-500">{timeAgo(s.createdAt)}</span>
@@ -2748,7 +2748,7 @@ export default function HomePage() {
               <Glass className="p-4">
                 <div className="flex items-center gap-1.5 mb-3">
                   <PieChart className="w-3.5 h-3.5 text-amber-400" />
-                  <span className="text-xs font-bold text-white">توزيع الشراء والبيع</span>
+                  <span className="text-xs font-bold text-foreground">توزيع الشراء والبيع</span>
                 </div>
                 <div className="flex gap-3">
                   <div className="flex-1 rounded-xl bg-emerald-500/[0.06] border border-emerald-500/10 p-3 text-center">
@@ -2762,7 +2762,7 @@ export default function HomePage() {
                     <div className="text-[9px] text-red-400/70 font-medium">بيع</div>
                   </div>
                 </div>
-                <div className="mt-3 h-2.5 rounded-full bg-white/[0.06] overflow-hidden flex">
+                <div className="mt-3 h-2.5 rounded-full bg-muted overflow-hidden flex">
                   <div className="bg-gradient-to-l from-emerald-500 to-emerald-400 h-full rounded-r-full transition-all duration-500"
                     style={{ width: `${(stats.buyCount / (stats.buyCount + stats.sellCount)) * 100}%` }} />
                   <div className="bg-gradient-to-l from-red-500 to-red-400 h-full rounded-l-full flex-1" />
@@ -2772,7 +2772,7 @@ export default function HomePage() {
 
             {/* ── Motivational Footer ── */}
             <div className="text-center py-2">
-              <div className="inline-flex items-center gap-1.5 bg-white/[0.03] rounded-full px-4 py-2 border border-white/[0.05]">
+              <div className="inline-flex items-center gap-1.5 bg-muted/50 rounded-full px-4 py-2 border border-border">
                 <Sparkles className="w-3.5 h-3.5 text-amber-400" />
                 <span className="text-[10px] text-slate-400">
                   {stats && stats.winRate >= 70
@@ -2822,7 +2822,7 @@ export default function HomePage() {
 
             {/* ── Premium Stats Header ── */}
             {stats && (
-              <div className="rounded-2xl border border-white/[0.06] overflow-hidden" style={{ background: "linear-gradient(135deg, rgba(255,215,0,0.06) 0%, rgba(255,140,0,0.03) 50%, rgba(255,215,0,0.06) 100%)" }}>
+              <div className="rounded-2xl border border-border overflow-hidden" style={{ background: "linear-gradient(135deg, rgba(255,215,0,0.06) 0%, rgba(255,140,0,0.03) 50%, rgba(255,215,0,0.06) 100%)" }}>
                 <div className="p-4">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="w-1 h-5 rounded-full bg-gradient-to-b from-amber-400 to-orange-500" />
@@ -2830,11 +2830,11 @@ export default function HomePage() {
                   </div>
                   <div className="grid grid-cols-4 gap-2">
                     <div className="text-center">
-                      <div className="text-lg font-extrabold text-white">{stats.active}</div>
+                      <div className="text-lg font-extrabold text-foreground">{stats.active}</div>
                       <div className="text-[9px] text-emerald-400 font-medium">نشطة</div>
                     </div>
                     <div className="text-center">
-                      <div className="text-lg font-extrabold text-white">{stats.total}</div>
+                      <div className="text-lg font-extrabold text-foreground">{stats.total}</div>
                       <div className="text-[9px] text-slate-400 font-medium">إجمالي</div>
                     </div>
                     <div className="text-center">
@@ -2852,7 +2852,7 @@ export default function HomePage() {
                         <span className="text-emerald-400 font-semibold">ربح {winClosed.length}</span>
                         <span className="text-red-400 font-semibold">خسارة {lossClosed.length}</span>
                       </div>
-                      <div className="h-2 rounded-full bg-white/[0.06] overflow-hidden flex">
+                      <div className="h-2 rounded-full bg-muted overflow-hidden flex">
                         <div className="bg-gradient-to-l from-emerald-400 to-emerald-500 h-full rounded-r-full transition-all" style={{ width: `${closedWinRate}%` }} />
                         <div className="bg-gradient-to-r from-red-400 to-red-500 h-full rounded-l-full flex-1" />
                       </div>
@@ -2869,7 +2869,7 @@ export default function HomePage() {
                   className={`px-4 py-2 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all active:scale-95 ${
                     filter === f.key
                       ? "bg-gradient-to-r from-amber-500/20 to-orange-500/15 text-amber-400 border border-amber-500/30 shadow-lg shadow-amber-500/5"
-                      : "bg-white/[0.03] text-slate-400 border border-white/[0.06] hover:bg-white/[0.06] hover:border-white/[0.1]"
+                      : "bg-muted/50 text-slate-400 border border-border hover:bg-muted hover:border-border"
                   }`}>
                   {f.label}
                 </button>
@@ -2880,7 +2880,7 @@ export default function HomePage() {
               <div className="space-y-3">{[1, 2, 3].map(i => <SkeletonCard key={i} />)}</div>
             ) : filtered.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 text-slate-500">
-                <div className="w-16 h-16 rounded-2xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center mb-4">
+                <div className="w-16 h-16 rounded-2xl bg-muted/50 border border-border flex items-center justify-center mb-4">
                   <Activity className="w-7 h-7 text-slate-700" />
                 </div>
                 <p className="text-sm font-semibold text-slate-400">لا توجد إشارات</p>
@@ -2912,7 +2912,7 @@ export default function HomePage() {
                     <div className="flex items-center gap-2 px-1">
                       <div className="w-2 h-2 rounded-full bg-slate-500" />
                       <span className="text-[11px] font-bold text-slate-400">الإشارات المغلقة</span>
-                      <span className="text-[9px] bg-white/[0.06] text-slate-400 px-1.5 py-0.5 rounded-md font-bold">{closedSignals.length}</span>
+                      <span className="text-[9px] bg-muted text-slate-400 px-1.5 py-0.5 rounded-md font-bold">{closedSignals.length}</span>
                       {totalClosed > 0 && (
                         <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${closedWinRate >= 60 ? "bg-emerald-500/15 text-emerald-400" : closedWinRate >= 40 ? "bg-amber-500/15 text-amber-400" : "bg-red-500/15 text-red-400"}`}>
                           {closedWinRate}%
@@ -2951,7 +2951,7 @@ export default function HomePage() {
                 <div className="grid grid-cols-2 gap-3">
                   <Glass className="p-3.5">
                     <div className="text-[10px] text-slate-500 mb-1">إجمالي الإشارات</div>
-                    <div className="text-xl font-bold text-white">{stats.total}</div>
+                    <div className="text-xl font-bold text-foreground">{stats.total}</div>
                   </Glass>
                   <Glass className="p-3.5">
                     <div className="text-[10px] text-slate-500 mb-1">نشطة</div>
@@ -2972,7 +2972,7 @@ export default function HomePage() {
                       <span className="text-slate-600">/</span>
                       <span className="text-sm font-bold text-red-400">{stats.sellCount}</span>
                     </div>
-                    <div className="mt-1.5 h-1.5 rounded-full bg-white/[0.06] overflow-hidden flex">
+                    <div className="mt-1.5 h-1.5 rounded-full bg-muted overflow-hidden flex">
                       <div className="bg-emerald-500 h-full rounded-r-full transition-all" style={{ width: `${stats.buyCount + stats.sellCount > 0 ? (stats.buyCount / (stats.buyCount + stats.sellCount)) * 100 : 50}%` }} />
                       <div className="bg-red-500 h-full rounded-l-full flex-1" />
                     </div>
@@ -2995,7 +2995,7 @@ export default function HomePage() {
                         <span className="text-emerald-400">ربح ({stats.hitTp})</span>
                         <span className="text-red-400">خسارة ({stats.hitSl})</span>
                       </div>
-                      <div className="h-3 rounded-full bg-white/[0.06] overflow-hidden flex">
+                      <div className="h-3 rounded-full bg-muted overflow-hidden flex">
                         {stats.hitTp + stats.hitSl > 0 && (
                           <div className="bg-gradient-to-l from-emerald-500 to-emerald-400 h-full rounded-r-full transition-all" style={{ width: `${(stats.hitTp / (stats.hitTp + stats.hitSl)) * 100}%` }} />
                         )}
@@ -3015,8 +3015,8 @@ export default function HomePage() {
                         return (
                           <div key={i} className="flex items-center gap-2">
                             <span className="text-[10px] text-slate-500 w-5 text-center">{i + 1}</span>
-                            <span className="text-xs font-semibold text-white w-20 truncate">{p.pair}</span>
-                            <div className="flex-1 h-2 rounded-full bg-white/[0.06] overflow-hidden">
+                            <span className="text-xs font-semibold text-foreground w-20 truncate">{p.pair}</span>
+                            <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
                               <div className="h-full rounded-full bg-gradient-to-l from-amber-500 to-orange-500 transition-all" style={{ width: `${(p.count / maxCount) * 100}%` }} />
                             </div>
                             <span className="text-[10px] font-mono text-slate-400 w-8 text-left">{p.count}</span>
@@ -3038,7 +3038,7 @@ export default function HomePage() {
               <div className="text-xs font-semibold text-slate-300 flex items-center gap-1.5"><Send className="w-3.5 h-3.5 text-amber-400" />تحليل إشارة يدوي</div>
               <Textarea value={rawText} onChange={e => setRawText(e.target.value)}
                 placeholder="الصق نص الإشارة من TradingView هنا..."
-                className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-slate-600 min-h-[140px] text-xs rounded-xl resize-none" dir="rtl" />
+                className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground min-h-[140px] text-xs rounded-xl resize-none" dir="rtl" />
               <div className="flex gap-2">
                 <Button onClick={handleParse} disabled={parseLoad || !rawText.trim()}
                   className="flex-1 h-10 rounded-xl bg-amber-500/15 text-amber-400 border border-amber-500/25 text-xs font-semibold hover:bg-amber-500/25 transition-colors disabled:opacity-50">
@@ -3075,9 +3075,9 @@ export default function HomePage() {
                 </div>
                 <div className="space-y-2.5">
                   {/* Auto approve toggle */}
-                  <div className="flex items-center justify-between bg-white/[0.03] rounded-xl p-3 border border-white/[0.05]">
+                  <div className="flex items-center justify-between bg-muted/50 rounded-xl p-3 border border-border">
                     <div>
-                      <div className="text-[11px] font-semibold text-white">تفعيل تلقائي عند التسجيل</div>
+                      <div className="text-[11px] font-semibold text-foreground">تفعيل تلقائي عند التسجيل</div>
                       <div className="text-[9px] text-slate-500 mt-0.5">يتم تفعيل الحساب والباقة المجانية تلقائياً بدون موافقة</div>
                     </div>
                     <button onClick={() => handleSetAutoApprove(!appSettings.autoApproveOnRegister)}
@@ -3091,7 +3091,7 @@ export default function HomePage() {
 
             {/* ── Packages List ── */}
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-bold text-white flex items-center gap-2">
+              <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
                 <Package className="w-4 h-4 text-amber-400" />
                 إدارة الباقات
                 <span className="text-[9px] bg-amber-500/15 text-amber-400 px-1.5 py-0.5 rounded-md font-bold">{packages.length}</span>
@@ -3104,29 +3104,29 @@ export default function HomePage() {
 
             {/* ── Create Package Form ── */}
             {showPkgForm && (
-              <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4 space-y-3 animate-[fadeIn_0.2s_ease-out]">
+              <div className="rounded-2xl border border-border bg-muted/50 p-4 space-y-3 animate-[fadeIn_0.2s_ease-out]">
                 <div className="grid grid-cols-2 gap-2.5">
                   <div>
                     <label className="text-[9px] text-slate-500 mb-1 block">اسم الباقة</label>
                     <Input value={pkgFormName} onChange={e => setPkgFormName(e.target.value)} placeholder="مثال: شهرية VIP"
-                      className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-slate-600 h-9 rounded-lg text-[11px]" dir="rtl" />
+                      className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-9 rounded-lg text-[11px]" dir="rtl" />
                   </div>
                   <div>
                     <label className="text-[9px] text-slate-500 mb-1 block">المدة (أيام)</label>
                     <Input type="number" value={pkgFormDays} onChange={e => setPkgFormDays(e.target.value)} placeholder="30"
-                      className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-slate-600 h-9 rounded-lg text-[11px]" dir="ltr" />
+                      className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-9 rounded-lg text-[11px]" dir="ltr" />
                   </div>
                   <div>
                     <label className="text-[9px] text-slate-500 mb-1 block">السعر ($)</label>
                     <Input type="number" value={pkgFormPrice} onChange={e => setPkgFormPrice(e.target.value)} placeholder="0"
-                      className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-slate-600 h-9 rounded-lg text-[11px]" dir="ltr" />
+                      className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-9 rounded-lg text-[11px]" dir="ltr" />
                   </div>
                   <div>
                     <label className="text-[9px] text-slate-500 mb-1 block">النوع</label>
                     <div className="flex gap-1.5">
                       {(["free", "trial", "paid"] as const).map(t => (
                         <button key={t} onClick={() => setPkgFormType(t)}
-                          className={`flex-1 py-2 rounded-lg text-[10px] font-semibold transition-all ${pkgFormType === t ? "bg-amber-500/20 text-amber-400 border border-amber-500/30" : "bg-white/[0.03] text-slate-400 border border-white/[0.06]"}`}>
+                          className={`flex-1 py-2 rounded-lg text-[10px] font-semibold transition-all ${pkgFormType === t ? "bg-amber-500/20 text-amber-400 border border-amber-500/30" : "bg-muted/50 text-slate-400 border border-border"}`}>
                           {t === "free" ? "مجانية" : t === "trial" ? "تجربة" : "مدفوعة"}
                         </button>
                       ))}
@@ -3134,13 +3134,13 @@ export default function HomePage() {
                   </div>
                 </div>
                 <Input value={pkgFormDesc} onChange={e => setPkgFormDesc(e.target.value)} placeholder="وصف مختصر للباقة..."
-                  className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-slate-600 h-9 rounded-lg text-[11px]" dir="rtl" />
+                  className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-9 rounded-lg text-[11px]" dir="rtl" />
                 <div className="flex gap-2">
                   <button onClick={handleCreatePackage} disabled={pkgLoad || !pkgFormName || !pkgFormDays}
                     className="flex-1 h-9 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-black text-[11px] font-bold disabled:opacity-50 active:scale-[0.98] transition-transform">
                     {pkgLoad ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "إنشاء الباقة"}
                   </button>
-                  <button onClick={() => setShowPkgForm(false)} className="px-4 h-9 rounded-xl bg-white/[0.04] text-slate-400 text-[11px]">إلغاء</button>
+                  <button onClick={() => setShowPkgForm(false)} className="px-4 h-9 rounded-xl bg-muted/60 text-slate-400 text-[11px]">إلغاء</button>
                 </div>
               </div>
             )}
@@ -3156,12 +3156,12 @@ export default function HomePage() {
                 {packages.map(pkg => {
                   const isTrial = appSettings.freeTrialPackageId === pkg.id;
                   return (
-                    <div key={pkg.id} className={`rounded-xl border overflow-hidden transition-all ${isTrial ? "border-amber-500/30 bg-gradient-to-r from-amber-500/[0.08] to-orange-500/[0.03]" : pkg.isActive ? "border-white/[0.06] bg-white/[0.03]" : "border-white/[0.03] bg-white/[0.01] opacity-50"}`}>
+                    <div key={pkg.id} className={`rounded-xl border overflow-hidden transition-all ${isTrial ? "border-amber-500/30 bg-gradient-to-r from-amber-500/[0.08] to-orange-500/[0.03]" : pkg.isActive ? "border-border bg-muted/50" : "border-white/[0.03] bg-white/[0.01] opacity-50"}`}>
                       <div className="p-3.5">
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-sm font-bold text-white">{pkg.name}</span>
+                              <span className="text-sm font-bold text-foreground">{pkg.name}</span>
                               {isTrial && <span className="text-[8px] bg-amber-500/25 text-amber-400 px-1.5 py-0.5 rounded-md font-bold animate-pulse">التجربة التلقائية</span>}
                               {!pkg.isActive && <span className="text-[8px] bg-red-500/15 text-red-400 px-1.5 py-0.5 rounded-md font-bold">معطلة</span>}
                               <span className={`text-[8px] px-1.5 py-0.5 rounded-md font-bold ${pkg.type === "free" ? "bg-emerald-500/15 text-emerald-400" : pkg.type === "trial" ? "bg-sky-500/15 text-sky-400" : "bg-purple-500/15 text-purple-400"}`}>
@@ -3176,13 +3176,13 @@ export default function HomePage() {
                           </div>
                         </div>
                         {/* Actions */}
-                        <div className="flex gap-1.5 mt-3 pt-3 border-t border-white/[0.04] flex-wrap">
+                        <div className="flex gap-1.5 mt-3 pt-3 border-t border-border flex-wrap">
                           <button onClick={() => handleSetTrialPkg(pkg.id)}
-                            className={`px-2.5 py-1 rounded-lg text-[9px] font-bold transition-all active:scale-95 ${isTrial ? "bg-amber-500/20 text-amber-400 border border-amber-500/30" : "bg-white/[0.04] text-slate-400 border border-white/[0.06]"}`}>
+                            className={`px-2.5 py-1 rounded-lg text-[9px] font-bold transition-all active:scale-95 ${isTrial ? "bg-amber-500/20 text-amber-400 border border-amber-500/30" : "bg-muted/60 text-slate-400 border border-border"}`}>
                             {isTrial ? "✓ تجربة تلقائية" : "تعيين كتجربة"}
                           </button>
                           <button onClick={() => handleTogglePackage(pkg.id, !pkg.isActive)}
-                            className="px-2.5 py-1 rounded-lg text-[9px] font-medium bg-white/[0.04] text-slate-400 border border-white/[0.06] active:scale-95 transition-transform">
+                            className="px-2.5 py-1 rounded-lg text-[9px] font-medium bg-muted/60 text-slate-400 border border-border active:scale-95 transition-transform">
                             {pkg.isActive ? "تعطيل" : "تفعيل"}
                           </button>
                           <button onClick={() => handleDeletePackage(pkg.id)}
@@ -3203,8 +3203,8 @@ export default function HomePage() {
         {tab === "users" && isAdmin && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-bold text-white flex items-center gap-2"><User className="w-4 h-4 text-amber-400" />إدارة المستخدمين</h2>
-              <button onClick={fetchUsers} className="px-3 py-1.5 rounded-lg text-[10px] font-medium bg-white/[0.04] text-slate-400 border border-white/[0.06] active:scale-95 transition-transform hover:bg-white/[0.08]">
+              <h2 className="text-sm font-bold text-foreground flex items-center gap-2"><User className="w-4 h-4 text-amber-400" />إدارة المستخدمين</h2>
+              <button onClick={fetchUsers} className="px-3 py-1.5 rounded-lg text-[10px] font-medium bg-muted/60 text-slate-400 border border-border active:scale-95 transition-transform hover:bg-muted/80">
                 تحديث
               </button>
             </div>
@@ -3233,7 +3233,7 @@ export default function HomePage() {
                               <User className="w-4 h-4 text-amber-400" />
                             </div>
                             <div>
-                              <div className="text-xs font-bold text-white">{u.name}</div>
+                              <div className="text-xs font-bold text-foreground">{u.name}</div>
                               <div className="text-[10px] text-slate-500 font-mono" dir="ltr">{u.email}</div>
                             </div>
                           </div>
@@ -3273,7 +3273,7 @@ export default function HomePage() {
                               </div>
                               <div>
                                 <div className="flex items-center gap-1.5">
-                                  <span className="text-xs font-bold text-white">{u.name}</span>
+                                  <span className="text-xs font-bold text-foreground">{u.name}</span>
                                   {u.role === "admin" && <span className="text-[8px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded-md font-bold">مدير</span>}
                                   {isAgency && <span className="text-[8px] bg-purple-500/15 text-purple-400 px-1.5 py-0.5 rounded-md font-bold">وكالة</span>}
                                   {isSub && <span className="text-[8px] bg-sky-500/15 text-sky-400 px-1.5 py-0.5 rounded-md font-bold">مشترك</span>}
@@ -3294,7 +3294,7 @@ export default function HomePage() {
                           </div>
                           {/* Action Buttons */}
                           {u.role !== "admin" && (
-                            <div className="flex gap-1.5 mt-2.5 pt-2.5 border-t border-white/[0.04] flex-wrap">
+                            <div className="flex gap-1.5 mt-2.5 pt-2.5 border-t border-border flex-wrap">
                               <button onClick={() => setShowAssignPkg(u.id)}
                                 className="px-2 py-1 rounded-lg text-[9px] font-medium bg-sky-500/10 text-sky-400 border border-sky-500/15 active:scale-95 transition-transform">
                                 تعيين باقة
@@ -3310,7 +3310,7 @@ export default function HomePage() {
                           )}
                           {/* Assign Package Dropdown */}
                           {showAssignPkg === u.id && packages.filter(p => p.isActive).length > 0 && (
-                            <div className="mt-2 p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] space-y-2 animate-[fadeIn_0.2s_ease-out]">
+                            <div className="mt-2 p-2.5 rounded-xl bg-muted/50 border border-border space-y-2 animate-[fadeIn_0.2s_ease-out]">
                               <div className="flex gap-1.5 flex-wrap">
                                 {packages.filter(p => p.isActive).map(pkg => (
                                   <button key={pkg.id} onClick={() => handleAssignPackage(u.id, pkg.id)}
@@ -3321,8 +3321,8 @@ export default function HomePage() {
                               </div>
                               <div className="flex items-center gap-2">
                                 <Input type="number" value={assignDays} onChange={e => setAssignDays(e.target.value)} placeholder="أيام مخصصة (اختياري)"
-                                  className="flex-1 bg-white/[0.04] border-white/[0.08] text-white placeholder:text-slate-600 h-8 rounded-lg text-[10px]" dir="ltr" />
-                                <button onClick={() => setShowAssignPkg(null)} className="px-2 h-8 rounded-lg bg-white/[0.04] text-slate-400 text-[9px]">إلغاء</button>
+                                  className="flex-1 bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-8 rounded-lg text-[10px]" dir="ltr" />
+                                <button onClick={() => setShowAssignPkg(null)} className="px-2 h-8 rounded-lg bg-muted/60 text-slate-400 text-[9px]">إلغاء</button>
                               </div>
                             </div>
                           )}
@@ -3347,7 +3347,7 @@ export default function HomePage() {
                               <User className="w-4 h-4 text-red-400" />
                             </div>
                             <div>
-                              <div className="text-xs font-bold text-white">{u.name}</div>
+                              <div className="text-xs font-bold text-foreground">{u.name}</div>
                               <div className="text-[10px] text-slate-500 font-mono" dir="ltr">{u.email}</div>
                             </div>
                           </div>
@@ -3382,7 +3382,7 @@ export default function HomePage() {
                         <Mail className="w-3.5 h-3.5 text-sky-400" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="text-[11px] font-bold text-white">{r.userName}</div>
+                        <div className="text-[11px] font-bold text-foreground">{r.userName}</div>
                         <div className="text-[9px] text-slate-500">
                           <span className="line-through" dir="ltr">{r.oldEmail}</span>
                           <span className="mx-1.5 text-slate-600">→</span>
@@ -3410,7 +3410,7 @@ export default function HomePage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-white text-sm">{session.name}</span>
+                    <span className="font-bold text-foreground text-sm">{session.name}</span>
                     {isAdmin && <span className="text-[8px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded-md font-bold">مدير</span>}
                   </div>
                   <div className="text-xs text-slate-400" dir="ltr">{session.email}</div>
@@ -3434,11 +3434,11 @@ export default function HomePage() {
                       </span>
                     </div>
                     {session.packageName && (
-                      <div className="bg-white/[0.04] rounded-xl p-3 border border-white/[0.06] space-y-2">
+                      <div className="bg-muted/60 rounded-xl p-3 border border-border space-y-2">
                         <div className="flex items-center justify-between">
                           <div>
                             <div className="text-[10px] text-slate-500">نوع الباقة</div>
-                            <div className="text-[13px] font-bold text-white mt-0.5">{session.packageName}</div>
+                            <div className="text-[13px] font-bold text-foreground mt-0.5">{session.packageName}</div>
                           </div>
                           {session.subscriptionExpiry && (() => {
                             const days = Math.ceil((new Date(session.subscriptionExpiry).getTime() - Date.now()) / 86400000);
@@ -3454,7 +3454,7 @@ export default function HomePage() {
                           })()}
                         </div>
                         {session.subscriptionExpiry && (
-                          <div className="pt-2 border-t border-white/[0.04]">
+                          <div className="pt-2 border-t border-border">
                             <div className="text-[10px] text-slate-500">تاريخ الانتهاء</div>
                             <div className="text-[12px] font-semibold text-slate-300 mt-0.5">{new Date(session.subscriptionExpiry).toLocaleDateString("ar-SA", { year: "numeric", month: "long", day: "numeric" })}</div>
                           </div>
@@ -3507,7 +3507,7 @@ export default function HomePage() {
                   🛑 وقف خسارة
                 </button>
               </div>
-              <div className="pt-1 border-t border-white/[0.04]">
+              <div className="pt-1 border-t border-border">
                 <button onClick={async () => {
                   try {
                     const res = await fetch("/api/test-notification", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "buy" }) });
@@ -3526,17 +3526,17 @@ export default function HomePage() {
             {/* ── USER: Request Email Change ── */}
             {!isAdmin && (
               <Glass className="overflow-hidden">
-                <button onClick={() => setShowEmailReqSection(!showEmailReqSection)} className="w-full p-4 flex items-center justify-between text-sm text-slate-300 hover:bg-white/[0.02] transition-colors">
+                <button onClick={() => setShowEmailReqSection(!showEmailReqSection)} className="w-full p-4 flex items-center justify-between text-sm text-slate-300 hover:bg-muted/30 transition-colors">
                   <span className="flex items-center gap-2"><Mail className="w-4 h-4 text-sky-400" />طلب تغيير البريد الإلكتروني</span>
                   <ChevronIcon open={showEmailReqSection} />
                 </button>
                 {showEmailReqSection && (
                   <div className="px-4 pb-4 space-y-3 animate-[fadeIn_0.2s_ease-out]">
-                    <div className="text-[10px] text-slate-500 bg-white/[0.02] rounded-lg p-2">
+                    <div className="text-[10px] text-slate-500 bg-muted/30 rounded-lg p-2">
                       لتغيير بريدك الإلكتروني، أرسل طلبا وانتظر موافقة الإدارة
                     </div>
                     <Input type="email" value={emailReqNew} onChange={e => setEmailReqNew(e.target.value)} placeholder="البريد الإلكتروني الجديد"
-                      className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-slate-600 h-10 rounded-xl text-sm" dir="ltr" />
+                      className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-10 rounded-xl text-sm" dir="ltr" />
                     {emailReqMsg && (
                       <div className={`rounded-xl px-3 py-2 text-xs text-center ${emailReqMsg.includes("فشل") || emailReqMsg.includes("غير صالح") || emailReqMsg.includes("مسجل") ? "bg-red-500/10 border border-red-500/20 text-red-400" : "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400"}`}>
                         {emailReqMsg}
@@ -3552,7 +3552,7 @@ export default function HomePage() {
 
             {/* Change Password (both admin and user) */}
             <Glass className="overflow-hidden">
-              <button onClick={() => setShowCp(!showCp)} className="w-full p-4 flex items-center justify-between text-sm text-slate-300 hover:bg-white/[0.02] transition-colors">
+              <button onClick={() => setShowCp(!showCp)} className="w-full p-4 flex items-center justify-between text-sm text-slate-300 hover:bg-muted/30 transition-colors">
                 <span className="flex items-center gap-2"><Lock className="w-4 h-4 text-amber-400" />تغيير كلمة المرور</span>
                 <ChevronIcon open={showCp} />
               </button>
@@ -3561,22 +3561,22 @@ export default function HomePage() {
                   {isAdmin ? (
                     <>
                       <Input type="password" value={cpCur} onChange={e => setCpCur(e.target.value)} placeholder="كلمة المرور الحالية"
-                        className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-slate-600 h-10 rounded-xl text-sm" dir="ltr" />
+                        className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-10 rounded-xl text-sm" dir="ltr" />
                       <Input type="email" value={cpEmail} onChange={e => setCpEmail(e.target.value)} placeholder="البريد الإلكتروني الجديد"
-                        className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-slate-600 h-10 rounded-xl text-sm" dir="ltr" />
+                        className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-10 rounded-xl text-sm" dir="ltr" />
                       <Input type="password" value={cpNew} onChange={e => setCpNew(e.target.value)} placeholder="كلمة المرور الجديدة"
-                        className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-slate-600 h-10 rounded-xl text-sm" dir="ltr" />
+                        className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-10 rounded-xl text-sm" dir="ltr" />
                       <Input type="password" value={cpConf} onChange={e => setCpConf(e.target.value)} placeholder="تأكيد كلمة المرور"
-                        className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-slate-600 h-10 rounded-xl text-sm" dir="ltr" />
+                        className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-10 rounded-xl text-sm" dir="ltr" />
                     </>
                   ) : (
                     <>
                       <Input type="password" value={cpCur} onChange={e => setCpCur(e.target.value)} placeholder="كلمة المرور الحالية"
-                        className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-slate-600 h-10 rounded-xl text-sm" dir="ltr" />
+                        className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-10 rounded-xl text-sm" dir="ltr" />
                       <Input type="password" value={cpNew} onChange={e => setCpNew(e.target.value)} placeholder="كلمة المرور الجديدة"
-                        className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-slate-600 h-10 rounded-xl text-sm" dir="ltr" />
+                        className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-10 rounded-xl text-sm" dir="ltr" />
                       <Input type="password" value={cpConf} onChange={e => setCpConf(e.target.value)} placeholder="تأكيد كلمة المرور"
-                        className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-slate-600 h-10 rounded-xl text-sm" dir="ltr" />
+                        className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-10 rounded-xl text-sm" dir="ltr" />
                     </>
                   )}
                   {cpErr && <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2 text-xs text-red-400 text-center">{cpErr}</div>}
@@ -3599,7 +3599,7 @@ export default function HomePage() {
                     <div className="text-xs text-red-400 text-center">هل أنت متأكد من حذف جميع الإشارات؟</div>
                     <div className="flex gap-2">
                       <Button onClick={handleClearAll} className="flex-1 h-10 rounded-xl bg-red-500/15 text-red-400 border border-red-500/25 text-xs font-semibold">نعم، احذف</Button>
-                      <Button onClick={() => setConfirmClear(false)} className="flex-1 h-10 rounded-xl bg-white/[0.04] text-slate-400 border border-white/[0.06] text-xs">إلغاء</Button>
+                      <Button onClick={() => setConfirmClear(false)} className="flex-1 h-10 rounded-xl bg-muted/60 text-slate-400 border border-border text-xs">إلغاء</Button>
                     </div>
                   </div>
                 )}
@@ -3617,7 +3617,7 @@ export default function HomePage() {
       </main>
 
       {/* ── Bottom Navigation ── */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/[0.06] bg-[#080d1a]/90 dark:bg-[#080d1a]/90 backdrop-blur-lg safe-area-bottom">
+      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-background/90 backdrop-blur-lg safe-area-bottom">
         <div className="max-w-lg mx-auto flex">
           {tabs.map(t => (
             <button key={t.key} onClick={() => setTab(t.key)}
