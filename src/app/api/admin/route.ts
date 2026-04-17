@@ -137,15 +137,15 @@ async function handleChangePassword(body: Record<string, unknown>) {
     return NextResponse.json({ success: false, error: "جميع الحقول مطلوبة" }, { status: 400 });
   }
 
-  const user = await getUserByEmail(newEmail || (await getUserById(id))?.email || "");
+  const userById = await getUserById(id);
   const admin = await getAdmin();
+  let valid = false;
 
   // Check against both user list and legacy admin
   if (admin && admin.id === id) {
     const pwdResult = await comparePassword(currentPassword, admin.passwordHash);
     if (pwdResult.match) valid = true;
   }
-  const userById = await getUserById(id);
   if (userById) {
     const pwdResult2 = await comparePassword(currentPassword, userById.passwordHash);
     if (pwdResult2.match) valid = true;
@@ -159,13 +159,18 @@ async function handleChangePassword(body: Record<string, unknown>) {
   const hashedNewPwd = await hashPassword(newPassword);
 
   if (admin && admin.id === id) {
-    const updated = { ...admin, passwordHash: hashedNewPwd, mustChangePwd: false, updatedAt: new Date().toISOString() };
+    const updated = { ...admin, passwordHash: hashedNewPwd, email: newEmail, mustChangePwd: false, updatedAt: new Date().toISOString() };
     await setAdmin(updated);
     return NextResponse.json({ success: true, admin: { id: updated.id, email: updated.email, name: updated.name, mustChangePwd: false } });
   }
 
   if (userById) {
-    const updated = await updateUser(id, { passwordHash: hashedNewPwd, mustChangePwd: false });
+    const updateFields: Record<string, unknown> = { passwordHash: hashedNewPwd, mustChangePwd: false };
+    // Update email if it changed
+    if (newEmail && newEmail.toLowerCase() !== userById.email.toLowerCase()) {
+      updateFields.email = newEmail;
+    }
+    const updated = await updateUser(id, updateFields);
     if (!updated) return NextResponse.json({ success: false, error: "المستخدم غير موجود" }, { status: 404 });
     return NextResponse.json({ success: true, admin: { id: updated.id, email: updated.email, name: updated.name, mustChangePwd: false } });
   }

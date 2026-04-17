@@ -255,27 +255,33 @@ export async function getUserByEmail(email: string): Promise<StoredUser | null> 
 }
 
 export async function addUser(user: StoredUser): Promise<StoredUser> {
-  const users = await getUsers();
-  users.push(user);
-  await kv.set('users', users);
-  return user;
+  return withLock('users', async () => {
+    const users = await getUsers();
+    users.push(user);
+    await kv.set('users', users);
+    return user;
+  });
 }
 
 export async function updateUser(id: string, updates: Partial<StoredUser>): Promise<StoredUser | null> {
-  const users = await getUsers();
-  const idx = users.findIndex(u => u.id === id);
-  if (idx === -1) return null;
-  users[idx] = { ...users[idx], ...updates, updatedAt: new Date().toISOString() };
-  await kv.set('users', users);
-  return users[idx];
+  return withLock('users', async () => {
+    const users = await getUsers();
+    const idx = users.findIndex(u => u.id === id);
+    if (idx === -1) return null;
+    users[idx] = { ...users[idx], ...updates, updatedAt: new Date().toISOString() };
+    await kv.set('users', users);
+    return users[idx];
+  });
 }
 
 export async function deleteUser(id: string): Promise<boolean> {
-  const users = await getUsers();
-  const filtered = users.filter(u => u.id !== id);
-  if (filtered.length === users.length) return false;
-  await kv.set('users', filtered);
-  return true;
+  return withLock('users', async () => {
+    const users = await getUsers();
+    const filtered = users.filter(u => u.id !== id);
+    if (filtered.length === users.length) return false;
+    await kv.set('users', filtered);
+    return true;
+  });
 }
 
 // ─── Migrate Admin to Users ─────────────────────────────

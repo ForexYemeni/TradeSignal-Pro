@@ -381,6 +381,7 @@ function TradeStatusBanner({ s }: { s: Signal }) {
   const isProfit = s.status === "HIT_TP";
   const isLoss = s.status === "HIT_SL";
   const isManual = s.status === "MANUAL_CLOSE";
+  const isPartialWin = isProfit && s.partialWin;
   const hitCount = s.hitTpIndex >= 0 ? s.hitTpIndex : 0;
   const totalTPs = s.totalTPs || s.takeProfits?.length || 0;
   const isReentry = (s.signalCategory || "").startsWith("REENTRY");
@@ -422,7 +423,7 @@ function TradeStatusBanner({ s }: { s: Signal }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className={`text-xs font-bold ${c.text}`}>
-              {catIcon && `${catIcon} `}{isProfit ? (catLabel ? `${catLabel} رابح` : "صفقة رابحة") : isLoss ? (isReentry ? "تعويض خاسر" : isPyramid ? "تعزيز خاسر" : "صفقة خاسرة") : "صفقة مغلقة يدويا"}
+              {catIcon && `${catIcon} `}{isPartialWin ? (catLabel ? `${catLabel} ربح جزئي` : "ربح جزئي") : isProfit ? (catLabel ? `${catLabel} رابح` : "صفقة رابحة") : isLoss ? (isReentry ? "تعويض خاسر" : isPyramid ? "تعزيز خاسر" : "صفقة خاسرة") : "صفقة مغلقة يدويا"}
             </span>
             {isProfit && hitCount > 0 && totalTPs > 0 && (
               <span className={`text-[9px] ${c.badge} px-1.5 py-0.5 rounded-md font-bold`}>
@@ -430,10 +431,10 @@ function TradeStatusBanner({ s }: { s: Signal }) {
               </span>
             )}
           </div>
-          {isProfit && (s.pnlDollars ?? 0) > 0 && (
+          {isProfit && (s.pnlDollars ?? 0) !== 0 && (
             <div className={`text-[11px] font-mono font-bold ${c.text} mt-0.5`}>
-              +${s.pnlDollars}{" "}
-              <span className={`text-[9px] font-normal ${c.sub}`}>({s.pnlPoints ?? 0} نقطة)</span>
+              {s.pnlDollars! >= 0 ? "+" : ""}{s.pnlDollars}{" "}
+              <span className={`text-[9px] font-normal ${c.sub}`}>({s.pnlPoints! >= 0 ? "+" : ""}{s.pnlPoints ?? 0} نقطة)</span>
             </div>
           )}
           {isLoss && (s.pnlDollars ?? 0) !== 0 && (
@@ -451,7 +452,7 @@ function TradeStatusBanner({ s }: { s: Signal }) {
         </div>
         {isProfit && (
           <div className={`text-[10px] font-bold ${c.pill} px-2 py-1 rounded-lg flex-shrink-0`}>
-            ربح
+            {isPartialWin ? "ربح جزئي" : "ربح"}
           </div>
         )}
         {isLoss && (
@@ -652,6 +653,7 @@ function EntryCard({ s, idx, isAdmin, onUpdate, onDelete }: {
 function ClosedSignalCard({ s, idx, isAdmin, onDelete }: { s: Signal; idx: number; isAdmin: boolean; onDelete: (id: string) => void }) {
   const isProfit = s.status === "HIT_TP";
   const isLoss = s.status === "HIT_SL";
+  const isPartialWin = isProfit && s.partialWin;
   const [expanded, setExpanded] = useState(false);
   const hitCount = s.hitTpIndex >= 0 ? s.hitTpIndex : 0;
   const totalTPs = s.totalTPs || s.takeProfits?.length || 0;  const isBuy = s.type === "BUY";
@@ -671,7 +673,7 @@ function ClosedSignalCard({ s, idx, isAdmin, onDelete }: { s: Signal; idx: numbe
     : isLoss
     ? { bg: "bg-gradient-to-r from-red-500/[0.08] to-red-600/[0.03]", border: "border-red-500/20", iconBg: "bg-red-500/15", text: "text-red-400", badge: "bg-red-500/20 text-red-400", tpBadge: "bg-emerald-500/15 text-emerald-400 border-emerald-500/20" }
     : { bg: "bg-white/[0.03]", border: "border-white/[0.06]", iconBg: "bg-slate-500/15", text: "text-slate-400", badge: "bg-slate-500/20 text-slate-400", tpBadge: "bg-slate-500/10 text-slate-400 border-white/[0.06]" };
-  const catIcon = isReentry ? "♻️" : isPyramid ? "🔥" : isProfit ? "✅" : isLoss ? "❌" : "⊘";
+  const catIcon = isReentry ? "♻️" : isPyramid ? "🔥" : isPartialWin ? "⚡" : isProfit ? "✅" : isLoss ? "❌" : "⊘";
 
   return (
     <div className="animate-[fadeInUp_0.3s_ease-out]" style={{ animationDelay: `${idx * 30}ms`, animationFillMode: "both" }}>
@@ -698,16 +700,16 @@ function ClosedSignalCard({ s, idx, isAdmin, onDelete }: { s: Signal; idx: numbe
                     <span className={`text-[8px] ${catColors.badge} px-1.5 py-0.5 rounded-md font-bold`}>{hitCount}/{totalTPs} {isReentry ? "♻️" : isPyramid ? "🔥" : "TP"}</span>
                   )}
                 </div>
-                <span className={`text-[9px] font-medium ${catColors.text}/70`}>{catIcon} {catLabel}</span>
+                <span className={`text-[9px] font-medium ${catColors.text}/70`}>{catIcon} {isPartialWin ? "ربح جزئي" : catLabel}</span>
               </div>
             </div>
             <div className="flex items-center gap-2.5">
               {/* PnL badge */}
               <div className="text-right">
                 <div className={`text-[13px] font-extrabold font-mono ${isProfit ? catColors.text : "text-red-400"}`}>
-                  {isProfit ? "+" : "-"}${Math.abs(pnl)}
+                  {pnl >= 0 ? "+" : "-"}${Math.abs(pnl)}
                 </div>
-                <div className={`text-[8px] font-mono ${isProfit ? catColors.text + "/50" : "text-red-400/50"}`}>{points} نقطة</div>
+                <div className={`text-[8px] font-mono ${isProfit ? catColors.text + "/50" : "text-red-400/50"}`}>{points >= 0 ? "+" : ""}{points} نقطة</div>
               </div>
               {/* Chevron */}
               <svg className={`w-3.5 h-3.5 text-slate-600 transition-transform duration-300 ${expanded ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -1236,12 +1238,18 @@ export default function HomePage() {
               if (prev) {
                 const tpChanged = s.hitTpIndex !== prev.hitTpIndex && s.hitTpIndex > prev.hitTpIndex;
                 const slChanged = prev.status === "ACTIVE" && s.status === "HIT_SL";
+                // Detect partial win: SL hit but status shows HIT_TP (TPs were achieved first)
+                const partialWinChanged = prev.status === "ACTIVE" && s.status === "HIT_TP" && s.partialWin;
                 if (tpChanged && !audioMuted) {
                   playSound("tp", audioVol);
                   nativeNotify("🎯 تحقق هدف — " + s.pair, "هدف " + s.hitTpIndex + " تم تحقيقه", "tp_hit");
                 } else if (slChanged && !audioMuted) {
                   playSound("sl", audioVol);
                   nativeNotify("🛑 وقف خسارة — " + s.pair, "تم ضرب وقف الخسارة", "sl_hit");
+                } else if (partialWinChanged && !audioMuted) {
+                  // Partial win: TPs were hit, then SL → still a win
+                  playSound("tp", audioVol);
+                  nativeNotify("🎯 ربح جزئي — " + s.pair, "تم تحقيق " + s.hitTpIndex + " أهداف ثم ضرب الوقف", "tp_hit");
                 }
               }
             }
@@ -1605,7 +1613,7 @@ export default function HomePage() {
 
   async function handleClearAll() {
     try {
-      await Promise.all(signals.map(s => fetch(`/api/signals/${s.id}`, { method: "DELETE" })));
+      await Promise.allSettled(signals.map(s => fetch(`/api/signals/${s.id}`, { method: "DELETE" })));
       setConfirmClear(false);
       fetchSignals(); fetchStats();
     } catch (e) { console.error("Clear:", e); }

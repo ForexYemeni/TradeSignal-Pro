@@ -124,14 +124,47 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       const points = slDistance;
       let dollars = 0;
 
-      if (lotSize > 0) {
-        dollars = points * pipValue * lotSize;
-      } else if (balance > 0) {
-        dollars = balance * 0.02;
-      }
+      // ── KEY FIX: If TPs were already hit before SL, this is a PARTIAL WIN ──
+      const prevHitTp = Number(existing.hitTpIndex) || 0;
+      let tps: { tp: number; rr: number }[] = [];
+      try { tps = JSON.parse(String(existing.takeProfits)); } catch { tps = []; }
+      const totalTPsCount = tps.length;
 
-      updateData.pnlPoints = parseFloat(points.toFixed(1));
-      updateData.pnlDollars = parseFloat(-dollars.toFixed(2));
+      if (prevHitTp > 0) {
+        // Partial win: TPs were hit before SL
+        let tpProfitDollars = 0;
+        let tpProfitPoints = 0;
+        for (let i = 0; i < Math.min(prevHitTp, tps.length); i++) {
+          const tpPrice = tps[i].tp;
+          const pts = Math.abs(tpPrice - entry);
+          tpProfitPoints += pts;
+          if (lotSize > 0) tpProfitDollars += pts * pipValue * lotSize;
+          else if (balance > 0 && slDistance > 0) tpProfitDollars += (pts / slDistance) * (balance * 0.02) * tps[i].rr;
+        }
+        // SL loss on remaining fraction
+        const slDollars = lotSize > 0 ? points * pipValue * lotSize : balance > 0 ? balance * 0.02 : 0;
+        const remainingFraction = Math.max(0, 1 - (prevHitTp / totalTPsCount));
+        const netDollars = tpProfitDollars - (slDollars * remainingFraction);
+        const netPoints = tpProfitPoints - (points * remainingFraction);
+
+        updateData.status = "HIT_TP";
+        updateData.partialWin = true;
+        updateData.hitTpIndex = prevHitTp;
+        updateData.pnlPoints = parseFloat(netPoints.toFixed(1));
+        updateData.pnlDollars = parseFloat(netDollars.toFixed(2));
+        updateData.totalTPs = totalTPsCount;
+      } else {
+        // Pure SL loss
+        if (lotSize > 0) {
+          dollars = points * pipValue * lotSize;
+        } else if (balance > 0) {
+          dollars = balance * 0.02;
+        }
+        updateData.status = "HIT_SL";
+        updateData.partialWin = false;
+        updateData.pnlPoints = parseFloat(points.toFixed(1));
+        updateData.pnlDollars = parseFloat(-dollars.toFixed(2));
+      }
       updateData.hitPrice = stopLoss;
     }
 
@@ -150,17 +183,30 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           : existing.signalCategory === "PYRAMID" ? "PYRAMID_TP"
           : "TP_HIT"
       ).catch(() => {});
-    } else if (status === "HIT_SL") {
-      notifySlHit(
-        existing.pair,
-        updateData.pnlDollars as number | undefined
-      ).catch(() => {});
+    } else if (status === "HIT_SL" || (status === "HIT_SL" && updateData.partialWin)) {
+      // Partial win (SL after TPs) → send TP notification instead
+      if (updateData.partialWin && updateData.status === "HIT_TP") {
+        notifyTpHit(
+          existing.pair,
+          Number(existing.hitTpIndex) || 0,
+          updateData.pnlDollars as number | undefined,
+          existing.signalCategory === "REENTRY" ? "REENTRY_TP"
+            : existing.signalCategory === "PYRAMID" ? "PYRAMID_TP"
+            : "TP_HIT"
+        ).catch(() => {});
+      } else {
+        notifySlHit(
+          existing.pair,
+          updateData.pnlDollars as number | undefined
+        ).catch(() => {});
+      }
     }
 
     // Notify SSE subscribers
     if (status === "HIT_TP" || status === "HIT_SL") {
+      const isPartialWin = updateData.partialWin && updateData.status === "HIT_TP";
       notifySignalEvent({
-        type: status === "HIT_TP" ? "tp_hit" : "sl_hit",
+        type: isPartialWin ? "tp_hit" : status === "HIT_TP" ? "tp_hit" : "sl_hit",
         pair: existing.pair,
         signalType: status,
         tpIndex: updateData.hitTpIndex as number | undefined,

@@ -629,9 +629,15 @@ function extractSMCTrend(text: string): string {
 }
 
 function extractTPNumber(text: string): number {
-  // Match patterns: "تحقق الهدف 1", "الهدف 2", "هدف التعويض 3", "هدف التعزيز 4"
-  const match = text.match(/(?:تحقق\s+)?(?:هدف)\s*(?:التعويض|التعزيز)?\s*(\d+)/);
-  if (match) return parseInt(match[1]);
+  // Match patterns: "تحقق الهدف 1", "الهدف 2", "هدف التعويض 3", "هدف التعزيز 4", "TP1", "TP 1"
+  const patterns = [
+    /(?:تحقق\s+)?(?:هدف)\s*(?:التعويض|التعزيز)?\s*(\d+)/,
+    /TP\s*(\d+)/i,
+  ];
+  for (const p of patterns) {
+    const match = text.match(p);
+    if (match) return parseInt(match[1]);
+  }
   return -1;
 }
 
@@ -648,18 +654,26 @@ function extractPnLPoints(text: string): number | null {
 }
 
 function extractPnLDollar(text: string): number | null {
-  const match = text.match(/(?:ربح تقريبي|ربح|الخسارة|خسارة)[s:]?\s*[:\-–]?\s*[+-]?\$?([\d,.]+)/);
-  if (match) {
-    const val = parseFloat(match[1].replace(/,/g, ""));
-    return /الخسارة|خسارة/.test(match[0]) && !/\+/.test(match[0]) ? -val : val;
+  // Try matching specific patterns first for accuracy
+  const patterns = [
+    /(?:ربح تقريبي|ربح)[:\s-–]*[+-]?\$?([\d,.]+)/,
+    /(?:الخسارة|خسارة)[:\s-–]*[+-]?\$?([\d,.]+)/,
+    /[+-]?\$([\d,.]+)\s*(?:ربح|خسارة|نقطة)/,
+  ];
+  for (const p of patterns) {
+    const match = text.match(p);
+    if (match) {
+      const val = parseFloat(match[1].replace(/,/g, ""));
+      return /الخسارة|خسارة/.test(match[0]) && !/\+/.test(match[0]) ? -val : val;
+    }
   }
   return null;
 }
 
 function extractTPStatusList(text: string): string {
-  // Extract lines like "✅ TP1: 2355 ← الآن" or "⏳ TP2: 2360"
+  // Extract lines like "✅ TP1: 2355 ← الآن" or "⏳ TP2: 2360" or "✅ TP1 2355"
   const lines: string[] = [];
-  const regex = /[✅⏳]\s*TP\d+[:\s][\d,.]+(?:\s*←\s*الآن)?/g;
+  const regex = /[✅⏳]\s*TP\s*\d+[:\s][\d,.]+(?:\s*←\s*الآن)?/g;
   let match;
   while ((match = regex.exec(text)) !== null) {
     lines.push(match[0].trim());
@@ -669,9 +683,12 @@ function extractTPStatusList(text: string): string {
 
 function extractTotalTPCount(text: string): number {
   // Count total TPs from the status list (both ✅ and ⏳)
-  const regex = /[✅⏳]\s*TP\d+[:\s][\d,.]+/g;
+  const regex = /[✅⏳]\s*TP\s*\d+[:\s][\d,.]+/g;
   const matches = text.match(regex);
-  return matches ? matches.length : 0;
+  if (matches && matches.length > 0) return matches.length;
+  // Fallback: count TP patterns with prices
+  const tpPatterns = text.match(/TP\s*\d+[:\s][\d,.]+/gi);
+  return tpPatterns ? tpPatterns.length : 0;
 }
 
 function emptyRiskData(): RiskData {

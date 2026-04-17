@@ -85,7 +85,8 @@ export async function POST(request: NextRequest) {
         }
         return NextResponse.json({ success: true, signal: updated, updated: true, warnings: parseResult.warnings });
       }
-      // Fallback: if no parent found, create as new signal (backward compat)
+      // No parent found — reject orphan TP/SL update to avoid creating stray signals
+      return NextResponse.json({ success: false, error: "لم يتم العثور على الإشارة الأصلية لتحديثها", details: parseResult.warnings }, { status: 404 });
     }
 
     // ── Deduplication: skip if same signal already exists ──
