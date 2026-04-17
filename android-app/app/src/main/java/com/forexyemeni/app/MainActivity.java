@@ -2,10 +2,8 @@ package com.forexyemeni.app;
 
 import android.Manifest;
 import android.app.Activity;
-import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
-import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -29,11 +27,12 @@ import android.webkit.WebViewClient;
 import android.webkit.SslErrorHandler;
 
 /**
- * ForexYemeni VIP Trading Signals - Android App v4.0
+ * ForexYemeni VIP Trading Signals - Android App v5.0
  * - WebView wrapping the Next.js PWA
- * - Foreground Service for real-time signal monitoring (every 5 seconds)
+ * - NO foreground service (battery-friendly, no crash on Android 14+)
+ * - AlarmManager-based background polling every 30 seconds
+ * - State-based signal change detection (no duplicate notifications)
  * - Native notification bridge for JS -> Android notifications
- * - Different notification sounds per event type
  */
 public class MainActivity extends Activity {
 
@@ -59,8 +58,8 @@ public class MainActivity extends Activity {
             // Request notification permission for Android 13+
             requestNotificationPermission();
 
-            // Start the foreground service for real-time signal monitoring
-            startSignalService();
+            // Start background polling via AlarmManager (NO foreground service)
+            SignalPollReceiver.startPolling(this);
 
             // Setup WebView
             webView = new WebView(this);
@@ -107,7 +106,7 @@ public class MainActivity extends Activity {
         s.setMediaPlaybackRequiresUserGesture(false);
         s.setBuiltInZoomControls(false);
         s.setDisplayZoomControls(false);
-        s.setUserAgentString(s.getUserAgentString() + " ForexYemeni/App/4.0");
+        s.setUserAgentString(s.getUserAgentString() + " ForexYemeni/App/5.0");
         wv.setBackgroundColor(Color.parseColor("#070b14"));
         wv.setLayerType(View.LAYER_TYPE_HARDWARE, null);
     }
@@ -124,27 +123,6 @@ public class MainActivity extends Activity {
         }
     }
 
-    /**
-     * Start the foreground service for real-time signal monitoring
-     * This service checks for new signals every 5 seconds
-     * and shows notifications even when the app is closed
-     */
-    private void startSignalService() {
-        try {
-            Intent serviceIntent = new Intent(this, SignalService.class);
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(serviceIntent);
-            } else {
-                startService(serviceIntent);
-            }
-            android.util.Log.d("ForexYemeni", "SignalService started");
-        } catch (Exception e) {
-            android.util.Log.e("ForexYemeni", "Failed to start SignalService", e);
-            // Fallback: start AlarmManager polling
-            SignalPollReceiver.startPolling(this);
-        }
-    }
-
     @Override
     protected void onSaveInstanceState(Bundle outState) {
         if (webView != null) {
@@ -156,14 +134,12 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        // Service keeps running in background
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        // Do NOT stop the service - it should keep running
-        // to monitor signals even when app is closed
+        // Do NOT stop polling - it should keep running in background
         if (webView != null) {
             webView.destroy();
             webView = null;
