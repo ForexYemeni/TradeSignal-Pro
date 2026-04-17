@@ -255,3 +255,26 @@ Stage Summary:
 - File: /home/z/my-project/download/FOREXYEMENI-PRO-v2.0-fixed.pine
 - Change: Line 911 — `pyrLastAlert := pyrTPReached` moved to right after `alert()` call
 - All three signal types now have consistent, safe deduplication pattern
+---
+Task ID: medium-errors-fix
+Agent: Main Agent
+Task: Fix 5 medium-severity errors (12-16)
+
+Work Log:
+- Installed bcryptjs + @types/bcryptjs for password hashing
+- Error 12: Added hashPassword() and comparePassword() to store.ts. Updated admin/route.ts to use bcrypt comparison. Auto-rehashes legacy plaintext passwords on successful login. New passwords are always hashed with bcrypt (salt rounds=12).
+- Error 13: Added isAuthorized() auth guard to signals/route.ts (POST) and signals/[id]/route.ts (PUT+DELETE). Supports 3 auth methods: session cookie (fy_session), webhook secret (X-Webhook-Secret header), Authorization Bearer token. Updated admin/route.ts login to set fy_session cookie (HttpOnly, SameSite=strict, 7 days). Updated GAS TradeSignal-Parser.js to send X-Webhook-Secret header.
+- Error 14: Wrapped addPushSubscription, removePushSubscription, removePushSubscriptionByUserId in store.ts with withLock('push_subscriptions') to prevent race conditions.
+- Error 15: Added getUserById validation in push/subscribe/route.ts POST handler. Returns 403 if userId doesn't exist in users table.
+- Error 16: Removed email update from handleChangePassword in admin/route.ts. Only password is now changed. newEmail parameter still accepted for backwards compatibility but ignored.
+- Build: Successful (0 errors)
+- Pushed to GitHub: commit 392db3e
+
+Stage Summary:
+- 5 medium-severity errors fixed
+- Passwords now hashed with bcryptjs (auto-migration for existing plaintext)
+- Signal API endpoints protected with auth guard
+- Push subscription operations protected with distributed locks
+- Push subscriptions validated against real user IDs
+- Email change removed from password change flow
+- No changes to UI, sound alerts, or notification behavior
