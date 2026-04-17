@@ -233,3 +233,25 @@ Stage Summary:
 - No more old notifications on first app install/open
 - APK v4.2 at /home/z/my-project/download/ForexYemeni-v4.2.apk
 - User needs to uninstall v4.1 before installing v4.2 (different signing key)
+
+---
+Task ID: 6
+Agent: Main Agent
+Task: Fix التعزيز (pyr) continuous alert repetition in Pine Script
+
+Work Log:
+- Analyzed pyr TP alert section (section 18) in FOREXYEMENI-PRO-v2.0-fixed.pine
+- Found same bug pattern as reentry: `pyrLastAlert := pyrTPReached` was placed AFTER the cleanup block
+- When all pyr targets were hit, `pyrTPReached` was reset to 0 (line 920) before `pyrLastAlert` was updated (line 921)
+- This caused `pyrLastAlert` to get 0 instead of the actual TP count, allowing condition `pyrTPReached > pyrLastAlert` to potentially re-trigger
+- Fix: Moved `pyrLastAlert := pyrTPReached` to immediately after `alert()` call (line 911), BEFORE the cleanup block
+- Now pyrLastAlert captures the correct TP count before pyrTPReached is reset
+- Verified all three alert types have consistent dedup pattern:
+  - Basic (أساسي): last_alerted_tp updated after alert (max_tp_reached not reset, so order doesn't matter)
+  - Pyramiding (تعزيز): pyrLastAlert updated immediately after alert, BEFORE cleanup resets pyrTPReached
+  - Reentry (تعويض): reentryLastAlert updated immediately after alert (already fixed in previous session)
+
+Stage Summary:
+- File: /home/z/my-project/download/FOREXYEMENI-PRO-v2.0-fixed.pine
+- Change: Line 911 — `pyrLastAlert := pyrTPReached` moved to right after `alert()` call
+- All three signal types now have consistent, safe deduplication pattern

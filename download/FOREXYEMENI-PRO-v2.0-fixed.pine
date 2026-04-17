@@ -908,6 +908,7 @@ if inTrade and inPyrTrade
         pyrTPMsg += pyrTPReached == pyrTargets ? "🎊 جميع أهداف التعزيز!\n" : ""
         pyrTPMsg += SEP + "\n📱 t.me/forexYemeni_Gold"
         alert(pyrTPMsg, alert.freq_once_per_bar)
+        pyrLastAlert := pyrTPReached
 
         if pyrTPReached == pyrTargets
             inPyrTrade := false
@@ -918,7 +919,6 @@ if inTrade and inPyrTrade
             array.clear(pyrTPLbls)
             array.clear(pyrTPStatus)
             pyrTPReached := 0
-        pyrLastAlert := pyrTPReached
 
     bool pyrSLHit = (isBuyTrade and low <= pyrSLPrice) or (not isBuyTrade and high >= pyrSLPrice)
     if pyrSLHit and inPyrTrade and not pyrSL_alert_sent
