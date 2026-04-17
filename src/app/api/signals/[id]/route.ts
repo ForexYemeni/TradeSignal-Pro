@@ -49,6 +49,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       // hitTpIndex from admin is 0-indexed array position; convert to 1-indexed for consistency with parser
       const tpArrayIdx = hitTpIndex;
       const tpDisplayNum = hitTpIndex + 1;
+      const totalTPs = tps.length;
+      const isLastTP = tpArrayIdx >= totalTPs - 1;
+
       if (tps[tpArrayIdx]) {
         const tpPrice = tps[tpArrayIdx].tp;
         const points = Math.abs(tpPrice - entry);
@@ -65,6 +68,15 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         updateData.pnlDollars = parseFloat(dollars.toFixed(2));
         updateData.hitPrice = tpPrice;
         updateData.hitTpIndex = tpDisplayNum; // Store as 1-indexed
+        updateData.totalTPs = totalTPs;
+
+        // Only close the trade if this is the LAST TP
+        if (isLastTP) {
+          updateData.status = "HIT_TP";
+        } else {
+          // Partial TP hit — keep signal ACTIVE
+          updateData.status = "ACTIVE";
+        }
       }
     }
 
