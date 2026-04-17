@@ -293,8 +293,9 @@ function SkeletonCard() {
    ═══════════════════════════════════════════════════════════════ */
 
 /* ── Expandable TP Mini-Card ── */
-function TpMiniCard({ tp, index, isHit, isLastHit, entry, type }: {
+function TpMiniCard({ tp, index, isHit, isLastHit, entry, type, isAdmin, onUpdate, signalId }: {
   tp: TakeProfit; index: number; isHit: boolean; isLastHit: boolean; entry: number; type: "BUY" | "SELL";
+  isAdmin?: boolean; onUpdate?: (id: string, status: string, tpIdx?: number) => void; signalId?: string;
 }) {
   const [expanded, setExpanded] = useState(false);
   const diff = Math.abs(tp.tp - entry).toFixed(1);
@@ -334,19 +335,21 @@ function TpMiniCard({ tp, index, isHit, isLastHit, entry, type }: {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {/* Admin: inline TP hit button */}
+            {isAdmin && !isHit && onUpdate && signalId && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onUpdate(signalId, "HIT_TP", index); }}
+                className="px-2 py-1 rounded-lg text-[9px] font-bold bg-sky-500/15 text-sky-400 border border-sky-500/25 active:scale-95 transition-transform hover:bg-sky-500/25"
+              >
+                TP{index + 1} ✅
+              </button>
+            )}
             <div className={`text-[10px] font-mono font-semibold px-2 py-0.5 rounded-lg ${isHit ? "bg-emerald-500/15 text-emerald-400" : "bg-amber-500/[0.08] text-amber-400/70"}`}>
               {tp.rr.toFixed(2)}
             </div>
-            {!isHit && (
-              <svg className={`w-3.5 h-3.5 text-slate-600 transition-transform duration-300 ${expanded ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-              </svg>
-            )}
-            {isHit && (
-              <svg className={`w-3.5 h-3.5 text-emerald-500/60 transition-transform duration-300 ${expanded ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-              </svg>
-            )}
+            <svg className={`w-3.5 h-3.5 ${isHit ? "text-emerald-500/60" : "text-slate-600"} transition-transform duration-300 ${expanded ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
           </div>
         </div>
       </button>
@@ -594,6 +597,9 @@ function EntryCard({ s, idx, isAdmin, onUpdate, onDelete }: {
                     isLastHit={s.hitTpIndex - 1 === i}
                     entry={s.entry}
                     type={s.type}
+                    isAdmin={isAdmin}
+                    onUpdate={onUpdate}
+                    signalId={s.id}
                   />
                 ))}
               </div>
@@ -628,14 +634,11 @@ function EntryCard({ s, idx, isAdmin, onUpdate, onDelete }: {
           {/* ── Trade Close Status Banner ── */}
           <TradeStatusBanner s={s} />
 
-          {/* ── Admin Actions ── */}
+          {/* ── Admin Actions (SL + Close + Delete — TP buttons are inline on each target) ── */}
           {isAdmin && s.status === "ACTIVE" && (
             <>
               <Div />
               <div className="flex flex-wrap gap-1.5">
-                {s.takeProfits?.map((_, i) => (
-                  <button key={i} onClick={() => onUpdate(s.id, "HIT_TP", i)} className="px-2.5 py-1 rounded-lg text-[10px] font-medium bg-sky-500/10 text-sky-400 border border-sky-500/15 active:scale-95 transition-transform hover:bg-sky-500/20">TP{i + 1} ✅</button>
-                ))}
                 <button onClick={() => onUpdate(s.id, "HIT_SL")} className="px-2.5 py-1 rounded-lg text-[10px] font-medium bg-red-500/10 text-red-400 border border-red-500/15 active:scale-95 transition-transform hover:bg-red-500/20">وقف ❌</button>
                 <button onClick={() => onUpdate(s.id, "MANUAL_CLOSE")} className="px-2.5 py-1 rounded-lg text-[10px] font-medium bg-white/[0.04] text-slate-400 border border-white/[0.06] active:scale-95 transition-transform hover:bg-white/[0.08]">إغلاق</button>
                 <button onClick={() => onDelete(s.id)} className="px-2.5 py-1 rounded-lg text-[10px] font-medium bg-red-500/5 text-red-300/60 border border-red-500/10 active:scale-95 transition-transform hover:bg-red-500/10">🗑</button>
@@ -1049,10 +1052,7 @@ function SignalCard({ s, idx, isAdmin, onUpdate, onDelete }: {
   onUpdate: (id: string, status: string, tpIdx?: number) => void;
   onDelete: (id: string) => void;
 }) {
-  /* Closed signals (status !== ACTIVE) use compact card — whether category is ENTRY or TP/SL */
-  if (s.status !== "ACTIVE") return <ClosedSignalCard s={s} idx={idx} isAdmin={isAdmin} onDelete={onDelete} />;
-  /* Active entry signals use full card */
-  if (isEntry(s.signalCategory)) return <EntryCard s={s} idx={idx} isAdmin={isAdmin} onUpdate={onUpdate} onDelete={onDelete} />;
+  // All signals now use EntryCard — TP/SL updates are reflected in-place on the parent card
   return <EntryCard s={s} idx={idx} isAdmin={isAdmin} onUpdate={onUpdate} onDelete={onDelete} />;
 }
 
@@ -1088,6 +1088,7 @@ export default function HomePage() {
   const [audioMuted, setAudioMuted] = useState(false);
   const [audioVol, setAudioVol] = useState(0.7);
   const prevIdsRef = useRef<Set<string>>(new Set());
+  const prevStateRef = useRef<Map<string, { hitTpIndex: number; status: string }>>(new Map());
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -1209,23 +1210,43 @@ export default function HomePage() {
         const newSignals: Signal[] = data.signals;
         const newIds = new Set(newSignals.map((s: Signal) => s.id));
         const oldIds = prevIdsRef.current;
-        // Detect new signals
-        // Native notifications are handled by SignalService (background) - only play Web Audio here
-        // to avoid duplicate notifications in the APK
+        const oldStates = prevStateRef.current;
+
         if (oldIds.size > 0) {
           for (const s of newSignals) {
             if (!oldIds.has(s.id)) {
-              // Web Audio only (background service handles native notifications)
+              // New signal — play sound based on category
               if (!audioMuted) {
                 if (isEntry(s.signalCategory)) playSound(s.type === "BUY" ? "buy" : "sell", audioVol);
                 else if (isTpLike(s.signalCategory)) playSound("tp", audioVol);
                 else if (isSlLike(s.signalCategory)) playSound("sl", audioVol);
                 else playSound("message", audioVol);
               }
+            } else {
+              // Existing signal — detect updates (TP hit, SL hit, status change)
+              const prev = oldStates.get(s.id);
+              if (prev) {
+                const tpChanged = s.hitTpIndex !== prev.hitTpIndex && s.hitTpIndex > prev.hitTpIndex;
+                const slChanged = prev.status === "ACTIVE" && s.status === "HIT_SL";
+                const fullClose = prev.status === "ACTIVE" && s.status === "HIT_TP";
+                if (tpChanged && !audioMuted) {
+                  playSound("tp", audioVol);
+                } else if ((slChanged || fullClose) && !audioMuted) {
+                  playSound(slChanged ? "sl" : "tp", audioVol);
+                }
+              }
             }
           }
         }
+
+        // Save current state for next comparison
         prevIdsRef.current = newIds;
+        const stateMap = new Map<string, { hitTpIndex: number; status: string }>();
+        for (const s of newSignals) {
+          stateMap.set(s.id, { hitTpIndex: s.hitTpIndex, status: s.status });
+        }
+        prevStateRef.current = stateMap;
+
         setSignals(newSignals);
       }
     } catch (e) { console.error("Fetch signals:", e); }
@@ -2526,8 +2547,9 @@ export default function HomePage() {
 
         {/* ══════ TAB: SIGNALS — PREMIUM DESIGN ══════ */}
         {tab === "signals" && (() => {
+          // Only show entry-type signals (TP/SL updates are now reflected in-place on parent)
           const activeSignals = filtered.filter(s => isEntry(s.signalCategory) && s.status === "ACTIVE");
-          const closedSignals = filtered.filter(s => !isEntry(s.signalCategory) || s.status !== "ACTIVE");
+          const closedSignals = filtered.filter(s => isEntry(s.signalCategory) && s.status !== "ACTIVE");
           const winClosed = closedSignals.filter(s => s.status === "HIT_TP");
           const lossClosed = closedSignals.filter(s => s.status === "HIT_SL");
           const totalClosed = closedSignals.length;
