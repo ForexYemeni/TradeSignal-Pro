@@ -1,0 +1,1145 @@
+//@version=5
+indicator("FOREXYEMENI-PRO-v2.0", shorttitle="FOREXYEMENI-PRO-v2.0", overlay=true, max_lines_count=500, max_labels_count=500, max_boxes_count=100)
+
+//══════════════════════════════════════════════════════════════════════════════
+// 0. رسالة الترحيب
+//══════════════════════════════════════════════════════════════════════════════
+var table welcomeTable = table.new(position.top_center, 1, 3, border_width=1, border_color=color.new(color.gray, 80), frame_color=color.new(color.gray, 80), frame_width=1)
+
+if barstate.isfirst
+    table.cell(welcomeTable, 0, 0, "مرحباً بكم في مؤشر FOREXYEMENI-PRO", text_color=color.new(#FFC107, 0), text_size=size.normal, bgcolor=color.new(#1E222D, 10))
+    table.cell(welcomeTable, 0, 1, "قناتنا على التليجرام 👇", text_color=color.white, text_size=size.small, bgcolor=color.new(#1E222D, 10))
+    table.cell(welcomeTable, 0, 2, "https://t.me/forexYemeni_Gold", text_color=color.new(#00BCD4, 0), text_size=size.small, bgcolor=color.new(#1E222D, 10))
+
+//══════════════════════════════════════════════════════════════════════════════
+// 1. دالة الفريم الأكبر التلقائي
+//══════════════════════════════════════════════════════════════════════════════
+getHigherTimeframe() =>
+    string result = ""
+    if timeframe.isseconds
+        result := "5"
+    else if timeframe.isminutes
+        if timeframe.multiplier <= 1
+            result := "15"
+        else if timeframe.multiplier <= 3
+            result := "30"
+        else if timeframe.multiplier <= 5
+            result := "60"
+        else if timeframe.multiplier <= 15
+            result := "240"
+        else if timeframe.multiplier <= 30
+            result := "240"
+        else if timeframe.multiplier <= 60
+            result := "D"
+        else if timeframe.multiplier <= 240
+            result := "D"
+        else
+            result := "W"
+    else if timeframe.isdaily
+        result := "W"
+    else if timeframe.isweekly
+        result := "M"
+    else if timeframe.ismonthly
+        result := "12M"
+    else
+        result := "D"
+    result
+
+string autoHTF = getHigherTimeframe()
+
+getHTFDisplayName(string tf) =>
+    tf == "1" ? "1د" : tf == "3" ? "3د" : tf == "5" ? "5د" : tf == "15" ? "15د" : tf == "30" ? "30د" : tf == "60" ? "1س" : tf == "240" ? "4س" : tf == "D" ? "يومي" : tf == "W" ? "أسبوعي" : tf == "M" ? "شهري" : tf == "12M" ? "سنوي" : tf
+
+string htfDisplayName = getHTFDisplayName(autoHTF)
+
+//══════════════════════════════════════════════════════════════════════════════
+// 2. الإعدادات الأساسية
+//══════════════════════════════════════════════════════════════════════════════
+grpBase = "⚙️ إعدادات الإشارة"
+length = input.int(22, "طول ATR", group=grpBase)
+mult = input.float(2.0, "معامل ATR", step=0.1, group=grpBase)
+useClose = input.bool(true, "استخدام الإغلاق للقمم والقيعان", group=grpBase)
+
+grpInst = "🏛️ الفلاتر المؤسساتية"
+useAutoHTF = input.bool(true, "فريم أكبر تلقائي", group=grpInst)
+manualHTF = input.timeframe("60", "الفريم الأكبر (يدوي)", group=grpInst)
+smcLen = input.int(3, "حساسية هيكل السوق", minval=1, group=grpInst)
+minStars = input.int(1, "الحد الأدنى للنجوم", minval=1, maxval=3, group=grpInst)
+showSMC = input.bool(true, "إظهار FVG", group=grpInst)
+showOB = input.bool(true, "إظهار Order Blocks", group=grpInst)
+showSR = input.bool(true, "إظهار الدعوم والمقاومات", group=grpInst)
+
+string htf = useAutoHTF ? autoHTF : manualHTF
+string htfDisplay = useAutoHTF ? htfDisplayName : getHTFDisplayName(manualHTF)
+
+grpTgt = "🎯 الأهداف والوقف"
+numTargets = input.int(10, "عدد الأهداف", minval=1, maxval=10, group=grpTgt)
+tpMode = input.string("فيبوناتشي (Fib)", "نوع الأهداف", options=["ATR","مضاعفات الوقف (RR)","فيبوناتشي (Fib)","قمم وقيعان (Swings)"], group=grpTgt)
+slMode = input.string("ATR", "نوع الوقف", options=["ATR","Swing (قمم وقيعان)","FVG (فجوات السيولة)"], group=grpTgt)
+slMult = input.float(1.0, "مضاعف الوقف", step=0.1, group=grpTgt)
+useBreakeven = input.bool(false, "تأمين الصفقة", group=grpTgt)
+beTrigger = input.int(1, "تفعيل التأمين بعد الهدف:", minval=1, maxval=5, group=grpTgt)
+beBuffer = input.float(0.5, "هامش التأمين", step=0.1, group=grpTgt)
+useTrailing = input.bool(false, "الوقف التتبعي", group=grpTgt)
+
+grpExtra = "⚡ التعويض والتعزيز"
+useReentry = input.bool(false, "تفعيل صفقة التعويض", group=grpExtra)
+reentryMult = input.float(1.5, "مضاعف وقف التعويض", step=0.1, group=grpExtra)
+reentryRR = input.float(2.0, "نسبة R:R للتعويض", step=0.1, group=grpExtra)
+reentryTargets = input.int(5, "عدد أهداف التعويض", minval=1, maxval=10, group=grpExtra)
+usePyr = input.bool(true, "تفعيل صفقات التعزيز", group=grpExtra)
+pyrTargets = input.int(3, "أهداف التعزيز", minval=1, maxval=5, group=grpExtra)
+pyrSLMode = input.string("آخر هدف محقق", "وقف التعزيز", options=["آخر هدف محقق","ATR من الدخول","الدخول الأصلي"], group=grpExtra)
+pyrRR = input.float(1.5, "R:R أهداف التعزيز", step=0.1, group=grpExtra)
+
+//══════════════════════════════════════════════════════════════════════════════
+// 3. إدارة المخاطر — الإعدادات الوحيدة المطلوبة
+//══════════════════════════════════════════════════════════════════════════════
+grpRisk = "💰 إدارة المخاطر"
+accBalance = input.float(1000.0, "💵 رصيد الحساب ($)", step=100, minval=1, group=grpRisk)
+riskPct = input.float(1.0, "⚠️ نسبة المخاطرة (%)", step=0.1, minval=0.1, maxval=100, group=grpRisk)
+
+grpStat = "📊 الإحصائيات"
+statPeriod = input.string("كل البيانات", "الفترة", options=["آخر 24 ساعة","آخر 7 أيام","آخر 30 يوم","كل البيانات"], group=grpStat)
+
+//══════════════════════════════════════════════════════════════════════════════
+// 4. الكشف التلقائي عن الأداة — لا حاجة لإعداد يدوي
+//══════════════════════════════════════════════════════════════════════════════
+getAutoInstrument() =>
+    string t = syminfo.ticker
+    string inst = "فوركس (5 أرقام)"
+    // الذهب
+    if str.contains(t, "XAU") or str.contains(t, "GOLD")
+        inst := "الذهب (XAUUSD)"
+    // الفضة
+    else if str.contains(t, "XAG") or str.contains(t, "SILVER")
+        inst := "الفضة (XAGUSD)"
+    // العملات الرقمية
+    else if str.contains(t, "BTC") or str.contains(t, "ETH") or str.contains(t, "BNB") or str.contains(t, "SOL") or str.contains(t, "XRP") or str.contains(t, "ADA") or str.contains(t, "DOGE") or str.contains(t, "DOT") or str.contains(t, "USDT")
+        inst := "عملات رقمية"
+    // المؤشرات
+    else if str.contains(t, "NAS") or str.contains(t, "NDX") or str.contains(t, "US30") or str.contains(t, "DOW") or str.contains(t, "US500") or str.contains(t, "SPX") or str.contains(t, "US100") or str.contains(t, "JP225") or str.contains(t, "UK100") or str.contains(t, "DAX") or str.contains(t, "CAC")
+        inst := "مؤشرات (NAS/DOW)"
+    // فوركس ين (6 أرقام)
+    else if str.contains(t, "JPY")
+        inst := "فوركس (6 أرقام)"
+    inst
+
+string autoInstrument = getAutoInstrument()
+
+//══════════════════════════════════════════════════════════════════════════════
+// 5. الألوان
+//══════════════════════════════════════════════════════════════════════════════
+color C_GREEN  = color.new(#00E676, 0)
+color C_RED    = color.new(#FF5252, 0)
+color C_ORANGE = color.new(#FF9800, 0)
+color C_GOLD   = color.new(#FFD700, 0)
+color C_CYAN   = color.new(#00BCD4, 0)
+color C_GRAY   = color.new(color.gray, 0)
+color C_BG     = color.new(#1E222D, 10)
+color C_PURPLE = color.new(#E040FB, 0)
+color C_TEAL   = color.new(#00BCD4, 0)
+
+var color[] tpColors = array.from(
+     color.new(#2962FF, 0),
+     color.new(#00897B, 0),
+     color.new(#00BCD4, 0),
+     color.new(#009688, 0),
+     color.new(#4CAF50, 0),
+     color.new(#8BC34A, 0),
+     color.new(#CDDC39, 0),
+     color.new(#FFEB3B, 0),
+     color.new(#FFC107, 0),
+     color.new(#FF9800, 0))
+
+string SEP = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+//══════════════════════════════════════════════════════════════════════════════
+// 6. فترة الإحصائية
+//══════════════════════════════════════════════════════════════════════════════
+int lookbackMs = statPeriod == "آخر 24 ساعة" ? 86400000 : statPeriod == "آخر 7 أيام" ? 86400000 * 7 : statPeriod == "آخر 30 يوم" ? 86400000 * 30 : 0
+bool inStatWindow = lookbackMs == 0 or (time >= timenow - lookbackMs)
+
+//══════════════════════════════════════════════════════════════════════════════
+// 7. دوال حساب اللوت الموحدة — حساب تلقائي حسب الأداة المكتشفة
+//══════════════════════════════════════════════════════════════════════════════
+calcSLValuePerLot(float slDist) =>
+    float val = 0.0
+    if autoInstrument == "الذهب (XAUUSD)"
+        val := slDist * 100.0
+    else if autoInstrument == "الفضة (XAGUSD)"
+        val := slDist * 5000.0
+    else if autoInstrument == "فوركس (5 أرقام)"
+        float pips = slDist / (syminfo.mintick * 10.0)
+        val := pips * 10.0
+    else if autoInstrument == "فوركس (6 أرقام)"
+        float pips = slDist / (syminfo.mintick * 10.0)
+        val := pips * 10.0
+    else if autoInstrument == "مؤشرات (NAS/DOW)"
+        val := slDist * 1.0
+    else if autoInstrument == "عملات رقمية"
+        val := slDist * 1.0
+    else
+        val := slDist * 10.0
+    math.max(val, 0.0001)
+
+calcLot(float riskDollar, float slDist) =>
+    float slValPerLot = calcSLValuePerLot(slDist)
+    float rawLot = riskDollar / slValPerLot
+    float steppedLot = math.floor(rawLot * 100.0) / 100.0
+    float finalLot = math.max(steppedLot, 0.01)
+    finalLot := math.min(finalLot, 100.0)
+    finalLot
+
+calcPnLDollar(float lotSize, float priceDist) =>
+    float slValPerLot = calcSLValuePerLot(priceDist)
+    lotSize * slValPerLot
+
+buildWarning(float lotSize, float actualRisk) =>
+    float actualPct = (actualRisk / accBalance) * 100.0
+    string warning = ""
+    if actualPct > riskPct * 1.5
+        float recommendedBalance = (actualRisk / riskPct) * 100.0
+        warning := "\n⚠️ تحذير المخاطر:\n"
+        warning += "├ مستهدف : " + str.tostring(riskPct, "#.#") + "% = $" + str.tostring(math.round(accBalance * riskPct / 100.0, 2), "#.##") + "\n"
+        warning += "├ فعلي : " + str.tostring(math.round(actualPct, 1), "#.#") + "% = $" + str.tostring(math.round(actualRisk, 2), "#.##") + "\n"
+        warning += "└ موصى به: $" + str.tostring(math.round(recommendedBalance, 0), "#") + " رصيد\n"
+    warning
+
+lotToStr(float lots) =>
+    lots >= 1.0 ? str.tostring(math.round(lots, 2), "#.##") + " لوت" : lots >= 0.1 ? str.tostring(math.round(lots, 2), "#.##") + " لوت (" + str.tostring(math.round(lots * 10.0, 1), "#.#") + " ميني)" : str.tostring(math.round(lots, 2), "#.##") + " لوت (" + str.tostring(math.round(lots * 100.0, 0), "#") + " مايكرو)"
+
+//══════════════════════════════════════════════════════════════════════════════
+// 8. متغيرات الإحصائيات
+//══════════════════════════════════════════════════════════════════════════════
+var int totalTrades = 0
+var int winTrades = 0
+var int lossTrades = 0
+var int reentryWins = 0
+var int reentryLosses = 0
+var bool tradeCounted = false
+
+//══════════════════════════════════════════════════════════════════════════════
+// 9. متغيرات الصفقة الرئيسية
+//══════════════════════════════════════════════════════════════════════════════
+var float entryPrice = na
+var float slPrice = na
+var float initialSL = na
+var float tradeATR = na
+var bool isBuyTrade = false
+var int tradeStars = 0
+var float maxTP_price = na
+var bool inTrade = false
+var int lastSignal = 0
+var int max_tp_reached = 0
+var int last_alerted_tp= 0
+var bool sl_alert_sent = false
+
+var float savedLotSize = 0.0
+var float savedActualRisk= 0.0
+var float savedRiskTarget= 0.0
+var bool savedIsBuy = true
+
+var line entryLine = na
+var line slLine = na
+var label entryLbl = na
+var label slLbl = na
+var label signalLbl = na
+
+var float[] tpPrices = array.new_float()
+var line[] tpLines = array.new_line()
+var label[] tpLbls = array.new_label()
+var bool[] tpStatus = array.new_bool()
+
+//══════════════════════════════════════════════════════════════════════════════
+// 10. متغيرات التعزيز (Pyramiding)
+//══════════════════════════════════════════════════════════════════════════════
+var bool inPyrTrade = false
+var float pyrEntryPrice = na
+var float pyrSLPrice = na
+var float pyrATR = na
+var bool pyrAlertSent = false
+var float pyrLotSize = 0.0
+var float pyrActualRisk = 0.0
+
+var line pyrEntryLine = na
+var line pyrSLLine = na
+var label pyrEntryLbl = na
+var label pyrSLLbl = na
+
+var float[] pyrTPPrices = array.new_float()
+var line[] pyrTPLines = array.new_line()
+var label[] pyrTPLbls = array.new_label()
+var bool[] pyrTPStatus = array.new_bool()
+var int pyrTPReached = 0
+var int pyrLastAlert = 0
+
+//══════════════════════════════════════════════════════════════════════════════
+// 11. متغيرات التعويض (Reentry)
+//══════════════════════════════════════════════════════════════════════════════
+var bool inReentry = false
+var float reentryEntry = na
+var float reentrySL = na
+var float reentryATR = na
+var bool isBuyReentry = false
+var int reentryTPReached = 0
+var int reentryLastAlert = 0
+var bool reentrySLSent = false
+var bool pendingReentry = false
+var bool reentryCounted = false
+var float reentryLotSize = 0.0
+var float reentryActualRisk = 0.0
+
+var line reentryEntryLine = na
+var line reentrySLLine = na
+var label reentryEntryLbl = na
+var label reentrySLLbl = na
+var label reentrySignalLbl = na
+
+var float[] reentryTPPrices = array.new_float()
+var line[] reentryTPLines = array.new_line()
+var label[] reentryTPLbls = array.new_label()
+var bool[] reentryTPStatus = array.new_bool()
+
+//══════════════════════════════════════════════════════════════════════════════
+// 12. حسابات MTF & SMC & FVG & OB
+//══════════════════════════════════════════════════════════════════════════════
+htf_ema = ta.ema(close, 200)
+htf_trend = request.security(syminfo.tickerid, htf, close > htf_ema ? 1 : -1, barmerge.gaps_off, barmerge.lookahead_off)
+ph = ta.pivothigh(high, smcLen, smcLen)
+pl = ta.pivotlow (low, smcLen, smcLen)
+
+var float last_ph = na
+var float last_pl = na
+var float[] recent_phs = array.new_float()
+var float[] recent_pls = array.new_float()
+
+var line resLine = na
+var line supLine = na
+
+if not na(ph)
+    last_ph := ph
+    array.push(recent_phs, ph)
+    if array.size(recent_phs) > 50
+        array.shift(recent_phs)
+    if showSR
+        if not na(resLine)
+            line.delete(resLine)
+        resLine := line.new(bar_index[smcLen], last_ph, bar_index, last_ph, color=color.new(#FF5252, 50), width=2, style=line.style_dashed, extend=extend.right)
+
+if not na(pl)
+    last_pl := pl
+    array.push(recent_pls, pl)
+    if array.size(recent_pls) > 50
+        array.shift(recent_pls)
+    if showSR
+        if not na(supLine)
+            line.delete(supLine)
+        supLine := line.new(bar_index[smcLen], last_pl, bar_index, last_pl, color=color.new(#00E676, 50), width=2, style=line.style_dashed, extend=extend.right)
+
+var int smc_trend = 0
+if not na(last_ph) and not na(last_pl)
+    if close > last_ph
+        smc_trend := 1
+    else if close < last_pl
+        smc_trend := -1
+
+bull_fvg = low > high[2] and barstate.isconfirmed
+bear_fvg = high < low[2] and barstate.isconfirmed
+
+var float last_bull_fvg_top = na
+var float last_bull_fvg_bot = na
+var float last_bear_fvg_top = na
+var float last_bear_fvg_bot = na
+var bool bull_fvg_filled = false
+var bool bear_fvg_filled = false
+
+if bull_fvg
+    last_bull_fvg_top := low
+    last_bull_fvg_bot := high[2]
+    bull_fvg_filled := false
+    if showSMC
+        box.new(bar_index[2], last_bull_fvg_top, bar_index + 5, last_bull_fvg_bot, bgcolor=color.new(#00E676, 90), border_color=color.new(#00E676, 50), text="FVG ↑", text_size=size.tiny, text_color=color.new(#00E676, 30))
+
+if bear_fvg
+    last_bear_fvg_top := low[2]
+    last_bear_fvg_bot := high
+    bear_fvg_filled := false
+    if showSMC
+        box.new(bar_index[2], last_bear_fvg_top, bar_index + 5, last_bear_fvg_bot, bgcolor=color.new(#FF5252, 90), border_color=color.new(#FF5252, 50), text="FVG ↓", text_size=size.tiny, text_color=color.new(#FF5252, 30))
+
+if not bull_fvg_filled and not na(last_bull_fvg_bot) and low <= last_bull_fvg_bot
+    bull_fvg_filled := true
+if not bear_fvg_filled and not na(last_bear_fvg_top) and high >= last_bear_fvg_top
+    bear_fvg_filled := true
+
+var float last_bull_ob_top = na
+var float last_bull_ob_bot = na
+var float last_bear_ob_top = na
+var float last_bear_ob_bot = na
+var bool bull_ob_broken = false
+var bool bear_ob_broken = false
+
+if bull_fvg
+    for i = 2 to 15
+        if close[i] < open[i]
+            last_bull_ob_top := math.max(open[i], close[i])
+            last_bull_ob_bot := low[i]
+            bull_ob_broken := false
+            if showOB
+                box.new(bar_index[i], last_bull_ob_top, bar_index + 5, last_bull_ob_bot, bgcolor=color.new(#2962FF, 85), border_color=color.new(#2962FF, 40), text="OB+", text_size=size.tiny, text_color=color.new(#2962FF, 30))
+            break
+
+if bear_fvg
+    for i = 2 to 15
+        if close[i] > open[i]
+            last_bear_ob_top := high[i]
+            last_bear_ob_bot := math.min(open[i], close[i])
+            bear_ob_broken := false
+            if showOB
+                box.new(bar_index[i], last_bear_ob_top, bar_index + 5, last_bear_ob_bot, bgcolor=color.new(#FF1744, 85), border_color=color.new(#FF1744, 40), text="OB-", text_size=size.tiny, text_color=color.new(#FF1744, 30))
+            break
+
+if not bull_ob_broken and not na(last_bull_ob_bot) and low < last_bull_ob_bot
+    bull_ob_broken := true
+if not bear_ob_broken and not na(last_bear_ob_top) and high > last_bear_ob_top
+    bear_ob_broken := true
+
+bool near_bull_fvg = not bull_fvg_filled and not na(last_bull_fvg_top) and low <= last_bull_fvg_top and close >= last_bull_fvg_bot
+bool near_bear_fvg = not bear_fvg_filled and not na(last_bear_fvg_bot) and high >= last_bear_fvg_bot and close <= last_bear_fvg_top
+bool near_bull_ob = not bull_ob_broken and not na(last_bull_ob_top) and low <= last_bull_ob_top and close >= last_bull_ob_bot
+bool near_bear_ob = not bear_ob_broken and not na(last_bear_ob_bot) and high >= last_bear_ob_bot and close <= last_bear_ob_top
+bool bull_sweep = not na(last_pl) and low < last_pl and close > last_pl
+bool bear_sweep = not na(last_ph) and high > last_ph and close < last_ph
+
+//══════════════════════════════════════════════════════════════════════════════
+// 13. محرك الإشارات
+//══════════════════════════════════════════════════════════════════════════════
+atr = mult * ta.atr(length)
+hh = useClose ? ta.highest(close, length) : ta.highest(high, length)
+ll = useClose ? ta.lowest (close, length) : ta.lowest (low, length)
+longStop = hh - atr
+shortStop = ll + atr
+longPrev = nz(longStop[1], longStop)
+shortPrev = nz(shortStop[1], shortStop)
+longStop := (useClose ? close : high) > longPrev ? math.max(longStop, longPrev) : longStop
+shortStop := (useClose ? close : low) < shortPrev ? math.min(shortStop, shortPrev) : shortStop
+
+var int dir = 1
+dir := high > shortPrev ? 1 : low < longPrev ? -1 : dir
+rawBuy = dir == 1 and dir[1] == -1
+rawSell = dir == -1 and dir[1] == 1
+
+int currentStars = 0
+if rawBuy or rawSell
+    currentStars := 1
+if rawBuy
+    if htf_trend == 1
+        currentStars += 1
+    if near_bull_fvg or bull_sweep or near_bull_ob
+        currentStars += 1
+if rawSell
+    if htf_trend == -1
+        currentStars += 1
+    if near_bear_fvg or bear_sweep or near_bear_ob
+        currentStars += 1
+
+//══════════════════════════════════════════════════════════════════════════════
+// 14. دوال حذف الرسومات
+//══════════════════════════════════════════════════════════════════════════════
+clearMainGraphics() =>
+    if not na(entryLine)
+        line.delete(entryLine)
+    if not na(slLine)
+        line.delete(slLine)
+    if not na(entryLbl)
+        label.delete(entryLbl)
+    if not na(slLbl)
+        label.delete(slLbl)
+    if not na(signalLbl)
+        label.delete(signalLbl)
+    if array.size(tpLines) > 0
+        for j = 0 to array.size(tpLines) - 1
+            line.delete(array.get(tpLines, j))
+            label.delete(array.get(tpLbls, j))
+
+clearPyrGraphics() =>
+    if not na(pyrEntryLine)
+        line.delete(pyrEntryLine)
+    if not na(pyrSLLine)
+        line.delete(pyrSLLine)
+    if not na(pyrEntryLbl)
+        label.delete(pyrEntryLbl)
+    if not na(pyrSLLbl)
+        label.delete(pyrSLLbl)
+    if array.size(pyrTPLines) > 0
+        for j = 0 to array.size(pyrTPLines) - 1
+            line.delete(array.get(pyrTPLines, j))
+            label.delete(array.get(pyrTPLbls, j))
+
+clearReentryGraphics() =>
+    if not na(reentryEntryLine)
+        line.delete(reentryEntryLine)
+    if not na(reentrySLLine)
+        line.delete(reentrySLLine)
+    if not na(reentryEntryLbl)
+        label.delete(reentryEntryLbl)
+    if not na(reentrySLLbl)
+        label.delete(reentrySLLbl)
+    if not na(reentrySignalLbl)
+        label.delete(reentrySignalLbl)
+    if array.size(reentryTPLines) > 0
+        for j = 0 to array.size(reentryTPLines) - 1
+            line.delete(array.get(reentryTPLines, j))
+            label.delete(array.get(reentryTPLbls, j))
+
+clearAllGraphics() =>
+    clearMainGraphics()
+    clearPyrGraphics()
+    clearReentryGraphics()
+
+//══════════════════════════════════════════════════════════════════════════════
+// 15. دالة حساب وقف التعزيز
+//══════════════════════════════════════════════════════════════════════════════
+calcPyrSL(bool isBuy, float pyrEntry, float pyrAtr, float lastTPPrice) =>
+    float sl = na
+    if pyrSLMode == "آخر هدف محقق"
+        sl := isBuy ? (lastTPPrice < pyrEntry ? lastTPPrice : pyrEntry - pyrAtr) : (lastTPPrice > pyrEntry ? lastTPPrice : pyrEntry + pyrAtr)
+    else if pyrSLMode == "ATR من الدخول"
+        sl := isBuy ? pyrEntry - pyrAtr : pyrEntry + pyrAtr
+    else
+        sl := isBuy ? (entryPrice < pyrEntry ? entryPrice : pyrEntry - pyrAtr) : (entryPrice > pyrEntry ? entryPrice : pyrEntry + pyrAtr)
+    if isBuy and sl >= pyrEntry
+        sl := pyrEntry - pyrAtr
+    if not isBuy and sl <= pyrEntry
+        sl := pyrEntry + pyrAtr
+    sl
+
+//══════════════════════════════════════════════════════════════════════════════
+// 16. بناء نصوص التنبيهات
+//══════════════════════════════════════════════════════════════════════════════
+buildTPStatusText() =>
+    string s = ""
+    if array.size(tpPrices) > 0
+        for i = 0 to array.size(tpPrices) - 1
+            float p = array.get(tpPrices, i)
+            bool hit = array.get(tpStatus, i)
+            bool cur = i == max_tp_reached - 1
+            s += (hit ? "✅" : "⏳") + " TP" + str.tostring(i+1) + ": " + str.tostring(p, format.mintick) + (cur ? " ← الآن" : "") + "\n"
+    s
+
+buildReentryTPStatusText() =>
+    string s = ""
+    if array.size(reentryTPPrices) > 0
+        for i = 0 to array.size(reentryTPPrices) - 1
+            float p = array.get(reentryTPPrices, i)
+            bool hit = array.get(reentryTPStatus, i)
+            bool cur = i == reentryTPReached - 1
+            s += (hit ? "✅" : "⏳") + " TP" + str.tostring(i+1) + ": " + str.tostring(p, format.mintick) + (cur ? " ← الآن" : "") + "\n"
+    s
+
+buildPyrTPStatusText() =>
+    string s = ""
+    if array.size(pyrTPPrices) > 0
+        for i = 0 to array.size(pyrTPPrices) - 1
+            float p = array.get(pyrTPPrices, i)
+            bool hit = array.get(pyrTPStatus, i)
+            bool cur = i == pyrTPReached - 1
+            s += (hit ? "✅" : "⏳") + " TP" + str.tostring(i+1) + ": " + str.tostring(p, format.mintick) + (cur ? " ← الآن" : "") + "\n"
+    s
+
+buildRiskBlock(float lotSize, float targetRisk, float actualRisk, float slDist, float maxRR) =>
+    float actualPct = (actualRisk / accBalance) * 100.0
+    string s = "\n💰 إدارة المخاطر\n"
+    s += "💵 الرصيد : $" + str.tostring(accBalance, "#.##") + "\n"
+    s += "🎯 خطر مستهدف : $" + str.tostring(math.round(targetRisk, 2), "#.##") + " (" + str.tostring(riskPct, "#.#") + "%)\n"
+    s += "📦 حجم اللوت : " + lotToStr(lotSize) + "\n"
+    s += "💸 خسارة فعلية : $" + str.tostring(math.round(actualRisk, 2), "#.##") + " (" + str.tostring(math.round(actualPct, 1), "#.#") + "%)\n"
+    s += "📏 مسافة الوقف : " + str.tostring(math.round(slDist, 2), "#.##") + "\n"
+    s += "📊 R:R الأقصى : 1:" + str.tostring(math.round(maxRR, 2), "#.##") + "\n"
+    s += "🏦 الأداة : " + autoInstrument + "\n"
+    s += buildWarning(lotSize, actualRisk)
+    s
+
+buildEntryAlert() =>
+    float slDist = math.abs(entryPrice - slPrice)
+    float maxRR = slDist > 0 ? math.abs(maxTP_price - entryPrice) / slDist : 0
+    float targetRisk = accBalance * riskPct / 100.0
+    string starStr = tradeStars == 3 ? "⭐⭐⭐" : tradeStars == 2 ? "⭐⭐" : "⭐"
+    string dir_str = isBuyTrade ? "🟢 إشارة شراء 🚀" : "🔴 إشارة بيع 🔻"
+    string msg = "╔════════════════════════════════╗\n"
+    msg += "║ " + dir_str + " ║\n"
+    msg += "╚════════════════════════════════╝\n\n"
+    msg += "📌 " + syminfo.ticker + " | " + timeframe.period + " | " + htfDisplay + "\n"
+    msg += "⭐ " + starStr + "\n\n"
+    msg += SEP + "\n📊 الصفقة\n" + SEP + "\n"
+    msg += "🔵 الدخول: " + str.tostring(entryPrice, format.mintick) + "\n"
+    msg += "🔴 الوقف : " + str.tostring(slPrice, format.mintick) + "\n"
+    msg += buildRiskBlock(savedLotSize, targetRisk, savedActualRisk, slDist, maxRR)
+    msg += "\n" + SEP + "\n🎯 الأهداف\n" + SEP + "\n"
+    if array.size(tpPrices) > 0
+        for k = 0 to array.size(tpPrices) - 1
+            float tp = array.get(tpPrices, k)
+            float rr = slDist > 0 ? math.abs(tp - entryPrice) / slDist : 0
+            msg += "🎯 TP" + str.tostring(k+1) + ": " + str.tostring(tp, format.mintick) + " | R:R " + str.tostring(math.round(rr, 2), "#.##") + "\n"
+    msg += "\n" + SEP + "\n📈 " + htfDisplay + ": " + (htf_trend == 1 ? "صاعد 🐂" : "هابط 🐻") + " | SMC: " + (smc_trend == 1 ? "صاعد" : smc_trend == -1 ? "هابط" : "محايد") + "\n"
+    msg += SEP + "\n📱 t.me/forexYemeni_Gold"
+    msg
+
+buildTPAlert(int tpNum, bool isJump, int fromTP) =>
+    float hitPrice = array.get(tpPrices, math.max(0, tpNum - 1))
+    float pnlPts = math.abs(hitPrice - entryPrice)
+    float pnlDollar = calcPnLDollar(savedLotSize, pnlPts)
+    string msg = "╔════════════════════════════════╗\n"
+    if tpNum == numTargets
+        msg += "║ 🏆 إغلاق كامل بالربح! ║\n"
+    else if isJump
+        msg += "║ 🚀 قفزة سعرية! ║\n"
+    else
+        msg += "║ ✅ تحقق الهدف " + str.tostring(tpNum) + " ║\n"
+    msg += "╚════════════════════════════════╝\n\n"
+    msg += "📌 " + syminfo.ticker + "\n"
+    if isJump
+        msg += "⚡ الأهداف " + str.tostring(fromTP+1) + " ← " + str.tostring(tpNum) + " معاً!\n"
+    msg += "🎯 " + str.tostring(hitPrice, format.mintick) + " | +" + str.tostring(math.round(pnlPts, 2), "#.##") + " نقطة\n"
+    msg += "💰 ربح تقريبي: +$" + str.tostring(math.round(pnlDollar, 2), "#.##") + "\n\n"
+    msg += SEP + "\n" + buildTPStatusText() + SEP + "\n"
+    msg += tpNum == numTargets ? "🎊 جميع الأهداف!\n" : tpNum >= beTrigger and useBreakeven ? "💡 التأمين مفعّل\n" : "💡 فكر في تحريك الوقف\n"
+    msg += SEP + "\n📱 t.me/forexYemeni_Gold"
+    msg
+
+buildSLAlert() =>
+    float lossPts = math.abs(entryPrice - slPrice)
+    float lossDollar = calcPnLDollar(savedLotSize, lossPts)
+    string msg = "╔══════════════════════════════╗\n"
+    if max_tp_reached > 0
+        string closeType = slPrice == initialSL ? "⚠️ الوقف الأساسي" : useTrailing ? "🔒 الوقف المتتبع" : "🛡️ التأمين"
+        msg += "║ " + closeType + " ║\n"
+        msg += "╚══════════════════════════════╝\n\n"
+        msg += "📌 " + syminfo.ticker + "\n\n"
+        msg += SEP + "\n" + buildTPStatusText() + SEP + "\n"
+        msg += "✅ " + str.tostring(max_tp_reached) + "/" + str.tostring(numTargets) + " أهداف\n"
+        msg += "💰 ربح جزئي ✅\n"
+    else
+        msg += "║ ❌ ضرب الوقف ║\n"
+        msg += "╚════════════════════════════════╝\n\n"
+        msg += "📌 " + syminfo.ticker + "\n"
+        msg += "❌ " + str.tostring(slPrice, format.mintick) + " | -" + str.tostring(math.round(lossPts, 2), "#.##") + " نقطة\n"
+        msg += "💰 خسارة: -$" + str.tostring(math.round(lossDollar, 2), "#.##") + "\n\n"
+        msg += SEP + "\n" + buildTPStatusText() + SEP + "\n"
+        if useReentry
+            bool trendOK = (isBuyTrade and htf_trend == 1 and smc_trend == 1) or (not isBuyTrade and htf_trend == -1 and smc_trend == -1)
+            if trendOK
+                msg += "♻️ جاري البحث عن دخول تعويض...\n"
+    msg += SEP + "\n📱 t.me/forexYemeni_Gold"
+    msg
+
+buildReentryAlert() =>
+    float slDist = math.abs(reentryEntry - reentrySL)
+    float maxTP = array.size(reentryTPPrices) > 0 ? array.get(reentryTPPrices, array.size(reentryTPPrices) - 1) : reentryEntry
+    float maxRR = slDist > 0 ? math.abs(maxTP - reentryEntry) / slDist : 0
+    float targetRisk = accBalance * riskPct / 100.0
+    string msg = "╔══════════════════════════════╗\n"
+    msg += "║ ♻️ صفقة التعويض " + (isBuyReentry ? "شراء 🚀" : "بيع 🔻") + " ║\n"
+    msg += "╚════════════════════════════════╝\n\n"
+    msg += "📌 " + syminfo.ticker + " | الاتجاه يدعم الدخول!\n\n"
+    msg += SEP + "\n📊 الصفقة\n" + SEP + "\n"
+    msg += "🔵 الدخول: " + str.tostring(reentryEntry, format.mintick) + "\n"
+    msg += "🔴 الوقف : " + str.tostring(reentrySL, format.mintick) + "\n"
+    msg += buildRiskBlock(reentryLotSize, targetRisk, reentryActualRisk, slDist, maxRR)
+    msg += "\n" + SEP + "\n🎯 الأهداف\n" + SEP + "\n"
+    if array.size(reentryTPPrices) > 0
+        for k = 0 to array.size(reentryTPPrices) - 1
+            float tp = array.get(reentryTPPrices, k)
+            float rr = slDist > 0 ? math.abs(tp - reentryEntry) / slDist : 0
+            msg += "♻️ TP" + str.tostring(k+1) + ": " + str.tostring(tp, format.mintick) + " | R:R " + str.tostring(math.round(rr, 2), "#.##") + "\n"
+    msg += SEP + "\n📱 t.me/forexYemeni_Gold"
+    msg
+
+buildReentryTPAlert(int tpNum) =>
+    float hitPrice = array.get(reentryTPPrices, math.max(0, tpNum - 1))
+    float pnlPts = math.abs(hitPrice - reentryEntry)
+    float pnlDollar = calcPnLDollar(reentryLotSize, pnlPts)
+    string msg = "╔══════════════════════════════╗\n"
+    msg += tpNum == reentryTargets ? "║ 🏆 تعويض كامل بالربح! 🎊 ║\n" : "║ ✅ هدف التعويض " + str.tostring(tpNum) + " ║\n"
+    msg += "╚════════════════════════════════╝\n\n"
+    msg += "📌 " + syminfo.ticker + " | ♻️ التعويض\n"
+    msg += "🎯 " + str.tostring(hitPrice, format.mintick) + " | +" + str.tostring(math.round(pnlPts, 2), "#.##") + " نقطة\n"
+    msg += "💰 ربح تقريبي: +$" + str.tostring(math.round(pnlDollar, 2), "#.##") + "\n\n"
+    msg += SEP + "\n" + buildReentryTPStatusText()
+    msg += SEP + "\n📱 t.me/forexYemeni_Gold"
+    msg
+
+buildPyrAlert() =>
+    float slDist = math.abs(pyrEntryPrice - pyrSLPrice)
+    float maxTP = array.size(pyrTPPrices) > 0 ? array.get(pyrTPPrices, array.size(pyrTPPrices) - 1) : pyrEntryPrice
+    float maxRR = slDist > 0 ? math.abs(maxTP - pyrEntryPrice) / slDist : 0
+    float targetRisk = accBalance * riskPct / 100.0
+    string msg = "╔════════════════════════════════╗\n"
+    msg += "║ 🔥 تعزيز " + (isBuyTrade ? "شراء 🚀" : "بيع 🔻") + " ║\n"
+    msg += "╚════════════════════════════════╝\n\n"
+    msg += "📌 " + syminfo.ticker + " | " + str.tostring(max_tp_reached) + " أهداف محققة\n\n"
+    msg += SEP + "\n📊 التعزيز\n" + SEP + "\n"
+    msg += "🔵 الدخول: " + str.tostring(pyrEntryPrice, format.mintick) + "\n"
+    msg += "🔴 الوقف : " + str.tostring(pyrSLPrice, format.mintick) + "\n"
+    msg += buildRiskBlock(pyrLotSize, targetRisk, pyrActualRisk, slDist, maxRR)
+    msg += "\n" + SEP + "\n🎯 أهداف التعزيز\n" + SEP + "\n"
+    if array.size(pyrTPPrices) > 0
+        for k = 0 to array.size(pyrTPPrices) - 1
+            float tp = array.get(pyrTPPrices, k)
+            float rr = slDist > 0 ? math.abs(tp - pyrEntryPrice) / slDist : 0
+            msg += "🔥 TP" + str.tostring(k+1) + ": " + str.tostring(tp, format.mintick) + " | R:R " + str.tostring(math.round(rr, 2), "#.##") + "\n"
+    msg += SEP + "\n📱 t.me/forexYemeni_Gold"
+    msg
+
+//══════════════════════════════════════════════════════════════════════════════
+// 17. مراقبة الصفقة الرئيسية
+//══════════════════════════════════════════════════════════════════════════════
+if inTrade
+    if array.size(tpPrices) > 0
+        for i = 0 to numTargets - 1
+            if not array.get(tpStatus, i)
+                float tpP = array.get(tpPrices, i)
+                if (isBuyTrade and high >= tpP) or (not isBuyTrade and low <= tpP)
+                    array.set(tpStatus, i, true)
+                    max_tp_reached := math.max(max_tp_reached, i + 1)
+                    label.set_text(array.get(tpLbls, i), "✅ TP" + str.tostring(i + 1))
+
+    if max_tp_reached > last_alerted_tp
+        bool isJump = (max_tp_reached - last_alerted_tp) > 1
+        alert(buildTPAlert(max_tp_reached, isJump, last_alerted_tp), alert.freq_once_per_bar)
+
+        if max_tp_reached == numTargets
+            if inStatWindow and not tradeCounted
+                winTrades += 1
+                totalTrades += 1
+                tradeCounted := true
+            inTrade := false
+            lastSignal := 0
+            inPyrTrade := false
+            pyrAlertSent := false
+            clearAllGraphics()
+        last_alerted_tp := max_tp_reached
+
+    if useBreakeven and max_tp_reached >= beTrigger and inTrade
+        float newBE = isBuyTrade ? entryPrice + beBuffer : entryPrice - beBuffer
+        if (isBuyTrade and slPrice < newBE) or (not isBuyTrade and slPrice > newBE)
+            slPrice := newBE
+            line.set_y1(slLine, slPrice)
+            line.set_y2(slLine, slPrice)
+            label.set_y(slLbl, slPrice)
+            label.set_text(slLbl, "🛡️ " + str.tostring(slPrice, format.mintick))
+            label.set_color(slLbl, C_GRAY)
+            line.set_color(slLine, C_GRAY)
+
+    if useTrailing and max_tp_reached > 1 and inTrade
+        if array.size(tpPrices) > 0
+            float newSL = array.get(tpPrices, max_tp_reached - 2)
+            if (isBuyTrade and newSL > slPrice) or (not isBuyTrade and newSL < slPrice)
+                slPrice := newSL
+                line.set_y1(slLine, slPrice)
+                line.set_y2(slLine, slPrice)
+                label.set_y(slLbl, slPrice)
+                label.set_text(slLbl, "🔄 " + str.tostring(slPrice, format.mintick))
+                label.set_color(slLbl, C_GRAY)
+                line.set_color(slLine, C_GRAY)
+
+    bool slHit = (isBuyTrade and low <= slPrice) or (not isBuyTrade and high >= slPrice)
+    if slHit and not sl_alert_sent and inTrade
+        alert(buildSLAlert(), alert.freq_once_per_bar)
+        sl_alert_sent := true
+        if inStatWindow and not tradeCounted
+            if max_tp_reached >= beTrigger
+                winTrades += 1
+            else
+                lossTrades += 1
+            totalTrades += 1
+            tradeCounted := true
+        inTrade := false
+        lastSignal := 0
+        inPyrTrade := false
+        pyrAlertSent := false
+        clearMainGraphics()
+        clearPyrGraphics()
+
+        if useReentry and max_tp_reached == 0
+            bool trendOK = (isBuyTrade and htf_trend == 1 and smc_trend == 1) or (not isBuyTrade and htf_trend == -1 and smc_trend == -1)
+            if trendOK
+                pendingReentry := true
+                isBuyReentry := isBuyTrade
+
+//══════════════════════════════════════════════════════════════════════════════
+// 18. مراقبة التعزيز (Pyramiding) — تم إصلاح: إضافة قائمة حالة الأهداف
+//══════════════════════════════════════════════════════════════════════════════
+if inTrade and inPyrTrade
+    if array.size(pyrTPPrices) > 0
+        for i = 0 to array.size(pyrTPPrices) - 1
+            if not array.get(pyrTPStatus, i)
+                float pTp = array.get(pyrTPPrices, i)
+                if (isBuyTrade and high >= pTp) or (not isBuyTrade and low <= pTp)
+                    array.set(pyrTPStatus, i, true)
+                    pyrTPReached := math.max(pyrTPReached, i + 1)
+                    label.set_text(array.get(pyrTPLbls, i), "✅ 🔥TP" + str.tostring(i + 1))
+
+    if pyrTPReached > pyrLastAlert
+        float hitPTP = array.get(pyrTPPrices, math.max(0, pyrTPReached - 1))
+        float pnlPts = math.abs(hitPTP - pyrEntryPrice)
+        float pnlDollar = calcPnLDollar(pyrLotSize, pnlPts)
+        string pyrTPMsg = "╔════════════════════════════════╗\n"
+        pyrTPMsg += pyrTPReached == pyrTargets ? "║ 🏆 تعزيز كامل بالربح! ║\n" : "║ ✅ هدف التعزيز " + str.tostring(pyrTPReached) + " ║\n"
+        pyrTPMsg += "╚════════════════════════════════╝\n\n"
+        pyrTPMsg += "📌 " + syminfo.ticker + " | 🔥 التعزيز\n"
+        pyrTPMsg += "🎯 " + str.tostring(hitPTP, format.mintick) + " | +" + str.tostring(math.round(pnlPts, 2), "#.##") + " نقطة\n"
+        pyrTPMsg += "💰 ربح تقريبي: +$" + str.tostring(math.round(pnlDollar, 2), "#.##") + "\n\n"
+        pyrTPMsg += SEP + "\n" + buildPyrTPStatusText() + SEP + "\n"
+        pyrTPMsg += pyrTPReached == pyrTargets ? "🎊 جميع أهداف التعزيز!\n" : ""
+        pyrTPMsg += SEP + "\n📱 t.me/forexYemeni_Gold"
+        alert(pyrTPMsg, alert.freq_once_per_bar)
+
+        if pyrTPReached == pyrTargets
+            inPyrTrade := false
+            pyrAlertSent := false
+            clearPyrGraphics()
+            array.clear(pyrTPPrices)
+            array.clear(pyrTPLines)
+            array.clear(pyrTPLbls)
+            array.clear(pyrTPStatus)
+            pyrTPReached := 0
+        pyrLastAlert := pyrTPReached
+
+    bool pyrSLHit = (isBuyTrade and low <= pyrSLPrice) or (not isBuyTrade and high >= pyrSLPrice)
+    if pyrSLHit and inPyrTrade
+        float lossPts = math.abs(pyrEntryPrice - pyrSLPrice)
+        float lossDollar = calcPnLDollar(pyrLotSize, lossPts)
+        string pyrSLMsg = "╔════════════════════════════════╗\n"
+        pyrSLMsg += "║ ❌ ضرب وقف التعزيز ║\n"
+        pyrSLMsg += "╚════════════════════════════════╝\n\n"
+        pyrSLMsg += "📌 " + syminfo.ticker + "\n"
+        pyrSLMsg += "❌ " + str.tostring(pyrSLPrice, format.mintick) + " | -" + str.tostring(math.round(lossPts, 2), "#.##") + " نقطة\n"
+        pyrSLMsg += "💰 خسارة: -$" + str.tostring(math.round(lossDollar, 2), "#.##") + "\n\n"
+        pyrSLMsg += SEP + "\n" + buildPyrTPStatusText() + SEP + "\n"
+        pyrSLMsg += pyrTPReached > 0 ? "💰 ربح جزئي ✅\n" : "❌ خسارة كاملة\n"
+        pyrSLMsg += "💡 الصفقة الرئيسية لا تزال نشطة\n"
+        pyrSLMsg += SEP + "\n📱 t.me/forexYemeni_Gold"
+        alert(pyrSLMsg, alert.freq_once_per_bar)
+
+        inPyrTrade := false
+        pyrAlertSent := false
+        clearPyrGraphics()
+        array.clear(pyrTPPrices)
+        array.clear(pyrTPLines)
+        array.clear(pyrTPLbls)
+        array.clear(pyrTPStatus)
+        pyrTPReached := 0
+        pyrLastAlert := 0
+
+//══════════════════════════════════════════════════════════════════════════════
+// 19. فتح صفقة التعزيز
+//══════════════════════════════════════════════════════════════════════════════
+if inTrade and not inPyrTrade and usePyr and not pyrAlertSent and max_tp_reached >= math.floor(numTargets / 2) and max_tp_reached < numTargets
+    bool pyrSignal = (isBuyTrade and rawBuy) or (not isBuyTrade and rawSell)
+    if pyrSignal and barstate.isconfirmed
+        inPyrTrade := true
+        pyrEntryPrice := close
+        pyrATR := atr
+        pyrTPReached := 0
+        pyrLastAlert := 0
+        float lastTPHit = array.size(tpPrices) > 0 ? array.get(tpPrices, math.max(0, max_tp_reached - 1)) : entryPrice
+        pyrSLPrice := calcPyrSL(isBuyTrade, pyrEntryPrice, pyrATR, lastTPHit)
+        float pyrSLDist = math.max(math.abs(pyrEntryPrice - pyrSLPrice), syminfo.mintick)
+        float pTargetRisk = accBalance * riskPct / 100.0
+        pyrLotSize := calcLot(pTargetRisk, pyrSLDist)
+        pyrActualRisk := calcPnLDollar(pyrLotSize, pyrSLDist)
+
+        clearPyrGraphics()
+        array.clear(pyrTPPrices)
+        array.clear(pyrTPLines)
+        array.clear(pyrTPLbls)
+        array.clear(pyrTPStatus)
+
+        pyrEntryLine := line.new(bar_index, pyrEntryPrice, bar_index + 1, pyrEntryPrice, extend=extend.right, color=C_PURPLE, width=2)
+        pyrEntryLbl := label.new(bar_index, pyrEntryPrice, "🔥 " + str.tostring(pyrEntryPrice, format.mintick) + " | " + lotToStr(pyrLotSize), style=label.style_label_left, color=C_PURPLE, textcolor=color.white, size=size.normal)
+        color pSLColor = color.new(#FF6B6B, 0)
+        pyrSLLine := line.new(bar_index, pyrSLPrice, bar_index + 1, pyrSLPrice, extend=extend.right, color=pSLColor, width=2, style=line.style_dotted)
+        pyrSLLbl := label.new(bar_index, pyrSLPrice, "🛑🔥 " + str.tostring(pyrSLPrice, format.mintick), style=label.style_label_left, color=pSLColor, textcolor=color.white, size=size.small)
+
+        for k = 1 to pyrTargets
+            float pTp = isBuyTrade ? pyrEntryPrice + (pyrSLDist * pyrRR * k) : pyrEntryPrice - (pyrSLDist * pyrRR * k)
+            if isBuyTrade and pTp <= pyrEntryPrice
+                pTp := pyrEntryPrice + pyrATR * k * 0.5
+            if not isBuyTrade and pTp >= pyrEntryPrice
+                pTp := pyrEntryPrice - pyrATR * k * 0.5
+            color pTPColor = color.new(#E040FB, math.min(k * 10, 60))
+            line pL = line.new(bar_index, pTp, bar_index + 1, pTp, extend=extend.right, color=pTPColor, width=1, style=line.style_dotted)
+            label pLb = label.new(bar_index, pTp, "🔥 TP" + str.tostring(k) + ": " + str.tostring(pTp, format.mintick), style=label.style_label_left, color=pTPColor, textcolor=color.white, size=size.small)
+            array.push(pyrTPLines, pL)
+            array.push(pyrTPLbls, pLb)
+            array.push(pyrTPPrices, pTp)
+            array.push(pyrTPStatus, false)
+
+        alert(buildPyrAlert(), alert.freq_once_per_bar)
+        pyrAlertSent := true
+
+//══════════════════════════════════════════════════════════════════════════════
+// 20. مراقبة وفتح صفقة التعويض
+//══════════════════════════════════════════════════════════════════════════════
+if pendingReentry and not inTrade and not inReentry and barstate.isconfirmed
+    bool reentrySignal = (isBuyReentry and rawBuy) or (not isBuyReentry and rawSell)
+    bool trendStillOK = (isBuyReentry and htf_trend == 1 and smc_trend >= 0) or (not isBuyReentry and htf_trend == -1 and smc_trend <= 0)
+
+    if reentrySignal and trendStillOK
+        reentryEntry := close
+        reentryATR := atr
+        inReentry := true
+        reentryTPReached := 0
+        reentryLastAlert := 0
+        reentrySLSent := false
+        reentryCounted := false
+        pendingReentry := false
+        reentrySL := isBuyReentry ? reentryEntry - (reentryATR * reentryMult) : reentryEntry + (reentryATR * reentryMult)
+        float rSlDist = math.max(math.abs(reentryEntry - reentrySL), syminfo.mintick)
+        float rTargetRisk = accBalance * riskPct / 100.0
+        reentryLotSize := calcLot(rTargetRisk, rSlDist)
+        reentryActualRisk := calcPnLDollar(reentryLotSize, rSlDist)
+
+        clearReentryGraphics()
+        array.clear(reentryTPLines)
+        array.clear(reentryTPLbls)
+        array.clear(reentryTPPrices)
+        array.clear(reentryTPStatus)
+
+        reentrySignalLbl := label.new(bar_index, isBuyReentry ? low - atr * 0.5 : high + atr * 0.5, isBuyReentry ? "♻️ تعويض شراء" : "♻️ تعويض بيع", style = isBuyReentry ? label.style_label_up : label.style_label_down, color = C_TEAL, textcolor=color.white, size=size.normal)
+        reentryEntryLine := line.new(bar_index, reentryEntry, bar_index + 1, reentryEntry, extend=extend.right, color=C_TEAL, width=2)
+        reentryEntryLbl := label.new(bar_index, reentryEntry, "♻️ " + str.tostring(reentryEntry, format.mintick) + " | " + lotToStr(reentryLotSize), style=label.style_label_left, color=C_TEAL, textcolor=color.white, size=size.normal)
+        color rSlColor = color.new(#FF6B35, 0)
+        reentrySLLine := line.new(bar_index, reentrySL, bar_index + 1, reentrySL, extend=extend.right, color=rSlColor, width=2, style=line.style_dashed)
+        reentrySLLbl := label.new(bar_index, reentrySL, "🛑♻️ " + str.tostring(reentrySL, format.mintick) + " | -$" + str.tostring(math.round(reentryActualRisk, 2), "#.##"), style=label.style_label_left, color=rSlColor, textcolor=color.white, size=size.small)
+
+        for k = 1 to reentryTargets
+            float tp = isBuyReentry ? reentryEntry + (rSlDist * reentryRR * k) : reentryEntry - (rSlDist * reentryRR * k)
+            color rTPColor = color.new(#00BCD4, math.min(k * 8, 50))
+            line tL = line.new(bar_index, tp, bar_index + 1, tp, extend=extend.right, color=rTPColor, width=1, style=line.style_dotted)
+            label tLb = label.new(bar_index, tp, "♻️ TP" + str.tostring(k) + ": " + str.tostring(tp, format.mintick), style=label.style_label_left, color=rTPColor, textcolor=color.white, size=size.small)
+            array.push(reentryTPLines, tL)
+            array.push(reentryTPLbls, tLb)
+            array.push(reentryTPPrices, tp)
+            array.push(reentryTPStatus, false)
+
+        alert(buildReentryAlert(), alert.freq_once_per_bar)
+
+    else if not trendStillOK
+        pendingReentry := false
+        string cancelMsg = "╔════════════════════════════════╗\n"
+        cancelMsg += "║ ⚠️ إلغاء انتظار التعويض ║\n"
+        cancelMsg += "╚════════════════════════════════╝\n\n"
+        cancelMsg += "📌 " + syminfo.ticker + " | الاتجاه انعكس\n"
+        cancelMsg += SEP + "\n📱 t.me/forexYemeni_Gold"
+        alert(cancelMsg, alert.freq_once_per_bar)
+
+if inReentry
+    if array.size(reentryTPPrices) > 0
+        for i = 0 to array.size(reentryTPPrices) - 1
+            if not array.get(reentryTPStatus, i)
+                float tpP = array.get(reentryTPPrices, i)
+                if (isBuyReentry and high >= tpP) or (not isBuyReentry and low <= tpP)
+                    array.set(reentryTPStatus, i, true)
+                    reentryTPReached := math.max(reentryTPReached, i + 1)
+                    label.set_text(array.get(reentryTPLbls, i), "✅ ♻️TP" + str.tostring(i + 1))
+
+    if reentryTPReached > reentryLastAlert
+        alert(buildReentryTPAlert(reentryTPReached), alert.freq_once_per_bar)
+
+    if reentryTPReached == reentryTargets
+        if inStatWindow and not reentryCounted
+            reentryWins += 1
+            reentryCounted := true
+        inReentry := false
+        clearReentryGraphics()
+        array.clear(reentryTPLines)
+        array.clear(reentryTPLbls)
+        array.clear(reentryTPPrices)
+        array.clear(reentryTPStatus)
+        reentryLastAlert := reentryTPReached
+
+    bool reentrySLHit = (isBuyReentry and low <= reentrySL) or (not isBuyReentry and high >= reentrySL)
+    if reentrySLHit and not reentrySLSent
+        float lossPts = math.abs(reentryEntry - reentrySL)
+        float lossDollar = calcPnLDollar(reentryLotSize, lossPts)
+        if inStatWindow and not reentryCounted
+            reentryLosses += 1
+            reentryCounted := true
+        string rSlMsg = "╔════════════════════════════════╗\n"
+        rSlMsg += "║ ❌ ضرب وقف التعويض ║\n"
+        rSlMsg += "╚════════════════════════════════╝\n\n"
+        rSlMsg += "📌 " + syminfo.ticker + "\n"
+        rSlMsg += "❌ " + str.tostring(reentrySL, format.mintick) + " | -" + str.tostring(math.round(lossPts, 2), "#.##") + " نقطة\n"
+        rSlMsg += "💰 خسارة: -$" + str.tostring(math.round(lossDollar, 2), "#.##") + "\n\n"
+        rSlMsg += SEP + "\n" + buildReentryTPStatusText() + SEP + "\n"
+        rSlMsg += reentryTPReached > 0 ? "💰 ربح جزئي ✅\n" : "❌ خسارة كاملة\n"
+        rSlMsg += SEP + "\n📱 t.me/forexYemeni_Gold"
+        alert(rSlMsg, alert.freq_once_per_bar)
+        reentrySLSent := true
+        inReentry := false
+        clearReentryGraphics()
+        array.clear(reentryTPLines)
+        array.clear(reentryTPLbls)
+        array.clear(reentryTPPrices)
+        array.clear(reentryTPStatus)
+
+//══════════════════════════════════════════════════════════════════════════════
+// 21. الإشارة الجديدة وتنفيذ الصفقة
+//══════════════════════════════════════════════════════════════════════════════
+bool isNewBuy = rawBuy and lastSignal != 1 and currentStars >= minStars and not inTrade and not inReentry and barstate.isconfirmed
+bool isNewSell = rawSell and lastSignal != -1 and currentStars >= minStars and not inTrade and not inReentry and barstate.isconfirmed
+
+if (isNewBuy or isNewSell)
+    tradeCounted := false
+    max_tp_reached := 0
+    last_alerted_tp := 0
+    sl_alert_sent := false
+    inPyrTrade := false
+    pyrAlertSent := false
+    pyrTPReached := 0
+    pyrLastAlert := 0
+    pendingReentry := false
+    reentryCounted := false
+
+    clearMainGraphics()
+    clearPyrGraphics()
+    array.clear(tpLines)
+    array.clear(tpLbls)
+    array.clear(tpPrices)
+    array.clear(tpStatus)
+    array.clear(pyrTPPrices)
+    array.clear(pyrTPLines)
+    array.clear(pyrTPLbls)
+    array.clear(pyrTPStatus)
+
+    entryPrice := close
+    tradeATR := atr
+    isBuyTrade := isNewBuy
+    inTrade := true
+    tradeStars := currentStars
+    lastSignal := isNewBuy ? 1 : -1
+
+    float calcSL = na
+    if slMode == "ATR"
+        calcSL := isBuyTrade ? entryPrice - (tradeATR * slMult) : entryPrice + (tradeATR * slMult)
+    else if slMode == "Swing (قمم وقيعان)"
+        calcSL := isBuyTrade ? (na(last_pl) ? entryPrice - tradeATR : last_pl - tradeATR * 0.2) : (na(last_ph) ? entryPrice + tradeATR : last_ph + tradeATR * 0.2)
+    else if slMode == "FVG (فجوات السيولة)"
+        calcSL := isBuyTrade ? (na(last_bull_fvg_bot) ? entryPrice - tradeATR : last_bull_fvg_bot - tradeATR * 0.2) : (na(last_bear_fvg_top) ? entryPrice + tradeATR : last_bear_fvg_top + tradeATR * 0.2)
+    else
+        calcSL := isBuyTrade ? entryPrice - (tradeATR * slMult) : entryPrice + (tradeATR * slMult)
+
+    slPrice := calcSL
+    initialSL := slPrice
+    float slDist = math.max(math.abs(entryPrice - initialSL), syminfo.mintick)
+    float targetRisk = accBalance * riskPct / 100.0
+    savedLotSize := calcLot(targetRisk, slDist)
+    savedActualRisk := calcPnLDollar(savedLotSize, slDist)
+    savedRiskTarget := targetRisk
+    savedIsBuy := isBuyTrade
+
+    string starStr = tradeStars == 3 ? "⭐⭐⭐" : tradeStars == 2 ? "⭐⭐" : "⭐"
+    signalLbl := label.new(bar_index, isBuyTrade ? low : high, (isBuyTrade ? "شراء " : "بيع ") + starStr, style = isBuyTrade ? label.style_label_up : label.style_label_down, color = isBuyTrade ? C_GREEN : C_RED, textcolor= color.white, size=size.normal)
+    entryLine := line.new(bar_index, entryPrice, bar_index + 1, entryPrice, extend=extend.right, color=C_ORANGE, width=2)
+    entryLbl := label.new(bar_index, entryPrice, (isBuyTrade ? "🚀 " : "🔻 ") + str.tostring(entryPrice, format.mintick) + " | " + lotToStr(savedLotSize), style=label.style_label_left, color=C_ORANGE, textcolor=color.white, size=size.normal)
+    slLine := line.new(bar_index, slPrice, bar_index + 1, slPrice, extend=extend.right, color=C_RED, width=2, style=line.style_dashed)
+    slLbl := label.new(bar_index, slPrice, "🛑 " + str.tostring(slPrice, format.mintick) + " | -$" + str.tostring(math.round(savedActualRisk, 2), "#.##"), style=label.style_label_left, color=C_RED, textcolor=color.white, size=size.normal)
+
+    float[] fibLevels = array.from(0.382, 0.618, 0.786, 1.0, 1.272, 1.618, 2.0, 2.618, 3.618, 4.236)
+    float[] valid_swings = array.new_float()
+
+    if tpMode == "قمم وقيعان (Swings)"
+        if isBuyTrade
+            for p in recent_phs
+                if p > entryPrice and array.indexof(valid_swings, p) == -1
+                    array.push(valid_swings, p)
+            array.sort(valid_swings)
+        else
+            for p in recent_pls
+                if p < entryPrice and array.indexof(valid_swings, p) == -1
+                    array.push(valid_swings, p)
+            array.sort(valid_swings, order.descending)
+
+    for i = 0 to numTargets - 1
+        float tp = na
+        if tpMode == "مضاعفات الوقف (RR)"
+            tp := isBuyTrade ? entryPrice + slDist * (i+1) : entryPrice - slDist * (i+1)
+        else if tpMode == "فيبوناتشي (Fib)"
+            float fib = array.get(fibLevels, math.min(i, 9))
+            tp := isBuyTrade ? entryPrice + slDist * fib : entryPrice - slDist * fib
+        else if tpMode == "قمم وقيعان (Swings)"
+            tp := array.size(valid_swings) > i ? array.get(valid_swings, i) : (isBuyTrade ? entryPrice + slDist * (i+1) : entryPrice - slDist * (i+1))
+        else
+            float m = 1.0 + i * 0.5
+            tp := isBuyTrade ? entryPrice + tradeATR * m : entryPrice - tradeATR * m
+
+        color tpC = array.get(tpColors, math.min(i, 9))
+        line tL = line.new(bar_index, tp, bar_index + 1, tp, extend=extend.right, color=tpC, width=1)
+        label tLb = label.new(bar_index, tp, "TP" + str.tostring(i+1) + ": " + str.tostring(tp, format.mintick), style=label.style_label_left, color=tpC, textcolor=color.white, size=size.small)
+        array.push(tpLines, tL)
+        array.push(tpLbls, tLb)
+        array.push(tpPrices, tp)
+        array.push(tpStatus, false)
+
+        if i == numTargets - 1
+            maxTP_price := tp
+
+    alert(buildEntryAlert(), alert.freq_once_per_bar)
+
+//══════════════════════════════════════════════════════════════════════════════
+// 22. لوحة الإحصائيات
+//══════════════════════════════════════════════════════════════════════════════
+var table dash = table.new(position.top_right, 2, 17, border_width=1, border_color=color.new(color.gray, 80), frame_color=color.new(color.gray, 80), frame_width=1)
+
+if barstate.islast
+    color htfColor = htf_trend == 1 ? C_GREEN : C_RED
+    color smcColor = smc_trend == 1 ? C_GREEN : C_RED
+    float winRate = totalTrades > 0 ? winTrades * 100.0 / totalTrades : 0.0
+    color wrColor = winRate >= 60 ? C_GREEN : winRate >= 40 ? C_GOLD : C_RED
+    float displayTargetRisk = accBalance * riskPct / 100.0
+    float displayActualRisk = savedActualRisk
+    float actualPct = displayActualRisk > 0 ? (displayActualRisk / accBalance) * 100.0 : riskPct
+    color riskColor = actualPct > riskPct * 1.5 ? C_RED : actualPct > riskPct * 1.1 ? C_GOLD : C_GREEN
+
+    table.cell(dash, 0, 0, "📊 FOREXYEMENI-PRO", text_color=C_GOLD, text_size=size.normal, bgcolor=color.new(#333333, 0), text_halign=text.align_center)
+    table.cell(dash, 1, 0, "v2.0", text_color=C_GRAY, text_size=size.small, bgcolor=color.new(#333333, 0))
+    table.cell(dash, 0, 1, "🏦 الأداة (تلقائي)", text_color=C_GRAY, text_size=size.small, bgcolor=C_BG)
+    table.cell(dash, 1, 1, autoInstrument, text_color=C_CYAN, text_size=size.tiny, bgcolor=C_BG)
+    table.cell(dash, 0, 2, "💵 الرصيد", text_color=C_GRAY, text_size=size.small, bgcolor=C_BG)
+    table.cell(dash, 1, 2, "$" + str.tostring(accBalance, "#.##"), text_color=color.white, text_size=size.small, bgcolor=C_BG)
+    table.cell(dash, 0, 3, "🎯 خطر مستهدف", text_color=C_GRAY, text_size=size.small, bgcolor=C_BG)
+    table.cell(dash, 1, 3, "$" + str.tostring(math.round(displayTargetRisk, 2), "#.##") + " (" + str.tostring(riskPct, "#.#") + "%)", text_color=C_GOLD, text_size=size.small, bgcolor=C_BG)
+    table.cell(dash, 0, 4, "💸 خطر فعلي", text_color=C_GRAY, text_size=size.small, bgcolor=C_BG)
+    table.cell(dash, 1, 4, displayActualRisk > 0 ? "$" + str.tostring(math.round(displayActualRisk, 2), "#.##") + " (" + str.tostring(math.round(actualPct, 1), "#.#") + "%)" : "---", text_color=riskColor, text_size=size.small, bgcolor=C_BG)
+    table.cell(dash, 0, 5, "📦 اللوت (تلقائي)", text_color=C_GRAY, text_size=size.small, bgcolor=C_BG)
+    color lotColor = savedIsBuy ? C_GREEN : C_RED
+    table.cell(dash, 1, 5, savedLotSize >= 0.01 ? lotToStr(savedLotSize) : "---", text_color=inTrade ? lotColor : C_GRAY, text_size=size.small, bgcolor=C_BG)
+    string htfLabel = useAutoHTF ? "📈 MTF تلقائي" : "📈 MTF يدوي"
+    table.cell(dash, 0, 6, htfLabel, text_color=C_GRAY, text_size=size.small, bgcolor=C_BG)
+    table.cell(dash, 1, 6, htfDisplay + (htf_trend == 1 ? " 🐂" : " 🐻"), text_color=htfColor, text_size=size.small, bgcolor=C_BG)
+    table.cell(dash, 0, 7, "🏗️ SMC", text_color=C_GRAY, text_size=size.small, bgcolor=C_BG)
+    table.cell(dash, 1, 7, smc_trend == 1 ? "صاعد" : smc_trend == -1 ? "هابط" : "محايد", text_color=smcColor, text_size=size.small, bgcolor=C_BG)
+    table.cell(dash, 0, 8, "📊 الصفقات", text_color=C_GRAY, text_size=size.small, bgcolor=C_BG)
+    table.cell(dash, 1, 8, str.tostring(totalTrades), text_color=color.white, text_size=size.normal, bgcolor=C_BG)
+    table.cell(dash, 0, 9, "✅ ناجحة", text_color=C_GRAY, text_size=size.small, bgcolor=C_BG)
+    table.cell(dash, 1, 9, str.tostring(winTrades), text_color=C_GREEN, text_size=size.normal, bgcolor=C_BG)
+    table.cell(dash, 0, 10, "❌ خاسرة", text_color=C_GRAY, text_size=size.small, bgcolor=C_BG)
+    table.cell(dash, 1, 10, str.tostring(lossTrades), text_color=C_RED, text_size=size.normal, bgcolor=C_BG)
+    table.cell(dash, 0, 11, "🎯 النجاح", text_color=color.white, text_size=size.small, bgcolor=C_BG)
+    table.cell(dash, 1, 11, str.tostring(math.round(winRate, 1), "#.#") + "%", text_color=wrColor, text_size=size.large, bgcolor=C_BG)
+    table.cell(dash, 0, 12, "♻️ تعويض ✅", text_color=C_GRAY, text_size=size.small, bgcolor=C_BG)
+    table.cell(dash, 1, 12, str.tostring(reentryWins), text_color=C_TEAL, text_size=size.normal, bgcolor=C_BG)
+    table.cell(dash, 0, 13, "♻️ تعويض ❌", text_color=C_GRAY, text_size=size.small, bgcolor=C_BG)
+    table.cell(dash, 1, 13, str.tostring(reentryLosses), text_color=C_RED, text_size=size.normal, bgcolor=C_BG)
+    table.cell(dash, 0, 14, "⏳ الصفقة", text_color=C_GRAY, text_size=size.small, bgcolor=C_BG)
+    string tradeStatus = not inTrade and not inReentry ? "لا توجد" : inTrade and inPyrTrade ? "رئيسية+تعزيز 🔥" : inTrade ? "نشطة ⏳" : inReentry ? "تعويض ♻️" : pendingReentry ? "انتظار ♻️ 🔍" : "---"
+    color statusColor = not inTrade and not inReentry ? C_GRAY : inTrade and inPyrTrade ? C_PURPLE : inTrade ? C_GOLD : inReentry ? C_TEAL : pendingReentry ? C_CYAN : C_GRAY
+    table.cell(dash, 1, 14, tradeStatus, text_color=statusColor, text_size=size.small, bgcolor=C_BG)
+    table.cell(dash, 0, 15, "🎯 الأهداف", text_color=C_GRAY, text_size=size.small, bgcolor=C_BG)
+    string tpDisplay = inTrade ? str.tostring(max_tp_reached) + "/" + str.tostring(numTargets) : inReentry ? "♻️ " + str.tostring(reentryTPReached) + "/" + str.tostring(reentryTargets) : "---"
+    table.cell(dash, 1, 15, tpDisplay, text_color=C_CYAN, text_size=size.small, bgcolor=C_BG)
+    table.cell(dash, 0, 16, "🔥 وقف التعزيز", text_color=C_GRAY, text_size=size.small, bgcolor=C_BG)
+    table.cell(dash, 1, 16, inPyrTrade and not na(pyrSLPrice) ? str.tostring(pyrSLPrice, format.mintick) : "---", text_color=C_PURPLE, text_size=size.small, bgcolor=C_BG)
