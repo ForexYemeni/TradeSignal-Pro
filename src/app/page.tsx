@@ -1215,12 +1215,20 @@ export default function HomePage() {
         if (oldIds.size > 0) {
           for (const s of newSignals) {
             if (!oldIds.has(s.id)) {
-              // Brand new signal — play sound based on category
+              // Brand new signal — play sound + native notification
               if (!audioMuted) {
-                if (isEntry(s.signalCategory)) playSound(s.type === "BUY" ? "buy" : "sell", audioVol);
-                else if (isTpLike(s.signalCategory)) playSound("tp", audioVol);
-                else if (isSlLike(s.signalCategory)) playSound("sl", audioVol);
-                else playSound("message", audioVol);
+                if (isEntry(s.signalCategory)) {
+                  playSound(s.type === "BUY" ? "buy" : "sell", audioVol);
+                  nativeNotify(s.type === "BUY" ? "📊 إشارة شراء — " + s.pair : "📊 إشارة بيع — " + s.pair, s.type === "BUY" ? "شراء @" + s.entry : "بيع @" + s.entry, s.type === "BUY" ? "buy" : "sell");
+                } else if (isTpLike(s.signalCategory)) {
+                  playSound("tp", audioVol);
+                  nativeNotify("🎯 تحقق هدف — " + s.pair, "هدف " + s.hitTpIndex + " تم تحقيقه", "tp_hit");
+                } else if (isSlLike(s.signalCategory)) {
+                  playSound("sl", audioVol);
+                  nativeNotify("🛑 وقف خسارة — " + s.pair, "تم ضرب وقف الخسارة", "sl_hit");
+                } else {
+                  playSound("message", audioVol);
+                }
               }
             } else {
               // Existing signal — detect TP/SL state changes
@@ -1228,8 +1236,13 @@ export default function HomePage() {
               if (prev) {
                 const tpChanged = s.hitTpIndex !== prev.hitTpIndex && s.hitTpIndex > prev.hitTpIndex;
                 const slChanged = prev.status === "ACTIVE" && s.status === "HIT_SL";
-                if (tpChanged && !audioMuted) playSound("tp", audioVol);
-                else if (slChanged && !audioMuted) playSound("sl", audioVol);
+                if (tpChanged && !audioMuted) {
+                  playSound("tp", audioVol);
+                  nativeNotify("🎯 تحقق هدف — " + s.pair, "هدف " + s.hitTpIndex + " تم تحقيقه", "tp_hit");
+                } else if (slChanged && !audioMuted) {
+                  playSound("sl", audioVol);
+                  nativeNotify("🛑 وقف خسارة — " + s.pair, "تم ضرب وقف الخسارة", "sl_hit");
+                }
               }
             }
           }
