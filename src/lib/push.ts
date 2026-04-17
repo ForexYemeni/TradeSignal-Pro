@@ -6,7 +6,7 @@
  */
 
 import webpush from 'web-push';
-import { getPushSubscriptions, PushSubscription, getUsers } from './store';
+import { getPushSubscriptions, removePushSubscription, PushSubscription, getUsers } from './store';
 
 // Lazy VAPID initialization - only configure when actually sending
 let vapidConfigured = false;
@@ -85,7 +85,8 @@ export async function sendPushToAll(payload: PushPayload): Promise<{ success: nu
         // If subscription is invalid/expired, we should clean it up
         const error = err as { statusCode?: number };
         if (error.statusCode === 404 || error.statusCode === 410) {
-          // Subscription expired or gone - it will be cleaned on next subscribe
+          // Subscription expired or gone — remove it
+          removePushSubscription(sub.endpoint).catch(() => {});
           console.warn(`[Push] Dead subscription removed: ${sub.endpoint.substring(0, 50)}...`);
         }
       }

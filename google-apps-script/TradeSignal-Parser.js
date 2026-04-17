@@ -161,19 +161,25 @@ function getLogs() { try{return{success:true,count:JSON.parse(PropertiesService.
 function clearLogs() { PropertiesService.getScriptProperties().deleteProperty("webhook_logs"); }
 
 function detectCategory(text) {
-  if (/إغلاق كامل بالربح/.test(text)&&/♻️/.test(text)) return "TP_HIT";
-  if (/هدف التعويض/.test(text)) return "TP_HIT";
-  if (/تعزيز كامل بالربح/.test(text)) return "TP_HIT";
-  if (/هدف التعزيز/.test(text)) return "TP_HIT";
-  if (/إغلاق كامل بالربح/.test(text)) return "TP_HIT";
-  if (/قفزة سعرية/.test(text)) return "TP_HIT";
+  // ── REENTRY (تعويض) signals ──
+  if (/صفقة التعويض/.test(text)) return "REENTRY";
+  if (/هدف التعويض/.test(text)) return "REENTRY_TP";
+  if (/ضرب وقف التعويض/.test(text)) return "REENTRY_SL";
+  if (/إغلاق كامل بالربح/.test(text) && /♻️/.test(text)) return "REENTRY_TP";
+
+  // ── PYRAMID (تعزيز) signals ──
+  if (/تعزيز/.test(text) && /الدخول:/.test(text)) return "PYRAMID";
+  if (/هدف التعزيز/.test(text)) return "PYRAMID_TP";
+  if (/ضرب وقف التعزيز/.test(text)) return "PYRAMID_SL";
+  if (/تعزيز كامل بالربح/.test(text)) return "PYRAMID_TP";
+
+  // ── Basic (أساسي) signals ──
+  if (/إشارة شراء/.test(text) || /إشارة بيع/.test(text)) return "ENTRY";
   if (/تحقق الهدف/.test(text)) return "TP_HIT";
-  if (/ضرب وقف التعويض/.test(text)) return "SL_HIT";
-  if (/ضرب وقف التعزيز/.test(text)) return "SL_HIT";
+  if (/قفزة سعرية/.test(text)) return "TP_HIT";
+  if (/إغلاق كامل بالربح/.test(text)) return "TP_HIT";
   if (/ضرب الوقف/.test(text)) return "SL_HIT";
-  if (/إشارة شراء/.test(text)||/إشارة بيع/.test(text)) return "ENTRY";
-  if (/صفقة التعويض/.test(text)) return "ENTRY";
-  if (/تعزيز/.test(text)&&/الدخول:/.test(text)) return "ENTRY";
+
   return "OTHER";
 }
 

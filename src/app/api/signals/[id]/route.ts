@@ -106,8 +106,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (status === "HIT_TP") {
       notifyTpHit(
         existing.pair,
-        (hitTpIndex ?? 0) + 1, // Convert 0-indexed admin input to 1-indexed for notification
-        updateData.pnlDollars as number | undefined
+        (hitTpIndex ?? 0) + 1,
+        updateData.pnlDollars as number | undefined,
+        existing.signalCategory === "REENTRY" ? "REENTRY_TP"
+          : existing.signalCategory === "PYRAMID" ? "PYRAMID_TP"
+          : "TP_HIT"
       ).catch(() => {});
     } else if (status === "HIT_SL") {
       notifySlHit(

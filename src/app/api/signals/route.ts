@@ -40,10 +40,39 @@ export async function POST(request: NextRequest) {
       // Fallback: if no parent found, create as new signal (backward compat)
     }
 
-    if (cat === "ENTRY") {
+    // ── Deduplication: skip if same signal already exists ──
+    if (isEntry(cat)) {
       const validation = validateSignal(parseResult.signal);
       if (!validation.valid) {
         return NextResponse.json({ success: false, error: "بيانات غير صالحة", details: validation.errors }, { status: 400 });
+      }
+
+      const existing = await getSignals(50);
+      const rawText = parseResult.signal.rawText.trim();
+      const isDuplicate = existing.some(s => {
+        if (s.rawText.trim() === rawText) return true;
+        // Also check same pair + category within 5 minutes
+        if (String(s.pair).toUpperCase() === String(parseResult.signal.pair).toUpperCase() && s.signalCategory === cat) {
+          const age = Date.now() - new Date(s.createdAt).getTime();
+          if (age < 5 * 60 * 1000) return true;
+        }
+        return false;
+      });
+      if (isDuplicate) {
+        return NextResponse.json({ success: true, duplicate: true, message: "إشارة مكررة - تم التجاهل", warnings: parseResult.warnings });
+      }
+    }
+
+    // Non-entry deduplication: skip if same update already applied
+    if (!isEntry(cat)) {
+      const recent = await getSignals(20);
+      const isDup = recent.some(s => {
+        if (String(s.pair).toUpperCase() !== String(parseResult.signal.pair || "").toUpperCase()) return false;
+        if (s.rawText.trim() === (parseResult.signal.rawText || "").trim()) return true;
+        return false;
+      });
+      if (isDup) {
+        return NextResponse.json({ success: true, duplicate: true, message: "تحديث مكرر - تم التجاهل", warnings: parseResult.warnings });
       }
     }
 
@@ -145,8 +174,12 @@ async function handleUpdateSignal(parsed: any) {
   if (parsed.signalCategory === "TP_HIT" || parsed.signalCategory === "REENTRY_TP" || parsed.signalCategory === "PYRAMID_TP") {
     const tpNum = parsed.hitTpIndex ?? 0; // 1-indexed from parser
     const tpArrayIdx = tpNum > 0 ? tpNum - 1 : -1;
+    const totalTPsCount = parsed.totalTPs || tps.length;
+    const isFullClose = /إغلاق كامل بالربح/.test(String(parsed.rawText || ""));
+    const isLastTP = isFullClose || tpNum >= totalTPsCount;
 
-    updateData.status = "HIT_TP";
+    // Keep ACTIVE for partial TP hits, only set HIT_TP on last/full close
+    updateData.status = isLastTP ? "HIT_TP" : "ACTIVE";
     updateData.hitTpIndex = tpNum;
     updateData.signalCategory = parentCat === "REENTRY" ? "REENTRY_TP" : parentCat === "PYRAMID" ? "PYRAMID_TP" : "TP_HIT";
 
@@ -166,14 +199,13 @@ async function handleUpdateSignal(parsed: any) {
       updateData.pnlDollars = parsed.pnlDollar || 0;
     }
 
-    updateData.totalTPs = parsed.totalTPs || tps.length;
+    updateData.totalTPs = totalTPsCount;
     updateData.tpStatusList = parsed.tpStatusList || "";
     updateData.partialWin = parsed.partialWin || false;
 
-    // If full close (all TPs hit), keep status HIT_TP but signal is done
-    const isFullClose = /إغلاق كامل بالربح/.test(String(parsed.rawText || ""));
+    // Full close: mark all TPs as hit
     if (isFullClose) {
-      updateData.hitTpIndex = parsed.totalTPs || tps.length;
+      updateData.hitTpIndex = totalTPsCount;
     }
   }
 
