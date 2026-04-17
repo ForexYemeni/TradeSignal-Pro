@@ -76,7 +76,12 @@ export async function POST(request: NextRequest) {
         if (cat === "TP_HIT" || cat === "REENTRY_TP" || cat === "PYRAMID_TP") {
           notifyTpHit(parseResult.signal.pair, parseResult.signal.hitTpIndex ?? 0, undefined, cat).catch(() => {});
         } else if (cat === "SL_HIT" || cat === "REENTRY_SL" || cat === "PYRAMID_SL") {
-          notifySlHit(parseResult.signal.pair).catch(() => {});
+          // If it was a partial win (TPs hit before SL), send TP notification instead
+          if (updated.partialWin && updated.status === "HIT_TP") {
+            notifyTpHit(parseResult.signal.pair, updated.hitTpIndex ?? 0, undefined, cat).catch(() => {});
+          } else {
+            notifySlHit(parseResult.signal.pair).catch(() => {});
+          }
         }
         return NextResponse.json({ success: true, signal: updated, updated: true, warnings: parseResult.warnings });
       }
@@ -255,28 +260,78 @@ async function handleUpdateSignal(parsed: any) {
   }
 
   if (parsed.signalCategory === "SL_HIT" || parsed.signalCategory === "REENTRY_SL" || parsed.signalCategory === "PYRAMID_SL") {
-    const points = slDist;
-    let dollars = 0;
-    if (lotSize > 0) dollars = points * pipVal * lotSize;
-    else if (balance > 0) dollars = balance * 0.02;
+    // ── KEY FIX: If TPs were already hit before SL, this is a PARTIAL WIN, not a loss ──
+    const prevHitTp = Number(parent.hitTpIndex) || 0;
+    const totalTPsCount = parsed.totalTPs || tps.length;
+    const hadTpsBeforeSl = prevHitTp > 0;
 
-    updateData.status = "HIT_SL";
+    if (hadTpsBeforeSl) {
+      // Signal already hit TP(s) before SL → mark as WIN with partial close
+      updateData.status = "HIT_TP";
+      updateData.partialWin = true;
+      // Keep the existing hitTpIndex (number of TPs achieved before SL)
+      updateData.hitTpIndex = prevHitTp;
+
+      // Calculate NET P&L: sum of TP wins minus SL loss on remaining position
+      let tpProfitDollars = 0;
+      let tpProfitPoints = 0;
+      for (let i = 0; i < Math.min(prevHitTp, tps.length); i++) {
+        const tpPrice = tps[i].tp;
+        const pts = Math.abs(tpPrice - entry);
+        tpProfitPoints += pts;
+        if (lotSize > 0) tpProfitDollars += pts * pipVal * lotSize;
+        else if (balance > 0 && slDist > 0) tpProfitDollars += (pts / slDist) * (balance * 0.02) * tps[i].rr;
+      }
+      // SL loss on remaining fraction
+      const slPoints = slDist;
+      let slDollars = 0;
+      if (lotSize > 0) slDollars = slPoints * pipVal * lotSize;
+      else if (balance > 0) slDollars = balance * 0.02;
+      // Approximate remaining position after partial closes
+      const remainingFraction = Math.max(0, 1 - (prevHitTp / totalTPsCount));
+      const netDollars = tpProfitDollars - (slDollars * remainingFraction);
+      const netPoints = tpProfitPoints - (slPoints * remainingFraction);
+
+      updateData.hitPrice = parsed.hitPrice || stopLoss;
+      updateData.pnlPoints = parsed.pnlPoints || parseFloat(netPoints.toFixed(1));
+      updateData.pnlDollars = parsed.pnlDollar || parseFloat(netDollars.toFixed(2));
+      updateData.totalTPs = totalTPsCount;
+      // Mark TP status list to show which TPs were hit + SL on remainder
+      updateData.tpStatusList = parsed.tpStatusList || "";
+    } else {
+      // No TPs were hit — pure SL loss
+      const points = slDist;
+      let dollars = 0;
+      if (lotSize > 0) dollars = points * pipVal * lotSize;
+      else if (balance > 0) dollars = balance * 0.02;
+
+      updateData.status = "HIT_SL";
+      updateData.partialWin = false;
+      updateData.hitPrice = parsed.hitPrice || stopLoss;
+      updateData.pnlPoints = parsed.pnlPoints || parseFloat(points.toFixed(1));
+      updateData.pnlDollars = parsed.pnlDollar || parseFloat((-dollars).toFixed(2));
+      updateData.totalTPs = totalTPsCount;
+      updateData.tpStatusList = parsed.tpStatusList || "";
+    }
     // Do NOT change signalCategory — keep original entry type
-    updateData.hitPrice = parsed.hitPrice || stopLoss;
-    updateData.pnlPoints = parsed.pnlPoints || parseFloat(points.toFixed(1));
-    updateData.pnlDollars = parsed.pnlDollar || parseFloat((-dollars).toFixed(2));
-    updateData.totalTPs = parsed.totalTPs;
-    updateData.tpStatusList = parsed.tpStatusList || "";
-    updateData.partialWin = parsed.partialWin || false;
   }
 
   const updated = await updateSignal(parent.id, updateData);
   if (!updated) return null;
 
   // Notify SSE subscribers about the update
-  const eventType = (parsed.signalCategory === "TP_HIT" || parsed.signalCategory === "REENTRY_TP" || parsed.signalCategory === "PYRAMID_TP") ? "tp_hit"
-    : (parsed.signalCategory === "SL_HIT" || parsed.signalCategory === "REENTRY_SL" || parsed.signalCategory === "PYRAMID_SL") ? "sl_hit"
-    : "signal";
+  // For partial wins (SL after TPs), send tp_hit event instead of sl_hit
+  const isPartialWin = parsed.signalCategory === "SL_HIT" || parsed.signalCategory === "REENTRY_SL" || parsed.signalCategory === "PYRAMID_SL";
+  let eventType: string;
+  if (parsed.signalCategory === "TP_HIT" || parsed.signalCategory === "REENTRY_TP" || parsed.signalCategory === "PYRAMID_TP") {
+    eventType = "tp_hit";
+  } else if (isPartialWin && updateData.partialWin && updateData.status === "HIT_TP") {
+    eventType = "tp_hit"; // SL after TPs → treat as TP win event
+  } else if (isPartialWin) {
+    eventType = "sl_hit";
+  } else {
+    eventType = "signal";
+  }
   notifySignalEvent({ type: eventType, pair: parsed.pair, signalType: parsed.signalCategory, tpIndex: parsed.hitTpIndex, timestamp: Date.now() });
 
   let parsedTps: { tp: number; rr: number }[] = [];
