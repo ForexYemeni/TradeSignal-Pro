@@ -31,7 +31,7 @@ interface Signal {
   rawText: string; timeframe: string; htfTimeframe: string;
   htfTrend: string; smcTrend: string; hitTpIndex: number;
   hitPrice?: number; pnlPoints?: number; pnlDollars?: number;
-  partialClose?: boolean; totalTPs?: number;
+  partialWin?: boolean; totalTPs?: number;
   balance?: number; lotSize?: string;
   riskTarget?: number; riskPercent?: number; actualRisk?: number;
   actualRiskPct?: number; slDistance?: number; maxRR?: number;
@@ -81,7 +81,7 @@ function timeAgo(d: string) {
   return `منذ ${dy} ي`;
 }
 
-function isEntry(cat: SignalCategory) {
+function isEntry(cat: SignalCategory | undefined | null) {
   return cat === "ENTRY" || cat === "REENTRY" || cat === "PYRAMID";
 }
 
@@ -92,10 +92,10 @@ function entryAccent(s: Signal) {
   return { accent: "from-red-400 to-red-600", border: "border-red-500/25", text: "text-red-400", bg: "bg-red-500/15" };
 }
 
-function isTpLike(c: SignalCategory) {
+function isTpLike(c: SignalCategory | undefined | null) {
   return c === "TP_HIT" || c === "REENTRY_TP" || c === "PYRAMID_TP";
 }
-function isSlLike(c: SignalCategory) {
+function isSlLike(c: SignalCategory | undefined | null) {
   return c === "SL_HIT" || c === "REENTRY_SL" || c === "PYRAMID_SL";
 }
 
@@ -383,8 +383,8 @@ function TradeStatusBanner({ s }: { s: Signal }) {
   const isManual = s.status === "MANUAL_CLOSE";
   const hitCount = s.hitTpIndex >= 0 ? s.hitTpIndex : 0;
   const totalTPs = s.totalTPs || s.takeProfits?.length || 0;
-  const isReentry = s.signalCategory.startsWith("REENTRY");
-  const isPyramid = s.signalCategory.startsWith("PYRAMID");
+  const isReentry = (s.signalCategory || "").startsWith("REENTRY");
+  const isPyramid = (s.signalCategory || "").startsWith("PYRAMID");
   if (s.status === "ACTIVE") return null;
 
   const c = isReentry
@@ -660,8 +660,8 @@ function ClosedSignalCard({ s, idx, isAdmin, onDelete }: { s: Signal; idx: numbe
   const points = s.pnlPoints ?? 0;
 
   // Category-specific color theme
-  const isReentry = s.signalCategory.startsWith("REENTRY");
-  const isPyramid = s.signalCategory.startsWith("PYRAMID");
+  const isReentry = (s.signalCategory || "").startsWith("REENTRY");
+  const isPyramid = (s.signalCategory || "").startsWith("PYRAMID");
   const catColors = isReentry
     ? { bg: "bg-gradient-to-r from-cyan-500/[0.08] to-cyan-600/[0.03]", border: "border-cyan-500/20", iconBg: "bg-cyan-500/15", text: "text-cyan-400", badge: "bg-cyan-500/20 text-cyan-400", tpBadge: "bg-cyan-500/15 text-cyan-400 border-cyan-500/20" }
     : isPyramid
