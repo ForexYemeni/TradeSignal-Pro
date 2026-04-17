@@ -1,11 +1,54 @@
 import { NextRequest, NextResponse } from "next/server";
-import { addSignal, getSignals, updateSignal } from "@/lib/store";
+import { addSignal, getSignals, updateSignal, getUserById } from "@/lib/store";
 import { parseTradingViewSignal, validateSignal } from "@/lib/signal-parser";
 import { notifyNewSignal, notifyTpHit, notifySlHit } from "@/lib/push";
 import { notifySignalEvent } from "./stream/route";
 
+// ─── Auth Guard ───────────────────────────────────────
+const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || "";
+
+/**
+ * Validates request auth: accepts either a session cookie (fy_session), a valid user token
+ * (Authorization: Bearer <userId>), or a webhook secret (X-Webhook-Secret header).
+ * Returns true if authorized, false otherwise.
+ */
+async function isAuthorized(request: NextRequest): Promise<boolean> {
+  // 1. Check session cookie (set on login, sent automatically by browser)
+  const sessionCookie = request.cookies.get('fy_session')?.value;
+  if (sessionCookie) {
+    const user = await getUserById(sessionCookie);
+    if (user) return true;
+  }
+
+  // 2. Check webhook secret (for Google Apps Script)
+  const webhookHeader = request.headers.get("x-webhook-secret");
+  if (WEBHOOK_SECRET && webhookHeader === WEBHOOK_SECRET) return true;
+
+  // 3. Check Authorization header
+  const authHeader = request.headers.get("authorization");
+  if (!authHeader) return false;
+  const token = authHeader.replace(/^Bearer\s+/i, "");
+
+  // If token matches webhook secret, allow
+  if (WEBHOOK_SECRET && token === WEBHOOK_SECRET) return true;
+
+  // If token matches a valid user/admin ID, allow
+  if (token) {
+    const user = await getUserById(token);
+    if (user) return true;
+  }
+
+  return false;
+}
+
 export async function POST(request: NextRequest) {
   try {
+    // Auth check for signal creation/update
+    const authed = await isAuthorized(request);
+    if (!authed) {
+      return NextResponse.json({ success: false, error: "غير مصرح" }, { status: 401 });
+    }
+
     const body = await request.json();
     const { text } = body;
 

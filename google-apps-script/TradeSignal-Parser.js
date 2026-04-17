@@ -4,6 +4,7 @@
 // يحتوي على دوال اختبار شاملة لكل نوع إشارة
 
 var APP_URL = "https://trade-signal-pro.vercel.app/api/signals";
+var WEBHOOK_SECRET = ""; // ← ضع الـ Webhook Secret هنا (نفس القيمة في Vercel env WEBHOOK_SECRET)
 
 // ═══════════════════════════════════════════════════════════════
 //  بيانات الاختبار الأساسية - XAUUSD
@@ -99,7 +100,9 @@ function extractRawText(e) {
 
 function sendToApp(rawText) {
   try {
-    var options = { method: "post", contentType: "application/json", payload: JSON.stringify({ text: rawText }), muteHttpExceptions: true };
+    var headers = { "Content-Type": "application/json" };
+    if (WEBHOOK_SECRET) headers["X-Webhook-Secret"] = WEBHOOK_SECRET;
+    var options = { method: "post", contentType: "application/json", headers: headers, payload: JSON.stringify({ text: rawText }), muteHttpExceptions: true };
     var response = UrlFetchApp.fetch(APP_URL, options);
     var code = response.getResponseCode();
     var text = response.getContentText();

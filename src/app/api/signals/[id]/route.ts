@@ -1,10 +1,48 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSignalById, updateSignal, deleteSignal } from "@/lib/store";
+import { getSignalById, updateSignal, deleteSignal, getUserById } from "@/lib/store";
 import { notifyTpHit, notifySlHit } from "@/lib/push";
 import { notifySignalEvent } from "../stream/route";
 
+// ─── Auth Guard ───────────────────────────────────────
+const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || "";
+
+async function isAuthorized(request: NextRequest): Promise<boolean> {
+  // 1. Check session cookie (set on login, sent automatically by browser)
+  const sessionCookie = request.cookies.get('fy_session')?.value;
+  if (sessionCookie) {
+    const user = await getUserById(sessionCookie);
+    if (user) return true;
+  }
+
+  // 2. Check webhook secret (for Google Apps Script)
+  const webhookHeader = request.headers.get("x-webhook-secret");
+  if (WEBHOOK_SECRET && webhookHeader === WEBHOOK_SECRET) return true;
+
+  // 3. Check Authorization header
+  const authHeader = request.headers.get("authorization");
+  if (!authHeader) return false;
+  const token = authHeader.replace(/^Bearer\s+/i, "");
+
+  // If token matches webhook secret, allow
+  if (WEBHOOK_SECRET && token === WEBHOOK_SECRET) return true;
+
+  // If token matches a valid user/admin ID, allow
+  if (token) {
+    const user = await getUserById(token);
+    if (user) return true;
+  }
+
+  return false;
+}
+
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    // Auth check
+    const authed = await isAuthorized(request);
+    if (!authed) {
+      return NextResponse.json({ success: false, error: "غير مصرح" }, { status: 401 });
+    }
+
     const { id } = await params;
     const body = await request.json();
     const { status, hitTpIndex } = body;
@@ -144,6 +182,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    // Auth check
+    const authed = await isAuthorized(request);
+    if (!authed) {
+      return NextResponse.json({ success: false, error: "غير مصرح" }, { status: 401 });
+    }
+
     const { id } = await params;
     await deleteSignal(id);
     return NextResponse.json({ success: true });

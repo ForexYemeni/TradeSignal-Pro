@@ -10,6 +10,7 @@
  */
 
 import { kv } from '@vercel/kv';
+import bcrypt from 'bcryptjs';
 
 // ─── Types ───────────────────────────────────────────────
 export interface StoredSignal {
@@ -182,23 +183,49 @@ export async function getPushSubscriptions(): Promise<PushSubscription[]> {
 }
 
 export async function addPushSubscription(sub: PushSubscription): Promise<void> {
-  const subs = await getPushSubscriptions();
-  // Remove old subscription for this user (one per user)
-  const filtered = subs.filter(s => s.userId !== sub.userId);
-  filtered.push(sub);
-  await kv.set('push_subscriptions', filtered);
+  return withLock('push_subscriptions', async () => {
+    const subs = await getPushSubscriptions();
+    // Remove old subscription for this user (one per user)
+    const filtered = subs.filter(s => s.userId !== sub.userId);
+    filtered.push(sub);
+    await kv.set('push_subscriptions', filtered);
+  });
 }
 
 export async function removePushSubscription(endpoint: string): Promise<void> {
-  const subs = await getPushSubscriptions();
-  const filtered = subs.filter(s => s.endpoint !== endpoint);
-  await kv.set('push_subscriptions', filtered);
+  return withLock('push_subscriptions', async () => {
+    const subs = await getPushSubscriptions();
+    const filtered = subs.filter(s => s.endpoint !== endpoint);
+    await kv.set('push_subscriptions', filtered);
+  });
 }
 
 export async function removePushSubscriptionByUserId(userId: string): Promise<void> {
-  const subs = await getPushSubscriptions();
-  const filtered = subs.filter(s => s.userId !== userId);
-  await kv.set('push_subscriptions', filtered);
+  return withLock('push_subscriptions', async () => {
+    const subs = await getPushSubscriptions();
+    const filtered = subs.filter(s => s.userId !== userId);
+    await kv.set('push_subscriptions', filtered);
+  });
+}
+
+// ─── Password Hashing ─────────────────────────────────
+export async function hashPassword(plainText: string): Promise<string> {
+  return bcrypt.hash(plainText, 12);
+}
+
+/**
+ * Compare password: supports both hashed (bcrypt) and legacy plaintext.
+ * Returns { match, needsRehash } — if needsRehash, caller should re-hash and save.
+ */
+export async function comparePassword(plainText: string, stored: string): Promise<{ match: boolean; needsRehash: boolean }> {
+  // If stored value looks like a bcrypt hash (starts with $2), use bcrypt
+  if (stored.startsWith('$2')) {
+    const match = await bcrypt.compare(plainText, stored);
+    return { match, needsRehash: false };
+  }
+  // Legacy plaintext comparison
+  const match = plainText === stored;
+  return { match, needsRehash: match }; // re-hash on successful plaintext match
 }
 
 // ─── Health Check ───────────────────────────────────────

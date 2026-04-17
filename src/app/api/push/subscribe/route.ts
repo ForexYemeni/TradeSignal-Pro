@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { addPushSubscription, removePushSubscription } from "@/lib/store";
+import { addPushSubscription, removePushSubscription, getUserById } from "@/lib/store";
 
 export async function POST(request: NextRequest) {
   try {
@@ -8,6 +8,12 @@ export async function POST(request: NextRequest) {
 
     if (!endpoint || !keys || !keys.p256dh || !keys.auth || !userId) {
       return NextResponse.json({ success: false, error: "بيانات الاشتراك غير مكتملة" }, { status: 400 });
+    }
+
+    // Validate that userId corresponds to a real user
+    const user = await getUserById(userId);
+    if (!user) {
+      return NextResponse.json({ success: false, error: "معرف المستخدم غير صالح" }, { status: 403 });
     }
 
     await addPushSubscription({

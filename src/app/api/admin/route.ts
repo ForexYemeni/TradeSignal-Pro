@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAdmin, setAdmin, getUserByEmail, migrateAdminToUsers } from "@/lib/store";
+import { getAdmin, setAdmin, getUserByEmail, migrateAdminToUsers, comparePassword, hashPassword, getUserById, updateUser } from "@/lib/store";
 
 export async function POST(request: NextRequest) {
   try {
@@ -30,8 +30,14 @@ async function handleLogin(body: Record<string, unknown>) {
   const user = await getUserByEmail(email);
 
   if (user) {
-    if (user.passwordHash !== password) {
+    const pwdResult = await comparePassword(password, user.passwordHash);
+    if (!pwdResult.match) {
       return NextResponse.json({ success: false, error: "بيانات الدخول غير صحيحة" }, { status: 401 });
+    }
+    // Auto-rehash legacy plaintext passwords on successful login
+    if (pwdResult.needsRehash) {
+      const { updateUser: upUser } = await import("@/lib/store");
+      await upUser(user.id, { passwordHash: await hashPassword(password) });
     }
 
     if (user.status === "pending") {
@@ -58,7 +64,7 @@ async function handleLogin(body: Record<string, unknown>) {
       }
     }
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       admin: {
         id: user.id,
@@ -74,6 +80,9 @@ async function handleLogin(body: Record<string, unknown>) {
       },
       token: user.id,
     });
+    // Set session cookie so browser sends it automatically with API calls
+    response.cookies.set('fy_session', user.id, { path: '/', httpOnly: true, sameSite: 'strict', maxAge: 60 * 60 * 24 * 7 });
+    return response;
   }
 
   // Fallback to legacy admin
@@ -91,11 +100,19 @@ async function handleLogin(body: Record<string, unknown>) {
     await setAdmin(admin);
   }
 
-  if (admin.email !== email || admin.passwordHash !== password) {
+  if (admin.email !== email) {
     return NextResponse.json({ success: false, error: "بيانات الدخول غير صحيحة" }, { status: 401 });
   }
+  const adminPwdResult = await comparePassword(password, admin.passwordHash);
+  if (!adminPwdResult.match) {
+    return NextResponse.json({ success: false, error: "بيانات الدخول غير صحيحة" }, { status: 401 });
+  }
+  // Auto-rehash legacy plaintext admin password
+  if (adminPwdResult.needsRehash) {
+    await setAdmin({ ...admin, passwordHash: await hashPassword(password) });
+  }
 
-  return NextResponse.json({
+  const response = NextResponse.json({
     success: true,
     admin: {
       id: admin.id,
@@ -106,6 +123,9 @@ async function handleLogin(body: Record<string, unknown>) {
     },
     token: admin.id,
   });
+  // Set session cookie so browser sends it automatically with API calls
+  response.cookies.set('fy_session', admin.id, { path: '/', httpOnly: true, sameSite: 'strict', maxAge: 60 * 60 * 24 * 7 });
+  return response;
 }
 
 async function handleChangePassword(body: Record<string, unknown>) {
@@ -117,28 +137,35 @@ async function handleChangePassword(body: Record<string, unknown>) {
     return NextResponse.json({ success: false, error: "جميع الحقول مطلوبة" }, { status: 400 });
   }
 
-  const user = await getUserByEmail((await import("@/lib/store")).getUserById(id).then(u => u?.email || newEmail));
+  const user = await getUserByEmail(newEmail || (await getUserById(id))?.email || "");
   const admin = await getAdmin();
 
   // Check against both user list and legacy admin
-  let valid = false;
-  if (admin && admin.id === id && admin.passwordHash === currentPassword) valid = true;
-  const userById = await (await import("@/lib/store")).getUserById(id);
-  if (userById && userById.passwordHash === currentPassword) valid = true;
+  if (admin && admin.id === id) {
+    const pwdResult = await comparePassword(currentPassword, admin.passwordHash);
+    if (pwdResult.match) valid = true;
+  }
+  const userById = await getUserById(id);
+  if (userById) {
+    const pwdResult2 = await comparePassword(currentPassword, userById.passwordHash);
+    if (pwdResult2.match) valid = true;
+  }
 
   if (!valid) {
     return NextResponse.json({ success: false, error: "كلمة المرور الحالية غير صحيحة" }, { status: 401 });
   }
 
+  // Hash the new password before storing
+  const hashedNewPwd = await hashPassword(newPassword);
+
   if (admin && admin.id === id) {
-    const updated = { ...admin, email: newEmail, passwordHash: newPassword, mustChangePwd: false, updatedAt: new Date().toISOString() };
+    const updated = { ...admin, passwordHash: hashedNewPwd, mustChangePwd: false, updatedAt: new Date().toISOString() };
     await setAdmin(updated);
     return NextResponse.json({ success: true, admin: { id: updated.id, email: updated.email, name: updated.name, mustChangePwd: false } });
   }
 
   if (userById) {
-    const { updateUser } = await import("@/lib/store");
-    const updated = await updateUser(id, { email: newEmail, passwordHash: newPassword, mustChangePwd: false });
+    const updated = await updateUser(id, { passwordHash: hashedNewPwd, mustChangePwd: false });
     if (!updated) return NextResponse.json({ success: false, error: "المستخدم غير موجود" }, { status: 404 });
     return NextResponse.json({ success: true, admin: { id: updated.id, email: updated.email, name: updated.name, mustChangePwd: false } });
   }
