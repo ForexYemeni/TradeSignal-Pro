@@ -296,6 +296,7 @@ var label[] pyrTPLbls = array.new_label()
 var bool[] pyrTPStatus = array.new_bool()
 var int pyrTPReached = 0
 var int pyrLastAlert = 0
+var bool pyrSL_alert_sent = false
 
 //══════════════════════════════════════════════════════════════════════════════
 // 11. متغيرات التعويض (Reentry)
@@ -847,7 +848,7 @@ if inTrade and inPyrTrade
         string pyrTPMsg = "╔════════════════════════════════╗\n"
         pyrTPMsg += pyrTPReached == pyrTargets ? "║ 🏆 تعزيز كامل بالربح! ║\n" : "║ ✅ هدف التعزيز " +
             str.tostring(pyrTPReached) + " ║\n"
-        pyrTPMsg += "╚════════════════════════════════╝\n\n"
+        pyrTPMsg += "╚════════════════════════════════════════════╝\n\n"
         pyrTPMsg += "📌 " + syminfo.ticker + " | 🔥 التعزيز\n"
         pyrTPMsg += "🎯 " + str.tostring(hitPTP, format.mintick) + " | +" + str.tostring(math.round(pnlPts,
             2), "#.##") + " نقطة\n"
@@ -859,7 +860,7 @@ if inTrade and inPyrTrade
 
         if pyrTPReached == pyrTargets
             inPyrTrade := false
-            pyrAlertSent := false
+            pyrSL_alert_sent := false
             clearPyrGraphics()
             array.clear(pyrTPPrices)
             array.clear(pyrTPLines)
@@ -869,7 +870,7 @@ if inTrade and inPyrTrade
         pyrLastAlert := pyrTPReached
 
     bool pyrSLHit = (isBuyTrade and low <= pyrSLPrice) or (not isBuyTrade and high >= pyrSLPrice)
-    if pyrSLHit and inPyrTrade
+    if pyrSLHit and inPyrTrade and not pyrSL_alert_sent
         float lossPts = math.abs(pyrEntryPrice - pyrSLPrice)
         float lossDollar = calcPnLDollar(pyrLotSize, lossPts)
         string pyrSLMsg = "╔════════════════════════════════╗\n"
@@ -884,9 +885,9 @@ if inTrade and inPyrTrade
         pyrSLMsg += "💡 الصفقة الرئيسية لا تزال نشطة\n"
         pyrSLMsg += SEP + "\n📱 t.me/forexYemeni_Gold"
         alert(pyrSLMsg, alert.freq_once_per_bar)
+        pyrSL_alert_sent := true
 
         inPyrTrade := false
-        pyrAlertSent := false
         clearPyrGraphics()
         array.clear(pyrTPPrices)
         array.clear(pyrTPLines)
@@ -1091,6 +1092,7 @@ if (isNewBuy or isNewSell)
     pyrAlertSent := false
     pyrTPReached := 0
     pyrLastAlert := 0
+    pyrSL_alert_sent := false
     pendingReentry := false
     reentryCounted := false
 
