@@ -2170,53 +2170,18 @@ export default function HomePage() {
               <span className="text-[10px] text-slate-500">آخر تحديث: {new Date().toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" })}</span>
             </div>
 
-            {/* ── Active Signals Summary (if any) ── */}
+            {/* ── Active Signals — Full Cards with Live TP/SL Updates ── */}
             {activeSignals.length > 0 && (
               <div>
-                <div className="flex items-center justify-between mb-3 px-1">
-                  <div className="flex items-center gap-2">
-                    <div className="w-1 h-5 rounded-full bg-gradient-to-b from-amber-400 to-orange-500" />
-                    <span className="text-xs font-bold text-white">الإشارات النشطة</span>
-                    <span className="text-[9px] bg-amber-500/15 text-amber-400 px-1.5 py-0.5 rounded-md font-bold">{activeSignals.length}</span>
-                  </div>
-                  <button onClick={() => setTab("signals")} className="text-[10px] text-amber-400 font-medium flex items-center gap-0.5 hover:text-amber-300 transition-colors">
-                    عرض الكل <ArrowUpRight className="w-3 h-3" />
-                  </button>
+                <div className="flex items-center gap-2 mb-3 px-1">
+                  <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="text-[11px] font-bold text-emerald-400">الإشارات النشطة</span>
+                  <span className="text-[9px] bg-emerald-500/15 text-emerald-400 px-1.5 py-0.5 rounded-md font-bold">{activeSignals.length}</span>
                 </div>
-                <div className="space-y-2">
-                  {activeSignals.slice(0, 3).map((s, i) => {
-                    const ac = entryAccent(s);
-                    const isBuy = s.type === "BUY";
-                    return (
-                      <div key={s.id} className="animate-[fadeInUp_0.3s_ease-out]" style={{ animationDelay: `${i * 60}ms`, animationFillMode: "both" }}>
-                        <div className={`rounded-2xl border ${ac.border} bg-white/[0.03] p-3 flex items-center gap-3 active:scale-[0.99] transition-transform cursor-pointer`} onClick={() => setTab("signals")}>
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${ac.bg}`}>
-                            {isBuy ? <TrendingUp className={`w-5 h-5 ${ac.text}`} /> : <TrendingDown className={`w-5 h-5 ${ac.text}`} />}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold text-white text-sm">{s.pair}</span>
-                              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${isBuy ? "bg-emerald-500/15 text-emerald-400" : "bg-red-500/15 text-red-400"}`}>
-                                {isBuy ? "شراء" : "بيع"}
-                              </span>
-                              {s.timeframe && <span className="text-[8px] bg-white/[0.06] text-slate-500 px-1 py-0.5 rounded-md">{s.timeframe}</span>}
-                            </div>
-                            <div className="flex items-center gap-3 mt-1 text-[10px]">
-                              <span className="text-slate-400">دخول: <span className="font-mono font-semibold text-slate-200">{s.entry}</span></span>
-                              <span className="text-red-400/60">وقف: <span className="font-mono font-semibold text-red-300">{s.stopLoss}</span></span>
-                            </div>
-                          </div>
-                          <div className="flex flex-col items-end gap-1">
-                            <div className="flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded-full">
-                              <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                              <span className="text-[8px] text-emerald-400 font-semibold">نشطة</span>
-                            </div>
-                            <span className="text-[9px] text-slate-600">{timeAgo(s.createdAt)}</span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                <div className="space-y-3">
+                  {activeSignals.map((s, i) => (
+                    <SignalCard key={s.id} s={s} idx={i} isAdmin={isAdmin} onUpdate={handleUpdate} onDelete={handleDelete} />
+                  ))}
                 </div>
               </div>
             )}
@@ -2455,47 +2420,18 @@ export default function HomePage() {
               </Glass>
             )}
 
-            {/* ── Recent Activity (Last 5 Closed Signals) ── */}
+            {/* ── Recent Activity — Full Closed Signal Cards ── */}
             {closedSignals.length > 0 && (
               <div>
-                <div className="flex items-center justify-between mb-3 px-1">
-                  <div className="flex items-center gap-2">
-                    <div className="w-1 h-5 rounded-full bg-gradient-to-b from-emerald-400 to-red-500" />
-                    <span className="text-xs font-bold text-white">آخر النتائج</span>
-                  </div>
-                  <button onClick={() => setTab("signals")} className="text-[10px] text-amber-400 font-medium flex items-center gap-0.5 hover:text-amber-300 transition-colors">
-                    الكل <ArrowUpRight className="w-3 h-3" />
-                  </button>
+                <div className="flex items-center gap-2 mb-3 px-1">
+                  <div className="w-2 h-2 rounded-full bg-slate-500" />
+                  <span className="text-[11px] font-bold text-slate-400">آخر النتائج</span>
+                  <span className="text-[9px] bg-white/[0.06] text-slate-400 px-1.5 py-0.5 rounded-md font-bold">{Math.min(closedSignals.length, 5)}</span>
                 </div>
-                <div className="space-y-1.5">
-                  {closedSignals.slice(0, 5).map((s, i) => {
-                    const isProfit = s.status === "HIT_TP";
-                    const isBuy = s.type === "BUY";
-                    return (
-                      <div key={s.id} className="flex items-center gap-3 rounded-xl px-3 py-2.5 border border-white/[0.04] bg-white/[0.02] animate-[fadeInUp_0.25s_ease-out]" style={{ animationDelay: `${i * 50}ms`, animationFillMode: "both" }}>
-                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isProfit ? "bg-emerald-500/10" : "bg-red-500/10"}`}>
-                          {isProfit ? (
-                            <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-                          ) : (
-                            <svg className="w-4 h-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-xs font-bold text-white">{s.pair}</span>
-                            <span className={`text-[8px] font-bold px-1 py-0.5 rounded ${isBuy ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"}`}>{isBuy ? "BUY" : "SELL"}</span>
-                          </div>
-                          <span className="text-[9px] text-slate-500">{timeAgo(s.createdAt)}</span>
-                        </div>
-                        <div className="text-right">
-                          <div className={`text-[12px] font-extrabold font-mono ${isProfit ? "text-emerald-400" : "text-red-400"}`}>
-                            {isProfit ? "+" : "-"}${Math.abs(s.pnlDollars ?? 0)}
-                          </div>
-                          <div className="text-[8px] text-slate-600 font-mono">{s.pnlPoints ?? 0} pts</div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                <div className="space-y-3">
+                  {closedSignals.slice(0, 5).map((s, i) => (
+                    <SignalCard key={s.id} s={s} idx={i} isAdmin={isAdmin} onUpdate={handleUpdate} onDelete={handleDelete} />
+                  ))}
                 </div>
               </div>
             )}
