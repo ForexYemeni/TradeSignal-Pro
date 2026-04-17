@@ -386,8 +386,8 @@ function TradeStatusBanner({ s }: { s: Signal }) {
   const isManual = s.status === "MANUAL_CLOSE";
   const hitCount = s.hitTpIndex >= 0 ? s.hitTpIndex : 0;
   const totalTPs = s.totalTPs || s.takeProfits?.length || 0;
-  const isReentry = s.signalCategory.startsWith("REENTRY");
-  const isPyramid = s.signalCategory.startsWith("PYRAMID");
+  const isReentry = (s.signalCategory || "").startsWith("REENTRY");
+  const isPyramid = (s.signalCategory || "").startsWith("PYRAMID");
   if (s.status === "ACTIVE") return null;
 
   const c = isReentry
@@ -480,7 +480,7 @@ function EntryCard({ s, idx, isAdmin, onUpdate, onDelete }: {
   const hitCount = s.hitTpIndex >= 0 ? s.hitTpIndex : 0;
 
   return (
-    <div className="animate-[fadeInUp_0.35s_ease-out]" style={{ animationDelay: `${idx * 40}ms`, animationFillMode: "both" }}>
+    <div className="animate-[fadeInUp_0.3s_ease-out]" style={{ animationDelay: `${Math.min(idx * 20, 300)}ms`, animationFillMode: "both" }}>
       <Glass className={`overflow-hidden ${ac.border} transition-all duration-300 ${isClosed ? "opacity-80" : ""}`}>
         {/* Top gradient accent bar */}
         <div className={`h-[3px] bg-gradient-to-l ${ac.accent}`} />
@@ -663,8 +663,8 @@ function ClosedSignalCard({ s, idx, isAdmin, onDelete }: { s: Signal; idx: numbe
   const points = s.pnlPoints ?? 0;
 
   // Category-specific color theme
-  const isReentry = s.signalCategory.startsWith("REENTRY");
-  const isPyramid = s.signalCategory.startsWith("PYRAMID");
+  const isReentry = (s.signalCategory || "").startsWith("REENTRY");
+  const isPyramid = (s.signalCategory || "").startsWith("PYRAMID");
   const catColors = isReentry
     ? { bg: "bg-gradient-to-r from-cyan-500/[0.08] to-cyan-600/[0.03]", border: "border-cyan-500/20", iconBg: "bg-cyan-500/15", text: "text-cyan-400", badge: "bg-cyan-500/20 text-cyan-400", tpBadge: "bg-cyan-500/15 text-cyan-400 border-cyan-500/20" }
     : isPyramid
@@ -677,7 +677,7 @@ function ClosedSignalCard({ s, idx, isAdmin, onDelete }: { s: Signal; idx: numbe
   const catIcon = isReentry ? "♻️" : isPyramid ? "🔥" : isProfit ? "✅" : isLoss ? "❌" : "⊘";
 
   return (
-    <div className="animate-[fadeInUp_0.3s_ease-out]" style={{ animationDelay: `${idx * 30}ms`, animationFillMode: "both" }}>
+    <div className="animate-[fadeInUp_0.25s_ease-out]" style={{ animationDelay: `${Math.min(idx * 15, 250)}ms`, animationFillMode: "both" }}>
       <div className={`rounded-xl border overflow-hidden transition-all duration-300 active:scale-[0.99] ${catColors.bg} ${catColors.border}`}>
         {/* Compact Header - Always Visible */}
         <button onClick={() => setExpanded(!expanded)} className="w-full text-right">
@@ -1201,10 +1201,14 @@ export default function HomePage() {
     return () => clearTimeout(timeoutId);
   }, []);
 
-  /* ── Fetch Signals ── */
-  const fetchSignals = useCallback(async () => {
+  /* ── Fetch Signals (debounced - max once per 5s) ── */
+  const lastFetchRef = useRef<number>(0);
+  const fetchSignals = useCallback(async (force = false) => {
     try {
-      const res = await fetch("/api/signals?limit=100");
+      const now = Date.now();
+      if (!force && now - lastFetchRef.current < 5000) return;
+      lastFetchRef.current = now;
+      const res = await fetch("/api/signals?limit=50");
       const data = await res.json();
       if (data.success) {
         const newSignals: Signal[] = data.signals;
@@ -1283,13 +1287,13 @@ export default function HomePage() {
   useEffect(() => {
     if (view !== "main" || !session) return;
     setLoading(true);
-    Promise.all([fetchSignals(), fetchStats()]).finally(() => setLoading(false));
+    Promise.all([fetchSignals(true), fetchStats()]).finally(() => setLoading(false));
 
-    // Fast update check every 3 seconds (lightweight - only checks timestamps)
-    const updateInterval = setInterval(checkForUpdates, 3000);
+    // Lightweight update check every 10 seconds (only checks timestamps)
+    const updateInterval = setInterval(checkForUpdates, 10000);
 
-    // Full signal refresh every 15 seconds
-    const fullInterval = setInterval(() => { fetchSignals(); fetchStats(); }, 15000);
+    // Full signal refresh every 30 seconds
+    const fullInterval = setInterval(() => { fetchSignals(); fetchStats(); }, 30000);
 
     // Try to connect to SSE for instant updates
     try {
@@ -1299,7 +1303,7 @@ export default function HomePage() {
           const data = JSON.parse(event.data);
           if (data.type === "signal" || data.type === "new_signal" || data.type === "tp_hit" || data.type === "sl_hit") {
             // New signal event from server - refresh immediately
-            fetchSignals();
+            fetchSignals(true);
           }
         } catch { /* ignore */ }
       };
@@ -1321,7 +1325,7 @@ export default function HomePage() {
   useEffect(() => {
     if (refreshKey === 0 || view !== "main") return;
     setLoading(true);
-    Promise.all([fetchSignals(), fetchStats()]).finally(() => setLoading(false));
+    Promise.all([fetchSignals(true), fetchStats()]).finally(() => setLoading(false));
   }, [refreshKey]);
 
   /* ── Load users when admin switches to users tab ── */
