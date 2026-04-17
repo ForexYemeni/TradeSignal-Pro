@@ -2484,8 +2484,8 @@ export default function HomePage() {
         {/* ══════ TAB: SIGNALS — PREMIUM DESIGN ══════ */}
         {tab === "signals" && (() => {
           // Only show entry-type signals (TP/SL updates are now reflected in-place on parent)
-          const activeSignals = filtered.filter(s => isEntry(s.signalCategory) && s.status === "ACTIVE");
-          const closedSignals = filtered.filter(s => isEntry(s.signalCategory) && s.status !== "ACTIVE");
+          const activeSignals = filtered.filter(s => s.status === "ACTIVE");
+          const closedSignals = filtered.filter(s => s.status !== "ACTIVE");
           const winClosed = closedSignals.filter(s => s.status === "HIT_TP");
           const lossClosed = closedSignals.filter(s => s.status === "HIT_SL");
           const totalClosed = closedSignals.length;
