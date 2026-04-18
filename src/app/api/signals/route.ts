@@ -143,7 +143,8 @@ export async function POST(request: NextRequest) {
       hitTpIndex: parseResult.signal.hitTpIndex ?? -1,
       hitPrice: parseResult.signal.hitPrice ?? 0,
       pnlPoints: parseResult.signal.pnlPoints ?? 0,
-      pnlDollars: parseResult.signal.pnlDollar ?? 0,
+      pnlDollars: (typeof parseResult.signal.pnlDollar === "number" && isFinite(parseResult.signal.pnlDollar) && Math.abs(parseResult.signal.pnlDollar) < 50000)
+        ? parseFloat(Math.min(Math.max(parseResult.signal.pnlDollar, -50000), 50000).toFixed(2)) : 0,
       tpStatusList: parseResult.signal.tpStatusList ?? "",
       totalTPs: parseResult.signal.totalTPs,
       partialWin: parseResult.signal.partialWin ?? false,
@@ -220,6 +221,16 @@ async function handleUpdateSignal(parsed: any) {
   else if (pair.includes("BTC") || pair.includes("ETH")) pipVal = 1;
   else if (pair.includes("JPY")) pipVal = 6.5;
 
+  // Cap function to prevent unrealistic P&L values
+  const capPnL = (val: number) => {
+    const clamped = Math.min(Math.max(val, -50000), 50000);
+    return parseFloat(clamped.toFixed(2));
+  };
+
+  // Validate parsed pnlDollar from text - reject if unreasonable
+  const validatedParsedDollar = (typeof parsed.pnlDollar === "number" && isFinite(parsed.pnlDollar) && Math.abs(parsed.pnlDollar) < 50000)
+    ? parsed.pnlDollar : null;
+
   if (parsed.signalCategory === "TP_HIT" || parsed.signalCategory === "REENTRY_TP" || parsed.signalCategory === "PYRAMID_TP") {
     const tpNum = parsed.hitTpIndex ?? 0; // 1-indexed from parser
     const tpArrayIdx = tpNum > 0 ? tpNum - 1 : -1;
@@ -243,11 +254,11 @@ async function handleUpdateSignal(parsed: any) {
 
       updateData.hitPrice = parsed.hitPrice || tpPrice;
       updateData.pnlPoints = parsed.pnlPoints || parseFloat(points.toFixed(1));
-      updateData.pnlDollars = parsed.pnlDollar || parseFloat(dollars.toFixed(2));
+      updateData.pnlDollars = validatedParsedDollar != null ? capPnL(validatedParsedDollar) : capPnL(dollars);
     } else {
       updateData.hitPrice = parsed.hitPrice || 0;
       updateData.pnlPoints = parsed.pnlPoints || 0;
-      updateData.pnlDollars = parsed.pnlDollar || 0;
+      updateData.pnlDollars = validatedParsedDollar != null ? capPnL(validatedParsedDollar) : 0;
     }
 
     updateData.totalTPs = totalTPsCount;
@@ -295,7 +306,7 @@ async function handleUpdateSignal(parsed: any) {
 
       updateData.hitPrice = parsed.hitPrice || stopLoss;
       updateData.pnlPoints = parsed.pnlPoints || parseFloat(netPoints.toFixed(1));
-      updateData.pnlDollars = parsed.pnlDollar || parseFloat(netDollars.toFixed(2));
+      updateData.pnlDollars = validatedParsedDollar != null ? capPnL(validatedParsedDollar) : capPnL(netDollars);
       updateData.totalTPs = totalTPsCount;
       // Mark TP status list to show which TPs were hit + SL on remainder
       updateData.tpStatusList = parsed.tpStatusList || "";
@@ -310,7 +321,7 @@ async function handleUpdateSignal(parsed: any) {
       updateData.partialWin = false;
       updateData.hitPrice = parsed.hitPrice || stopLoss;
       updateData.pnlPoints = parsed.pnlPoints || parseFloat(points.toFixed(1));
-      updateData.pnlDollars = parsed.pnlDollar || parseFloat((-dollars).toFixed(2));
+      updateData.pnlDollars = validatedParsedDollar != null ? capPnL(validatedParsedDollar) : capPnL(-dollars);
       updateData.totalTPs = totalTPsCount;
       updateData.tpStatusList = parsed.tpStatusList || "";
     }
