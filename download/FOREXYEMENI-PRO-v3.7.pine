@@ -1,0 +1,1037 @@
+//@version=5
+indicator("FOREXYEMENI-PRO-v3.7", shorttitle="FYP-v3.7", overlay=true, max_lines_count=500, max_labels_count=500, max_boxes_count=100)
+
+//═══════════════════════════════════════════════
+//  1. HTF تلقائي
+//═══════════════════════════════════════════════
+getHTF() =>
+    string r = ""
+    if timeframe.isseconds
+        r := "5"
+    else if timeframe.isminutes
+        if timeframe.multiplier <= 1
+            r := "15"
+        else if timeframe.multiplier <= 5
+            r := "60"
+        else if timeframe.multiplier <= 15
+            r := "240"
+        else if timeframe.multiplier <= 60
+            r := "D"
+        else
+            r := "W"
+    else if timeframe.isdaily
+        r := "W"
+    else if timeframe.isweekly
+        r := "M"
+    else
+        r := "D"
+    r
+
+string autoHTF = getHTF()
+htfName(string tf) =>
+    tf == "60" ? "1س" : tf == "240" ? "4س" : tf == "D" ? "يومي" : tf == "W" ? "أسبوعي" : tf
+
+//═══════════════════════════════════════════════
+//  2. الإعدادات
+//═══════════════════════════════════════════════
+grp1 = "1️⃣ الإعدادات الأساسية"
+length = input.int(22, "📏 طول ATR", group=grp1)
+mult = input.float(2.0, "🔄 معامل ATR", step=0.1, group=grp1)
+useClose = input.bool(true, "🕯️ إغلاق للقمم/القيعان", group=grp1)
+
+grp2 = "2️⃣ فلاتر الدخول والسيولة"
+useCooldown = input.bool(false, "❄️ تفعيل نظام التبريد (تأخير الدخول)", group=grp2)
+useCross = input.bool(true, "🔀 تقاطع السوبرترند", group=grp2)
+usePullback = input.bool(true, "🔄 سحب + استمرار", group=grp2)
+useLevel = input.bool(true, "📐 ارتداد مستويات", group=grp2)
+pbBars = input.int(5, "🕯️ شموع السحب", minval=2, maxval=15, group=grp2)
+pbDist = input.float(0.3, "📏 مسافة السحب (×ATR)", step=0.05, group=grp2)
+useRSI = input.bool(false, "📊 تفعيل RSI", group=grp2)
+rsiLen = input.int(14, "📏 طول RSI", group=grp2)
+rsiBuyMax = input.float(55.0, "📈 RSI شراء أقل من", group=grp2)
+rsiSellMin = input.float(45.0, "📉 RSI بيع أعلى من", group=grp2)
+useMom = input.bool(false, "🚀 زخم ATR", group=grp2)
+minATR = input.float(0.01, "📊 ATR أدنى %", step=0.01, group=grp2)
+useCandle = input.bool(false, "🕯️ أنماط الشموع", group=grp2)
+useChop = input.bool(false, "🌊 ضد التذبذب", group=grp2)
+chopLen = input.int(14, "📏 طول التذبذب", group=grp2)
+useSession = input.bool(false, "🕐 فلتر الجلسات", group=grp2)
+sessionStr = input.session("0700-2100", "🌍 الجلسة النشطة (UTC)", group=grp2)
+useAutoHTF = input.bool(true, "🤖 HTF تلقائي", group=grp2)
+manualHTF = input.timeframe("60", "⏱️ HTF يدوي", group=grp2)
+smcLen = input.int(3, "🎯 حساسية SMC", minval=1, group=grp2)
+minStars = input.int(1, "⭐ حد أدنى نجوم", minval=1, maxval=3, group=grp2)
+showFVG = input.bool(true, "📦 إظهار FVG", group=grp2)
+showOB = input.bool(true, "🧱 إظهار OB", group=grp2)
+showSR = input.bool(true, "📊 دعم/مقاومة", group=grp2)
+
+string htf = useAutoHTF ? autoHTF : manualHTF
+string htfD = useAutoHTF ? htfName(autoHTF) : htfName(manualHTF)
+
+grp3 = "3️⃣ الأهداف والوقف"
+numTP = input.int(10, "🔢 عدد الأهداف", minval=1, maxval=10, group=grp3)
+tpMode = input.string("Fib", "📐 نوع الأهداف", options=["ATR", "RR", "Fib", "Swings"], group=grp3)
+slMode = input.string("ATR", "🛑 نوع الوقف", options=["ATR", "Swing", "FVG"], group=grp3)
+slMult = input.float(1.0, "➗ مضاعف الوقف", step=0.1, group=grp3)
+beBuf = input.float(0.5, "🛡️ هامش التأمين (نقاط)", step=0.1, group=grp3)
+useTrail = input.bool(false, "🚀 وقف تتبعي", group=grp3)
+
+grp4 = "4️⃣ التعزيز والتعويض"
+useReentry = input.bool(false, "♻️ صفقة تعويض", group=grp4)
+reMult = input.float(1.5, "➗ مضاعف وقف التعويض", group=grp4)
+reRR = input.float(2.0, "🎯 R:R تعويض", group=grp4)
+reTPn = input.int(5, "🔢 أهداف تعويض", minval=1, maxval=10, group=grp4)
+usePyr = input.bool(true, "🔥 تعزيز", group=grp4)
+pyrTP = input.int(3, "🔢 أهداف تعزيز", minval=1, maxval=5, group=grp4)
+pyrSLM = input.string("آخر محقق", "🛑 وقف التعزيز", options=["آخر محقق", "ATR", "أصلي"], group=grp4)
+pyrRR = input.float(1.5, "🎯 R:R تعزيز", group=grp4)
+
+grp5 = "5️⃣ إدارة المخاطر"
+bal = input.float(1000.0, "💵 الرصيد ($)", step=100, minval=1, group=grp5)
+riskP = input.float(1.0, "⚠️ المخاطرة %", step=0.1, minval=0.1, maxval=100, group=grp5)
+
+grp6 = "6️⃣ الإحصائيات والمظهر"
+statPeriod = input.string("اليوم الحالي (مكة)", "📅 فترة الإحصائيات", options=["اليوم الحالي (مكة)", "آخر 7 أيام", "آخر 30 يوم", "كل البيانات"], group=grp6)
+showSTLine = input.bool(true, "📈 خط السوبرترند", group=grp6)
+showTradeBG = input.bool(true, "🎨 خلفية الصفقة", group=grp6)
+showEntryMark = input.bool(true, "📍 علامة الدخول", group=grp6)
+
+//═══════════════════════════════════════════════
+//  3. كشف الأداة
+//═══════════════════════════════════════════════
+getInst() =>
+    string t = syminfo.ticker
+    string r = "فوركس"
+    if str.contains(t, "XAU") or str.contains(t, "GOLD")
+        r := "الذهب (XAUUSD)"
+    else if str.contains(t, "XAG") or str.contains(t, "SILVER")
+        r := "الفضة (XAGUSD)"
+    else if str.contains(t, "BTC") or str.contains(t, "ETH") or str.contains(t, "SOL") or str.contains(t, "BNB") or str.contains(t, "XRP") or str.contains(t, "ADA") or str.contains(t, "DOGE") or str.contains(t, "DOT") or str.contains(t, "USDT")
+        r := "عملات رقمية"
+    else if str.contains(t, "NAS") or str.contains(t, "US30") or str.contains(t, "DAX") or str.contains(t, "US500") or str.contains(t, "SPX") or str.contains(t, "NDX")
+        r := "مؤشرات (NAS/DOW)"
+    else if str.contains(t, "JPY")
+        r := "فوركس (6 أرقام)"
+    r
+
+string inst = getInst()
+
+getInstShort() =>
+    string t = syminfo.ticker
+    string r = "فوركس"
+    if str.contains(t, "XAU") or str.contains(t, "GOLD")
+        r := "🥇 ذهب"
+    else if str.contains(t, "XAG") or str.contains(t, "SILVER")
+        r := "🥈 فضة"
+    else if str.contains(t, "BTC") or str.contains(t, "ETH") or str.contains(t, "SOL")
+        r := "₿ كريبتو"
+    else if str.contains(t, "NAS") or str.contains(t, "US30") or str.contains(t, "DAX")
+        r := "📊 مؤشرات"
+    else if str.contains(t, "JPY")
+        r := "💱 فوركس JPY"
+    r
+
+string instShort = getInstShort()
+
+//═══════════════════════════════════════════════
+//  4. الألوان
+//═══════════════════════════════════════════════
+color cG = color.new(#00E676, 0)
+color cR = color.new(#FF5252, 0)
+color cO = color.new(#FF9800, 0)
+color cAu = color.new(#FFD700, 0)
+color cCy = color.new(#00BCD4, 0)
+color cGr = color.new(color.gray, 0)
+color cBG = color.new(#1E222D, 10)
+color cP = color.new(#E040FB, 0)
+var color[] tpC = array.from(color.new(#2962FF, 0), color.new(#00897B, 0), color.new(#00BCD4, 0), color.new(#009688, 0), color.new(#4CAF50, 0), color.new(#8BC34A, 0), color.new(#CDDC39, 0), color.new(#FFEB3B, 0), color.new(#FFC107, 0), color.new(#FF9800, 0))
+
+string SEP = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+//═══════════════════════════════════════════════
+//  5. حسابات
+//═══════════════════════════════════════════════
+slValPerLot(float d) =>
+    math.max(d * syminfo.pointvalue, 0.0001)
+
+calcLot(float risk, float dist) =>
+    math.min(math.max(math.floor(risk / slValPerLot(dist) * 100) / 100, 0.01), 100)
+
+pnlD(float lot, float dist) =>
+    slValPerLot(dist) * lot
+
+beBufPx() =>
+    beBuf * syminfo.mintick * 10
+
+lotStr(float l) =>
+    l >= 1 ? str.tostring(math.round(l, 2), "#.##") + " لوت" : l >= 0.1 ? str.tostring(math.round(l, 2), "#.##") + " ميني" : str.tostring(math.round(l, 2), "#.##") + " مايكرو"
+
+buildRiskBlock(float lotSz, float tRisk, float aRisk, float slDist, float maxRR) =>
+    float aPct = aRisk > 0 and bal > 0 ? (aRisk / bal) * 100.0 : 0.0
+    string s = "\n💰 إدارة المخاطر\n"
+    s += "💵 الرصيد : $" + str.tostring(bal, "#.##") + "\n"
+    s += "🎯 خطر مستهدف : $" + str.tostring(math.round(tRisk, 2), "#.##") + " (" + str.tostring(riskP, "#.#") + "%)\n"
+    s += "📦 حجم اللوت : " + lotStr(lotSz) + "\n"
+    s += "💸 خسارة فعلية : $" + str.tostring(math.round(aRisk, 2), "#.##") + " (" + str.tostring(math.round(aPct, 1), "#.#") + "%)\n"
+    s += "📏 مسافة الوقف : " + str.tostring(math.round(slDist, 2), "#.##") + "\n"
+    s += "📊 R:R الأقصى : 1:" + str.tostring(math.round(maxRR, 2), "#.##") + "\n"
+    s += "🏦 الأداة : " + inst + "\n"
+    if aPct > riskP * 1.5
+        float recBal = tRisk > 0 ? (aRisk / riskP) * 100.0 : 0.0
+        s += "\n⚠️ تحذير المخاطر:\n"
+        s += "├ مستهدف : " + str.tostring(riskP, "#.#") + "% = $" + str.tostring(math.round(bal * riskP / 100.0, 2), "#.##") + "\n"
+        s += "├ فعلي : " + str.tostring(math.round(aPct, 1), "#.#") + "% = $" + str.tostring(math.round(aRisk, 2), "#.##") + "\n"
+        s += "└ موصى به: $" + str.tostring(math.round(recBal, 0), "#") + " رصيد\n"
+    s
+
+buildTPStatusMain() =>
+    string s = ""
+    if array.size(tpP) > 0
+        for i = 0 to array.size(tpP) - 1
+            float p = array.get(tpP, i)
+            bool hit = array.get(tpS, i)
+            bool cur = i == mxTPR - 1
+            s += (hit ? "✅" : "⏳") + " TP" + str.tostring(i + 1) + ": " + str.tostring(p, format.mintick) + (cur ? " ← الآن" : "") + "\n"
+    s
+
+buildTPStatusPyr() =>
+    string s = ""
+    if array.size(pyTP) > 0
+        for i = 0 to array.size(pyTP) - 1
+            float p = array.get(pyTP, i)
+            bool hit = array.get(pyTS, i)
+            bool cur = i == pyrR - 1
+            s += (hit ? "✅" : "⏳") + " TP" + str.tostring(i + 1) + ": " + str.tostring(p, format.mintick) + (cur ? " ← الآن" : "") + "\n"
+    s
+
+buildTPStatusRe() =>
+    string s = ""
+    if array.size(reTP) > 0
+        for i = 0 to array.size(reTP) - 1
+            float p = array.get(reTP, i)
+            bool hit = array.get(reTS, i)
+            bool cur = i == reR - 1
+            s += (hit ? "✅" : "⏳") + " TP" + str.tostring(i + 1) + ": " + str.tostring(p, format.mintick) + (cur ? " ← الآن" : "") + "\n"
+    s
+
+//═══════════════════════════════════════════════
+//  6. Bar Guard
+//═══════════════════════════════════════════════
+var int laE = -999, var int laTP = -999, var int laSL = -999
+var int laRE = -999, var int laRETP = -999, var int laRESL = -999
+var int laPE = -999, var int laPTP = -999, var int laPSL = -999, var int laCN = -999
+
+//═══════════════════════════════════════════════
+//  7. متغيرات الصفقة الرئيسية
+//═══════════════════════════════════════════════
+var int totT = 0, var int winT = 0, var int lossT = 0
+var int reWin = 0, var int reLoss = 0, var int lastExit = 0
+var bool tradeCnt = false
+var float ep = na, var float sl = na, var float iSL = na, var float tATR = na, var float mxTP = na
+var float sLot = 0, var float sRisk = 0
+var bool sIsBuy = true, var bool inT = false, var bool isBuy = false
+var bool slSent = false, var bool pyrSent = false, var bool beSent = false
+var int dir = 1, var int lastSig = 0, var int mxTPR = 0, var int laTP2 = 0
+var int stars = 0
+var string sigType = ""
+var int entryTime = na
+var line eL = na, var line slL = na, var label eLb = na, var label slLb = na
+var float[] tpP = array.new_float(), var line[] tpL = array.new_line(), var label[] tpLb = array.new_label(), var bool[] tpS = array.new_bool()
+
+//═══════════════════════════════════════════════
+//  8. متغيرات التعزيز
+//═══════════════════════════════════════════════
+var bool inPy = false, var float pyE = na, var float pySL = na, var float pyA = na, var float pyLot = 0
+var int pyrR = 0, var int pyrLA = 0, var bool pyrSLAS = false
+var line pyEL = na, var line pySLL = na, var label pyELb = na, var label pySLb = na
+var float[] pyTP = array.new_float(), var line[] pyTL = array.new_line(), var label[] pyTLb = array.new_label(), var bool[] pyTS = array.new_bool()
+
+//═══════════════════════════════════════════════
+//  9. متغيرات التعويض
+//═══════════════════════════════════════════════
+var bool inRe = false, var bool pendRe = false, var bool reCnt = false
+var float reE = na, var float reSL = na, var float reA = na, var float reLot = 0
+var int reR = 0, var int reLA = 0, var bool isBuyRe = false, var bool reSLS = false
+var line reEL = na, var line reSLL = na, var label reELb = na, var label reSLb = na
+var float[] reTP = array.new_float(), var line[] reTL = array.new_line(), var label[] reTLb = array.new_label(), var bool[] reTS = array.new_bool()
+
+//═══════════════════════════════════════════════
+//  10. تتبع الإحصائيات الزمنية
+//═══════════════════════════════════════════════
+var int[] tCTime = array.new_int()
+var int[] tCWin = array.new_int()
+
+//═══════════════════════════════════════════════
+//  11. MTF/SMC/FVG/OB
+//═══════════════════════════════════════════════
+float htfEMA = ta.ema(close, 200)
+int htfTr = request.security(syminfo.tickerid, htf, close > htfEMA ? 1 : -1, barmerge.gaps_off, barmerge.lookahead_off)
+
+float ph2 = ta.pivothigh(high, smcLen, smcLen)
+float pl2 = ta.pivotlow(low, smcLen, smcLen)
+var float lph = na, var float lpl = na
+var float[] rPH = array.new_float(), var float[] rPL = array.new_float()
+var line rLine = na, var line sLine = na
+
+if not na(ph2)
+    lph := ph2
+    array.push(rPH, ph2)
+    if array.size(rPH) > 50 => array.shift(rPH)
+    if showSR
+        if not na(rLine) => line.delete(rLine)
+        rLine := line.new(bar_index[smcLen], lph, bar_index, lph, color=color.new(#FF5252, 50), width=2, style=line.style_dashed, extend=extend.right)
+
+if not na(pl2)
+    lpl := pl2
+    array.push(rPL, pl2)
+    if array.size(rPL) > 50 => array.shift(rPL)
+    if showSR
+        if not na(sLine) => line.delete(sLine)
+        sLine := line.new(bar_index[smcLen], lpl, bar_index, lpl, color=color.new(#00E676, 50), width=2, style=line.style_dashed, extend=extend.right)
+
+var int smcT = 0
+if not na(lph) and not na(lpl)
+    if close > lph => smcT := 1
+    else if close < lpl => smcT := -1
+
+bool bf = low > high[2] and barstate.isconfirmed
+bool bf2 = high < low[2] and barstate.isconfirmed
+var float bft = na, var float bfb = na, var float brt = na, var float brb = na
+var bool bff = false, var bool brf = false
+
+if bf
+    bft := low, bfb := high[2], bff := false
+    if showFVG => box.new(bar_index[2], bft, bar_index + 5, bfb, bgcolor=color.new(#00E676, 90), border_color=color.new(#00E676, 50), text="FVG↑", text_size=size.tiny)
+
+if bf2
+    brt := low[2], brb := high, brf := false
+    if showFVG => box.new(bar_index[2], brt, bar_index + 5, brb, bgcolor=color.new(#FF5252, 90), border_color=color.new(#FF5252, 50), text="FVG↓", text_size=size.tiny)
+
+if not bff and not na(bfb) and low <= bfb => bff := true
+if not brf and not na(brt) and high >= brt => brf := true
+
+var float bobt = na, var float bobb = na, var float robt = na, var float robb = na
+var bool bobBroken = false, var bool robBroken = false
+
+if bf
+    for i = 2 to 15
+        if close[i] < open[i]
+            bobt := math.max(open[i], close[i]), bobb := low[i], bobBroken := false
+            if showOB => box.new(bar_index[i], bobt, bar_index + 5, bobb, bgcolor=color.new(#2962FF, 85), border_color=color.new(#2962FF, 40), text="OB+", text_size=size.tiny)
+            break
+
+if bf2
+    for i = 2 to 15
+        if close[i] > open[i]
+            robt := high[i], robb := math.min(open[i], close[i]), robBroken := false
+            if showOB => box.new(bar_index[i], robt, bar_index + 5, robb, bgcolor=color.new(#FF1744, 85), border_color=color.new(#FF1744, 40), text="OB-", text_size=size.tiny)
+            break
+
+if not bobBroken and not na(bobb) and low < bobb => bobBroken := true
+if not robBroken and not na(robt) and high > robt => robBroken := true
+
+bool nBF = not bff and not na(bft) and low <= bft and close >= bfb
+bool nBR = not brf and not na(brb) and high >= brb and close <= brt
+bool nBOB = not bobBroken and not na(bobt) and low <= bobt and close >= bobb
+bool nROB = not robBroken and not na(robb) and high >= robb and close <= robt
+bool bSw = not na(lpl) and low < lpl and close > lpl
+bool bSe = not na(lph) and high > lph and close < lph
+
+//═══════════════════════════════════════════════
+//  12. فلاتر التأكيد
+//═══════════════════════════════════════════════
+float rsiV = ta.rsi(close, rsiLen)
+float rATR = ta.atr(length)
+float atrPc = rATR / close * 100
+bool hasMom = not useMom or atrPc >= minATR
+bool rsiBuyOK = not useRSI or rsiV < rsiBuyMax
+bool rsiSellOK = not useRSI or rsiV > rsiSellMin
+float cH = ta.highest(high, chopLen)
+float cL = ta.lowest(low, chopLen)
+bool isChop = useChop and (cH - cL) < rATR * 2
+bool inSess = not useSession or timeframe.isdaily or timeframe.isweekly or timeframe.ismonthly or not na(time(timeframe.period, sessionStr, "UTC"))
+float body = math.abs(close - open)
+float uShad = high - math.max(close, open)
+float lShad = math.min(close, open) - low
+bool bEng = useCandle and close[1] < open[1] and close > open and close > open[1] and open < close[1]
+bool sEng = useCandle and close[1] > open[1] and close < open and close < open[1] and open > close[1]
+bool ham = useCandle and body > 0 and lShad > body * 2 and uShad < body * 0.5 and close > open
+bool shot = useCandle and body > 0 and uShad > body * 2 and lShad < body * 0.5 and close < open
+bool bCand = not useCandle or bEng or ham or (close > open and close > high[1])
+bool sCand = not useCandle or sEng or shot or (close < open and close < low[1])
+
+passBuy() => hasMom and rsiBuyOK and bCand and not isChop and inSess
+passSell() => hasMom and rsiSellOK and sCand and not isChop and inSess
+
+//═══════════════════════════════════════════════
+//  13. محرك الإشارات (Triggers)
+//═══════════════════════════════════════════════
+float atr = mult * ta.atr(length)
+float hh = useClose ? ta.highest(close, length) : ta.highest(high, length)
+float ll = useClose ? ta.lowest(close, length) : ta.lowest(low, length)
+float lS = hh - atr
+float sS = ll + atr
+float lP = nz(lS[1], lS)
+float sP = nz(sS[1], sS)
+lS := (useClose ? close : high) > lP ? math.max(lS, lP) : lS
+sS := (useClose ? close : low) < sP ? math.min(sS, sP) : sS
+dir := high > sP ? 1 : low < lS ? -1 : dir
+
+bool rawB = dir == 1 and dir[1] == -1
+bool rawS = dir == -1 and dir[1] == 1
+
+bool nearLS = false
+bool nearSS = false
+for i = 1 to pbBars
+    float dL = math.abs(nz(close[i], 0) - nz(lS[i], 0))
+    float dS = math.abs(nz(close[i], 0) - nz(sS[i], 0))
+    if dL <= pbDist * rATR => nearLS := true
+    if dS <= pbDist * rATR => nearSS := true
+
+bool pullB_cond = usePullback and dir == 1 and dir[1] == 1 and nearLS and close > open and close > lS
+bool pullS_cond = usePullback and dir == -1 and dir[1] == -1 and nearSS and close < open and close < sS
+bool pullB = pullB_cond and not pullB_cond[1]
+bool pullS = pullS_cond and not pullS_cond[1]
+
+bool lvlB_cond = useLevel and dir == 1 and (nBF or nBOB or bSw or (not na(lpl) and low >= lpl * 0.999 and close > lpl)) and close > open
+bool lvlS_cond = useLevel and dir == -1 and (nBR or nROB or bSe or (not na(lph) and high <= lph * 1.001 and close < lph)) and close < open
+bool lvlB = lvlB_cond and not lvlB_cond[1]
+bool lvlS = lvlS_cond and not lvlS_cond[1]
+
+bool anyB = (useCross and rawB) or pullB or lvlB
+bool anyS = (useCross and rawS) or pullS or lvlS
+
+int cStars = 0
+string cSigType = ""
+if anyB or anyS
+    cStars := 1
+    if anyB
+        cSigType := rawB ? "تقاطع" : pullB ? "سحب" : "مستوى"
+        if htfTr == 1 => cStars += 1
+        if nBF or bSw or nBOB => cStars := math.min(cStars + 1, 3)
+    else
+        cSigType := rawS ? "تقاطع" : pullS ? "سحب" : "مستوى"
+        if htfTr == -1 => cStars += 1
+        if nBR or bSe or nROB => cStars := math.min(cStars + 1, 3)
+
+//═══════════════════════════════════════════════
+//  14. حذف الرسومات
+//═══════════════════════════════════════════════
+clrM() =>
+    if not na(eL) => line.delete(eL)
+    if not na(slL) => line.delete(slL)
+    if not na(eLb) => label.delete(eLb)
+    if not na(slLb) => label.delete(slLb)
+    if array.size(tpL) > 0
+        for j = 0 to array.size(tpL) - 1
+            line.delete(array.get(tpL, j))
+    if array.size(tpLb) > 0
+        for j = 0 to array.size(tpLb) - 1
+            label.delete(array.get(tpLb, j))
+
+clrP() =>
+    if not na(pyEL) => line.delete(pyEL)
+    if not na(pySLL) => line.delete(pySLL)
+    if not na(pyELb) => label.delete(pyELb)
+    if not na(pySLb) => label.delete(pySLb)
+    if array.size(pyTL) > 0
+        for j = 0 to array.size(pyTL) - 1
+            line.delete(array.get(pyTL, j))
+    if array.size(pyTLb) > 0
+        for j = 0 to array.size(pyTLb) - 1
+            label.delete(array.get(pyTLb, j))
+
+clrR() =>
+    if not na(reEL) => line.delete(reEL)
+    if not na(reSLL) => line.delete(reSLL)
+    if not na(reELb) => label.delete(reELb)
+    if not na(reSLb) => label.delete(reSLb)
+    if array.size(reTL) > 0
+        for j = 0 to array.size(reTL) - 1
+            line.delete(array.get(reTL, j))
+    if array.size(reTLb) > 0
+        for j = 0 to array.size(reTLb) - 1
+            label.delete(array.get(reTLb, j))
+
+clrAll() =>
+    clrM(), clrP(), clrR()
+
+//═══════════════════════════════════════════════
+//  15. بناء التنبيهات (متوافقة مع signal-parser.ts)
+//═══════════════════════════════════════════════
+starStr(int s) => s == 3 ? "⭐⭐⭐" : s == 2 ? "⭐⭐" : "⭐"
+sigTypeName(string t) => t == "تقاطع" ? "📈تقاطع" : t == "سحب" ? "🔄سحب" : "🎯مستوى"
+
+// ─── 15a. تنبيه الدخول الرئيسي ───
+buildEnt() =>
+    float sd = math.abs(ep - sl)
+    float mxR = sd > 0 ? math.abs(mxTP - ep) / sd : 0
+    float tR = bal * riskP / 100
+    string m = "╔════════════════════════════════╗\n"
+    m += "║ " + (isBuy ? "🟢 إشارة شراء 🚀" : "🔴 إشارة بيع 🔻") + " ║\n"
+    m += "╚════════════════════════════════╝\n\n"
+    m += "📌 " + syminfo.ticker + " │ " + timeframe.period + " │ " + htfD + "\n"
+    m += "⭐ " + starStr(stars) + " | " + sigTypeName(sigType) + "\n\n"
+    m += SEP + "\n📊 الصفقة\n" + SEP + "\n"
+    m += "🔵 الدخول: " + str.tostring(ep, format.mintick) + "\n"
+    m += "🔴 الوقف : " + str.tostring(sl, format.mintick) + " | تأمين تلقائي TP1\n"
+    m += buildRiskBlock(sLot, tR, sRisk, sd, mxR)
+    m += "\n" + SEP + "\n🎯 الأهداف\n" + SEP + "\n"
+    if array.size(tpP) > 0
+        for k = 0 to array.size(tpP) - 1
+            float t = array.get(tpP, k)
+            float rr = sd > 0 ? math.abs(t - ep) / sd : 0
+            m += "🎯 TP" + str.tostring(k + 1) + ": " + str.tostring(t, format.mintick) + " │ R:R " + str.tostring(math.round(rr, 2), "#.##") + "\n"
+    m += "\n" + SEP + "\n"
+    m += "📈 " + htfD + ": " + (htfTr == 1 ? "صاعد 🐂" : "هابط 🐻") + " | SMC: " + (smcT == 1 ? "صاعد" : smcT == -1 ? "هابط" : "محايد") + "\n"
+    m += SEP + "\n📱 t.me/forexYemeni_Gold"
+    m
+
+// ─── 15b. تنبيه تحقق هدف ───
+buildTPA(int n, bool jump) =>
+    float hp = array.size(tpP) > 0 ? array.get(tpP, math.max(0, n - 1)) : ep
+    float pp = math.abs(hp - ep)
+    float pd = pnlD(sLot, pp)
+    string m = "╔════════════════════════════════╗\n"
+    if n == numTP
+        m += "║ 🏆 إغلاق كامل بالربح! ║\n"
+    else if jump
+        m += "║ 🚀 قفزة سعرية! ║\n"
+    else
+        m += "║ ✅ تحقق الهدف " + str.tostring(n) + " ║\n"
+    m += "╚════════════════════════════════╝\n\n"
+    m += "📌 " + syminfo.ticker + "\n"
+    if jump
+        m += "⚡ الأهداف " + str.tostring(laTP2 + 1) + " ← " + str.tostring(n) + " معاً!\n"
+    m += "🎯 " + str.tostring(hp, format.mintick) + " │ +" + str.tostring(math.round(pp, 2), "#.##") + " نقطة\n"
+    m += "💰 ربح تقريبي: +$" + str.tostring(math.round(pd, 2), "#.##") + "\n\n"
+    m += SEP + "\n" + buildTPStatusMain() + SEP + "\n"
+    if n == numTP
+        m += "🎊 جميع الأهداف!\n"
+    else if n >= 1
+        m += "🛡️ التأمين مفعّل\n"
+    else
+        m += "💡 فكر في تحريك الوقف\n"
+    m += SEP + "\n📱 t.me/forexYemeni_Gold"
+    m
+
+// ─── 15c. تنبيه ضرب الوقف الرئيسي ───
+buildSLA() =>
+    float lp = math.abs(ep - iSL)
+    float ld = pnlD(sLot, lp)
+    string m = ""
+    if mxTPR == 0
+        m := "╔════════════════════════════════╗\n"
+        m += "║ ❌ ضرب الوقف — خسارة كاملة ║\n"
+        m += "╚════════════════════════════════╝\n\n"
+        m += "📌 " + syminfo.ticker + "\n"
+        m += "❌ " + str.tostring(sl, format.mintick) + " | -" + str.tostring(math.round(lp, 2), "#.##") + " نقطة\n"
+        m += "💰 الخسارة: -$" + str.tostring(math.round(ld, 2), "#.##") + "\n\n"
+        m += SEP + "\n" + buildTPStatusMain() + SEP + "\n"
+        if useReentry
+            bool ok = (isBuy and htfTr == 1 and smcT == 1) or (not isBuy and htfTr == -1 and smcT == -1)
+            if ok => m += "♻️ جاري البحث عن دخول تعويض...\n"
+    else if beSent and mxTPR <= 1
+        m := "╔════════════════════════════════╗\n"
+        m += "║ ⚖️ تعادل — وقف الدخول ║\n"
+        m += "╚════════════════════════════════╝\n\n"
+        m += "📌 " + syminfo.ticker + "\n\n"
+        m += "⚖️ تم تحقيق هدف واحد ثم عاد السعر\n"
+        m += "🛡️ تم الخروج عند نقطة الدخول (بدون خسارة)\n"
+        m += "✅ " + str.tostring(mxTPR) + "/" + str.tostring(numTP) + " أهداف محققة\n\n"
+        m += SEP + "\n" + buildTPStatusMain() + SEP + "\n"
+    else
+        string closeType = sl == iSL ? "⚠️ الوقف الأساسي" : useTrail ? "🔒 الوقف المتتبع" : "🛡️ التأمين"
+        m := "╔════════════════════════════════╗\n"
+        m += "║ " + closeType + " ║\n"
+        m += "╚════════════════════════════════╝\n\n"
+        m += "📌 " + syminfo.ticker + "\n\n"
+        m += SEP + "\n" + buildTPStatusMain() + SEP + "\n"
+        m += "✅ " + str.tostring(mxTPR) + "/" + str.tostring(numTP) + " أهداف\n"
+        m += "💰 ربح جزئي ✅\n"
+    m += SEP + "\n📱 t.me/forexYemeni_Gold"
+    m
+
+// ─── 15d. تنبيه التأمين التلقائي ───
+buildBE() =>
+    string m = "╔════════════════════════════════╗\n"
+    m += "║ 🛡️ تأمين تلقائي ← الدخول ║\n"
+    m += "╚════════════════════════════════╝\n\n"
+    m += "📌 " + syminfo.ticker + "\n"
+    m += "🛡️ تم سحب الوقف لنقطة الدخول تلقائياً\n"
+    m += "🔵 الدخول: " + str.tostring(ep, format.mintick) + "\n"
+    m += "✅ تم تحقيق " + str.tostring(mxTPR) + " أهداف\n"
+    m += "💰 الصفقة الآن محمية بدون خسارة\n\n"
+    m += SEP + "\n" + buildTPStatusMain() + SEP + "\n"
+    m += "📱 t.me/forexYemeni_Gold"
+    m
+
+// ─── 15e. تنبيه دخول التعزيز ───
+buildPyrEnt() =>
+    float sd = math.abs(pyE - pySL)
+    float mxT = array.size(pyTP) > 0 ? array.get(pyTP, array.size(pyTP) - 1) : pyE
+    float mxR = sd > 0 ? math.abs(mxT - pyE) / sd : 0
+    float tR = bal * riskP / 100
+    string m = "╔════════════════════════════════╗\n"
+    m += "║ 🔥 تعزيز " + (isBuy ? "شراء 🚀" : "بيع 🔻") + " ║\n"
+    m += "╚════════════════════════════════╝\n\n"
+    m += "📌 " + syminfo.ticker + " | " + str.tostring(mxTPR) + " أهداف محققة\n\n"
+    m += SEP + "\n📊 التعزيز\n" + SEP + "\n"
+    m += "🔵 الدخول: " + str.tostring(pyE, format.mintick) + "\n"
+    m += "🔴 الوقف : " + str.tostring(pySL, format.mintick) + "\n"
+    m += buildRiskBlock(pyLot, tR, pnlD(pyLot, sd), sd, mxR)
+    m += "\n" + SEP + "\n🎯 أهداف التعزيز\n" + SEP + "\n"
+    if array.size(pyTP) > 0
+        for k = 0 to array.size(pyTP) - 1
+            float t = array.get(pyTP, k)
+            float rr = sd > 0 ? math.abs(t - pyE) / sd : 0
+            m += "🔥 TP" + str.tostring(k + 1) + ": " + str.tostring(t, format.mintick) + " │ R:R " + str.tostring(math.round(rr, 2), "#.##") + "\n"
+    m += SEP + "\n📱 t.me/forexYemeni_Gold"
+    m
+
+// ─── 15f. تنبيه هدف تعزيز ───
+buildPyrTPA(int n) =>
+    float hp = array.size(pyTP) > 0 ? array.get(pyTP, math.max(0, n - 1)) : pyE
+    float pp = math.abs(hp - pyE)
+    float pd = pnlD(pyLot, pp)
+    string m = "╔════════════════════════════════╗\n"
+    if n == pyrTP
+        m += "║ 🏆 تعزيز كامل بالربح! 🎊 ║\n"
+    else
+        m += "║ ✅ هدف التعزيز " + str.tostring(n) + " ║\n"
+    m += "╚════════════════════════════════╝\n\n"
+    m += "📌 " + syminfo.ticker + " | 🔥 التعزيز\n"
+    m += "🎯 " + str.tostring(hp, format.mintick) + " │ +" + str.tostring(math.round(pp, 2), "#.##") + " نقطة\n"
+    m += "💰 ربح تقريبي: +$" + str.tostring(math.round(pd, 2), "#.##") + "\n\n"
+    m += SEP + "\n" + buildTPStatusPyr() + SEP + "\n"
+    if n == pyrTP => m += "🎊 جميع أهداف التعزيز!\n"
+    m += "📱 t.me/forexYemeni_Gold"
+    m
+
+// ─── 15g. تنبيه ضرب وقف التعزيز ───
+buildPyrSLA() =>
+    float lp = math.abs(pyE - pySL)
+    float ld = pnlD(pyLot, lp)
+    string m = "╔════════════════════════════════╗\n"
+    m += "║ ❌ ضرب وقف التعزيز ║\n"
+    m += "╚════════════════════════════════╝\n\n"
+    m += "📌 " + syminfo.ticker + " | 🔥 التعزيز\n"
+    m += "❌ " + str.tostring(pySL, format.mintick) + " | -" + str.tostring(math.round(lp, 2), "#.##") + " نقطة\n"
+    m += "💰 الخسارة: -$" + str.tostring(math.round(ld, 2), "#.##") + "\n\n"
+    m += SEP + "\n" + buildTPStatusPyr() + SEP + "\n"
+    if pyrR >= 1 => m += "💰 ربح جزئي ✅\n"
+    m += "📱 t.me/forexYemeni_Gold"
+    m
+
+// ─── 15h. تنبيه دخول التعويض ───
+buildReEnt() =>
+    float sd = math.abs(reE - reSL)
+    float mxT = array.size(reTP) > 0 ? array.get(reTP, array.size(reTP) - 1) : reE
+    float mxR = sd > 0 ? math.abs(mxT - reE) / sd : 0
+    float tR = bal * riskP / 100
+    string m = "╔════════════════════════════════╗\n"
+    m += "║ ♻️ صفقة التعويض " + (isBuyRe ? "شراء 🚀" : "بيع 🔻") + " ║\n"
+    m += "╚════════════════════════════════╝\n\n"
+    m += "📌 " + syminfo.ticker + " | الاتجاه يدعم الدخول!\n\n"
+    m += SEP + "\n📊 الصفقة\n" + SEP + "\n"
+    m += "🔵 الدخول: " + str.tostring(reE, format.mintick) + "\n"
+    m += "🔴 الوقف : " + str.tostring(reSL, format.mintick) + "\n"
+    m += buildRiskBlock(reLot, tR, pnlD(reLot, sd), sd, mxR)
+    m += "\n" + SEP + "\n🎯 الأهداف\n" + SEP + "\n"
+    if array.size(reTP) > 0
+        for k = 0 to array.size(reTP) - 1
+            float t = array.get(reTP, k)
+            float rr = sd > 0 ? math.abs(t - reE) / sd : 0
+            m += "♻️ TP" + str.tostring(k + 1) + ": " + str.tostring(t, format.mintick) + " │ R:R " + str.tostring(math.round(rr, 2), "#.##") + "\n"
+    m += SEP + "\n📱 t.me/forexYemeni_Gold"
+    m
+
+// ─── 15i. تنبيه هدف تعويض ───
+buildReTPA(int n) =>
+    float hp = array.size(reTP) > 0 ? array.get(reTP, math.max(0, n - 1)) : reE
+    float pp = math.abs(hp - reE)
+    float pd = pnlD(reLot, pp)
+    string m = "╔════════════════════════════════╗\n"
+    if n == reTPn
+        m += "║ 🏆 تعويض كامل بالربح! 🎊 ║\n"
+    else
+        m += "║ ✅ هدف التعويض " + str.tostring(n) + " ║\n"
+    m += "╚════════════════════════════════╝\n\n"
+    m += "📌 " + syminfo.ticker + " | ♻️ التعويض\n"
+    m += "🎯 " + str.tostring(hp, format.mintick) + " │ +" + str.tostring(math.round(pp, 2), "#.##") + " نقطة\n"
+    m += "💰 ربح تقريبي: +$" + str.tostring(math.round(pd, 2), "#.##") + "\n\n"
+    m += SEP + "\n" + buildTPStatusRe() + SEP + "\n"
+    if n == reTPn => m += "🎊 جميع أهداف التعويض!\n"
+    m += "📱 t.me/forexYemeni_Gold"
+    m
+
+// ─── 15j. تنبيه ضرب وقف التعويض ───
+buildReSLA() =>
+    float lp = math.abs(reE - reSL)
+    float ld = pnlD(reLot, lp)
+    string m = "╔════════════════════════════════╗\n"
+    m += "║ ❌ ضرب وقف التعويض ║\n"
+    m += "╚════════════════════════════════╝\n\n"
+    m += "📌 " + syminfo.ticker + " | ♻️ التعويض\n"
+    m += "❌ " + str.tostring(reSL, format.mintick) + " | -" + str.tostring(math.round(lp, 2), "#.##") + " نقطة\n"
+    m += "💰 الخسارة: -$" + str.tostring(math.round(ld, 2), "#.##") + "\n\n"
+    m += SEP + "\n" + buildTPStatusRe() + SEP + "\n"
+    if reR >= 1 => m += "💰 ربح جزئي ✅\n"
+    m += "📱 t.me/forexYemeni_Gold"
+    m
+
+//═══════════════════════════════════════════════
+//  16. دوال الألوان للإحصائيات
+//═══════════════════════════════════════════════
+wrC(float pct) => pct >= 60 ? cG : pct >= 40 ? cAu : cR
+
+//═══════════════════════════════════════════════
+//  17. مراقبة الصفقة الرئيسية
+//═══════════════════════════════════════════════
+if inT
+    if array.size(tpP) > 0
+        for i = 0 to numTP - 1
+            if not array.get(tpS, i)
+                float t = array.get(tpP, i)
+                if (isBuy and high >= t) or (not isBuy and low <= t)
+                    array.set(tpS, i, true)
+                    mxTPR := math.max(mxTPR, i + 1)
+                    label.set_text(array.get(tpLb, i), "✅TP" + str.tostring(i + 1))
+                    // تأمين تلقائي على TP1
+                    if i == 0 and inT and not beSent
+                        float bv = beBufPx()
+                        float nBE = isBuy ? ep + bv : ep - bv
+                        if (isBuy and sl < nBE) or (not isBuy and sl > nBE)
+                            sl := nBE
+                            beSent := true
+                            line.set_y1(slL, sl), line.set_y2(slL, sl)
+                            label.set_y(slLb, sl), label.set_text(slLb, "🛡️" + str.tostring(sl, format.mintick)), label.set_color(slLb, cGr), line.set_color(slL, cGr)
+                            alert(buildBE(), alert.freq_all)
+                    // تنبيه TP
+                    if mxTPR > laTP2
+                        bool j = (mxTPR - laTP2) > 1
+                        alert(buildTPA(mxTPR, j), alert.freq_all)
+                        if mxTPR == numTP
+                            if not tradeCnt
+                                winT += 1, totT += 1, tradeCnt := true
+                                array.push(tCTime, entryTime), array.push(tCWin, 1)
+                            inT := false, lastSig := 0, inPy := false, pyrSent := false, beSent := false
+                            clrAll(), lastExit := bar_index
+                        laTP2 := mxTPR
+                    // وقف تتبعي
+                    if useTrail and mxTPR > 1 and inT and array.size(tpP) > 0
+                        float nSL = array.get(tpP, mxTPR - 2)
+                        if (isBuy and nSL > sl) or (not isBuy and nSL < sl)
+                            sl := nSL
+                            line.set_y1(slL, sl), line.set_y2(slL, sl)
+                            label.set_y(slLb, sl), label.set_text(slLb, "🔄" + str.tostring(sl, format.mintick)), label.set_color(slLb, cGr), line.set_color(slL, cGr)
+                else
+                    break
+
+    bool slH = (isBuy and low <= sl) or (not isBuy and high >= sl)
+    if slH and not slSent and inT
+        alert(buildSLA(), alert.freq_all)
+        slSent := true
+        if not tradeCnt
+            if mxTPR >= 1 => winT += 1
+            else => lossT += 1
+            totT += 1, tradeCnt := true
+            array.push(tCTime, entryTime), array.push(tCWin, mxTPR >= 1 ? 1 : 0)
+        if useReentry and mxTPR == 0
+            bool ok = (isBuy and htfTr == 1 and smcT == 1) or (not isBuy and htfTr == -1 and smcT == -1)
+            if ok => pendRe := true, isBuyRe := isBuy
+        inT := false, lastSig := 0, inPy := false, pyrSent := false, beSent := false
+        clrAll(), lastExit := bar_index
+
+//═══════════════════════════════════════════════
+//  18. مراقبة التعزيز (Pyramid)
+//═══════════════════════════════════════════════
+// ─── 18a. فتح صفقة التعزيز ───
+if inT and not inPy and not inRe and usePyr and mxTPR >= pyrTP and not pyrSent
+    pyrSent := true, pyrR := 0, pyrLA := 0, inPy := true, pyrSLAS := false
+    pyE := close, pyA := tATR
+    float pSD = math.max(math.abs(pyE - sl), syminfo.mintick)
+    // حساب وقف التعزيز
+    if pyrSLM == "آخر محقق"
+        float lastT = array.size(tpP) > mxTPR - 1 ? array.get(tpP, mxTPR - 1) : ep
+        pySL := isBuy ? math.min(lastT, pyE - pSD * 0.5) : math.max(lastT, pyE + pSD * 0.5)
+    else if pyrSLM == "ATR"
+        pySL := isBuy ? pyE - pyA : pyE + pyA
+    else
+        pySL := isBuy ? math.min(ep, pyE - pyA) : math.max(ep, pyE + pyA)
+    // حماية: وقف لا يكون فوق/تحت الدخول
+    if isBuy and pySL >= pyE => pySL := pyE - pyA
+    if not isBuy and pySL <= pyE => pySL := pyE + pyA
+    // حساب اللوت
+    float pRisk = bal * riskP / 100
+    pyLot := calcLot(pRisk, math.abs(pyE - pySL))
+    // إنشاء خطوط التعزيز
+    pyEL := line.new(bar_index, pyE, bar_index + 1, pyE, extend=extend.right, color=cP, width=2)
+    pyELb := label.new(bar_index, pyE, "🔥" + str.tostring(pyE, format.mintick), style=label.style_label_left, color=cP, textcolor=color.white, size=size.small)
+    pySLL := line.new(bar_index, pySL, bar_index + 1, pySL, extend=extend.right, color=cR, width=2, style=line.style_dashed)
+    pySLb := label.new(bar_index, pySL, "🛑" + str.tostring(pySL, format.mintick), style=label.style_label_left, color=cR, textcolor=color.white, size=size.small)
+    array.clear(pyTP), array.clear(pyTL), array.clear(pyTLb), array.clear(pyTS)
+    float pySD = math.abs(pyE - pySL)
+    for j = 0 to pyrTP - 1
+        float pt = isBuy ? pyE + pySD * pyrRR * (j + 1) : pyE - pySD * pyrRR * (j + 1)
+        color tc = array.get(tpC, math.min(j, 9))
+        line tl = line.new(bar_index, pt, bar_index + 1, pt, extend=extend.right, color=tc, width=1)
+        label tlb = label.new(bar_index, pt, "🔥TP" + str.tostring(j + 1) + ":" + str.tostring(pt, format.mintick), style=label.style_label_left, color=tc, textcolor=color.white, size=size.small)
+        array.push(pyTL, tl), array.push(pyTLb, tlb), array.push(pyTP, pt), array.push(pyTS, false)
+    alert(buildPyrEnt(), alert.freq_all)
+
+// ─── 18b. مراقبة أهداف التعزيز ───
+if inPy
+    if array.size(pyTP) > 0
+        for i = 0 to pyrTP - 1
+            if not array.get(pyTS, i)
+                float t = array.get(pyTP, i)
+                if (isBuy and high >= t) or (not isBuy and low <= t)
+                    array.set(pyTS, i, true)
+                    pyrR := math.max(pyrR, i + 1)
+                    label.set_text(array.get(pyTLb, i), "✅🔥TP" + str.tostring(i + 1))
+                    if pyrR > pyrLA
+                        alert(buildPyrTPA(pyrR), alert.freq_all)
+                        if pyrR == pyrTP
+                            inPy := false
+                            clrP()
+                        pyrLA := pyrR
+                else
+                    break
+
+    bool pySLH = (isBuy and low <= pySL) or (not isBuy and high >= pySL)
+    if pySLH and not pyrSLAS and inPy
+        alert(buildPyrSLA(), alert.freq_all)
+        pyrSLAS := true
+        inPy := false, clrP()
+
+//═══════════════════════════════════════════════
+//  19. مراقبة التعويض (Reentry)
+//═══════════════════════════════════════════════
+// ─── 19a. فتح صفقة التعويض ───
+if pendRe and not inT and not inRe and not inPy and barstate.isconfirmed
+    bool canRe = isBuyRe ? (anyB and passBuy()) : (anyS and passSell())
+    if canRe
+        pendRe := false, reCnt := false, reR := 0, reLA := 0, reSLS := false, inRe := true
+        reE := close
+        reA := tATR
+        // وقف أوسع للتعويض
+        reSL := isBuyRe ? reE - (reA * reMult) : reE + (reA * reMult)
+        // حماية المسافة
+        float minSD = tATR * 0.5
+        if math.abs(reE - reSL) < minSD
+            reSL := isBuyRe ? reE - minSD : reE + minSD
+        // حساب اللوت
+        float reRisk = bal * riskP / 100
+        reLot := calcLot(reRisk, math.abs(reE - reSL))
+        // إنشاء خطوط التعويض
+        reEL := line.new(bar_index, reE, bar_index + 1, reE, extend=extend.right, color=cCy, width=2)
+        reELb := label.new(bar_index, reE, "♻️" + str.tostring(reE, format.mintick), style=label.style_label_left, color=cCy, textcolor=color.white, size=size.small)
+        reSLL := line.new(bar_index, reSL, bar_index + 1, reSL, extend=extend.right, color=cR, width=2, style=line.style_dashed)
+        reSLb := label.new(bar_index, reSL, "🛑" + str.tostring(reSL, format.mintick), style=label.style_label_left, color=cR, textcolor=color.white, size=size.small)
+        array.clear(reTP), array.clear(reTL), array.clear(reTLb), array.clear(reTS)
+        float reSD = math.abs(reE - reSL)
+        for j = 0 to reTPn - 1
+            float rt = isBuyRe ? reE + reSD * reRR * (j + 1) : reE - reSD * reRR * (j + 1)
+            color tc = array.get(tpC, math.min(j, 9))
+            line tl = line.new(bar_index, rt, bar_index + 1, rt, extend=extend.right, color=tc, width=1)
+            label tlb = label.new(bar_index, rt, "♻️TP" + str.tostring(j + 1) + ":" + str.tostring(rt, format.mintick), style=label.style_label_left, color=tc, textcolor=color.white, size=size.small)
+            array.push(reTL, tl), array.push(reTLb, tlb), array.push(reTP, rt), array.push(reTS, false)
+        alert(buildReEnt(), alert.freq_all)
+
+// ─── 19b. مراقبة أهداف التعويض ───
+if inRe
+    if array.size(reTP) > 0
+        for i = 0 to reTPn - 1
+            if not array.get(reTS, i)
+                float t = array.get(reTP, i)
+                if (isBuyRe and high >= t) or (not isBuyRe and low <= t)
+                    array.set(reTS, i, true)
+                    reR := math.max(reR, i + 1)
+                    label.set_text(array.get(reTLb, i), "✅♻️TP" + str.tostring(i + 1))
+                    if reR > reLA
+                        alert(buildReTPA(reR), alert.freq_all)
+                        if reR == reTPn
+                            if not reCnt
+                                reWin += 1, reCnt := true
+                            inRe := false, clrR()
+                        reLA := reR
+                else
+                    break
+
+    bool reSLH = (isBuyRe and low <= reSL) or (not isBuyRe and high >= reSL)
+    if reSLH and not reSLS and inRe
+        alert(buildReSLA(), alert.freq_all)
+        reSLS := true
+        if not reCnt => reLoss += 1
+        inRe := false, clrR()
+
+//═══════════════════════════════════════════════
+//  20. فتح الصفقة الجديدة (إشارات الشارت)
+//═══════════════════════════════════════════════
+int cooldownBars = useCooldown ? 3 : 1
+bool isCooldownOK = bar_index > lastExit + cooldownBars
+
+bool newB = anyB and cStars >= minStars and passBuy() and lastSig != 1 and not inT and not inRe and not pendRe and barstate.isconfirmed and isCooldownOK and not na(atr)
+bool newS = anyS and cStars >= minStars and passSell() and lastSig != -1 and not inT and not inRe and not pendRe and barstate.isconfirmed and isCooldownOK and not na(atr)
+
+plotshape(showEntryMark and newB, title="شراء", text="BUY", style=shape.labelup, location=location.belowbar, color=color.new(#00E676, 20), textcolor=color.white, size=size.small)
+plotshape(showEntryMark and newS, title="بيع", text="SELL", style=shape.labeldown, location=location.abovebar, color=color.new(#FF5252, 20), textcolor=color.white, size=size.small)
+
+if newB or newS
+    tradeCnt := false, mxTPR := 0, laTP2 := 0, slSent := false, beSent := false, inPy := false, pyrSent := false, pyrR := 0, pyrLA := 0, pendRe := false, reCnt := false
+    clrM(), clrP(), clrR()
+    array.clear(tpP), array.clear(tpL), array.clear(tpLb), array.clear(tpS)
+    array.clear(pyTP), array.clear(pyTL), array.clear(pyTLb), array.clear(pyTS)
+    array.clear(reTP), array.clear(reTL), array.clear(reTLb), array.clear(reTS)
+    ep := close, tATR := atr, isBuy := newB, inT := true, stars := cStars, sigType := cSigType
+    lastSig := newB ? 1 : -1
+    entryTime := time
+
+    float cSL = float(na)
+    float minSlDist = tATR * 0.5
+    if slMode == "ATR"
+        cSL := isBuy ? ep - (tATR * slMult) : ep + (tATR * slMult)
+    else if slMode == "Swing"
+        cSL := isBuy ? (na(lpl) ? ep - tATR : math.min(ep - minSlDist, lpl - tATR * 0.2)) : (na(lph) ? ep + tATR : math.max(ep + minSlDist, lph + tATR * 0.2))
+    else
+        cSL := isBuy ? (na(bfb) ? ep - tATR : math.min(ep - minSlDist, bfb - tATR * 0.2)) : (na(brt) ? ep + tATR : math.max(ep + minSlDist, brt + tATR * 0.2))
+
+    sl := cSL, iSL := sl
+    float sD = math.max(math.abs(ep - iSL), syminfo.mintick)
+    float tR = bal * riskP / 100
+    sLot := calcLot(tR, sD), sRisk := pnlD(sLot, sD), sIsBuy := isBuy
+    eL := line.new(bar_index, ep, bar_index + 1, ep, extend=extend.right, color=cO, width=3)
+    eLb := label.new(bar_index, ep, (isBuy ? "🚀" : "🔻") + str.tostring(ep, format.mintick), style=label.style_label_left, color=cO, textcolor=color.white)
+    slL := line.new(bar_index, sl, bar_index + 1, sl, extend=extend.right, color=cR, width=2, style=line.style_dashed)
+    slLb := label.new(bar_index, sl, "🛑" + str.tostring(sl, format.mintick), style=label.style_label_left, color=cR, textcolor=color.white, size=size.small)
+    float[] fibs = array.from(0.382, 0.618, 0.786, 1.0, 1.272, 1.618, 2.0, 2.618, 3.618, 4.236)
+    float[] vSw = array.new_float()
+    if tpMode == "Swings"
+        if isBuy
+            for p in rPH
+                if p > ep
+                    bool dup = false
+                    for v in vSw
+                        if v == p => dup := true, break
+                    if not dup => array.push(vSw, p)
+            array.sort(vSw)
+        else
+            for p in rPL
+                if p < ep
+                    bool dup = false
+                    for v in vSw
+                        if v == p => dup := true, break
+                    if not dup => array.push(vSw, p)
+            array.sort(vSw, order.descending)
+    for i = 0 to numTP - 1
+        float t = float(na)
+        if tpMode == "RR" => t := isBuy ? ep + sD * (i + 1) : ep - sD * (i + 1)
+        else if tpMode == "Fib" => t := isBuy ? ep + sD * array.get(fibs, math.min(i, 9)) : ep - sD * array.get(fibs, math.min(i, 9))
+        else if tpMode == "Swings" => t := array.size(vSw) > i ? array.get(vSw, i) : (isBuy ? ep + sD * (i + 1) : ep - sD * (i + 1))
+        else => t := isBuy ? ep + tATR * (1 + i * 0.5) : ep - tATR * (1 + i * 0.5)
+        color tc = array.get(tpC, math.min(i, 9))
+        line tl = line.new(bar_index, t, bar_index + 1, t, extend=extend.right, color=tc, width=1)
+        label tlb = label.new(bar_index, t, "TP" + str.tostring(i + 1) + ":" + str.tostring(t, format.mintick), style=label.style_label_left, color=tc, textcolor=color.white, size=size.small)
+        array.push(tpL, tl), array.push(tpLb, tlb), array.push(tpP, t), array.push(tpS, false)
+        if i == numTP - 1 => mxTP := t
+    alert(buildEnt(), alert.freq_all)
+
+//═══════════════════════════════════════════════
+//  21. رسم السوبرترند والخلفية
+//═══════════════════════════════════════════════
+float sTLine = dir == 1 ? sS : lS
+color sTColor = dir == 1 ? color.new(#00E676, 20) : color.new(#FF5252, 20)
+plot(showSTLine ? sTLine : na, "SuperTrend", color=sTColor, linewidth=2, style=plot.style_linebr)
+bgcolor(showTradeBG and inT ? (isBuy ? color.new(#00E676, 93) : color.new(#FF5252, 93)) : na, title="Trade Background")
+
+//═══════════════════════════════════════════════
+//  22. لوحة الإحصائيات
+//═══════════════════════════════════════════════
+var table d = table.new(position.top_right, 2, 16, border_width=1, border_color=color.new(color.gray, 80), frame_color=color.new(#333333, 0), frame_width=2)
+
+if barstate.islast
+    int pTrades = 0
+    int pWins = 0
+    int nowT = time
+    int currentY = year(nowT, "Asia/Riyadh")
+    int currentM = month(nowT, "Asia/Riyadh")
+    int currentD = dayofmonth(nowT, "Asia/Riyadh")
+
+    if array.size(tCTime) > 0
+        for i = 0 to array.size(tCTime) - 1
+            int ft = array.get(tCTime, i)
+            int fw = array.get(tCWin, i)
+            bool isMatch = false
+
+            if statPeriod == "اليوم الحالي (مكة)"
+                if year(ft, "Asia/Riyadh") == currentY and month(ft, "Asia/Riyadh") == currentM and dayofmonth(ft, "Asia/Riyadh") == currentD
+                    isMatch := true
+            else if statPeriod == "آخر 7 أيام"
+                if nowT - ft <= 604800000 => isMatch := true
+            else if statPeriod == "آخر 30 يوم"
+                if nowT - ft <= 2592000000 => isMatch := true
+            else
+                isMatch := true
+
+            if isMatch
+                pTrades += 1
+                pWins += fw
+
+    if array.size(tCTime) > 500
+        array.shift(tCTime)
+        array.shift(tCWin)
+
+    color hc = htfTr == 1 ? cG : cR
+    color sc = smcT == 1 ? cG : cR
+    float pWR = pTrades > 0 ? pWins * 100.0 / pTrades : 0.0
+
+    table.cell(d, 0, 0, "🔥 FYP-PRO v3.7 🔥", text_color=cAu, text_size=size.normal, bgcolor=color.new(#222222, 0), text_halign=text.align_center)
+    table.cell(d, 1, 0, "💎 DAY TRADER", text_color=cGr, text_size=size.small, bgcolor=color.new(#222222, 0))
+
+    table.cell(d, 0, 1, "🏦 الأداة", text_color=cGr, text_size=size.small, bgcolor=cBG)
+    table.cell(d, 1, 1, instShort, text_color=cCy, text_size=size.tiny, bgcolor=cBG)
+    table.cell(d, 0, 2, "💰 الرصيد", text_color=cGr, text_size=size.small, bgcolor=cBG)
+    table.cell(d, 1, 2, "$" + str.tostring(bal, "#.##"), text_color=color.white, text_size=size.small, bgcolor=cBG)
+    table.cell(d, 0, 3, "📦 اللوت", text_color=cGr, text_size=size.small, bgcolor=cBG)
+    table.cell(d, 1, 3, sLot >= 0.01 ? lotStr(sLot) : "---", text_color=inT ? (sIsBuy ? cG : cR) : cGr, text_size=size.small, bgcolor=cBG)
+
+    string fs = isChop ? "⚠️تذبذب" : not hasMom ? "⚠️زخم ضعيف" : not inSess ? "⏸️خارج جلسة" : "✅نشط"
+    color fc = isChop ? cR : not hasMom ? cAu : cG
+    table.cell(d, 0, 4, "🔍 الفلاتر", text_color=cGr, text_size=size.small, bgcolor=cBG)
+    table.cell(d, 1, 4, fs, text_color=fc, text_size=size.small, bgcolor=cBG)
+
+    table.cell(d, 0, 5, "📈 MTF", text_color=cGr, text_size=size.small, bgcolor=cBG)
+    table.cell(d, 1, 5, htfD + (htfTr == 1 ? "🐂" : "🐻"), text_color=hc, text_size=size.small, bgcolor=cBG)
+    table.cell(d, 0, 6, "🏗️ SMC", text_color=cGr, text_size=size.small, bgcolor=cBG)
+    table.cell(d, 1, 6, smcT == 1 ? "صاعد" : smcT == -1 ? "هابط" : "محايد", text_color=sc, text_size=size.small, bgcolor=cBG)
+
+    string ts = not inT and not inRe ? "لا توجد" : inT and inPy ? "رئيسية+تعزيز🔥" : inT ? "نشطة⏳" : inRe ? "تعويض♻️" : pendRe ? "انتظار♻️" : "---"
+    color tsc = not inT and not inRe ? cGr : inT and inPy ? cP : inT ? cAu : inRe ? cCy : cGr
+    table.cell(d, 0, 7, "⏳ الحالة", text_color=cGr, text_size=size.small, bgcolor=cBG)
+    table.cell(d, 1, 7, ts, text_color=tsc, text_size=size.small, bgcolor=cBG)
+
+    string td = inT ? str.tostring(mxTPR) + "/" + str.tostring(numTP) : inRe ? "♻️" + str.tostring(reR) + "/" + str.tostring(reTPn) : inPy ? "🔥" + str.tostring(pyrR) + "/" + str.tostring(pyrTP) : "---"
+    table.cell(d, 0, 8, "🎯 الأهداف", text_color=cGr, text_size=size.small, bgcolor=cBG)
+    table.cell(d, 1, 8, td, text_color=cCy, text_size=size.small, bgcolor=cBG)
+
+    table.cell(d, 0, 9, "📊══════════════", text_color=cAu, text_size=size.tiny, bgcolor=color.new(#444444, 0), text_halign=text.align_center)
+    table.cell(d, 1, 9, "════════════📊", text_color=cAu, text_size=size.tiny, bgcolor=color.new(#444444, 0), text_halign=text.align_center)
+
+    table.cell(d, 0, 10, "📅 الفترة", text_color=cGr, text_size=size.small, bgcolor=cBG)
+    table.cell(d, 1, 10, statPeriod, text_color=cCy, text_size=size.small, bgcolor=cBG)
+
+    table.cell(d, 0, 11, "📊 الصفقات", text_color=cGr, text_size=size.small, bgcolor=cBG)
+    table.cell(d, 1, 11, str.tostring(pTrades) + " صفقة | " + str.tostring(pWins) + "✅", text_color=color.white, text_size=size.small, bgcolor=cBG)
+
+    table.cell(d, 0, 12, "🎯 نسبة النجاح", text_color=cGr, text_size=size.small, bgcolor=cBG)
+    table.cell(d, 1, 12, str.tostring(math.round(pWR, 1), "#.#") + "%", text_color=wrC(pWR), text_size=size.large, bgcolor=cBG)
+
+    table.cell(d, 0, 13, "♻️ التعويض", text_color=cGr, text_size=size.small, bgcolor=cBG)
+    table.cell(d, 1, 13, str.tostring(reWin) + "✅ " + str.tostring(reLoss) + "❌", text_color=cCy, text_size=size.small, bgcolor=cBG)
+
+    table.cell(d, 0, 14, "⏰ الجلسة", text_color=cGr, text_size=size.small, bgcolor=cBG)
+    table.cell(d, 1, 14, inSess ? "✅ نشطة" : "⏸️ خارج", text_color=inSess ? cG : cR, text_size=size.small, bgcolor=cBG)
+
+    table.cell(d, 0, 15, "🔀 سوبرترند", text_color=cGr, text_size=size.small, bgcolor=cBG)
+    table.cell(d, 1, 15, dir == 1 ? "🟢 صاعد" : "🔴 هابط", text_color=dir == 1 ? cG : cR, text_size=size.small, bgcolor=cBG)
