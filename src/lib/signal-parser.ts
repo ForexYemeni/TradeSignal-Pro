@@ -654,16 +654,18 @@ function extractPnLPoints(text: string): number | null {
 }
 
 function extractPnLDollar(text: string): number | null {
-  // Try matching specific patterns first for accuracy
+  // Try matching specific patterns - require $ sign to avoid matching prices
   const patterns = [
-    /(?:ربح تقريبي|ربح)[:\s-–]*[+-]?\$?([\d,.]+)/,
-    /(?:الخسارة|خسارة)[:\s-–]*[+-]?\$?([\d,.]+)/,
-    /[+-]?\$([\d,.]+)\s*(?:ربح|خسارة|نقطة)/,
+    /(?:ربح تقريبي|ربح)\s*[:\s\-–]*\$\s*([+-]?[\d,.]+)/,
+    /(?:الخسارة|خسارة)\s*[:\s\-–]*\$\s*([+-]?[\d,.]+)/,
+    /\$\s*([+-]?[\d,.]+)\s*(?:ربح|خسارة|نقطة)/,
   ];
   for (const p of patterns) {
     const match = text.match(p);
     if (match) {
       const val = parseFloat(match[1].replace(/,/g, ""));
+      if (!isFinite(val) || val === 0) continue;
+      if (Math.abs(val) > 50000) continue;
       return /الخسارة|خسارة/.test(match[0]) && !/\+/.test(match[0]) ? -val : val;
     }
   }

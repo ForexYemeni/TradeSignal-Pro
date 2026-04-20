@@ -1166,7 +1166,7 @@ export default function HomePage() {
           });
           const todayWins = todaySignals.filter(s => s.status === "HIT_TP").length;
           const todayLosses = todaySignals.filter(s => s.status === "HIT_SL").length;
-          const todayPnl = todaySignals.reduce((acc, s) => acc + (s.pnlDollars ?? 0), 0);
+          const todayPnl = todaySignals.filter(s => s.status !== "ACTIVE").reduce((acc, s) => acc + (s.pnlDollars ?? 0), 0);
           const subDaysLeft = session?.subscriptionExpiry ? Math.max(0, Math.ceil((new Date(session.subscriptionExpiry).getTime() - Date.now()) / 86400000)) : null;
           const totalActiveUsers = users.filter(u => u.status === "active" && u.role === "user").length;
           const totalSubscribers = users.filter(u => u.subscriptionType === "subscriber").length;
