@@ -77,6 +77,8 @@ export function parseTradingViewSignal(rawText: string): ParseResult {
       return parseTPHitAlert(text);
     case "SL_HIT":
       return parseSLHitAlert(text);
+    case "BREAKEVEN":
+      return parseBreakevenAlert(text);
     case "REENTRY":
       return parseReentrySignal(text);
     case "REENTRY_TP":
@@ -99,6 +101,9 @@ export function parseTradingViewSignal(rawText: string): ParseResult {
 //  Signal Category Detection
 // ═══════════════════════════════════════════════════════════════
 function detectSignalCategory(text: string): string {
+  // BREAKEVEN: تأمين تلقائي عند الدخول (قبل التحقق من التأمين كـ SL)
+  if (/تأمين تلقائي/.test(text) && /الدخول/.test(text)) return "BREAKEVEN";
+
   if (/إغلاق كامل بالربح/.test(text) && /♻️/.test(text)) return "REENTRY_TP";
   if (/هدف التعويض/.test(text)) return "REENTRY_TP";
   if (/ضرب وقف التعويض/.test(text)) return "REENTRY_SL";
@@ -111,7 +116,7 @@ function detectSignalCategory(text: string): string {
   if (/قفزة سعرية/.test(text)) return "TP_HIT";
   if (/تحقق الهدف/.test(text)) return "TP_HIT";
   if (/ضرب الوقف/.test(text) && !/تعويض/.test(text) && !/تعزيز/.test(text)) return "SL_HIT";
-  if (/الوقف الأساسي/.test(text) || /الوقف المتتبع/.test(text) || /التأمين/.test(text)) return "SL_HIT";
+  if (/الوقف الأساسي/.test(text) || /الوقف المتتبع/.test(text) || (/التأمين/.test(text) && !/تأمين تلقائي/.test(text))) return "SL_HIT";
   if (/إشارة شراء/.test(text) || /إشارة بيع/.test(text)) return "ENTRY";
   if (/🟢/.test(text) || /🔴/.test(text)) return "ENTRY";
 
@@ -253,6 +258,32 @@ function parseSLHitAlert(text: string): ParseResult {
       htfTimeframe: "",
       htfTrend: "",
       smcTrend: "",
+      riskData: emptyRiskData(),
+    },
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Parse Breakeven Alert
+// ═══════════════════════════════════════════════════════════════
+function parseBreakevenAlert(text: string): ParseResult {
+  const pair = extractPair(text) || "";
+  const entry = extractEntry(text) || 0;
+  const tpsHit = text.match(/تم تحقيق\s+(\d+)/)?.[1] || "0";
+
+  return {
+    success: true,
+    signal: {
+      pair, type: "BUY", entry, stopLoss: entry,
+      takeProfits: [], confidence: 0,
+      signalCategory: "BREAKEVEN", rawText: text,
+      hitTpIndex: parseInt(tpsHit) || 0,
+      hitPrice: entry,
+      pnlPoints: 0,
+      pnlDollar: 0,
+      tpStatusList: extractTPStatusList(text),
+      totalTPs: extractTotalTPCount(text),
+      timeframe: "", htfTimeframe: "", htfTrend: "", smcTrend: "",
       riskData: emptyRiskData(),
     },
   };
@@ -487,10 +518,17 @@ function extractTimeframes(text: string): { timeframe: string; htfTimeframe: str
     htfTimeframe = tfMatch[2].trim();
   }
 
-  // Fallback HTF from trend line
+  // Fallback HTF from trend line (supports Arabic names: يومي, أسبوعي, شهري)
   if (!htfTimeframe) {
-    const htfMatch = text.match(/📈\s*(\d+\s*[سدشم]?|[a-zA-Z]+)\s*:/);
+    const htfMatch = text.match(/📈\s*(\d+\s*[سدشم]?|[a-zA-Z]+|يومي|أسبوعي|شهري|شهري)\s*:/);
     if (htfMatch) htfTimeframe = htfMatch[1].trim();
+  }
+
+  // Fallback: extract HTF from text containing Arabic timeframe names
+  if (!htfTimeframe) {
+    if (/يومي/.test(text)) htfTimeframe = "يومي";
+    else if (/أسبوعي/.test(text)) htfTimeframe = "أسبوعي";
+    else if (/شهري/.test(text)) htfTimeframe = "شهري";
   }
 
   return { timeframe, htfTimeframe };
@@ -515,7 +553,12 @@ function extractEntry(text: string): number | null {
 
 function extractStopLoss(text: string): number | null {
   const patterns = [
+    // Primary: "الوقف : <price>" or "الوقف: <price>"
     /(?:الوقف|وقف الخسارة|Stop\s*Loss|SL)\s*[:\-–]?\s*([\d,]+\.?\d*)/i,
+    // Fallback: "الوقف: <price>" with space before colon (Pine Script format)
+    /الوقف\s*:\s*([\d,]+\.?\d*)/i,
+    // Fallback: "❌ <price> │" pattern from SL hit alerts
+    /❌\s*([\d,]+\.?\d*)\s*[│|]/,
   ];
   for (const p of patterns) {
     const m = text.match(p);
