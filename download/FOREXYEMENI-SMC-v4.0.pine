@@ -1,0 +1,1207 @@
+//@version=5
+indicator("FOREXYEMENI-SMC-v4.0", shorttitle="FYP-SMC", overlay=true, max_lines_count=500, max_labels_count=500, max_boxes_count=500)
+
+//═══════════════════════════════════════════════
+//  1. الإعدادات
+//═══════════════════════════════════════════════
+grp1 = "1 SMC / ICT"
+swingLen     = input.int(5,      "Candle sensitivity (swing)", minval=2, maxval=20, group=grp1)
+dispMult     = input.float(1.5,  "Displacement factor", step=0.1, group=grp1)
+bodyAvgLen   = input.int(20,     "Average candle body period", group=grp1)
+useOBEntry   = input.bool(true,  "Entry from Order Block", group=grp1)
+useFVGEntry  = input.bool(true,  "Entry from FVG", group=grp1)
+useSweep     = input.bool(true,  "Entry from Liquidity Sweep", group=grp1)
+useCHoCH     = input.bool(true,  "Entry from CHoCH", group=grp1)
+candleConf   = input.bool(true,  "Require candle confirmation", group=grp1)
+zoneExpiry   = input.int(50,     "Zone expiry (bars)", minval=10, maxval=200, group=grp1)
+
+grp2 = "2 HTF"
+useAutoHTF = input.bool(true,  "Auto HTF", group=grp2)
+manualHTF  = input.timeframe("60", "Manual HTF", group=grp2)
+
+grp3 = "3 TP / SL"
+numTP    = input.int(5,    "Number of TPs", minval=1, maxval=10, group=grp3)
+slBuffer = input.float(1.0,"SL buffer (points)", step=0.1, group=grp3)
+useTrail = input.bool(false, "Trailing stop", group=grp3)
+
+grp4 = "4 Risk"
+bal   = input.float(1000.0, "Balance ($)", step=100, minval=1, group=grp4)
+riskP = input.float(1.0,    "Risk %", step=0.1, minval=0.1, maxval=100, group=grp4)
+
+grp5 = "5 Pyramid / Reentry"
+usePyr = input.bool(true,  "Pyramid", group=grp5)
+pyrTP  = input.int(3,      "Pyramid TPs", minval=1, maxval=5, group=grp5)
+pyrRR  = input.float(1.5,  "Pyramid RR", group=grp5)
+useReentry = input.bool(false, "Reentry", group=grp5)
+
+grp6 = "6 Display"
+showOB      = input.bool(true,  "Show Order Blocks", group=grp6)
+showFVG     = input.bool(true,  "Show FVG", group=grp6)
+showSwing   = input.bool(true,  "Show Swing Points", group=grp6)
+showBOS     = input.bool(true,  "Show BOS / CHoCH", group=grp6)
+showTradeBG = input.bool(true,  "Trade background",  group=grp6)
+showEntryMark = input.bool(true, "Entry marks",  group=grp6)
+statPeriod  = input.string("Today (Makkah)", "Stats period",
+     options=["Today (Makkah)","Last 7 days","Last 30 days","All data"], group=grp6)
+
+//═══════════════════════════════════════════════
+//  2. HTF
+//═══════════════════════════════════════════════
+getHTF() =>
+    string r = ""
+    if timeframe.isseconds
+        r := "5"
+    else if timeframe.isminutes
+        r := timeframe.multiplier <= 1 ? "15" : timeframe.multiplier <= 5 ? "60" : timeframe.multiplier <= 15 ? "240" : timeframe.multiplier <= 60 ? "D" : "W"
+    else if timeframe.isdaily
+        r := "W"
+    else if timeframe.isweekly
+        r := "M"
+    else
+        r := "D"
+    r
+
+htfName(string tf) =>
+    tf == "60" ? "1H" : tf == "240" ? "4H" : tf == "D" ? "Daily" : tf == "W" ? "Weekly" : tf
+
+string autoHTF = getHTF()
+string htf  = useAutoHTF ? autoHTF : manualHTF
+string htfD = useAutoHTF ? htfName(autoHTF) : htfName(manualHTF)
+
+//═══════════════════════════════════════════════
+//  3. Instrument
+//═══════════════════════════════════════════════
+getInst() =>
+    string t = syminfo.ticker
+    if str.contains(t,"XAU") or str.contains(t,"GOLD")
+        "Gold (XAUUSD)"
+    else if str.contains(t,"XAG") or str.contains(t,"SILVER")
+        "Silver (XAGUSD)"
+    else if str.contains(t,"BTC") or str.contains(t,"ETH") or str.contains(t,"SOL")
+        "Crypto"
+    else if str.contains(t,"NAS") or str.contains(t,"US30") or str.contains(t,"DAX")
+        "Indices"
+    else if str.contains(t,"JPY")
+        "Forex (6 digits)"
+    else
+        "Forex"
+
+string inst = getInst()
+
+getInstShort() =>
+    string t = syminfo.ticker
+    if str.contains(t,"XAU") or str.contains(t,"GOLD")
+        "Gold"
+    else if str.contains(t,"XAG") or str.contains(t,"SILVER")
+        "Silver"
+    else if str.contains(t,"BTC") or str.contains(t,"ETH") or str.contains(t,"SOL")
+        "Crypto"
+    else if str.contains(t,"NAS") or str.contains(t,"US30") or str.contains(t,"DAX")
+        "Indices"
+    else if str.contains(t,"JPY")
+        "JPY Forex"
+    else
+        "Forex"
+
+string instShort = getInstShort()
+
+//═══════════════════════════════════════════════
+//  4. Colors
+//═══════════════════════════════════════════════
+color cG  = color.new(#00E676, 0)
+color cR  = color.new(#FF5252, 0)
+color cO  = color.new(#FF9800, 0)
+color cAu = color.new(#FFD700, 0)
+color cCy = color.new(#00BCD4, 0)
+color cGr = color.new(color.gray, 0)
+color cBG = color.new(#1E222D, 10)
+color cP  = color.new(#E040FB, 0)
+color cBl = color.new(#2962FF, 0)
+
+var color[] tpC = array.from(color.new(#2962FF,0), color.new(#00897B,0), color.new(#00BCD4,0), color.new(#009688,0), color.new(#4CAF50,0), color.new(#8BC34A,0), color.new(#CDDC39,0), color.new(#FFEB3B,0), color.new(#FFC107,0), color.new(#FF9800,0))
+
+string SEP = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+//═══════════════════════════════════════════════
+//  5. Risk Functions
+//═══════════════════════════════════════════════
+slValPerLot(float d) =>
+    math.max(d / syminfo.mintick * syminfo.pointvalue, 0.0001)
+
+calcLot(float risk, float dist) =>
+    math.min(math.max(math.floor(risk / slValPerLot(dist) * 100.0) / 100.0, 0.01), 100.0)
+
+pnlD(float lot, float dist) =>
+    slValPerLot(dist) * lot
+
+beBufPx() =>
+    slBuffer * syminfo.mintick * 10.0
+
+lotStr(float l) =>
+    l >= 1.0 ? str.tostring(math.round(l,2),"#.##") + " std" : l >= 0.1 ? str.tostring(math.round(l,2),"#.##") + " mini" : str.tostring(math.round(l,2),"#.##") + " micro"
+
+//═══════════════════════════════════════════════
+//  6. Trade State
+//═══════════════════════════════════════════════
+var int   totT = 0,  var int winT = 0,  var int lossT = 0
+var int   reWin = 0, var int reLoss = 0, var int lastExit = 0
+var bool  tradeCnt = false
+var float ep = na, var float sl = na, var float iSL = na
+var float sLot = 0.0, var float sRisk = 0.0
+var bool  sIsBuy = true, var bool inT = false, var bool isBuy = false
+var bool  slSent = false, var bool pyrSent = false, var bool beSent = false
+var int   mxTPR = 0, var int laTP2 = 0, var int stars = 0
+var string sigType = "", var int entryTime = na
+var int   lastSig = 0
+
+var line  eL = na, var line  slL = na
+var label eLb = na, var label slLb = na
+var float[] tpP = array.new_float()
+var line[]  tpL = array.new_line()
+var label[] tpLb = array.new_label()
+var bool[]  tpS = array.new_bool()
+
+// Pyramid
+var bool inPy = false, var float pyE = na, var float pySL = na
+var float pyLot = 0.0
+var int   pyrR = 0, var int pyrLA = 0, var bool pyrSLAS = false
+var line pyEL = na, var line pySLL = na
+var label pyELb = na, var label pySLb = na
+var float[] pyTP = array.new_float()
+var line[] pyTL = array.new_line()
+var label[] pyTLb = array.new_label()
+var bool[] pyTS = array.new_bool()
+
+// Reentry
+var bool inRe = false, var bool pendRe = false, var bool reCnt = false
+var float reE = na, var float reSL = na
+var float reLot = 0.0, var int reR = 0, var int reLA = 0
+var bool isBuyRe = false, var bool reSLS = false
+var line reEL = na, var line reSLL = na
+var label reELb = na, var label reSLb = na
+var float[] reTP = array.new_float()
+var line[] reTL = array.new_line()
+var label[] reTLb = array.new_label()
+var bool[] reTS = array.new_bool()
+
+// Stats
+var int[] tCTime = array.new_int()
+var int[] tCWin  = array.new_int()
+
+//═══════════════════════════════════════════════
+//  7. SMC ENGINE: Swing Detection
+//═══════════════════════════════════════════════
+float ph = ta.pivothigh(high, swingLen, swingLen)
+float pl = ta.pivotlow (low,  swingLen, swingLen)
+
+// Track swing points
+var float sh1 = na, var float sh2 = na, var float sh3 = na
+var float sl1 = na, var float sl2 = na, var float sl3 = na
+var int sh1Bar = 0, var int sl1Bar = 0
+
+if not na(ph)
+    sh3 := sh2
+    sh2 := sh1
+    sh1 := ph
+    sh1Bar := bar_index - swingLen
+
+if not na(pl)
+    sl3 := sl2
+    sl2 := sl1
+    sl1 := pl
+    sl1Bar := bar_index - swingLen
+
+// Store all swing levels for TP targeting
+var float[] allSH = array.new_float()
+var float[] allSL = array.new_float()
+
+if not na(ph)
+    array.push(allSH, ph)
+    if array.size(allSH) > 50
+        array.shift(allSH)
+if not na(pl)
+    array.push(allSL, pl)
+    if array.size(allSL) > 50
+        array.shift(allSL)
+
+//═══════════════════════════════════════════════
+//  8. SMC ENGINE: Market Structure (HH/HL/LH/LL)
+//═══════════════════════════════════════════════
+// Structure direction: 1=bullish (HH+HL), -1=bearish (LH+LL), 0=ranging
+var int structDir = 0
+
+if not na(sh2) and not na(sh1) and not na(sl2) and not na(sl1)
+    if sh1 > sh2 and sl1 > sl2
+        structDir := 1
+    else if sh1 < sh2 and sl1 < sl2
+        structDir := -1
+
+// BOS: Break of last swing in trend direction
+bool bosBull = false
+bool bosBear = false
+if barstate.isconfirmed and not inT
+    if structDir == 1 and not na(sh1) and close > sh1
+        bosBull := true
+    if structDir == -1 and not na(sl1) and close < sl1
+        bosBear := true
+
+// CHoCH: Break of last swing AGAINST current trend
+bool chochBull = false
+bool chochBear = false
+if barstate.isconfirmed and not inT
+    if structDir == -1 and not na(sh1) and close > sh1
+        chochBull := true
+        structDir := 1
+    if structDir == 1 and not na(sl1) and close < sl1
+        chochBear := true
+        structDir := -1
+
+//═══════════════════════════════════════════════
+//  9. SMC ENGINE: Displacement Detection
+//═══════════════════════════════════════════════
+float avgBody = ta.sma(math.abs(close - open), bodyAvgLen)
+bool bullDisp = barstate.isconfirmed and (close - open) > avgBody * dispMult and close > high[1]
+bool bearDisp = barstate.isconfirmed and (open - close) > avgBody * dispMult and close < low[1]
+
+//═══════════════════════════════════════════════
+//  10. SMC ENGINE: Order Block Zone
+//  The OB is the last opposing candle(s) before displacement
+//═══════════════════════════════════════════════
+var float obTop = na
+var float obBot = na
+var bool obActive = false
+var bool obBull = false
+var int obBar = 0
+var string obSource = ""
+var box obBox = na
+
+// Create OB when displacement detected
+if bullDisp and not obActive
+    obTop := math.max(open[1], close[1])
+    obBot := math.min(open[1], close[1])
+    obBull := true
+    obActive := true
+    obBar := bar_index
+    obSource := "OB"
+    if showOB
+        if not na(obBox)
+            box.delete(obBox)
+        obBox := box.new(bar_index - 1, obTop, bar_index + 20, obBot, bgcolor=color.new(#00E676,85), border_color=color.new(#00E676,50), text="OB+", text_size=size.tiny)
+
+if bearDisp and not obActive
+    obTop := math.max(open[1], close[1])
+    obBot := math.min(open[1], close[1])
+    obBull := false
+    obActive := true
+    obBar := bar_index
+    obSource := "OB"
+    if showOB
+        if not na(obBox)
+            box.delete(obBox)
+        obBox := box.new(bar_index - 1, obTop, bar_index + 20, obBot, bgcolor=color.new(#FF1744,85), border_color=color.new(#FF1744,50), text="OB-", text_size=size.tiny)
+
+// OB mitigated when price passes through fully
+if obActive
+    if obBull and low < obBot
+        obActive := false
+        if showOB and not na(obBox)
+            box.delete(obBox)
+    if not obBull and high > obTop
+        obActive := false
+        if showOB and not na(obBox)
+            box.delete(obBox)
+    if bar_index - obBar > zoneExpiry
+        obActive := false
+        if showOB and not na(obBox)
+            box.delete(obBox)
+
+//═══════════════════════════════════════════════
+//  11. SMC ENGINE: FVG Zone
+//═══════════════════════════════════════════════
+var float fvgTop = na
+var float fvgBot = na
+var bool fvgActive = false
+var bool fvgBull = false
+var int fvgBar = 0
+var box fvgBox = na
+
+// Bullish FVG: low > high[2] (gap up)
+bool bf = barstate.isconfirmed and low > high[2]
+
+// Bearish FVG: high < low[2] (gap down)
+bool bf2 = barstate.isconfirmed and high < low[2]
+
+if bf and not obActive and not fvgActive
+    fvgTop := low
+    fvgBot := high[2]
+    fvgBull := true
+    fvgActive := true
+    fvgBar := bar_index
+    obSource := "FVG"
+    if showFVG
+        if not na(fvgBox)
+            box.delete(fvgBox)
+        fvgBox := box.new(bar_index - 2, fvgTop, bar_index + 10, fvgBot, bgcolor=color.new(#00E676,90), border_color=color.new(#00E676,50), text="FVG", text_size=size.tiny)
+
+if bf2 and not obActive and not fvgActive
+    fvgTop := low[2]
+    fvgBot := high
+    fvgBull := false
+    fvgActive := true
+    fvgBar := bar_index
+    obSource := "FVG"
+    if showFVG
+        if not na(fvgBox)
+            box.delete(fvgBox)
+        fvgBox := box.new(bar_index - 2, fvgTop, bar_index + 10, fvgBot, bgcolor=color.new(#FF1744,90), border_color=color.new(#FF1744,50), text="FVG", text_size=size.tiny)
+
+// FVG mitigated when price fills the gap
+if fvgActive
+    if fvgBull and close < fvgBot
+        fvgActive := false
+        if showFVG and not na(fvgBox)
+            box.delete(fvgBox)
+    if not fvgBull and close > fvgTop
+        fvgActive := false
+        if showFVG and not na(fvgBox)
+            box.delete(fvgBox)
+    if bar_index - fvgBar > zoneExpiry
+        fvgActive := false
+        if showFVG and not na(fvgBox)
+            box.delete(fvgBox)
+
+//═══════════════════════════════════════════════
+//  12. SMC ENGINE: Liquidity Sweep
+//  Price takes out equal highs/lows then reverses
+//═══════════════════════════════════════════════
+var float sweepLevel = na
+var bool sweepBull = false
+var bool sweepBear = false
+
+float tolerance = syminfo.mintick * 5.0
+
+if not na(sh1) and not na(sh2)
+    float eqH = math.abs(sh1 - sh2) < tolerance ? sh1 : na
+    if not na(eqH)
+        if high > eqH and close < eqH and barstate.isconfirmed
+            sweepBull := true
+            sweepLevel := eqH
+
+if not na(sl1) and not na(sl2)
+    float eqL = math.abs(sl1 - sl2) < tolerance ? sl1 : na
+    if not na(eqL)
+        if low < eqL and close > eqL and barstate.isconfirmed
+            sweepBear := true
+            sweepLevel := eqL
+
+//═══════════════════════════════════════════════
+//  13. SMC ENGINE: Entry Signals
+//  REAL entries based on structure, not ATR
+//═══════════════════════════════════════════════
+
+// --- Helper: Candle confirmation ---
+bool bullCandleConf = not candleConf or (close > open and close > (high + low) / 2)
+bool bearCandleConf = not candleConf or (close < open and close < (high + low) / 2)
+
+// --- Entry 1: Order Block Retrace ---
+// Price pulls back into an unmitigated OB zone
+bool obBuyEntry = false
+bool obSellEntry = false
+
+if obActive and barstate.isconfirmed and not inT
+    if obBull and low <= obTop and close >= obBot and high > obTop
+        if bullCandleConf
+            obBuyEntry := true
+            obSource := "OB"
+    if not obBull and high >= obBot and close <= obTop and low < obBot
+        if bearCandleConf
+            obSellEntry := true
+            obSource := "OB"
+
+// --- Entry 2: FVG Retrace ---
+// Price returns to fill the FVG partially (premium entry)
+bool fvgBuyEntry = false
+bool fvgSellEntry = false
+
+if fvgActive and barstate.isconfirmed and not inT
+    if fvgBull and low <= fvgTop and close >= fvgBot
+        if bullCandleConf
+            fvgBuyEntry := true
+            obSource := "FVG"
+    if not fvgBull and high >= fvgBot and close <= fvgTop
+        if bearCandleConf
+            fvgSellEntry := true
+            obSource := "FVG"
+
+// --- Entry 3: Liquidity Sweep + Displacement ---
+bool sweepBuyEntry = false
+bool sweepSellEntry = false
+
+if barstate.isconfirmed and not inT
+    if sweepBull and bullDisp
+        sweepBuyEntry := true
+        obSource := "Sweep"
+    if sweepBear and bearDisp
+        sweepSellEntry := true
+        obSource := "Sweep"
+
+// --- Entry 4: CHoCH + Retest ---
+// CHoCH just happened, price retests the broken level
+bool chochBuyEntry = false
+bool chochSellEntry = false
+
+if barstate.isconfirmed and not inT
+    if chochBull and low <= sh1 and close > sh1 and bullCandleConf
+        chochBuyEntry := true
+        obSource := "CHoCH"
+    if chochBear and high >= sl1 and close < sl1 and bearCandleConf
+        chochSellEntry := true
+        obSource := "CHoCH"
+
+// --- Combine all signals ---
+bool buySignal = (useOBEntry and obBuyEntry) or (useFVGEntry and fvgBuyEntry) or (useSweep and sweepBuyEntry) or (useCHoCH and chochBuyEntry)
+bool sellSignal = (useOBEntry and obSellEntry) or (useFVGEntry and fvgSellEntry) or (useSweep and sweepSellEntry) or (useCHoCH and chochSellEntry)
+
+// --- Star rating based on confluence ---
+int cStars = 1
+string cSigType = obSource
+if buySignal or sellSignal
+    cStars := 2
+    if (buySignal and structDir == 1) or (sellSignal and structDir == -1)
+        cStars := 3
+
+// --- Determine SL from structure (REAL stop loss) ---
+// SL is placed below/above the zone that was used for entry
+float entrySL = na
+if buySignal
+    if obBuyEntry or fvgBuyEntry
+        float zoneBot = obBuyEntry ? obBot : fvgBot
+        entrySL := zoneBot - slBuffer * syminfo.mintick
+    else if sweepBuyEntry
+        entrySL := sweepLevel - slBuffer * syminfo.mintick
+    else if chochBuyEntry
+        entrySL := sl1 - slBuffer * syminfo.mintick
+if sellSignal
+    if obSellEntry or fvgSellEntry
+        float zoneTop = obSellEntry ? obTop : fvgTop
+        entrySL := zoneTop + slBuffer * syminfo.mintick
+    else if sweepSellEntry
+        entrySL := sweepLevel + slBuffer * syminfo.mintick
+    else if chochSellEntry
+        entrySL := sh1 + slBuffer * syminfo.mintick
+
+// --- Determine TPs from structure (REAL targets) ---
+// Scan swing levels + fill remaining with extensions
+var float[] entryTPs = array.new_float()
+
+if buySignal or sellSignal
+    float eP = close
+    float sL = entrySL
+    float riskDist = math.abs(eP - sL)
+    array.clear(entryTPs)
+
+    float[] fibs = array.from(0.618, 1.0, 1.272, 1.618, 2.0, 2.618, 3.618, 4.236, 5.0, 6.0)
+
+    // Collect structural targets
+    float[] structTargets = array.new_float()
+    if buySignal
+        for i = 0 to array.size(allSH) - 1
+            float s = array.get(allSH, i)
+            if s > eP + riskDist * 0.3
+                array.push(structTargets, s)
+        array.sort(structTargets)
+    else
+        for i = 0 to array.size(allSL) - 1
+            float s = array.get(allSL, i)
+            if s < eP - riskDist * 0.3
+                array.push(structTargets, s)
+        array.sort(structTargets, order.descending)
+
+    // Build TPs: structural first, then extensions
+    int structUsed = 0
+    int fibIdx = 0
+    for i = 0 to numTP - 1
+        float tp = float(na)
+        if structUsed < array.size(structTargets)
+            tp := array.get(structTargets, structUsed)
+            structUsed += 1
+        else
+            float ext = buySignal ? eP + riskDist * array.get(fibs, math.min(fibIdx, 9)) : eP - riskDist * array.get(fibs, math.min(fibIdx, 9))
+            tp := ext
+            fibIdx += 1
+        array.push(entryTPs, tp)
+
+//═══════════════════════════════════════════════
+//  14. HTF Confluence
+//═══════════════════════════════════════════════
+float htfEMA = ta.ema(close, 200)
+int htfTr = request.security(syminfo.tickerid, htf, close > htfEMA ? 1 : -1, barmerge.gaps_off, barmerge.lookahead_off)
+
+//═══════════════════════════════════════════════
+//  15. Alert Text Building
+//═══════════════════════════════════════════════
+sigTypeName(string t) =>
+    t == "OB" ? "OB Order Block" : t == "FVG" ? "FVG Fair Value" : t == "Sweep" ? "Liquidity Sweep" : "CHoCH"
+
+starStr(int s) => s == 3 ? "***" : s == 2 ? "**" : "*"
+
+buildRiskBlock(float lotSz, float tRisk, float aRisk, float slDist) =>
+    float aPct = aRisk > 0.0 and bal > 0.0 ? (aRisk / bal) * 100.0 : 0.0
+    string s = "\nRisk Management\n"
+    s += "Balance: $" + str.tostring(bal,"#.##") + "\n"
+    s += "Risk target: $" + str.tostring(math.round(tRisk,2),"#.##") + " (" + str.tostring(riskP,"#.#") + "%)\n"
+    s += "Lot size: " + lotStr(lotSz) + "\n"
+    s += "Actual loss: $" + str.tostring(math.round(aRisk,2),"#.##") + " (" + str.tostring(math.round(aPct,1),"#.#") + "%)\n"
+    s += "SL distance: " + str.tostring(math.round(slDist,2),"#.##") + "\n"
+    s += "Instrument: " + inst + "\n"
+    if aPct > riskP * 1.5
+        float recBal = tRisk > 0.0 ? (aRisk / riskP) * 100.0 : 0.0
+        s += "\nRisk Warning:\n"
+        s += "Target: " + str.tostring(riskP,"#.#") + "% = $" + str.tostring(math.round(bal * riskP / 100.0,2),"#.##") + "\n"
+        s += "Actual: " + str.tostring(math.round(aPct,1),"#.#") + "% = $" + str.tostring(math.round(aRisk,2),"#.##") + "\n"
+        s += "Recommended: $" + str.tostring(math.round(recBal,0),"#") + "\n"
+    s
+
+buildTPStatus() =>
+    string s = ""
+    if array.size(tpP) > 0
+        for i = 0 to array.size(tpP) - 1
+            float p = array.get(tpP, i)
+            bool hit = array.get(tpS, i)
+            bool cur = (i == mxTPR - 1)
+            s += (hit ? "OK" : "..") + " TP" + str.tostring(i+1) + ": " + str.tostring(p, format.mintick) + (cur ? " <- NOW" : "") + "\n"
+    s
+
+buildEnt() =>
+    float sd = math.abs(ep - sl)
+    float tR = bal * riskP / 100.0
+    string m = "╔════════════════════════════════╗\n"
+    m += "║ " + (isBuy ? "BUY SIGNAL" : "SELL SIGNAL") + " ║\n"
+    m += "╚════════════════════════════════════════════╝\n\n"
+    m += syminfo.ticker + " | " + timeframe.period + " | " + htfD + "\n"
+    m += starStr(stars) + " | " + sigTypeName(sigType) + "\n\n"
+    m += SEP + "\nTrade Details\n" + SEP + "\n"
+    m += "Entry: " + str.tostring(ep, format.mintick) + "\n"
+    m += "Stop: " + str.tostring(sl, format.mintick) + " | Auto BE at TP1\n"
+    m += buildRiskBlock(sLot, tR, sRisk, sd)
+    m += "\n" + SEP + "\nTargets\n" + SEP + "\n"
+    int tpSz = array.size(tpP)
+    if tpSz > 0
+        for k = 0 to tpSz - 1
+            float t = array.get(tpP, k)
+            float rr = sd > 0.0 ? math.abs(t - ep) / sd : 0.0
+            m += "TP" + str.tostring(k+1) + ": " + str.tostring(t, format.mintick) + " | RR " + str.tostring(math.round(rr,2),"#.##") + "\n"
+    m += "\n" + SEP + "\n"
+    m += htfD + ": " + (htfTr == 1 ? "Bullish" : "Bearish") + " | Structure: " + (structDir == 1 ? "Bullish" : structDir == -1 ? "Bearish" : "Ranging") + "\n"
+    m += SEP + "\n t.me/forexYemeni_Gold"
+    m
+
+buildTPA(int n, bool jump) =>
+    float hp = array.size(tpP) > 0 ? array.get(tpP, math.max(0, n-1)) : ep
+    float pp = math.abs(hp - ep)
+    float pd = pnlD(sLot, pp)
+    string m = "╔════════════════════════════════╗\n"
+    if n == numTP
+        m += "║ FULL CLOSE PROFIT! ║\n"
+    else if jump
+        m += "║ PRICE GAP! ║\n"
+    else
+        m += "║ TP " + str.tostring(n) + " HIT ║\n"
+    m += "╚════════════════════════════════════════════╝\n\n"
+    m += syminfo.ticker + "\n"
+    if jump
+        m += "GAP TP " + str.tostring(laTP2+1) + " to " + str.tostring(n) + "!\n"
+    m += str.tostring(hp, format.mintick) + " | +" + str.tostring(math.round(pp,2),"#.##") + " pts\n"
+    m += "Profit: +$" + str.tostring(math.round(pd,2),"#.##") + "\n\n"
+    m += SEP + "\n" + buildTPStatus() + SEP + "\n"
+    if n == numTP
+        m += "All targets reached!\n"
+    else if n >= 1
+        m += "BE Active\n"
+    m += SEP + "\n t.me/forexYemeni_Gold"
+    m
+
+buildSLA() =>
+    float lp = math.abs(ep - iSL)
+    float ld = pnlD(sLot, lp)
+    string m = ""
+    if mxTPR == 0
+        m := "╔════════════════════════════════╗\n"
+        m += "║ STOP LOSS - FULL LOSS ║\n"
+        m += "╚════════════════════════════════╝\n\n"
+        m += syminfo.ticker + "\n"
+        m += "SL: " + str.tostring(sl, format.mintick) + " | -" + str.tostring(math.round(lp,2),"#.##") + " pts\n"
+        m += "Loss: $" + str.tostring(math.round(ld,2),"#.##") + "\n\n"
+        m += SEP + "\n" + buildTPStatus() + SEP + "\n"
+    else if beSent and mxTPR <= 1
+        m := "╔════════════════════════════════╗\n"
+        m += "║ SL AT ENTRY (BE) ║\n"
+        m += "╚════════════════════════════════╝\n\n"
+        m += syminfo.ticker + "\n"
+        m += "1 TP hit then price returned\n"
+        m += "Exited at entry (no loss)\n"
+        m += str.tostring(mxTPR) + "/" + str.tostring(numTP) + " TPs\n\n"
+        m += SEP + "\n" + buildTPStatus() + SEP + "\n"
+    else
+        string closeType = sl == iSL ? "Original SL" : useTrail ? "Trailing SL" : "BE SL"
+        m := "╔════════════════════════════════╗\n"
+        m += "║ " + closeType + " ║\n"
+        m += "╚════════════════════════════════╝\n\n"
+        m += syminfo.ticker + "\n\n"
+        m += SEP + "\n" + buildTPStatus() + SEP + "\n"
+        m += str.tostring(mxTPR) + "/" + str.tostring(numTP) + " TPs\n"
+        m += "Partial profit OK\n"
+    m += SEP + "\n t.me/forexYemeni_Gold"
+    m
+
+buildBE() =>
+    string m = "╔════════════════════════════════╗\n"
+    m += "║ BE ACTIVE -> ENTRY ║\n"
+    m += "╚════════════════════════════════════════════╝\n\n"
+    m += syminfo.ticker + "\n"
+    m += "SL moved to entry price\n"
+    m += "Entry: " + str.tostring(ep, format.mintick) + "\n"
+    m += str.tostring(mxTPR) + " TPs hit\n"
+    m += "Trade is now protected\n\n"
+    m += SEP + "\n" + buildTPStatus() + SEP + "\n"
+    m += " t.me/forexYemeni_Gold"
+    m
+
+buildPyrEnt() =>
+    float sd = math.abs(pyE - pySL)
+    float tR = bal * riskP / 100.0
+    string m = "╔════════════════════════════════╗\n"
+    m += "║ PYRAMID " + (isBuy ? "BUY" : "SELL") + " ║\n"
+    m += "╚════════════════════════════════╝\n\n"
+    m += syminfo.ticker + " | " + str.tostring(mxTPR) + " TPs\n\n"
+    m += SEP + "\nPyramid\n" + SEP + "\n"
+    m += "Entry: " + str.tostring(pyE, format.mintick) + "\n"
+    m += "SL: " + str.tostring(pySL, format.mintick) + "\n"
+    m += buildRiskBlock(pyLot, tR, pnlD(pyLot, sd), sd)
+    m += "\n" + SEP + "\nPyramid TPs\n" + SEP + "\n"
+    int pySz = array.size(pyTP)
+    if pySz > 0
+        for k = 0 to pySz - 1
+            float t = array.get(pyTP, k)
+            float rr = sd > 0.0 ? math.abs(t - pyE) / sd : 0.0
+            m += "TP" + str.tostring(k+1) + ": " + str.tostring(t, format.mintick) + " | RR " + str.tostring(math.round(rr,2),"#.##") + "\n"
+    m += SEP + "\n t.me/forexYemeni_Gold"
+    m
+
+buildPyrTPA(int n) =>
+    float hp = array.size(pyTP) > 0 ? array.get(pyTP, math.max(0, n-1)) : pyE
+    float pp = math.abs(hp - pyE)
+    float pd = pnlD(pyLot, pp)
+    string m = "╔════════════════════════════════╗\n"
+    m += n == pyrTP ? "║ PYRAMID FULL PROFIT! ║\n" : "║ PYRAMID TP " + str.tostring(n) + " ║\n"
+    m += "╚════════════════════════════════════════════╝\n\n"
+    m += syminfo.ticker + " | Pyramid\n"
+    m += str.tostring(hp, format.mintick) + " | +" + str.tostring(math.round(pp,2),"#.##") + " pts\n"
+    m += "Profit: +$" + str.tostring(math.round(pd,2),"#.##") + "\n\n"
+    m += SEP + "\n t.me/forexYemeni_Gold"
+    m
+
+buildPyrSLA() =>
+    float lp = math.abs(pyE - pySL)
+    float ld = pnlD(pyLot, lp)
+    string m = "╔════════════════════════════════╗\n"
+    m += "║ PYRAMID SL HIT ║\n"
+    m += "╚══════════════════════════════════════════╝\n\n"
+    m += syminfo.ticker + " | Pyramid\n"
+    m += "SL: " + str.tostring(pySL, format.mintick) + " | -" + str.tostring(math.round(lp,2),"#.##") + " pts\n"
+    m += "Loss: $" + str.tostring(math.round(ld,2),"#.##") + "\n"
+    m += SEP + "\n t.me/forexYemeni_Gold"
+    m
+
+buildReEnt() =>
+    float sd = math.abs(reE - reSL)
+    float tR = bal * riskP / 100.0
+    string m = "╔════════════════════════════════╗\n"
+    m += "║ REENTRY " + (isBuyRe ? "BUY" : "SELL") + " ║\n"
+    m += "╚════════════════════════════════════════════╝\n\n"
+    m += syminfo.ticker + "\n\n"
+    m += SEP + "\nReentry\n" + SEP + "\n"
+    m += "Entry: " + str.tostring(reE, format.mintick) + "\n"
+    m += "SL: " + str.tostring(reSL, format.mintick) + "\n"
+    m += buildRiskBlock(reLot, tR, pnlD(reLot, sd), sd)
+    m += "\n" + SEP + "\nTargets\n" + SEP + "\n"
+    int reSz = array.size(reTP)
+    if reSz > 0
+        for k = 0 to reSz - 1
+            float t = array.get(reTP, k)
+            m += "TP" + str.tostring(k+1) + ": " + str.tostring(t, format.mintick) + "\n"
+    m += SEP + "\n t.me/forexYemeni_Gold"
+    m
+
+buildReTPA(int n) =>
+    float hp = array.size(reTP) > 0 ? array.get(reTP, math.max(0, n-1)) : reE
+    float pp = math.abs(hp - reE)
+    float pd = pnlD(reLot, pp)
+    string m = "╔════════════════════════════════╗\n"
+    m += "║ REENTRY TP " + str.tostring(n) + " ║\n"
+    m += "╚══════════════════════════════════════════╝\n\n"
+    m += syminfo.ticker + " | Reentry\n"
+    m += str.tostring(hp, format.mintick) + " | +$" + str.tostring(math.round(pd,2),"#.##") + "\n"
+    m += SEP + "\n t.me/forexYemeni_Gold"
+    m
+
+buildReSLA() =>
+    float lp = math.abs(reE - reSL)
+    float ld = pnlD(reLot, lp)
+    string m = "╔════════════════════════════════╗\n"
+    m += "║ REENTRY SL HIT ║\n"
+    m += "╚══════════════════════════════════════════╝\n\n"
+    m += syminfo.ticker + " | Reentry\n"
+    m += "SL: " + str.tostring(reSL, format.mintick) + " | -$" + str.tostring(math.round(ld,2),"#.##") + "\n"
+    m += SEP + "\n t.me/forexYemeni_Gold"
+    m
+
+//═══════════════════════════════════════════════
+//  16. Graphics Cleanup
+//═══════════════════════════════════════════════
+clrM() =>
+    if not na(eL) then line.delete(eL)
+    if not na(slL) then line.delete(slL)
+    if not na(eLb) then label.delete(eLb)
+    if not na(slLb) then label.delete(slLb)
+    for j = 0 to array.size(tpL) - 1
+        line.delete(array.get(tpL, j))
+    for j = 0 to array.size(tpLb) - 1
+        label.delete(array.get(tpLb, j))
+
+clrP() =>
+    if not na(pyEL) then line.delete(pyEL)
+    if not na(pySLL) then line.delete(pySLL)
+    if not na(pyELb) then label.delete(pyELb)
+    if not na(pySLb) then label.delete(pySLb)
+    for j = 0 to array.size(pyTL) - 1
+        line.delete(array.get(pyTL, j))
+    for j = 0 to array.size(pyTLb) - 1
+        label.delete(array.get(pyTLb, j))
+
+clrR() =>
+    if not na(reEL) then line.delete(reEL)
+    if not na(reSLL) then line.delete(reSLL)
+    if not na(reELb) then label.delete(reELb)
+    if not na(reSLb) then label.delete(reSLb)
+    for j = 0 to array.size(reTL) - 1
+        line.delete(array.get(reTL, j))
+    for j = 0 to array.size(reTLb) - 1
+        label.delete(array.get(reTLb, j))
+
+clrAll() =>
+    clrM()
+    clrP()
+    clrR()
+
+wrC(float pct) => pct >= 60.0 ? cG : pct >= 40.0 ? cAu : cR
+
+//═══════════════════════════════════════════════
+//  17. Trade Monitoring
+//═══════════════════════════════════════════════
+if inT
+    int tpSzM = array.size(tpP)
+    if tpSzM > 0
+        bool hitBE = false
+        for i = 0 to tpSzM - 1
+            if not array.get(tpS, i)
+                float t = array.get(tpP, i)
+                if (isBuy and high >= t) or (not isBuy and low <= t)
+                    array.set(tpS, i, true)
+                    mxTPR := math.max(mxTPR, i + 1)
+                    label.set_text(array.get(tpLb, i), "TP" + str.tostring(i+1))
+                    if i == 0 and not beSent
+                        hitBE := true
+                else
+                    break
+            else
+                break
+
+        if hitBE and inT
+            float bv = beBufPx()
+            float nBE = isBuy ? ep + bv : ep - bv
+            if (isBuy and sl < nBE) or (not isBuy and sl > nBE)
+                sl := nBE
+                beSent := true
+                line.set_y1(slL, sl)
+                line.set_y2(slL, sl)
+                label.set_y(slLb, sl)
+                label.set_text(slLb, "BE" + str.tostring(sl, format.mintick))
+                label.set_color(slLb, cGr)
+                line.set_color(slL, cGr)
+                alert(buildBE(), alert.freq_once_per_bar_close)
+
+        if mxTPR > laTP2 and inT
+            bool isJump = (mxTPR - laTP2) > 1
+            alert(buildTPA(mxTPR, isJump), alert.freq_once_per_bar_close)
+            if mxTPR == numTP
+                if not tradeCnt
+                    winT += 1
+                    totT += 1
+                    tradeCnt := true
+                    array.push(tCTime, entryTime)
+                    array.push(tCWin, 1)
+                inT := false
+                lastSig := 0
+                inPy := false
+                pyrSent := false
+                beSent := false
+                clrAll()
+                lastExit := bar_index
+            laTP2 := mxTPR
+
+        if useTrail and mxTPR > 1 and inT and array.size(tpP) > 0
+            float nSL = array.get(tpP, mxTPR - 2)
+            if (isBuy and nSL > sl) or (not isBuy and nSL < sl)
+                sl := nSL
+                line.set_y1(slL, sl)
+                line.set_y2(slL, sl)
+                label.set_y(slLb, sl)
+                label.set_text(slLb, "Trail" + str.tostring(sl, format.mintick))
+                label.set_color(slLb, cGr)
+                line.set_color(slL, cGr)
+
+    bool slH = (isBuy and low <= sl) or (not isBuy and high >= sl)
+    if slH and not slSent and inT
+        alert(buildSLA(), alert.freq_once_per_bar_close)
+        slSent := true
+        if not tradeCnt
+            if mxTPR >= 1
+                winT += 1
+            else
+                lossT += 1
+            totT += 1
+            tradeCnt := true
+            array.push(tCTime, entryTime)
+            array.push(tCWin, mxTPR >= 1 ? 1 : 0)
+        if useReentry and mxTPR == 0
+            pendRe := true
+            isBuyRe := isBuy
+        inT := false
+        lastSig := 0
+        inPy := false
+        pyrSent := false
+        beSent := false
+        clrAll()
+        lastExit := bar_index
+
+//═══════════════════════════════════════════════
+//  18. Pyramid
+//═══════════════════════════════════════════════
+if inT and not inPy and not inRe and usePyr and mxTPR >= pyrTP and not pyrSent
+    pyrSent := true
+    pyrR := 0
+    pyrLA := 0
+    inPy := true
+    pyrSLAS := false
+    pyE := close
+
+    float pSD = math.max(math.abs(pyE - sl), syminfo.mintick)
+    pySL := isBuy ? pyE - pSD : pyE + pSD
+
+    float pRisk = bal * riskP / 100.0
+    pyLot := calcLot(pRisk, math.abs(pyE - pySL))
+
+    pyEL := line.new(bar_index, pyE, bar_index+1, pyE, extend=extend.right, color=cP, width=2)
+    pyELb := label.new(bar_index, pyE, "P" + str.tostring(pyE, format.mintick), style=label.style_label_left, color=cP, textcolor=color.white, size=size.small)
+    pySLL := line.new(bar_index, pySL, bar_index+1, pySL, extend=extend.right, color=cR, width=2, style=line.style_dashed)
+    pySLb := label.new(bar_index, pySL, "SL" + str.tostring(pySL, format.mintick), style=label.style_label_left, color=cR, textcolor=color.white, size=size.small)
+
+    array.clear(pyTP)
+    array.clear(pyTL)
+    array.clear(pyTLb)
+    array.clear(pyTS)
+
+    float pySD = math.abs(pyE - pySL)
+    for j = 0 to pyrTP - 1
+        float pt = isBuy ? pyE + pySD * pyrRR * (j+1) : pyE - pySD * pyrRR * (j+1)
+        color tc = array.get(tpC, math.min(j, 9))
+        line tl = line.new(bar_index, pt, bar_index+1, pt, extend=extend.right, color=tc, width=1)
+        label tlb = label.new(bar_index, pt, "PTP" + str.tostring(j+1), style=label.style_label_left, color=tc, textcolor=color.white, size=size.small)
+        array.push(pyTL, tl)
+        array.push(pyTLb, tlb)
+        array.push(pyTP, pt)
+        array.push(pyTS, false)
+
+    alert(buildPyrEnt(), alert.freq_once_per_bar_close)
+
+if inPy
+    int pySzT = array.size(pyTP)
+    if pySzT > 0
+        for i = 0 to pySzT - 1
+            if not array.get(pyTS, i)
+                float t = array.get(pyTP, i)
+                if (isBuy and high >= t) or (not isBuy and low <= t)
+                    array.set(pyTS, i, true)
+                    pyrR := math.max(pyrR, i + 1)
+                    label.set_text(array.get(pyTLb, i), "PTP" + str.tostring(i+1) + " OK")
+                else
+                    break
+            else
+                    break
+
+        if pyrR > pyrLA and inPy
+            alert(buildPyrTPA(pyrR), alert.freq_once_per_bar_close)
+            if pyrR == pyrTP
+                inPy := false
+                clrP()
+            pyrLA := pyrR
+
+    bool pySLH = (isBuy and low <= pySL) or (not isBuy and high >= pySL)
+    if pySLH and not pyrSLAS and inPy
+        alert(buildPyrSLA(), alert.freq_once_per_bar_close)
+        pyrSLAS := true
+        inPy := false
+        clrP()
+
+//═══════════════════════════════════════════════
+//  19. Reentry
+//═══════════════════════════════════════════════
+if pendRe and not inT and not inRe and not inPy and barstate.isconfirmed
+    bool canRe = isBuyRe ? buySignal : sellSignal
+    if canRe
+        pendRe := false
+        reCnt := false
+        reR := 0
+        reLA := 0
+        reSLS := false
+        inRe := true
+        reE := close
+        reSL := entrySL
+
+        float reRisk = bal * riskP / 100.0
+        reLot := calcLot(reRisk, math.abs(reE - reSL))
+
+        reEL := line.new(bar_index, reE, bar_index+1, reE, extend=extend.right, color=cCy, width=2)
+        reELb := label.new(bar_index, reE, "RE" + str.tostring(reE, format.mintick), style=label.style_label_left, color=cCy, textcolor=color.white, size=size.small)
+        reSLL := line.new(bar_index, reSL, bar_index+1, reSL, extend=extend.right, color=cR, width=2, style=line.style_dashed)
+        reSLb := label.new(bar_index, reSL, "SL" + str.tostring(reSL, format.mintick), style=label.style_label_left, color=cR, textcolor=color.white, size=size.small)
+
+        array.clear(reTP)
+        array.clear(reTL)
+        array.clear(reTLb)
+        array.clear(reTS)
+
+        float reSD = math.abs(reE - reSL)
+        for j = 0 to 3
+            float rt = isBuyRe ? reE + reSD * 1.5 * (j+1) : reE - reSD * 1.5 * (j+1)
+            color tc = array.get(tpC, math.min(j, 9))
+            line tl = line.new(bar_index, rt, bar_index+1, rt, extend=extend.right, color=tc, width=1)
+            label tlb = label.new(bar_index, rt, "RTP" + str.tostring(j+1), style=label.style_label_left, color=tc, textcolor=color.white, size=size.small)
+            array.push(reTL, tl)
+            array.push(reTLb, tlb)
+            array.push(reTP, rt)
+            array.push(reTS, false)
+
+        alert(buildReEnt(), alert.freq_once_per_bar_close)
+
+if inRe
+    int reSzT = array.size(reTP)
+    if reSzT > 0
+        for i = 0 to reSzT - 1
+            if not array.get(reTS, i)
+                float t = array.get(reTP, i)
+                if (isBuyRe and high >= t) or (not isBuyRe and low <= t)
+                    array.set(reTS, i, true)
+                    reR := math.max(reR, i + 1)
+                    label.set_text(array.get(reTLb, i), "RTP" + str.tostring(i+1) + " OK")
+                else
+                    break
+            else
+                break
+
+        if reR > reLA and inRe
+            alert(buildReTPA(reR), alert.freq_once_per_bar_close)
+            if reR == 3
+                if not reCnt
+                    reWin += 1
+                    reCnt := true
+                inRe := false
+                clrR()
+            reLA := reR
+
+    bool reSLH = (isBuyRe and low <= reSL) or (not isBuyRe and high >= reSL)
+    if reSLH and not reSLS and inRe
+        alert(buildReSLA(), alert.freq_once_per_bar_close)
+        reSLS := true
+        if not reCnt
+            reLoss += 1
+        inRe := false
+        clrR()
+
+//═══════════════════════════════════════════════
+//  20. Open New Trade (SMC Entry)
+//═══════════════════════════════════════════════
+bool newB = buySignal and lastSig != 1 and not inT and not inRe and not pendRe and barstate.isconfirmed and not na(entrySL)
+bool newS = sellSignal and lastSig != -1 and not inT and not inRe and not pendRe and barstate.isconfirmed and not na(entrySL)
+
+plotshape(showEntryMark and newB, title="BUY", text="BUY", style=shape.labelup, location=location.belowbar, color=color.new(#00E676,20), textcolor=color.white, size=size.small)
+plotshape(showEntryMark and newS, title="SELL", text="SELL", style=shape.labeldown, location=location.abovebar, color=color.new(#FF5252,20), textcolor=color.white, size=size.small)
+
+if newB or newS
+    tradeCnt := false
+    mxTPR := 0
+    laTP2 := 0
+    slSent := false
+    beSent := false
+    inPy := false
+    pyrSent := false
+    pyrR := 0
+    pyrLA := 0
+    pendRe := false
+    reCnt := false
+    clrM()
+    clrP()
+    clrR()
+    array.clear(tpP)
+    array.clear(tpL)
+    array.clear(tpLb)
+    array.clear(tpS)
+    array.clear(pyTP)
+    array.clear(pyTL)
+    array.clear(pyTLb)
+    array.clear(pyTS)
+    array.clear(reTP)
+    array.clear(reTL)
+    array.clear(reTLb)
+    array.clear(reTS)
+
+    ep := close
+    isBuy := newB
+    inT := true
+    stars := cStars
+    sigType := cSigType
+    lastSig := newB ? 1 : -1
+    entryTime := time
+
+    sl := entrySL
+    iSL := sl
+    float sD = math.max(math.abs(ep - iSL), syminfo.mintick)
+    float tR = bal * riskP / 100.0
+    sLot := calcLot(tR, sD)
+    sRisk := pnlD(sLot, sD)
+    sIsBuy := isBuy
+
+    eL := line.new(bar_index, ep, bar_index+1, ep, extend=extend.right, color=cO, width=3)
+    eLb := label.new(bar_index, ep, (isBuy ? "+" : "-") + str.tostring(ep, format.mintick), style=label.style_label_left, color=cO, textcolor=color.white)
+    slL := line.new(bar_index, sl, bar_index+1, sl, extend=extend.right, color=cR, width=2, style=line.style_dashed)
+    slLb := label.new(bar_index, sl, "SL" + str.tostring(sl, format.mintick), style=label.style_label_left, color=cR, textcolor=color.white, size=size.small)
+
+    // TPs from structure
+    for i = 0 to array.size(entryTPs) - 1
+        float t = array.get(entryTPs, i)
+        color tc = array.get(tpC, math.min(i, 9))
+        line tl = line.new(bar_index, t, bar_index+1, t, extend=extend.right, color=tc, width=1)
+        label tlb = label.new(bar_index, t, "TP" + str.tostring(i+1) + ":" + str.tostring(t, format.mintick), style=label.style_label_left, color=tc, textcolor=color.white, size=size.small)
+        array.push(tpL, tl)
+        array.push(tpLb, tlb)
+        array.push(tpP, t)
+        array.push(tpS, false)
+
+    // Deactivate zones after entry
+    if obActive
+        obActive := false
+        if showOB and not na(obBox)
+            box.delete(obBox)
+    if fvgActive
+        fvgActive := false
+        if showFVG and not na(fvgBox)
+            box.delete(fvgBox)
+
+    alert(buildEnt(), alert.freq_once_per_bar_close)
+
+//═══════════════════════════════════════════════
+//  21. Chart Drawing
+//═══════════════════════════════════════════════
+bgcolor(showTradeBG and inT ? (isBuy ? color.new(#00E676,93) : color.new(#FF5252,93)) : na, title="Trade Background")
+
+// Swing points
+plotshape(showSwing and not na(ph), title="Swing High", text="", style=shape.circle, location=location.abovebar, color=cR, size=size.tiny)
+plotshape(showSwing and not na(pl), title="Swing Low", text="", style=shape.circle, location=location.belowbar, color=cG, size=size.tiny)
+
+// BOS / CHoCH labels
+plotshape(showBOS and bosBull, title="BOS Bull", text="BOS", style=shape.labelup, location=location.belowbar, color=color.new(#00E676,30), textcolor=color.white, size=size.tiny)
+plotshape(showBOS and bosBear, title="BOS Bear", text="BOS", style=shape.labeldown, location=location.abovebar, color=color.new(#FF5252,30), textcolor=color.white, size=size.tiny)
+plotshape(showBOS and chochBull, title="CHoCH Bull", text="CHoCH", style=shape.labelup, location=location.belowbar, color=color.new(#FFD700,30), textcolor=color.black, size=size.tiny)
+plotshape(showBOS and chochBear, title="CHoCH Bear", text="CHoCH", style=shape.labeldown, location=location.abovebar, color=color.new(#FFD700,30), textcolor=color.black, size=size.tiny)
+
+// Displacement markers
+plotshape(bullDisp, title="Bull Disp", text="DISP", style=shape.triangleup, location=location.belowbar, color=color.new(#2962FF,50), textcolor=color.white, size=size.tiny)
+plotshape(bearDisp, title="Bear Disp", text="DISP", style=shape.triangledown, location=location.abovebar, color=color.new(#FF5252,50), textcolor=color.white, size=size.tiny)
+
+//═══════════════════════════════════════════════
+//  22. Statistics Table
+//═══════════════════════════════════════════════
+var table d = table.new(position.top_right, 2, 14, border_width=1, border_color=color.new(color.gray,80), frame_color=color.new(#333333,0), frame_width=2)
+
+if barstate.islast
+    int pTrades = 0
+    int pWins = 0
+    int nowT = time
+    int cY = year(nowT, "Asia/Riyadh")
+    int cM = month(nowT, "Asia/Riyadh")
+    int cD = dayofmonth(nowT, "Asia/Riyadh")
+
+    int szStat = array.size(tCTime)
+    if szStat > 0
+        for i = 0 to szStat - 1
+            int ft = array.get(tCTime, i)
+            int fw = array.get(tCWin, i)
+            bool isMatch = false
+            if statPeriod == "Today (Makkah)"
+                if year(ft,"Asia/Riyadh") == cY and month(ft,"Asia/Riyadh") == cM and dayofmonth(ft,"Asia/Riyadh") == cD
+                    isMatch := true
+            else if statPeriod == "Last 7 days"
+                if nowT - ft <= 604800000
+                    isMatch := true
+            else if statPeriod == "Last 30 days"
+                if nowT - ft <= 2592000000
+                    isMatch := true
+            else
+                isMatch := true
+            if isMatch
+                pTrades += 1
+                pWins += fw
+
+    if array.size(tCTime) > 500
+        array.shift(tCTime)
+        array.shift(tCWin)
+
+    float pWR = pTrades > 0 ? pWins * 100.0 / pTrades : 0.0
+
+    table.cell(d, 0, 0, "FYP-SMC v4.0", text_color=cAu, text_size=size.normal, bgcolor=color.new(#222222,0), text_halign=text.align_center)
+    table.cell(d, 1, 0, timeframe.period + " | SMC/ICT", text_color=cGr, text_size=size.small, bgcolor=color.new(#222222,0))
+    table.cell(d, 0, 1, "Instrument", text_color=cGr, text_size=size.small, bgcolor=cBG)
+    table.cell(d, 1, 1, instShort, text_color=cCy, text_size=size.tiny, bgcolor=cBG)
+    table.cell(d, 0, 2, "Balance", text_color=cGr, text_size=size.small, bgcolor=cBG)
+    table.cell(d, 1, 2, "$" + str.tostring(bal,"#.##"), text_color=color.white, text_size=size.small, bgcolor=cBG)
+    table.cell(d, 0, 3, "Lot", text_color=cGr, text_size=size.small, bgcolor=cBG)
+    table.cell(d, 1, 3, sLot >= 0.01 ? lotStr(sLot) : "---", text_color=inT ? (sIsBuy ? cG : cR) : cGr, text_size=size.small, bgcolor=cBG)
+    table.cell(d, 0, 4, "HTF", text_color=cGr, text_size=size.small, bgcolor=cBG)
+    table.cell(d, 1, 4, htfD + (htfTr==1 ? " Bull" : " Bear"), text_color=htfTr==1 ? cG : cR, text_size=size.small, bgcolor=cBG)
+    table.cell(d, 0, 5, "Structure", text_color=cGr, text_size=size.small, bgcolor=cBG)
+    table.cell(d, 1, 5, structDir==1 ? "Bull HH/HL" : structDir==-1 ? "Bear LH/LL" : "Ranging", text_color=structDir==1 ? cG : structDir==-1 ? cR : cAu, text_size=size.small, bgcolor=cBG)
+
+    string ts = not inT and not inRe ? "No trade" : inT and inPy ? "Main+Pyramid" : inT ? "Active" : inRe ? "Reentry" : "---"
+    color tsc = not inT and not inRe ? cGr : inT and inPy ? cP : inT ? cAu : cCy
+    table.cell(d, 0, 6, "Status", text_color=cGr, text_size=size.small, bgcolor=cBG)
+    table.cell(d, 1, 6, ts, text_color=tsc, text_size=size.small, bgcolor=cBG)
+
+    string td = inT ? str.tostring(mxTPR) + "/" + str.tostring(numTP) : "---"
+    table.cell(d, 0, 7, "TPs", text_color=cGr, text_size=size.small, bgcolor=cBG)
+    table.cell(d, 1, 7, td, text_color=cCy, text_size=size.small, bgcolor=cBG)
+
+    table.cell(d, 0, 8, "OB Zone", text_color=cGr, text_size=size.small, bgcolor=cBG)
+    table.cell(d, 1, 8, obActive ? (obBull ? "Demand" : "Supply") : "---", text_color=obActive ? (obBull ? cG : cR) : cGr, text_size=size.small, bgcolor=cBG)
+
+    table.cell(d, 0, 9, "FVG Zone", text_color=cGr, text_size=size.small, bgcolor=cBG)
+    table.cell(d, 1, 9, fvgActive ? (fvgBull ? "Bull FVG" : "Bear FVG") : "---", text_color=fvgActive ? (fvgBull ? cG : cR) : cGr, text_size=size.small, bgcolor=cBG)
+
+    table.cell(d, 0, 10, "Trades", text_color=cGr, text_size=size.small, bgcolor=cBG)
+    table.cell(d, 1, 10, str.tostring(pTrades) + " | " + str.tostring(pWins) + "W", text_color=color.white, text_size=size.small, bgcolor=cBG)
+    table.cell(d, 0, 11, "Win Rate", text_color=cGr, text_size=size.small, bgcolor=cBG)
+    table.cell(d, 1, 11, str.tostring(math.round(pWR,1),"#.#") + "%", text_color=wrC(pWR), text_size=size.large, bgcolor=cBG)
+    table.cell(d, 0, 12, "Reentry", text_color=cGr, text_size=size.small, bgcolor=cBG)
+    table.cell(d, 1, 12, str.tostring(reWin) + "W " + str.tostring(reLoss) + "L", text_color=cCy, text_size=size.small, bgcolor=cBG)
+    table.cell(d, 0, 13, "Signal", text_color=cGr, text_size=size.small, bgcolor=cBG)
+    table.cell(d, 1, 13, sigTypeName(sigType), text_color=cBl, text_size=size.small, bgcolor=cBG)
