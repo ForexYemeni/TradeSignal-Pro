@@ -101,8 +101,11 @@ export function parseTradingViewSignal(rawText: string): ParseResult {
 //  Signal Category Detection
 // ═══════════════════════════════════════════════════════════════
 function detectSignalCategory(text: string): string {
-  // BREAKEVEN: تأمين تلقائي عند الدخول (قبل التحقق من التأمين كـ SL)
-  if (/تأمين تلقائي/.test(text) && /الدخول/.test(text)) return "BREAKEVEN";
+  // BREAKEVEN: BE alert title "تأمين تلقائي ← الدخول" or body "سحب الوقف لنقطة الدخول تلقائياً"
+  if (/تأمين تلقائي\s*←\s*الدخول/.test(text)) return "BREAKEVEN";
+  if (/سحب الوقف لنقطة الدخول تلقائيا/.test(text)) return "BREAKEVEN";
+  // BE exit: SL hit at entry price after BE was activated
+  if (/ضرب الوقف عند الدخول/.test(text)) return "BREAKEVEN";
 
   if (/إغلاق كامل بالربح/.test(text) && /♻️/.test(text)) return "REENTRY_TP";
   if (/هدف التعويض/.test(text)) return "REENTRY_TP";
@@ -269,7 +272,7 @@ function parseSLHitAlert(text: string): ParseResult {
 function parseBreakevenAlert(text: string): ParseResult {
   const pair = extractPair(text) || "";
   const entry = extractEntry(text) || 0;
-  const tpsHit = text.match(/تم تحقيق\s+(\d+)/)?.[1] || "0";
+  const tpsHit = text.match(/تم تحقيق\s+(\d+)/)?.[1] || text.match(/(\d+)\/\d+\s*أهداف محققة/)?.[1] || "0";
 
   return {
     success: true,
@@ -718,7 +721,7 @@ function extractPnLDollar(text: string): number | null {
 function extractTPStatusList(text: string): string {
   // Extract lines like "✅ TP1: 2355 ← الآن" or "⏳ TP2: 2360" or "✅ TP1 2355"
   const lines: string[] = [];
-  const regex = /[✅⏳]\s*TP\s*\d+[:\s][\d,.]+(?:\s*←\s*الآن)?/g;
+  const regex = /[✅⏳]\s*TP\s*\d+\s*:\s*[\d,.]+(?:\s*←\s*الآن)?/g;
   let match;
   while ((match = regex.exec(text)) !== null) {
     lines.push(match[0].trim());
@@ -728,7 +731,7 @@ function extractTPStatusList(text: string): string {
 
 function extractTotalTPCount(text: string): number {
   // Count total TPs from the status list (both ✅ and ⏳)
-  const regex = /[✅⏳]\s*TP\s*\d+[:\s][\d,.]+/g;
+  const regex = /[✅⏳]\s*TP\s*\d+\s*:\s*[\d,.]+/g;
   const matches = text.match(regex);
   if (matches && matches.length > 0) return matches.length;
   // Fallback: count TP patterns with prices
