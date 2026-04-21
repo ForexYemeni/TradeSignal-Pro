@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
     const cat = parseResult.signal.signalCategory;
 
     // ═══════════════════════════════════════════════════════════════
-    //  TP/SL/REENTRY/PYRAMID updates → find parent & update in-place
+    //  TP/SL/REENTRY/PYRAMID/BREAKEVEN updates → find parent & update in-place
     // ═══════════════════════════════════════════════════════════════
     if (!isEntry(cat)) {
       const updated = await handleUpdateSignal(parseResult.signal);
@@ -75,6 +75,9 @@ export async function POST(request: NextRequest) {
         // Send push notification for the update
         if (cat === "TP_HIT" || cat === "REENTRY_TP" || cat === "PYRAMID_TP") {
           notifyTpHit(parseResult.signal.pair, parseResult.signal.hitTpIndex ?? 0, undefined, cat).catch(() => {});
+        } else if (cat === "BREAKEVEN") {
+          // BE is informational — SL was moved to entry, no P&L change
+          notifySignalEvent({ type: "breakeven", pair: parseResult.signal.pair, signalType: cat, timestamp: Date.now() });
         } else if (cat === "SL_HIT" || cat === "REENTRY_SL" || cat === "PYRAMID_SL") {
           // If it was a partial win (TPs hit before SL), send TP notification instead
           if (updated.partialWin && updated.status === "HIT_TP") {
@@ -188,7 +191,7 @@ async function handleUpdateSignal(parsed: any) {
 
   // Map update category → parent category to search
   let parentCat: string;
-  if (parsed.signalCategory === "TP_HIT" || parsed.signalCategory === "SL_HIT") parentCat = "ENTRY";
+  if (parsed.signalCategory === "TP_HIT" || parsed.signalCategory === "SL_HIT" || parsed.signalCategory === "BREAKEVEN") parentCat = "ENTRY";
   else if (parsed.signalCategory === "REENTRY_TP" || parsed.signalCategory === "REENTRY_SL") parentCat = "REENTRY";
   else if (parsed.signalCategory === "PYRAMID_TP" || parsed.signalCategory === "PYRAMID_SL") parentCat = "PYRAMID";
   else return null;
@@ -231,7 +234,15 @@ async function handleUpdateSignal(parsed: any) {
   const validatedParsedDollar = (typeof parsed.pnlDollar === "number" && isFinite(parsed.pnlDollar) && Math.abs(parsed.pnlDollar) < 50000)
     ? parsed.pnlDollar : null;
 
-  if (parsed.signalCategory === "TP_HIT" || parsed.signalCategory === "REENTRY_TP" || parsed.signalCategory === "PYRAMID_TP") {
+  if (parsed.signalCategory === "BREAKEVEN") {
+    // Breakeven: SL was moved to entry price, signal stays ACTIVE
+    updateData.status = "ACTIVE";
+    updateData.hitTpIndex = parsed.hitTpIndex ?? 0;
+    updateData.stopLoss = parsed.entry || parent.stopLoss;
+    updateData.tpStatusList = parsed.tpStatusList || "";
+    updateData.totalTPs = parsed.totalTPs;
+    updateData.partialWin = false;
+  } else if (parsed.signalCategory === "TP_HIT" || parsed.signalCategory === "REENTRY_TP" || parsed.signalCategory === "PYRAMID_TP") {
     const tpNum = parsed.hitTpIndex ?? 0; // 1-indexed from parser
     const tpArrayIdx = tpNum > 0 ? tpNum - 1 : -1;
     const totalTPsCount = parsed.totalTPs || tps.length;
@@ -334,9 +345,12 @@ async function handleUpdateSignal(parsed: any) {
   // Notify SSE subscribers about the update
   // For partial wins (SL after TPs), send tp_hit event instead of sl_hit
   const isPartialWin = parsed.signalCategory === "SL_HIT" || parsed.signalCategory === "REENTRY_SL" || parsed.signalCategory === "PYRAMID_SL";
+  const isBeUpdate = parsed.signalCategory === "BREAKEVEN";
   let eventType: string;
   if (parsed.signalCategory === "TP_HIT" || parsed.signalCategory === "REENTRY_TP" || parsed.signalCategory === "PYRAMID_TP") {
     eventType = "tp_hit";
+  } else if (isBeUpdate) {
+    eventType = "breakeven";
   } else if (isPartialWin && updateData.partialWin && updateData.status === "HIT_TP") {
     eventType = "tp_hit"; // SL after TPs → treat as TP win event
   } else if (isPartialWin) {
