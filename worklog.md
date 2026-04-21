@@ -1,18 +1,21 @@
 ---
 Task ID: 1
-Agent: Main Agent
-Task: Comprehensive audit of Pine Script v3.7 and signal-parser.ts compatibility
+Agent: Main
+Task: Update Google Apps Script v5.0 to match Pine Script v3.7 format
 
 Work Log:
-- Read complete Pine Script file (1244 lines) - verified encoding (UTF-8, no BOM, Unix line endings, no tabs, no zero-width chars)
-- Read signal-parser.ts (752 lines) - analyzed all 10 alert type handlers
-- Read signals/route.ts (396 lines) - analyzed webhook handler, dedup logic, parent signal matching
-- Ran comprehensive test suite with 12 test cases covering all alert types
-- Found and fixed 3 critical bugs in signal-parser.ts
-- Verified all fixes with passing tests
+- Analyzed Pine Script v3.7 build functions (buildEnt, buildTPA, buildSLA, buildBE, buildPyrEnt, buildPyrTPA, buildPyrSLA, buildReEnt, buildReTPA, buildReSLA)
+- Analyzed signal-parser.ts regex patterns for all 11 signal categories
+- Updated all build functions to match v3.7 box-drawing format (╔══╗║╚══╝)
+- Added BREAKEVEN (BE) detection and build functions
+- Added 3 SL variants: full loss, BE hit at entry, partial win
+- Added price jump text builder
+- Updated detectCategory with correct priority order matching parser
+- Added test functions: testBreakeven, testSLBeHit, testSLPartial, testBEHit, testPartialWin, testAllTypes
+- Added scenario test functions for complete trade workflows
 
 Stage Summary:
-- Pine Script: Clean, no compilation issues, all 10 alert types produce correctly formatted Arabic text
-- signal-parser.ts: Fixed 3 bugs (BREAKEVEN false-positive on ENTRY, TP count regex, TP status regex)
-- route.ts: No changes needed, existing dedup and parent matching logic is correct
-- All 12 compatibility tests pass
+- Updated Google Apps Script from v5.0 to v6.0
+- All build functions now match Pine Script v3.7 output format exactly
+- BREAKEVEN support added (was missing in v5.0)
+- 11 signal types fully supported: ENTRY, TP_HIT, SL_HIT, BREAKEVEN, PYRAMID, PYRAMID_TP, PYRAMID_SL, REENTRY, REENTRY_TP, REENTRY_SL
