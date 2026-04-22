@@ -225,3 +225,30 @@ Stage Summary:
 - updates/route.ts: Added entry field to API response
 - All changes ensure notifications work when app is closed/swiped away
 
+---
+Task ID: 1
+Agent: Main Agent
+Task: Fix Android background notifications - complete rewrite of notification system
+
+Work Log:
+- Analyzed all Android source files (SignalService.java, MainActivity.java, NotificationHelper.java, SignalPollReceiver.java, BootReceiver.java, AndroidManifest.xml)
+- Analyzed API updates endpoint (route.ts) to understand data flow
+- Identified 5 critical root causes:
+  1. startForeground() missing FOREGROUND_SERVICE_TYPE_SPECIAL_USE on Android 14+
+  2. Notification channels get lowered by OEMs with no reset mechanism
+  3. MainActivity.onResume() was clearing session token (setToken(""))
+  4. No test notification to verify pipeline works
+  5. Heartbeat chain could break if scheduleNext() wasn't called first
+- Rewrote NotificationHelper.java v2.0: Added resetSignalChannels() to delete/recreate channels on every launch
+- Rewrote SignalService.java v8: Added ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE, test notification, comprehensive logging
+- Rewrote MainActivity.java v2.0: Removed onResume() token clearing bug, added channel reset on launch
+- Rewrote SignalPollReceiver.java v7: Made heartbeat chain unbreakable (scheduleNext called FIRST)
+- Updated BootReceiver.java: Added channel reset on boot
+- Built ForexYemeni-v2.0-fix.apk (5.1 MB)
+
+Stage Summary:
+- 5 files completely rewritten with comprehensive fixes
+- APK built successfully: /home/z/my-project/download/ForexYemeni-v2.0-fix.apk
+- User must delete old app and install new APK (different signing key)
+- App will now send a test notification 3-5s after launch to verify notifications work
+- Notification channels are reset on every launch to prevent OEM lowering

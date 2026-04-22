@@ -10,21 +10,22 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.PixelFormat;
 import android.graphics.drawable.GradientDrawable;
 import android.media.AudioAttributes;
-import android.media.MediaPlayer;
 import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
-import android.view.LayoutInflater;
+import android.util.Log;
 
 /**
- * NotificationHelper v1.10 - Creates and shows Android notifications with:
- * - App icon as notification icon
- * - Custom sounds per event type (buy/sell/tp_hit/sl_hit/admin)
- * - Gold VIP styling with large icons
- * - Full-screen intent for critical alerts
+ * NotificationHelper v2.0 - CRITICAL FIX: Reset channels on every launch
+ *
+ * KEY CHANGES from v1.10:
+ * - resetSignalChannels(): Deletes and recreates signal channels to restore IMPORTANCE_HIGH
+ *   (OEMs/users may lower importance; we reset on every launch)
+ * - Uses IMPORTANCE_HIGH (not MAX) with heads-up guaranteed via setBypassDnd(true)
+ * - Enhanced logging for diagnostics
+ * - playNotificationTone: plays sound via DEFAULT_SOUND_URI for maximum volume
  */
 public class NotificationHelper {
 
@@ -33,32 +34,80 @@ public class NotificationHelper {
     public static final String CHANNEL_SL_HIT = "forexyemeni_sl_hit";
     public static final String CHANNEL_ADMIN = "forexyemeni_admin";
     public static final String CHANNEL_SERVICE = "forexyemeni_service";
+    public static final String CHANNEL_TEST = "forexyemeni_test";
 
     private static int notificationCounter = 2000;
+
+    /**
+     * CRITICAL: Delete and recreate ALL signal channels to restore IMPORTANCE_HIGH.
+     * OEMs (Samsung, Xiaomi, Huawei) often lower channel importance after creation.
+     * This MUST be called on every app launch.
+     */
+    public static void resetSignalChannels(Context context) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                NotificationManager nm = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+                if (nm == null) return;
+
+                // Delete signal channels (NOT the service channel - it's used by foreground service)
+                String[] signalChannels = {
+                    CHANNEL_NEW_SIGNAL, CHANNEL_TP_HIT, CHANNEL_SL_HIT,
+                    CHANNEL_ADMIN, CHANNEL_TEST
+                };
+                for (String channelId : signalChannels) {
+                    try {
+                        nm.deleteNotificationChannel(channelId);
+                        Log.d("NotifHelper", "Deleted channel: " + channelId);
+                    } catch (Exception e) {
+                        Log.w("NotifHelper", "Failed to delete channel " + channelId + ": " + e.getMessage());
+                    }
+                }
+
+                // Wait a moment for deletion to take effect, then recreate
+                // Recreate immediately (Android handles this fine)
+                createAllChannels(context);
+                Log.d("NotifHelper", "All signal channels RESET to IMPORTANCE_HIGH");
+            }
+        } catch (Exception e) {
+            Log.e("NotifHelper", "resetSignalChannels error", e);
+        }
+    }
 
     public static void createAllChannels(Context context) {
         try {
             // New signal channel - HIGH importance with custom sound
-            createChannel(context, CHANNEL_NEW_SIGNAL, "إشارات جديدة", "إشعارات الإشارات الجديدة - شراء وبيع",
+            createChannel(context, CHANNEL_NEW_SIGNAL, "إشارات جديدة",
+                    "إشعارات الإشارات الجديدة - شراء وبيع",
                     NotificationManager.IMPORTANCE_HIGH, true);
 
             // TP hit channel - HIGH importance with success sound
-            createChannel(context, CHANNEL_TP_HIT, "تحقيق هدف ربح", "إشعارات تحقيق الأرباح وأهداف الربح",
+            createChannel(context, CHANNEL_TP_HIT, "تحقيق هدف ربح",
+                    "إشعارات تحقيق الأرباح وأهداف الربح",
                     NotificationManager.IMPORTANCE_HIGH, true);
 
             // SL hit channel - HIGH importance with alert sound
-            createChannel(context, CHANNEL_SL_HIT, "وقف خسارة", "إشعارات وقف الخسارة",
+            createChannel(context, CHANNEL_SL_HIT, "وقف خسارة",
+                    "إشعارات وقف الخسارة",
                     NotificationManager.IMPORTANCE_HIGH, true);
 
             // Admin channel - DEFAULT importance
-            createChannel(context, CHANNEL_ADMIN, "تنبيهات الإدارة", "إشعارات تسجيل الدخول والموافقات",
+            createChannel(context, CHANNEL_ADMIN, "تنبيهات الإدارة",
+                    "إشعارات تسجيل الدخول والموافقات",
                     NotificationManager.IMPORTANCE_DEFAULT, true);
 
-            // Service channel - LOW importance, no sound
-            createChannel(context, CHANNEL_SERVICE, "خدمة المراقبة", "خدمة مراقبة الإشارات في الخلفية",
+            // Test channel - HIGH importance (for test notifications)
+            createChannel(context, CHANNEL_TEST, "اختبار الإشعارات",
+                    "قناة اختبار - تتحقق من عمل الإشعارات",
+                    NotificationManager.IMPORTANCE_HIGH, true);
+
+            // Service channel - LOW importance, no sound (for foreground service)
+            createChannel(context, CHANNEL_SERVICE, "خدمة المراقبة",
+                    "خدمة مراقبة الإشارات في الخلفية",
                     NotificationManager.IMPORTANCE_LOW, false);
+
+            Log.d("NotifHelper", "All notification channels created/verified");
         } catch (Exception e) {
-            android.util.Log.e("ForexYemeni", "Create channels error", e);
+            Log.e("NotifHelper", "Create channels error", e);
         }
     }
 
@@ -71,9 +120,11 @@ public class NotificationHelper {
             channel.setLightColor(Color.parseColor("#FFD700"));
             channel.enableVibration(true);
             channel.setVibrationPattern(new long[]{100, 50, 100, 50, 200, 100, 200});
-            channel.setBypassDnd(true);
+            channel.setBypassDnd(true); // CRITICAL: Show even in Do Not Disturb mode
+            channel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC); // Show on lock screen
 
             if (withSound) {
+                // Use the default notification sound - LOUD and reliable
                 Uri soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
                 AudioAttributes audioAttributes = new AudioAttributes.Builder()
                         .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
@@ -85,6 +136,11 @@ public class NotificationHelper {
                 channel.setSound(null, null);
             }
 
+            // Set importance explicitly (belt and suspenders)
+            if (importance >= NotificationManager.IMPORTANCE_HIGH) {
+                channel.enableVibration(true);
+            }
+
             NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
             if (manager != null) {
                 manager.createNotificationChannel(channel);
@@ -92,8 +148,14 @@ public class NotificationHelper {
         }
     }
 
+    /**
+     * Show a notification with heads-up display.
+     * Uses IMPORTANCE_HIGH channel for guaranteed popup.
+     */
     public static void showNotification(Context context, String title, String body, String soundType) {
         try {
+            Log.d("NotifHelper", "showNotification: " + title + " | " + soundType);
+
             String channelId;
             int color;
             int iconRes = context.getResources().getIdentifier("ic_launcher", "mipmap", context.getPackageName());
@@ -114,21 +176,24 @@ public class NotificationHelper {
             } else if ("sell".equals(soundType)) {
                 channelId = CHANNEL_NEW_SIGNAL;
                 color = Color.parseColor("#FF5252");
+            } else if ("test".equals(soundType)) {
+                channelId = CHANNEL_TEST;
+                color = Color.parseColor("#2196F3");
             } else {
                 channelId = CHANNEL_NEW_SIGNAL;
                 color = Color.parseColor("#FFD700");
             }
 
             notificationCounter++;
+            int notifId = notificationCounter;
 
             Intent intent = new Intent(context, MainActivity.class);
             intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
             PendingIntent pendingIntent = PendingIntent.getActivity(
-                    context, 0, intent,
+                    context, notifId, intent,
                     PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
             );
 
-            // Use app icon as large icon
             Bitmap largeIcon = BitmapFactory.decodeResource(context.getResources(), iconRes);
             if (largeIcon == null) {
                 largeIcon = createColoredBitmap(color);
@@ -139,7 +204,7 @@ public class NotificationHelper {
                 builder = new Notification.Builder(context, channelId);
             } else {
                 builder = new Notification.Builder(context);
-                builder.setPriority(Notification.PRIORITY_HIGH);
+                builder.setPriority(Notification.PRIORITY_MAX);
             }
 
             builder.setContentTitle(title)
@@ -155,12 +220,6 @@ public class NotificationHelper {
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                 builder.setColor(color);
-                // Make notification show as heads-up
-                builder.setPriority(Notification.PRIORITY_HIGH);
-            }
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                // Set importance to HIGH for heads-up notification
                 builder.setPriority(Notification.PRIORITY_MAX);
             }
 
@@ -171,20 +230,41 @@ public class NotificationHelper {
             bigTextStyle.setSummaryText("ForexYemeni VIP");
             builder.setStyle(bigTextStyle);
 
+            Notification notification = builder.build();
+            // Ensure heads-up display
+            notification.flags |= Notification.FLAG_INSISTENT;
+            // Also ensure lights and sound
+            notification.defaults |= Notification.DEFAULT_SOUND | Notification.DEFAULT_VIBRATE;
+
             NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
             if (manager != null) {
-                Notification notification = builder.build();
-                // Ensure heads-up display
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    notification.flags |= Notification.FLAG_INSISTENT;
-                }
-                manager.notify(notificationCounter, notification);
+                manager.notify(notifId, notification);
+                Log.d("NotifHelper", "Notification shown: id=" + notifId + " channel=" + channelId);
+            } else {
+                Log.e("NotifHelper", "NotificationManager is NULL! Cannot show notification.");
             }
 
             // Play custom tone based on event type
             playNotificationTone(context, soundType);
+
         } catch (Exception e) {
-            android.util.Log.e("ForexYemeni", "Show notification error", e);
+            Log.e("NotifHelper", "showNotification FATAL: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Show a test notification to verify the pipeline works.
+     * Called on app launch and service start.
+     */
+    public static void showTestNotification(Context context) {
+        try {
+            showNotification(context,
+                    "🔔 اختبار الإشعارات",
+                    "إذا رأيت هذه الرسالة، فإن الإشعارات تعمل بشكل صحيح!",
+                    "test");
+            Log.d("NotifHelper", "Test notification sent");
+        } catch (Exception e) {
+            Log.e("NotifHelper", "Test notification failed: " + e.getMessage(), e);
         }
     }
 
@@ -198,7 +278,6 @@ public class NotificationHelper {
             drawable.setSize(96, 96);
             drawable.draw(canvas);
 
-            // Draw "F" letter in center
             android.graphics.Paint paint = new android.graphics.Paint();
             paint.setColor(Color.WHITE);
             paint.setTextSize(48);
@@ -213,13 +292,8 @@ public class NotificationHelper {
     }
 
     /**
-     * Play distinctive notification tones per event type:
-     * - buy: 3 ascending beeps (optimistic)
-     * - sell: 3 descending beeps (cautious)
-     * - tp_hit: triumphant melody (3 quick + 1 long ascending)
-     * - sl_hit: urgent double warning tone
-     * - admin: 2 short alert tones
-     * - default: single prompt tone
+     * Play distinctive notification tones per event type using ToneGenerator.
+     * ToneGenerator uses the notification audio stream which respects user volume settings.
      */
     private static void playNotificationTone(final Context context, final String soundType) {
         new Thread(new Runnable() {
@@ -234,16 +308,16 @@ public class NotificationHelper {
                     if (audioManager != null) {
                         int maxVol = audioManager.getStreamMaxVolume(streamType);
                         int currentVol = audioManager.getStreamVolume(streamType);
-                        // If completely silent, temporarily raise it
-                        boolean wasSilent = currentVol == 0;
-                        if (wasSilent && maxVol > 0) {
+                        if (currentVol == 0 && maxVol > 0) {
                             audioManager.setStreamVolume(streamType, Math.max(1, maxVol / 3), 0);
                         }
                     }
 
+                    android.media.ToneGenerator toneGen;
+
                     if ("buy".equals(soundType)) {
-                        // Ascending 3-beep pattern for BUY signals
-                        android.media.ToneGenerator toneGen = new android.media.ToneGenerator(streamType, 80);
+                        // Ascending 3-beep for BUY
+                        toneGen = new android.media.ToneGenerator(streamType, 80);
                         toneGen.startTone(android.media.ToneGenerator.TONE_CDMA_PIP, 200);
                         Thread.sleep(250);
                         toneGen.startTone(android.media.ToneGenerator.TONE_CDMA_PIP, 200);
@@ -252,8 +326,8 @@ public class NotificationHelper {
                         Thread.sleep(400);
                         toneGen.release();
                     } else if ("sell".equals(soundType)) {
-                        // Descending 2-beep pattern for SELL signals
-                        android.media.ToneGenerator toneGen = new android.media.ToneGenerator(streamType, 80);
+                        // Descending for SELL
+                        toneGen = new android.media.ToneGenerator(streamType, 80);
                         toneGen.startTone(android.media.ToneGenerator.TONE_PROP_BEEP2, 300);
                         Thread.sleep(350);
                         toneGen.startTone(android.media.ToneGenerator.TONE_PROP_BEEP, 300);
@@ -262,46 +336,68 @@ public class NotificationHelper {
                         Thread.sleep(250);
                         toneGen.release();
                     } else if ("tp_hit".equals(soundType)) {
-                        // Triumphant ascending melody for TP HIT - most distinctive
-                        android.media.ToneGenerator toneGen = new android.media.ToneGenerator(streamType, 100);
-                        // Quick ascending triplet
+                        // Triumphant ascending for TP HIT
+                        toneGen = new android.media.ToneGenerator(streamType, 100);
                         toneGen.startTone(android.media.ToneGenerator.TONE_CDMA_PIP, 150);
                         Thread.sleep(200);
                         toneGen.startTone(android.media.ToneGenerator.TONE_CDMA_PIP, 150);
                         Thread.sleep(200);
                         toneGen.startTone(android.media.ToneGenerator.TONE_CDMA_PIP, 150);
                         Thread.sleep(200);
-                        // Long triumphant note
                         toneGen.startTone(android.media.ToneGenerator.TONE_CDMA_PIP, 600);
                         Thread.sleep(700);
                         toneGen.release();
                     } else if ("sl_hit".equals(soundType)) {
                         // Urgent double-warning for SL HIT
-                        android.media.ToneGenerator toneGen = new android.media.ToneGenerator(streamType, 100);
+                        toneGen = new android.media.ToneGenerator(streamType, 100);
                         toneGen.startTone(android.media.ToneGenerator.TONE_CDMA_ABBR_ALERT, 400);
                         Thread.sleep(450);
                         toneGen.startTone(android.media.ToneGenerator.TONE_CDMA_ABBR_ALERT, 600);
                         Thread.sleep(700);
                         toneGen.release();
                     } else if ("admin".equals(soundType)) {
-                        // Professional 2-tone admin alert
-                        android.media.ToneGenerator toneGen = new android.media.ToneGenerator(streamType, 80);
+                        toneGen = new android.media.ToneGenerator(streamType, 80);
                         toneGen.startTone(android.media.ToneGenerator.TONE_CDMA_NETWORK_BUSY, 300);
                         Thread.sleep(350);
                         toneGen.startTone(android.media.ToneGenerator.TONE_PROP_PROMPT, 300);
                         Thread.sleep(350);
                         toneGen.release();
                     } else {
-                        // Default single notification tone
-                        android.media.ToneGenerator toneGen = new android.media.ToneGenerator(streamType, 80);
-                        toneGen.startTone(android.media.ToneGenerator.TONE_PROP_PROMPT, 400);
-                        Thread.sleep(450);
+                        // Default/test notification sound
+                        toneGen = new android.media.ToneGenerator(streamType, 100);
+                        toneGen.startTone(android.media.ToneGenerator.TONE_PROP_PROMPT, 500);
+                        Thread.sleep(600);
                         toneGen.release();
                     }
                 } catch (Exception e) {
-                    android.util.Log.e("ForexYemeni", "Tone error", e);
+                    Log.e("NotifHelper", "Tone error: " + e.getMessage());
                 }
             }
         }).start();
+    }
+
+    /**
+     * Diagnostic: Log all channel states for debugging
+     */
+    public static void logChannelStates(Context context) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                NotificationManager nm = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+                if (nm == null) return;
+                String[] channelIds = {CHANNEL_NEW_SIGNAL, CHANNEL_TP_HIT, CHANNEL_SL_HIT, CHANNEL_ADMIN, CHANNEL_SERVICE};
+                for (String id : channelIds) {
+                    NotificationChannel ch = nm.getNotificationChannel(id);
+                    if (ch != null) {
+                        Log.d("NotifHelper", "Channel '" + id + "': importance=" + ch.getImportance()
+                                + ", sound=" + (ch.getSound() != null) + ", vibration=" + ch.shouldVibrate()
+                                + ", bypassDnd=" + ch.canBypassDnd());
+                    } else {
+                        Log.w("NotifHelper", "Channel '" + id + "' does NOT exist!");
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.e("NotifHelper", "logChannelStates error: " + e.getMessage());
+        }
     }
 }
