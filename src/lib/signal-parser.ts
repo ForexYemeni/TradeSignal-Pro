@@ -215,7 +215,7 @@ function parseTPHitAlert(text: string): ParseResult {
       hitTpIndex: tpNum,
       hitPrice: hitPrice || 0,
       pnlPoints: pnlPoints || 0,
-      pnlDollar: pnlDollar || 0,
+      pnlDollar: pnlDollar ?? undefined,
       tpStatusList,
       totalTPs: totalTPs || undefined,
       timeframe: "",
@@ -256,7 +256,7 @@ function parseSLHitAlert(text: string): ParseResult {
       partialWin,
       hitPrice: slPrice,
       pnlPoints,
-      pnlDollar,
+      pnlDollar: pnlDollar ?? undefined,
       timeframe: "",
       htfTimeframe: "",
       htfTrend: "",
@@ -283,7 +283,7 @@ function parseBreakevenAlert(text: string): ParseResult {
       hitTpIndex: parseInt(tpsHit) || 0,
       hitPrice: entry,
       pnlPoints: 0,
-      pnlDollar: 0,
+      pnlDollar: undefined,
       tpStatusList: extractTPStatusList(text),
       totalTPs: extractTotalTPCount(text),
       timeframe: "", htfTimeframe: "", htfTrend: "", smcTrend: "",
@@ -328,7 +328,7 @@ function parseReentryTPAlert(text: string): ParseResult {
   const tpNum = extractTPNumber(text);
   const hitPrice = extractHitPrice(text) || 0;
   const pnlPoints = extractPnLPoints(text) || 0;
-  const pnlDollar = extractPnLDollar(text) || 0;
+  const pnlDollar = extractPnLDollar(text);
   const tpStatusList = extractTPStatusList(text);
   const totalTPs = extractTotalTPCount(text);
 
@@ -339,7 +339,7 @@ function parseReentryTPAlert(text: string): ParseResult {
       takeProfits: [], confidence: 0,
       signalCategory: "REENTRY_TP", rawText: text,
       hitTpIndex: tpNum,
-      hitPrice, pnlPoints, pnlDollar,
+      hitPrice, pnlPoints, pnlDollar: pnlDollar ?? undefined,
       tpStatusList,
       totalTPs: totalTPs || undefined,
       timeframe: "", htfTimeframe: "", htfTrend: "", smcTrend: "",
@@ -352,7 +352,7 @@ function parseReentrySLAlert(text: string): ParseResult {
   const pair = extractPair(text) || "";
   const slPrice = extractStopLoss(text) || 0;
   const pnlPoints = extractPnLPoints(text) || 0;
-  const pnlDollar = extractPnLDollar(text) || 0;
+  const pnlDollar = extractPnLDollar(text);
   const partialWin = /ربح جزئي/.test(text);
 
   return {
@@ -361,7 +361,7 @@ function parseReentrySLAlert(text: string): ParseResult {
       pair, type: "BUY", entry: 0, stopLoss: slPrice,
       takeProfits: [], confidence: 0,
       signalCategory: "REENTRY_SL", rawText: text,
-      partialWin, hitPrice: slPrice, pnlPoints, pnlDollar,
+      partialWin, hitPrice: slPrice, pnlPoints, pnlDollar: pnlDollar ?? undefined,
       timeframe: "", htfTimeframe: "", htfTrend: "", smcTrend: "",
       riskData: emptyRiskData(),
     },
@@ -395,7 +395,7 @@ function parsePyramidTPAlert(text: string): ParseResult {
   const tpNum = extractTPNumber(text);
   const hitPrice = extractHitPrice(text) || 0;
   const pnlPoints = extractPnLPoints(text) || 0;
-  const pnlDollar = extractPnLDollar(text) || 0;
+  const pnlDollar = extractPnLDollar(text);
   const tpStatusList = extractTPStatusList(text);
   const totalTPs = extractTotalTPCount(text);
 
@@ -408,7 +408,7 @@ function parsePyramidTPAlert(text: string): ParseResult {
       pair, type: "BUY", entry: 0, stopLoss: 0,
       takeProfits: [], confidence: 0,
       signalCategory: "PYRAMID_TP", rawText: text,
-      hitPrice, pnlPoints, pnlDollar,
+      hitPrice, pnlPoints, pnlDollar: pnlDollar ?? undefined,
       timeframe: "", htfTimeframe: "", htfTrend: "", smcTrend: "",
       riskData: emptyRiskData(),
     },
@@ -419,7 +419,7 @@ function parsePyramidSLAlert(text: string): ParseResult {
   const pair = extractPair(text) || "";
   const slPrice = extractStopLoss(text) || 0;
   const pnlPoints = extractPnLPoints(text) || 0;
-  const pnlDollar = extractPnLDollar(text) || 0;
+  const pnlDollar = extractPnLDollar(text);
   const partialWin = /ربح جزئي/.test(text);
 
   return {
@@ -428,7 +428,7 @@ function parsePyramidSLAlert(text: string): ParseResult {
       pair, type: "BUY", entry: 0, stopLoss: slPrice,
       takeProfits: [], confidence: 0,
       signalCategory: "PYRAMID_SL", rawText: text,
-      partialWin, hitPrice: slPrice, pnlPoints, pnlDollar,
+      partialWin, hitPrice: slPrice, pnlPoints, pnlDollar: pnlDollar ?? undefined,
       timeframe: "", htfTimeframe: "", htfTrend: "", smcTrend: "",
       riskData: emptyRiskData(),
     },
@@ -675,15 +675,26 @@ function extractSMCTrend(text: string): string {
 }
 
 function extractTPNumber(text: string): number {
-  // Match patterns: "تحقق الهدف 1", "الهدف 2", "هدف التعويض 3", "هدف التعزيز 4", "TP1", "TP 1"
-  const patterns = [
-    /(?:تحقق\s+)?(?:هدف)\s*(?:التعويض|التعزيز)?\s*(\d+)/,
-    /TP\s*(\d+)/i,
-  ];
-  for (const p of patterns) {
-    const match = text.match(p);
-    if (match) return parseInt(match[1]);
+  // For "تحقق الهدف X" or "الهدف X"
+  const explicitMatch = text.match(/(?:تحقق\s+)?(?:هدف)\s*(?:التعويض|التعزيز)?\s*(\d+)/);
+  if (explicitMatch) return parseInt(explicitMatch[1]);
+
+  // For full close "إغلاق كامل بالربح" or jump "قفزة سعرية" — find the HIGHEST TP number
+  if (/إغلاق كامل بالربح/.test(text) || /قفزة سعرية/.test(text)) {
+    let maxTP = -1;
+    const tpRegex = /TP\s*(\d+)/gi;
+    let m;
+    while ((m = tpRegex.exec(text)) !== null) {
+      const n = parseInt(m[1]);
+      if (n > maxTP) maxTP = n;
+    }
+    return maxTP;
   }
+
+  // Fallback: first TP number found
+  const fallback = text.match(/TP\s*(\d+)/i);
+  if (fallback) return parseInt(fallback[1]);
+
   return -1;
 }
 
@@ -701,10 +712,11 @@ function extractPnLPoints(text: string): number | null {
 
 function extractPnLDollar(text: string): number | null {
   // Try matching specific patterns - require $ sign to avoid matching prices
+  // v4.0 format: "ربح تقريبي: +$20.00" or "الخسارة: $5.00"
   const patterns = [
-    /(?:ربح تقريبي|ربح)\s*[:\s\-–]*\$\s*([+-]?[\d,.]+)/,
-    /(?:الخسارة|خسارة)\s*[:\s\-–]*\$\s*([+-]?[\d,.]+)/,
-    /\$\s*([+-]?[\d,.]+)\s*(?:ربح|خسارة|نقطة)/,
+    /(?:ربح تقريبي|ربح)\s*[:\s\-–]*[+\-]?\$\s*([\d,.]+)/,
+    /(?:الخسارة|خسارة)\s*[:\s\-–]*[+\-]?\$\s*([\d,.]+)/,
+    /\$\s*[+\-]?([\d,.]+)\s*(?:ربح|خسارة|نقطة)/,
   ];
   for (const p of patterns) {
     const match = text.match(p);
@@ -712,7 +724,11 @@ function extractPnLDollar(text: string): number | null {
       const val = parseFloat(match[1].replace(/,/g, ""));
       if (!isFinite(val) || val === 0) continue;
       if (Math.abs(val) > 50000) continue;
-      return /الخسارة|خسارة/.test(match[0]) && !/\+/.test(match[0]) ? -val : val;
+      // Loss patterns return negative, profit patterns return positive
+      const isLoss = /الخسارة|خسارة/.test(match[0]);
+      const hasPlusSign = /\+/.test(match[0]);
+      if (isLoss && !hasPlusSign) return -val;
+      return val;
     }
   }
   return null;

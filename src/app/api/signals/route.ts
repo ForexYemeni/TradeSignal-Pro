@@ -230,8 +230,8 @@ async function handleUpdateSignal(parsed: any) {
     return parseFloat(clamped.toFixed(2));
   };
 
-  // Validate parsed pnlDollar from text - reject if unreasonable
-  const validatedParsedDollar = (typeof parsed.pnlDollar === "number" && isFinite(parsed.pnlDollar) && Math.abs(parsed.pnlDollar) < 50000)
+  // Validate parsed pnlDollar from text - reject if unreasonable or zero (0 = not parsed)
+  const validatedParsedDollar = (typeof parsed.pnlDollar === "number" && isFinite(parsed.pnlDollar) && parsed.pnlDollar !== 0 && Math.abs(parsed.pnlDollar) < 50000)
     ? parsed.pnlDollar : null;
 
   if (parsed.signalCategory === "BREAKEVEN") {
