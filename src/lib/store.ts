@@ -410,6 +410,83 @@ export async function deletePackage(id: string): Promise<boolean> {
   return true;
 }
 
+// ─── Login Attempt Tracking ──────────────────────────
+interface LoginAttemptData {
+  count: number;
+  lockedUntil: string | null; // ISO timestamp
+}
+
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOCKOUT_DURATION_MINUTES = 15;
+const ATTEMPT_WINDOW_MINUTES = 15;
+
+export async function trackLoginAttempt(email: string): Promise<{ attemptsLeft: number; locked: boolean; lockedUntil: string | null }> {
+  const key = `login_attempts:${email.toLowerCase()}`;
+  const data = await kv.get<LoginAttemptData>(key);
+
+  const now = new Date();
+  const windowStart = new Date(now.getTime() - ATTEMPT_WINDOW_MINUTES * 60 * 1000);
+
+  if (data) {
+    // Check if currently locked
+    if (data.lockedUntil && new Date(data.lockedUntil) > now) {
+      return {
+        attemptsLeft: 0,
+        locked: true,
+        lockedUntil: data.lockedUntil,
+      };
+    }
+    // Lock expired, reset
+    if (data.lockedUntil && new Date(data.lockedUntil) <= now) {
+      await kv.del(key);
+      return { attemptsLeft: MAX_LOGIN_ATTEMPTS, locked: false, lockedUntil: null };
+    }
+  }
+
+  const newCount = (data?.count || 0) + 1;
+  let lockedUntil: string | null = null;
+
+  if (newCount >= MAX_LOGIN_ATTEMPTS) {
+    lockedUntil = new Date(now.getTime() + LOCKOUT_DURATION_MINUTES * 60 * 1000).toISOString();
+  }
+
+  await kv.set(key, { count: newCount, lockedUntil }, { ex: LOCKOUT_DURATION_MINUTES * 60 });
+
+  return {
+    attemptsLeft: Math.max(0, MAX_LOGIN_ATTEMPTS - newCount),
+    locked: newCount >= MAX_LOGIN_ATTEMPTS,
+    lockedUntil,
+  };
+}
+
+export async function getLoginAttempts(email: string): Promise<{ attemptsLeft: number; locked: boolean; lockedUntil: string | null }> {
+  const key = `login_attempts:${email.toLowerCase()}`;
+  const data = await kv.get<LoginAttemptData>(key);
+
+  if (!data) return { attemptsLeft: MAX_LOGIN_ATTEMPTS, locked: false, lockedUntil: null };
+
+  const now = new Date();
+  if (data.lockedUntil && new Date(data.lockedUntil) > now) {
+    return { attemptsLeft: 0, locked: true, lockedUntil: data.lockedUntil };
+  }
+
+  if (data.lockedUntil && new Date(data.lockedUntil) <= now) {
+    await kv.del(key);
+    return { attemptsLeft: MAX_LOGIN_ATTEMPTS, locked: false, lockedUntil: null };
+  }
+
+  return {
+    attemptsLeft: Math.max(0, MAX_LOGIN_ATTEMPTS - data.count),
+    locked: false,
+    lockedUntil: null,
+  };
+}
+
+export async function resetLoginAttempts(email: string): Promise<void> {
+  const key = `login_attempts:${email.toLowerCase()}`;
+  await kv.del(key);
+}
+
 // ─── App Settings ──────────────────────────────────────
 export interface AppSettings {
   freeTrialPackageId: string | null;

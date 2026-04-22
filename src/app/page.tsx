@@ -26,6 +26,54 @@ import { TpMiniCard, TradeStatusBanner, EntryCard, ClosedSignalCard, SplashScree
 
 
 
+// ═══ LOCKED COUNTDOWN COMPONENT ═══
+function LockedCountdown({ lockedUntil }: { lockedUntil: string }) {
+  const [timeLeft, setTimeLeft] = useState({ min: 0, sec: 0 });
+
+  useEffect(() => {
+    const calc = () => {
+      const diff = Math.max(0, new Date(lockedUntil).getTime() - Date.now());
+      setTimeLeft({
+        min: Math.floor(diff / 60000),
+        sec: Math.floor((diff % 60000) / 1000),
+      });
+    };
+    calc();
+    const id = setInterval(calc, 1000);
+    return () => clearInterval(id);
+  }, [lockedUntil]);
+
+  return (
+    <div className="flex items-center justify-center gap-4 py-2">
+      {/* Minutes */}
+      <div className="flex flex-col items-center">
+        <div className="w-16 h-16 rounded-2xl bg-red-600/15 border border-red-500/20 flex items-center justify-center">
+          <span className="text-2xl font-black text-red-300 font-mono">
+            {String(timeLeft.min).padStart(2, "0")}
+          </span>
+        </div>
+        <span className="text-[9px] text-muted-foreground mt-1.5">دقيقة</span>
+      </div>
+
+      {/* Separator */}
+      <div className="flex flex-col items-center gap-1 pt-2">
+        <div className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
+        <div className="w-1.5 h-1.5 rounded-full bg-red-400/50" />
+      </div>
+
+      {/* Seconds */}
+      <div className="flex flex-col items-center">
+        <div className="w-16 h-16 rounded-2xl bg-red-600/15 border border-red-500/20 flex items-center justify-center">
+          <span className="text-2xl font-black text-red-300 font-mono">
+            {String(timeLeft.sec).padStart(2, "0")}
+          </span>
+        </div>
+        <span className="text-[9px] text-muted-foreground mt-1.5">ثانية</span>
+      </div>
+    </div>
+  );
+}
+
 // ═══ SIGNAL CARD WRAPPER ═══
 function SignalCard({ s, idx, isAdmin, onUpdate, onDelete, isNew, statusChanged }: {
   s: Signal; idx: number; isAdmin: boolean;
@@ -59,6 +107,8 @@ export default function HomePage() {
   const [loginLoad, setLoginLoad] = useState(false);
   const [loginErr, setLoginErr] = useState("");
   const [showPwd, setShowPwd] = useState(false);
+  /* ── Login Feedback States ── */
+  const [loginFeedback, setLoginFeedback] = useState<null | { type: "email_not_found" | "wrong_password" | "account_locked"; attemptsLeft?: number; maxAttempts?: number; lockedUntil?: string; retryAfterMinutes?: number; email?: string }>(null);
 
   /* ── Change Password ── */
   const [cpCur, setCpCur] = useState("");
@@ -414,6 +464,7 @@ export default function HomePage() {
   /* ── Handlers ── */
   async function handleLogin() {
     setLoginErr("");
+    setLoginFeedback(null);
     setLoginLoad(true);
     try {
       const res = await fetch("/api/admin", {
@@ -436,9 +487,33 @@ export default function HomePage() {
           setView("expired");
           return;
         }
+        // Smart login feedback
+        if (data.error === "email_not_found") {
+          setLoginFeedback({ type: "email_not_found", email: data.email });
+          return;
+        }
+        if (data.error === "wrong_password") {
+          setLoginFeedback({
+            type: "wrong_password",
+            attemptsLeft: data.attemptsLeft,
+            maxAttempts: data.maxAttempts,
+            locked: data.locked,
+            lockedUntil: data.lockedUntil,
+          });
+          return;
+        }
+        if (data.error === "account_locked") {
+          setLoginFeedback({
+            type: "account_locked",
+            lockedUntil: data.lockedUntil,
+            retryAfterMinutes: data.retryAfterMinutes,
+          });
+          return;
+        }
         setLoginErr(data.error || data.detail || "خطأ في تسجيل الدخول");
         return;
       }
+      setLoginFeedback(null);
       const s: AdminSession = data.admin;
       setSession(s);
       localStorage.setItem("adminSession", JSON.stringify(s));
@@ -490,7 +565,7 @@ export default function HomePage() {
     unregisterPushNotification().catch(() => {});
     setSession(null);
     localStorage.removeItem("adminSession");
-    setEmail(""); setPwd("");
+    setEmail(""); setPwd(""); setLoginFeedback(null);
     setView("login");
     setTab("signals");
     prevIdsRef.current = new Set();
@@ -812,15 +887,194 @@ export default function HomePage() {
                 </button>
               </div>
 
-              {/* Error */}
-              {loginErr && (
-                <div className="bg-red-500/10 border border-red-500/20 rounded-2xl px-4 py-3 text-[12px] text-red-400 text-center animate-[fadeIn_0.2s_ease-out] break-all leading-relaxed">{loginErr}</div>
-              )}
+              {/* Smart Login Feedback */}
+              <AnimatePresence mode="wait">
+                {loginFeedback?.type === "email_not_found" && (
+                  <motion.div
+                    key="email-not-found"
+                    initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                    transition={{ duration: 0.4, ease: "easeOut" }}
+                    className="relative overflow-hidden rounded-2xl border border-amber-500/30"
+                  >
+                    {/* Animated gradient background */}
+                    <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-yellow-500/10" />
+                    <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-amber-400 to-transparent" />
+                    
+                    <div className="relative p-5 space-y-4">
+                      {/* Icon & Title */}
+                      <div className="flex items-start gap-3">
+                        <div className="w-11 h-11 rounded-xl bg-amber-500/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <User className="w-5 h-5 text-amber-400" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-sm font-bold text-amber-300">حساب غير موجود</h3>
+                          <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
+                            البريد <span className="text-amber-400/80 font-mono text-[10px]">{loginFeedback.email}</span> غير مسجل في النظام
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Divider */}
+                      <div className="h-px bg-gradient-to-r from-transparent via-amber-500/20 to-transparent" />
+
+                      {/* CTA Button */}
+                      <button
+                        onClick={() => { setView("register"); setLoginFeedback(null); setLoginErr(""); }}
+                        className="w-full h-[44px] rounded-xl bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/25 flex items-center justify-center gap-2 text-amber-300 text-sm font-bold hover:from-amber-500/30 hover:to-orange-500/30 transition-all active:scale-[0.98] group"
+                      >
+                        <Sparkles className="w-4 h-4 group-hover:rotate-12 transition-transform" />
+                        أنشئ حسابك الآن
+                        <ArrowUpRight className="w-3.5 h-3.5 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 transition-transform" />
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+
+                {loginFeedback?.type === "wrong_password" && (
+                  <motion.div
+                    key="wrong-password"
+                    initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                    transition={{ duration: 0.4, ease: "easeOut" }}
+                    className="relative overflow-hidden rounded-2xl border border-red-500/30"
+                  >
+                    {/* Animated gradient background */}
+                    <div className="absolute inset-0 bg-gradient-to-br from-red-500/10 via-rose-500/5 to-orange-500/10" />
+                    <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-red-400 to-transparent" />
+
+                    <div className="relative p-5 space-y-4">
+                      {/* Icon & Title */}
+                      <div className="flex items-start gap-3">
+                        <div className="w-11 h-11 rounded-xl bg-red-500/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <ShieldAlert className="w-5 h-5 text-red-400" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-sm font-bold text-red-300">كلمة المرور غير صحيحة</h3>
+                          <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
+                            تحقق من كلمة المرور وحاول مرة أخرى
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Attempts Counter */}
+                      <div className="flex items-center gap-3">
+                        {/* Progress Ring */}
+                        <div className="relative w-14 h-14 flex-shrink-0">
+                          <svg className="w-14 h-14 -rotate-90" viewBox="0 0 56 56">
+                            <circle cx="28" cy="28" r="23" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="4" />
+                            <circle
+                              cx="28" cy="28" r="23" fill="none"
+                              stroke={loginFeedback.attemptsLeft! <= 1 ? "#ef4444" : loginFeedback.attemptsLeft! <= 2 ? "#f97316" : "#FFD700"}
+                              strokeWidth="4"
+                              strokeLinecap="round"
+                              strokeDasharray={`${(loginFeedback.attemptsLeft! / loginFeedback.maxAttempts!) * 2 * Math.PI * 23} ${2 * Math.PI * 23}`}
+                              className="transition-all duration-700 ease-out"
+                            />
+                          </svg>
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <span className={`text-lg font-black ${loginFeedback.attemptsLeft! <= 1 ? "text-red-400" : loginFeedback.attemptsLeft! <= 2 ? "text-orange-400" : "text-amber-300"}`}>
+                              {loginFeedback.attemptsLeft}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Text Info */}
+                        <div className="flex-1">
+                          <div className="text-xs font-bold text-foreground">
+                            محاولات متبقية
+                          </div>
+                          <div className="text-[10px] text-muted-foreground mt-0.5">
+                            {loginFeedback.attemptsLeft! > 2 ? (
+                              <span>لديك <span className="text-amber-300 font-bold">{loginFeedback.attemptsLeft}</span> محاولات قبل قفل الحساب</span>
+                            ) : loginFeedback.attemptsLeft! === 2 ? (
+                              <span className="text-orange-300 font-medium">تحذير! محاولتان فقط متبقيتان</span>
+                            ) : (
+                              <span className="text-red-400 font-medium">محاولة أخيرة! ثم سيتم قفل الحساب</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Attempt Dots */}
+                      <div className="flex items-center justify-center gap-2">
+                        {Array.from({ length: loginFeedback.maxAttempts! }).map((_, i) => (
+                          <div
+                            key={i}
+                            className={`h-1.5 rounded-full transition-all duration-500 ${
+                              i < loginFeedback.attemptsLeft!
+                                ? loginFeedback.attemptsLeft! <= 2
+                                  ? "bg-orange-400 w-5"
+                                  : "bg-amber-400 w-5"
+                                : "bg-white/10 w-3"
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+
+                {loginFeedback?.type === "account_locked" && (
+                  <motion.div
+                    key="account-locked"
+                    initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                    transition={{ duration: 0.4, ease: "easeOut" }}
+                    className="relative overflow-hidden rounded-2xl border border-red-600/40"
+                  >
+                    {/* Animated background */}
+                    <div className="absolute inset-0 bg-gradient-to-br from-red-600/15 via-rose-600/10 to-red-800/15" />
+                    <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-red-500 to-transparent animate-pulse" />
+
+                    <div className="relative p-5 space-y-4">
+                      {/* Icon & Title */}
+                      <div className="flex items-start gap-3">
+                        <div className="w-11 h-11 rounded-xl bg-red-600/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <Lock className="w-5 h-5 text-red-400" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-sm font-bold text-red-300">تم قفل الحساب مؤقتاً</h3>
+                          <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
+                            تم تجاوز عدد المحاولات المسموحة. انتظر قبل المحاولة مرة أخرى.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Countdown */}
+                      <LockedCountdown lockedUntil={loginFeedback.lockedUntil!} />
+
+                      {/* Warning */}
+                      <div className="flex items-center gap-2 bg-red-500/10 rounded-xl px-3 py-2.5">
+                        <AlertTriangle className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
+                        <span className="text-[10px] text-red-300/80 leading-relaxed">
+                          لأسباب أمنية، سيتم فتح الحساب تلقائياً بعد انتهاء المدة
+                        </span>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+
+                {loginErr && !loginFeedback && (
+                  <motion.div
+                    key="generic-error"
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    className="bg-red-500/10 border border-red-500/20 rounded-2xl px-4 py-3 text-[12px] text-red-400 text-center break-all leading-relaxed"
+                  >
+                    {loginErr}
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {/* Login Button */}
               <button
                 onClick={handleLogin}
-                disabled={loginLoad || !email || !pwd}
+                disabled={loginLoad || !email || !pwd || loginFeedback?.type === "account_locked"}
                 className="w-full h-[56px] rounded-2xl gold-gradient text-black font-bold text-base hover:opacity-90 transition-all active:scale-[0.98] disabled:opacity-50 shadow-lg shadow-amber-500/20"
               >
                 {loginLoad ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : "تسجيل الدخول"}
@@ -830,7 +1084,7 @@ export default function HomePage() {
             {/* Register Link */}
             <div className="text-center">
               <button
-                onClick={() => { setView("register"); setLoginErr(""); }}
+                onClick={() => { setView("register"); setLoginErr(""); setLoginFeedback(null); }}
                 className="text-sm font-medium transition-colors"
                 style={{ color: "#FFD700" }}
               >
@@ -938,7 +1192,7 @@ export default function HomePage() {
             {/* Login Link */}
             <div className="text-center">
               <button
-                onClick={() => setView("login")}
+                onClick={() => { setView("login"); setLoginErr(""); setLoginFeedback(null); }}
                 className="text-sm font-medium transition-colors"
                 style={{ color: "#FFD700" }}
               >

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAdmin, setAdmin, getUserByEmail, migrateAdminToUsers, comparePassword, hashPassword, getUserById, updateUser } from "@/lib/store";
+import { getAdmin, setAdmin, getUserByEmail, migrateAdminToUsers, comparePassword, hashPassword, getUserById, updateUser, trackLoginAttempt, getLoginAttempts, resetLoginAttempts } from "@/lib/store";
 import { validateEmail, validatePassword, validateAction, validateUUID } from "@/lib/validation";
 
 export async function POST(request: NextRequest) {
@@ -30,33 +30,59 @@ async function handleLogin(body: Record<string, unknown>) {
   // Ensure admin is migrated to users
   await migrateAdminToUsers();
 
+  // Check if account is currently locked
+  const attemptStatus = await getLoginAttempts(email);
+  if (attemptStatus.locked) {
+    const lockedUntil = attemptStatus.lockedUntil!;
+    const remainingMs = new Date(lockedUntil).getTime() - Date.now();
+    const remainingMin = Math.ceil(remainingMs / 60000);
+    return NextResponse.json({
+      success: false,
+      error: "account_locked",
+      locked: true,
+      lockedUntil,
+      retryAfterMinutes: remainingMin,
+    }, { status: 423 });
+  }
+
   // Try to find user in users list
   const user = await getUserByEmail(email);
 
   if (user) {
-    const pwdResult = await comparePassword(password, user.passwordHash);
-    if (!pwdResult.match) {
-      return NextResponse.json({ success: false, error: "بيانات الدخول غير صحيحة" }, { status: 401 });
-    }
-    // Auto-rehash legacy plaintext passwords on successful login
-    if (pwdResult.needsRehash) {
-      const { updateUser: upUser } = await import("@/lib/store");
-      await upUser(user.id, { passwordHash: await hashPassword(password) });
-    }
-
+    // Check if user account has a status block
     if (user.status === "pending") {
       return NextResponse.json({ success: false, error: "حسابك قيد المراجعة. في انتظار موافقة الإدارة.", pending: true }, { status: 403 });
     }
-
     if (user.status === "blocked") {
       return NextResponse.json({ success: false, error: "حسابك محظور. تواصل مع الإدارة.", blocked: true }, { status: 403 });
     }
+
+    const pwdResult = await comparePassword(password, user.passwordHash);
+    if (!pwdResult.match) {
+      // Track failed attempt
+      const attempt = await trackLoginAttempt(email);
+      return NextResponse.json({
+        success: false,
+        error: "wrong_password",
+        attemptsLeft: attempt.attemptsLeft,
+        maxAttempts: 5,
+        locked: attempt.locked,
+        lockedUntil: attempt.lockedUntil,
+      }, { status: 401 });
+    }
+
+    // Auto-rehash legacy plaintext passwords on successful login
+    if (pwdResult.needsRehash) {
+      await updateUser(user.id, { passwordHash: await hashPassword(password) });
+    }
+
+    // Reset login attempts on success
+    await resetLoginAttempts(email);
 
     // Check subscription expiry for regular users
     if (user.role === "user" && user.subscriptionType !== "none" && user.subscriptionExpiry) {
       const now = new Date().toISOString();
       if (user.subscriptionExpiry < now) {
-        const { updateUser } = await import("@/lib/store");
         await updateUser(user.id, {
           subscriptionType: "none",
           subscriptionExpiry: null,
@@ -84,7 +110,6 @@ async function handleLogin(body: Record<string, unknown>) {
       },
       token: user.id,
     });
-    // Set session cookie so browser sends it automatically with API calls
     response.cookies.set('fy_session', user.id, { path: '/', httpOnly: true, sameSite: 'strict', maxAge: 60 * 60 * 24 * 7 });
     return response;
   }
@@ -104,17 +129,36 @@ async function handleLogin(body: Record<string, unknown>) {
     await setAdmin(admin);
   }
 
-  if (admin.email !== email) {
-    return NextResponse.json({ success: false, error: "بيانات الدخول غير صحيحة" }, { status: 401 });
+  if (admin.email.toLowerCase() !== email.toLowerCase()) {
+    // Email not found in users list and doesn't match legacy admin
+    return NextResponse.json({
+      success: false,
+      error: "email_not_found",
+      email: email,
+    }, { status: 404 });
   }
+
+  // Legacy admin found but wrong password
   const adminPwdResult = await comparePassword(password, admin.passwordHash);
   if (!adminPwdResult.match) {
-    return NextResponse.json({ success: false, error: "بيانات الدخول غير صحيحة" }, { status: 401 });
+    const attempt = await trackLoginAttempt(email);
+    return NextResponse.json({
+      success: false,
+      error: "wrong_password",
+      attemptsLeft: attempt.attemptsLeft,
+      maxAttempts: 5,
+      locked: attempt.locked,
+      lockedUntil: attempt.lockedUntil,
+    }, { status: 401 });
   }
+
   // Auto-rehash legacy plaintext admin password
   if (adminPwdResult.needsRehash) {
     await setAdmin({ ...admin, passwordHash: await hashPassword(password) });
   }
+
+  // Reset login attempts on success
+  await resetLoginAttempts(email);
 
   const response = NextResponse.json({
     success: true,
@@ -127,7 +171,6 @@ async function handleLogin(body: Record<string, unknown>) {
     },
     token: admin.id,
   });
-  // Set session cookie so browser sends it automatically with API calls
   response.cookies.set('fy_session', admin.id, { path: '/', httpOnly: true, sameSite: 'strict', maxAge: 60 * 60 * 24 * 7 });
   return response;
 }
