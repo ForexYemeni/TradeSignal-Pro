@@ -212,14 +212,19 @@ async function handleLogin(body: Record<string, unknown>) {
 
 async function handleChangePassword(body: Record<string, unknown>) {
   const { id, currentPassword, newEmail, newPassword } = body as {
-    id: string; currentPassword: string; newEmail: string; newPassword: string;
+    id: string; currentPassword: string; newEmail?: string; newPassword: string;
   };
 
   // Validate inputs
   const idVal = validateUUID(id);
   if (!idVal.valid) return NextResponse.json({ success: false, error: idVal.error }, { status: 400 });
-  const emailVal = validateEmail(newEmail);
-  if (!emailVal.valid) return NextResponse.json({ success: false, error: emailVal.error }, { status: 400 });
+
+  // newEmail is optional (only for admin)
+  if (newEmail) {
+    const emailVal = validateEmail(newEmail);
+    if (!emailVal.valid) return NextResponse.json({ success: false, error: emailVal.error }, { status: 400 });
+  }
+
   const curPwd = validatePassword(currentPassword);
   if (!curPwd.valid) return NextResponse.json({ success: false, error: curPwd.error }, { status: 400 });
   const newPwd = validatePassword(newPassword);
@@ -247,7 +252,7 @@ async function handleChangePassword(body: Record<string, unknown>) {
   const hashedNewPwd = await hashPassword(newPassword);
 
   if (admin && admin.id === id) {
-    const updated = { ...admin, passwordHash: hashedNewPwd, email: newEmail, mustChangePwd: false, updatedAt: new Date().toISOString() };
+    const updated = { ...admin, passwordHash: hashedNewPwd, email: newEmail || admin.email, mustChangePwd: false, updatedAt: new Date().toISOString() };
     await setAdmin(updated);
     return NextResponse.json({ success: true, admin: { id: updated.id, email: updated.email, name: updated.name, mustChangePwd: false } });
   }

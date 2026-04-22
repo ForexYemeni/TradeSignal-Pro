@@ -672,15 +672,19 @@ export default function HomePage() {
 
   async function handleChangePwd() {
     setCpErr("");
-    if (!cpCur || !cpEmail || !cpNew || !cpConf) { setCpErr("جميع الحقول مطلوبة"); return; }
+    const isAdmin = session?.role === "admin";
+    if (!cpCur || !cpNew || !cpConf) { setCpErr("جميع الحقول مطلوبة"); return; }
+    if (isAdmin && !cpEmail) { setCpErr("جميع الحقول مطلوبة"); return; }
     if (cpNew !== cpConf) { setCpErr("كلمة المرور غير متطابقة"); return; }
     if (cpNew.length < 6) { setCpErr("كلمة المرور يجب أن تكون 6 أحرف على الأقل"); return; }
     setCpLoad(true);
     try {
+      const payload: Record<string, string> = { action: "change-password", id: session?.id || "", currentPassword: cpCur, newPassword: cpNew };
+      if (isAdmin) payload.newEmail = cpEmail;
       const res = await fetch("/api/admin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "change-password", id: session?.id, currentPassword: cpCur, newEmail: cpEmail, newPassword: cpNew }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!data.success) { setCpErr(data.error || "خطأ"); return; }
