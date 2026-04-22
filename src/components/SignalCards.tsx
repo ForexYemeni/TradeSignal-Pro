@@ -266,10 +266,30 @@ function EntryCard({ s, idx, isAdmin, onUpdate, onDelete, isNew, statusChanged }
                 )}
                 {isClosed && (
                   <Badge className={`${s.status === "HIT_TP" ? "bg-emerald-500/10 text-emerald-400" : s.status === "HIT_SL" ? "bg-red-500/10 text-red-400" : "bg-muted/80 text-muted-foreground"} border-0 text-[8px] font-semibold px-2`}>
-                    {s.status === "HIT_TP" ? "مغلقة بربح" : s.status === "HIT_SL" ? "مغلقة بخسارة" : "مغلقة"}
+                    {s.status === "HIT_TP" ? (s.partialWin ? "ربح جزئي" : "مغلقة بربح") : s.status === "HIT_SL" ? "مغلقة بخسارة" : "مغلقة"}
                   </Badge>
                 )}
               </div>
+              {/* P&L Display — for active signals with TPs hit, or closed signals */}
+              {(hitCount > 0) && (s.pnlDollars != null && s.pnlDollars !== 0) && (
+                <div className="text-right">
+                  <div className={`text-[13px] font-extrabold font-mono ${s.pnlDollars >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                    {s.pnlDollars >= 0 ? "+" : ""}{s.pnlDollars}$
+                  </div>
+                  {s.pnlPoints != null && s.pnlPoints !== 0 && (
+                    <div className={`text-[8px] font-mono ${s.pnlDollars >= 0 ? "text-emerald-400/50" : "text-red-400/50"}`}>
+                      {s.pnlPoints >= 0 ? "+" : ""}{s.pnlPoints} نقطة
+                    </div>
+                  )}
+                </div>
+              )}
+              {isClosed && s.status === "HIT_SL" && (s.pnlDollars == null || s.pnlDollars === 0) && (
+                <div className="text-right">
+                  <div className="text-[13px] font-extrabold font-mono text-red-400">
+                    -{(s.pnlPoints ?? 0)} نقطة
+                  </div>
+                </div>
+              )}
               {s.confidence > 0 && <Stars r={s.confidence} />}
             </div>
           </div>

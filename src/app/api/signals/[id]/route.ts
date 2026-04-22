@@ -66,7 +66,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const stopLoss = Number(existing.stopLoss);
     const slDistance = Number(existing.slDistance) || Math.abs(entry - stopLoss);
     const lotSize = existing.lotSize ? parseFloat(String(existing.lotSize)) : 0;
-    const balance = Number(existing.balance) || 0;
+    let balance = Number(existing.balance) || 0;
+
+    // Fallback: if no lotSize and no balance, assume $1000 balance for P&L estimation
+    const hasRiskData = lotSize > 0 || balance > 0;
+    if (!hasRiskData) balance = 1000;
 
     // Determine pip value based on pair
     const pair = String(existing.pair || "").toUpperCase();
@@ -102,6 +106,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         } else if (balance > 0 && slDistance > 0) {
           const riskAmount = balance * 0.02;
           dollars = (points / slDistance) * riskAmount * tps[tpArrayIdx].rr;
+        } else if (balance > 0) {
+          // Fallback: use R:R ratio with 2% risk
+          dollars = (balance * 0.02) * tps[tpArrayIdx].rr;
         }
 
         updateData.pnlPoints = parseFloat(points.toFixed(1));
@@ -162,6 +169,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         }
         updateData.status = "HIT_SL";
         updateData.partialWin = false;
+        updateData.hitPrice = stopLoss;
         updateData.pnlPoints = parseFloat(points.toFixed(1));
         updateData.pnlDollars = parseFloat(-dollars.toFixed(2));
       }

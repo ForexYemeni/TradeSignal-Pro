@@ -213,7 +213,11 @@ async function handleUpdateSignal(parsed: any) {
   const stopLoss = Number(parent.stopLoss) || 0;
   const slDist = Number(parent.slDistance) || Math.abs(entry - stopLoss);
   const lotSize = parent.lotSize ? parseFloat(String(parent.lotSize)) : 0;
-  const balance = Number(parent.balance) || 0;
+  let balance = Number(parent.balance) || 0;
+
+  // Fallback: if no lotSize and no balance, assume $1000 balance for P&L estimation
+  const hasRiskData = lotSize > 0 || balance > 0;
+  if (!hasRiskData) balance = 1000;
   let tps: { tp: number; rr: number }[] = [];
   try { tps = JSON.parse(String(parent.takeProfits || "[]")); } catch { tps = []; }
 
