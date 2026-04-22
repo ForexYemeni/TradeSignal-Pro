@@ -9,6 +9,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogFooter,
+  AlertDialogTitle, AlertDialogDescription, AlertDialogAction, AlertDialogCancel,
+} from "@/components/ui/alert-dialog";
+import {
   TrendingUp, TrendingDown, Star, Target, ShieldAlert, Clock,
   Activity, Send, RefreshCw, LogOut, Lock, Mail, Zap, Eye,
   EyeOff, DollarSign, AlertTriangle, Trash2, Loader2, Radio,
@@ -153,6 +157,34 @@ export default function HomePage() {
   const [sendLoad, setSendLoad] = useState(false);
   const [parseError, setParseError] = useState("");
 
+  /* ── Professional Confirm Dialog ── */
+  const [confirmAction, setConfirmAction] = useState<{
+    title: string;
+    description: string;
+    action: () => void;
+    variant: "danger" | "warning" | "info";
+    confirmLabel?: string;
+    icon?: React.ReactNode;
+  } | null>(null);
+
+  function askConfirm(params: {
+    title: string;
+    description: string;
+    action: () => void;
+    variant?: "danger" | "warning" | "info";
+    confirmLabel?: string;
+    icon?: React.ReactNode;
+  }) {
+    setConfirmAction({
+      variant: params.variant || "warning",
+      confirmLabel: params.confirmLabel,
+      icon: params.icon,
+      title: params.title,
+      description: params.description,
+      action: params.action,
+    });
+  }
+
   /* ── Account ── */
   const [showCp, setShowCp] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
@@ -195,7 +227,7 @@ export default function HomePage() {
   const [pkgLoad, setPkgLoad] = useState(false);
   const [showAssignPkg, setShowAssignPkg] = useState<string | null>(null);
   const [assignDays, setAssignDays] = useState("");
-  const SUPER_ADMIN_EMAIL = "admin@forexyemeni.com";
+  const SUPER_ADMIN_EMAIL = "mhmdlybdhshay@gmail.com";
 
   /* ── Session Init: restore from localStorage ── */
   const [dbReady, setDbReady] = useState(false);
@@ -673,12 +705,22 @@ export default function HomePage() {
   }
 
   async function handleDeletePackage(id: string) {
-    if (!confirm("هل أنت متأكد من حذف هذه الباقة؟")) return;
-    try {
-      await fetch("/api/packages", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
-      fetchPackages();
-      toast.success("تم حذف الباقة");
-    } catch (e) { console.error("Delete package:", e); }
+    const pkg = packages.find(p => p.id === id);
+    const pkgName = pkg?.name || "هذه الباقة";
+    askConfirm({
+      title: "حذف الباقة",
+      description: `هل أنت متأكد من حذف باقة "${pkgName}"؟ سيتم فقدان جميع إعداداتها ولا يمكن التراجع عن هذا الإجراء.`,
+      variant: "danger",
+      confirmLabel: "نعم، حذف الباقة",
+      icon: <Trash2 className="w-5 h-5 text-red-400" />,
+      action: async () => {
+        try {
+          await fetch("/api/packages", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+          fetchPackages();
+          toast.success("تم حذف الباقة");
+        } catch (e) { console.error("Delete package:", e); }
+      },
+    });
   }
 
   async function handleTogglePackage(id: string, isActive: boolean) {
@@ -703,24 +745,60 @@ export default function HomePage() {
   }
 
   async function handleAssignPackage(userId: string, packageId: string) {
-    try {
-      const res = await fetch("/api/users", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: userId, action: "assign_package", packageId, days: assignDays ? Number(assignDays) : undefined }) });
-      const data = await res.json();
-      if (!data.success) {
-        toast.error(data.error || "فشل تعيين الباقة");
-        return;
-      }
-      setShowAssignPkg(null); setAssignDays("");
-      fetchUsers();
-      toast.success("تم تعيين الباقة بنجاح");
-    } catch (e) { console.error("Assign package:", e); toast.error("خطأ في الاتصال"); }
+    const user = users.find(u => u.id === userId);
+    const userName = user?.name || user?.email || "";
+    const pkg = packages.find(p => p.id === packageId);
+    const pkgName = pkg?.name || "";
+    askConfirm({
+      title: "تفعيل الباقة",
+      description: `هل تريد تفعيل باقة "${pkgName}" للمستخدم "${userName}"؟ ${assignDays ? `المدة: ${assignDays} يوم.` : ''}`,
+      variant: "info",
+      confirmLabel: "نعم، تفعيل",
+      icon: <Package className="w-5 h-5 text-sky-400" />,
+      action: async () => {
+        try {
+          const res = await fetch("/api/users", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: userId, action: "assign_package", packageId, days: assignDays ? Number(assignDays) : undefined }) });
+          const data = await res.json();
+          if (!data.success) {
+            if (data.alreadyActive) {
+              askConfirm({
+                title: "الباقة مفعلة بالفعل",
+                description: `باقة "${data.packageName}" مفعلة بالفعل لهذا المستخدم ولم تنتهِ بعد. متبقي ${data.remainingDays} يوم على الانتهاء. لا يمكن تفعيل نفس الباقة مرتين أثناء سريانها.`,
+                variant: "warning",
+                confirmLabel: "فهمت",
+                icon: <AlertTriangle className="w-5 h-5 text-amber-400" />,
+                action: () => {},
+              });
+            } else {
+              toast.error(data.error || "فشل تعيين الباقة");
+            }
+            return;
+          }
+          setShowAssignPkg(null); setAssignDays("");
+          fetchUsers();
+          toast.success("تم تفعيل الباقة بنجاح");
+        } catch (e) { console.error("Assign package:", e); toast.error("خطأ في الاتصال"); }
+      },
+    });
   }
 
   async function handleSetAgency(userId: string) {
-    try {
-      await fetch("/api/users", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: userId, action: "set_agency" }) });
-      fetchUsers();
-    } catch (e) { console.error("Set agency:", e); }
+    const user = users.find(u => u.id === userId);
+    const userName = user?.name || user?.email || "";
+    askConfirm({
+      title: "تعيين كوكالة",
+      description: `هل تريد تعيين "${userName}" كوكالة؟`,
+      variant: "info",
+      confirmLabel: "نعم، تعيين",
+      icon: <Users className="w-5 h-5 text-purple-400" />,
+      action: async () => {
+        try {
+          await fetch("/api/users", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: userId, action: "set_agency" }) });
+          fetchUsers();
+          toast.success("تم تعيين الوكالة");
+        } catch (e) { console.error("Set agency:", e); }
+      },
+    });
   }
 
   async function handleUserAction(id: string, action: string) {
@@ -728,12 +806,53 @@ export default function HomePage() {
     const userName = user?.name || user?.email || "";
 
     if (action === "remove_admin") {
-      if (!confirm(`هل أنت متأكد من إزالة صلاحية المدير من ${userName}؟ سيصبح مستخدم عادي.`)) return;
+      askConfirm({
+        title: "إزالة صلاحية المدير",
+        description: `هل أنت متأكد من إزالة صلاحية المدير من "${userName}"؟ سيصبح مستخدم عادي ولن يتمكن من الوصول لإدارة النظام.`,
+        variant: "warning",
+        confirmLabel: "نعم، إزالة الصلاحية",
+        icon: <ShieldAlert className="w-5 h-5 text-amber-400" />,
+        action: () => executeUserAction(id, action, userName),
+      });
+      return;
     }
     if (action === "block") {
-      if (!confirm(`هل أنت متأكد من حظر ${userName}؟`)) return;
+      askConfirm({
+        title: "حظر المستخدم",
+        description: `هل أنت متأكد من حظر "${userName}"؟ سيتم فوراً إيقاف صلاحية الوصول وستفقد جميع الاشتراكات والباقات النشطة. لا يمكن التراجع عن هذا الإجراء إلا بفتح الحظر لاحقاً.`,
+        variant: "danger",
+        confirmLabel: "نعم، حظر",
+        icon: <ShieldAlert className="w-5 h-5 text-red-400" />,
+        action: () => executeUserAction(id, action, userName),
+      });
+      return;
     }
+    if (action === "make_admin") {
+      askConfirm({
+        title: "ترقية إلى مدير",
+        description: `هل تريد ترقية "${userName}" ليصبح مديراً؟ سيحصل على كامل صلاحيات إدارة النظام بما في ذلك إدارة المستخدمين والباقات والإشارات.`,
+        variant: "warning",
+        confirmLabel: "نعم، ترقية",
+        icon: <Crown className="w-5 h-5 text-amber-400" />,
+        action: () => executeUserAction(id, action, userName),
+      });
+      return;
+    }
+    if (action === "unblock") {
+      askConfirm({
+        title: "فتح حظر المستخدم",
+        description: `هل تريد فتح حظر "${userName}" وإعادته كمتخدم نشط؟`,
+        variant: "info",
+        confirmLabel: "نعم، فتح الحظر",
+        icon: <ShieldAlert className="w-5 h-5 text-emerald-400" />,
+        action: () => executeUserAction(id, action, userName),
+      });
+      return;
+    }
+    await executeUserAction(id, action, userName);
+  }
 
+  async function executeUserAction(id: string, action: string, userName: string) {
     try {
       const res = await fetch("/api/users", {
         method: "PUT",
@@ -753,16 +872,29 @@ export default function HomePage() {
   async function handleDeleteUser(id: string) {
     const user = users.find(u => u.id === id);
     const userName = user?.name || user?.email || "";
-    if (!confirm(`هل أنت متأكد من حذف المستخدم ${userName}؟ لا يمكن التراجع.`)) return;
-    try {
-      await fetch("/api/users", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
-      });
-      fetchUsers();
-      toast.success("تم حذف المستخدم");
-    } catch (e) { console.error("Delete user:", e); }
+    askConfirm({
+      title: "حذف المستخدم",
+      description: `هل أنت متأكد من حذف المستخدم "${userName}" نهائياً؟ سيتم حذف جميع بياناته واشتراكاته بشكل دائم ولا يمكن التراجع عن هذا الإجراء.`,
+      variant: "danger",
+      confirmLabel: "نعم، حذف نهائياً",
+      icon: <Trash2 className="w-5 h-5 text-red-400" />,
+      action: async () => {
+        try {
+          const res = await fetch("/api/users", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id }),
+          });
+          const data = await res.json();
+          if (!data.success) {
+            toast.error(data.error || "فشل حذف المستخدم");
+            return;
+          }
+          fetchUsers();
+          toast.success("تم حذف المستخدم نهائياً");
+        } catch (e) { console.error("Delete user:", e); toast.error("خطأ في الاتصال"); }
+      },
+    });
   }
 
   async function handleSubmitEmailChange() {
@@ -810,9 +942,28 @@ export default function HomePage() {
   async function handleUpdate(id: string, status: string, tpIdx?: number) {
     // Confirm before manual close
     if (status === "HIT_TP" || status === "HIT_SL") {
-      const pair = signals.find(s => s.id === id)?.pair || "";
+      const sig = signals.find(s => s.id === id);
+      const pair = sig?.pair || "";
       const action = status === "HIT_TP" ? "إغلاق بربح" : "إغلاق بخسارة";
-      if (!confirm(`هل أنت متأكد من ${action} إشارة ${pair}؟`)) return;
+      askConfirm({
+        title: status === "HIT_TP" ? "إغلاق الإشارة بربح" : "إغلاق الإشارة بخسارة",
+        description: `هل أنت متأكد من ${action} إشارة "${pair}"؟ سيتم تحديث حالة الإشارة وإشعار المستخدمين.`,
+        variant: status === "HIT_TP" ? "info" : "danger",
+        confirmLabel: status === "HIT_TP" ? "نعم، إغلاق بربح" : "نعم، إغلاق بخسارة",
+        icon: status === "HIT_TP" ? <TrendingUp className="w-5 h-5 text-emerald-400" /> : <TrendingDown className="w-5 h-5 text-red-400" />,
+        action: async () => {
+          try {
+            await fetch(`/api/signals/${id}`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ status, hitTpIndex: tpIdx }),
+            });
+            fetchSignals(); fetchStats();
+            toast.success(status === "HIT_TP" ? "تم إغلاق الإشارة بربح" : status === "HIT_SL" ? "تم إغلاق الإشارة بخسارة" : "تم التحديث");
+          } catch (e) { console.error("Update:", e); }
+        },
+      });
+      return;
     }
     try {
       await fetch(`/api/signals/${id}`, {
@@ -821,18 +972,27 @@ export default function HomePage() {
         body: JSON.stringify({ status, hitTpIndex: tpIdx }),
       });
       fetchSignals(); fetchStats();
-      toast.success(status === "HIT_TP" ? "تم إغلاق الإشارة بربح" : status === "HIT_SL" ? "تم إغلاق الإشارة بخسارة" : "تم التحديث");
+      toast.success("تم التحديث");
     } catch (e) { console.error("Update:", e); }
   }
 
   async function handleDelete(id: string) {
-    const pair = signals.find(s => s.id === id)?.pair || "";
-    if (!confirm(`هل أنت متأكد من حذف إشارة ${pair}؟ لا يمكن التراجع عن هذا الإجراء.`)) return;
-    try {
-      await fetch(`/api/signals/${id}`, { method: "DELETE" });
-      fetchSignals(); fetchStats();
-      toast.success("تم حذف الإشارة");
-    } catch (e) { console.error("Delete:", e); }
+    const sig = signals.find(s => s.id === id);
+    const pair = sig?.pair || "";
+    askConfirm({
+      title: "حذف الإشارة",
+      description: `هل أنت متأكد من حذف إشارة "${pair}" نهائياً؟ سيتم حذفها من النظام ولن تظهر للمستخدمين. لا يمكن التراجع عن هذا الإجراء.`,
+      variant: "danger",
+      confirmLabel: "نعم، حذف الإشارة",
+      icon: <Trash2 className="w-5 h-5 text-red-400" />,
+      action: async () => {
+        try {
+          await fetch(`/api/signals/${id}`, { method: "DELETE" });
+          fetchSignals(); fetchStats();
+          toast.success("تم حذف الإشارة");
+        } catch (e) { console.error("Delete:", e); }
+      },
+    });
   }
 
   async function handleClearAll() {
@@ -2318,7 +2478,14 @@ export default function HomePage() {
                 {showPkgForm && editingPkgId ? "✕ إلغاء التعديل" : showPkgForm ? "✕ إلغاء" : <><span className="text-amber-300">+</span> إنشاء باقة</>}
               </button>
               <div className="flex gap-1.5">
-              <button onClick={async () => { if (!confirm("هل تريد إضافة الباقات الافتراضية؟ الباقات الحالية لن تُحذف.")) return; await fetch("/api/seed", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ force: false }) }); fetchPackages(); toast.success("تم إنشاء الباقات الافتراضية"); }}
+              <button onClick={() => askConfirm({
+                title: "إضافة الباقات الافتراضية",
+                description: "هل تريد إضافة الباقات الافتراضية إلى النظام؟ الباقات الحالية لن تُحذف ولن تتأثر.",
+                variant: "info",
+                confirmLabel: "نعم، إضافة",
+                icon: <Sparkles className="w-5 h-5 text-emerald-400" />,
+                action: async () => { await fetch("/api/seed", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ force: false }) }); fetchPackages(); toast.success("تم إنشاء الباقات الافتراضية"); },
+              })}
                 className="px-3 py-1.5 rounded-xl text-[10px] font-bold bg-gradient-to-r from-emerald-500/20 to-green-500/15 text-emerald-400 border border-emerald-500/25 active:scale-95 transition-transform flex items-center gap-1">
                 <Sparkles className="w-3 h-3" /> باقات افتراضية
               </button>
@@ -2638,7 +2805,14 @@ export default function HomePage() {
                             <div className="text-[8px] text-muted-foreground/60 mt-0.5">{new Date(u.createdAt).toLocaleDateString("ar-SA", { year: "numeric", month: "short", day: "numeric" })}</div>
                           </div>
                           <div className="flex items-center gap-1.5 flex-shrink-0">
-                            <button onClick={() => handleUserAction(u.id, "approve")} className="px-3 py-1.5 rounded-lg text-[9px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 active:scale-95 transition-transform">قبول</button>
+                            <button onClick={() => askConfirm({
+                              title: "قبول المستخدم",
+                              description: `هل تريد قبول طلب التسجيل من "${u.name}"؟ سيتم تفعيل حسابه فوراً.`,
+                              variant: "info",
+                              confirmLabel: "نعم، قبول",
+                              icon: <User className="w-5 h-5 text-emerald-400" />,
+                              action: () => handleUserAction(u.id, "approve"),
+                            })} className="px-3 py-1.5 rounded-lg text-[9px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 active:scale-95 transition-transform">قبول</button>
                             <button onClick={() => handleDeleteUser(u.id)} className="px-2 py-1.5 rounded-lg text-[9px] font-medium bg-red-500/10 text-red-400 border border-red-500/15 active:scale-95 transition-transform">رفض</button>
                           </div>
                         </div>
@@ -2855,8 +3029,22 @@ export default function HomePage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <button onClick={() => handleEmailRequestAction(r.id, "approve")} className="flex-1 px-2 py-1.5 rounded-lg text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 active:scale-95 transition-transform">قبول</button>
-                      <button onClick={() => handleEmailRequestAction(r.id, "reject")} className="flex-1 px-2 py-1.5 rounded-lg text-[10px] font-medium bg-red-500/10 text-red-400 border border-red-500/15 active:scale-95 transition-transform">رفض</button>
+                      <button onClick={() => askConfirm({
+                        title: "قبول تغيير البريد",
+                        description: `هل تريد قبول تغيير البريد من "${r.oldEmail}" إلى "${r.newEmail}" للمستخدم "${r.userName}"؟`,
+                        variant: "info",
+                        confirmLabel: "نعم، قبول",
+                        icon: <Mail className="w-5 h-5 text-emerald-400" />,
+                        action: () => handleEmailRequestAction(r.id, "approve"),
+                      })} className="flex-1 px-2 py-1.5 rounded-lg text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 active:scale-95 transition-transform">قبول</button>
+                      <button onClick={() => askConfirm({
+                        title: "رفض تغيير البريد",
+                        description: `هل تريد رفض طلب تغيير البريد للمستخدم "${r.userName}"؟`,
+                        variant: "warning",
+                        confirmLabel: "نعم، رفض",
+                        icon: <Mail className="w-5 h-5 text-red-400" />,
+                        action: () => handleEmailRequestAction(r.id, "reject"),
+                      })} className="flex-1 px-2 py-1.5 rounded-lg text-[10px] font-medium bg-red-500/10 text-red-400 border border-red-500/15 active:scale-95 transition-transform">رفض</button>
                     </div>
                   </div>
                 ))}
@@ -3054,19 +3242,16 @@ export default function HomePage() {
             {/* Admin Only: Clear All */}
             {isAdmin && (
               <Glass className="overflow-hidden">
-                {!confirmClear ? (
-                  <button onClick={() => setConfirmClear(true)} className="w-full p-4 flex items-center justify-between text-sm text-red-400 hover:bg-red-500/[0.03] transition-colors">
-                    <span className="flex items-center gap-2"><Trash2 className="w-4 h-4" />حذف جميع الإشارات</span>
-                  </button>
-                ) : (
-                  <div className="p-4 space-y-3 animate-[fadeIn_0.2s_ease-out]">
-                    <div className="text-xs text-red-400 text-center">هل أنت متأكد من حذف جميع الإشارات؟</div>
-                    <div className="flex gap-2">
-                      <Button onClick={handleClearAll} className="flex-1 h-10 rounded-xl bg-red-500/15 text-red-400 border border-red-500/25 text-xs font-semibold">نعم، احذف</Button>
-                      <Button onClick={() => setConfirmClear(false)} className="flex-1 h-10 rounded-xl bg-muted/60 text-muted-foreground border border-border text-xs">إلغاء</Button>
-                    </div>
-                  </div>
-                )}
+                <button onClick={() => askConfirm({
+                  title: "حذف جميع الإشارات",
+                  description: "هل أنت متأكد من حذف جميع الإشارات من النظام؟ سيتم حذفها بشكل دائم ولا يمكن استرجاعها. هذا الإجراء يشمل جميع الإشارات النشطة والمغلقة.",
+                  variant: "danger",
+                  confirmLabel: "نعم، احذف الكل",
+                  icon: <Trash2 className="w-5 h-5 text-red-400" />,
+                  action: handleClearAll,
+                })} className="w-full p-4 flex items-center justify-between text-sm text-red-400 hover:bg-red-500/[0.03] transition-colors">
+                  <span className="flex items-center gap-2"><Trash2 className="w-4 h-4" />حذف جميع الإشارات</span>
+                </button>
               </Glass>
             )}
 
@@ -3119,6 +3304,52 @@ export default function HomePage() {
           ))}
         </div>
       </nav>
+
+      {/* ═══ Professional Confirmation Dialog ═══ */}
+      <AlertDialog open={!!confirmAction} onOpenChange={(open) => { if (!open) setConfirmAction(null); }}>
+        <AlertDialogContent className="sm:max-w-md" dir="rtl">
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3 mb-1">
+              {confirmAction?.icon && (
+                <div className={`w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0 ${
+                  confirmAction.variant === "danger" ? "bg-red-500/15 border border-red-500/20" :
+                  confirmAction.variant === "warning" ? "bg-amber-500/15 border border-amber-500/20" :
+                  "bg-sky-500/15 border border-sky-500/20"
+                }`}>
+                  {confirmAction.icon}
+                </div>
+              )}
+              <AlertDialogTitle className="text-base font-bold">{confirmAction?.title}</AlertDialogTitle>
+            </div>
+            <AlertDialogDescription className="text-sm leading-relaxed text-muted-foreground pr-14">
+              {confirmAction?.description}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex gap-2 sm:gap-3 mt-2">
+            <AlertDialogCancel className="flex-1 h-11 rounded-xl text-sm font-medium cursor-pointer">
+              إلغاء
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                if (confirmAction?.action) {
+                  confirmAction.action();
+                }
+                setConfirmAction(null);
+              }}
+              className={`flex-1 h-11 rounded-xl text-sm font-bold cursor-pointer ${
+                confirmAction?.variant === "danger"
+                  ? "bg-red-500/15 text-red-400 border border-red-500/25 hover:bg-red-500/25"
+                  : confirmAction?.variant === "warning"
+                  ? "bg-amber-500/15 text-amber-400 border border-amber-500/25 hover:bg-amber-500/25"
+                  : "bg-sky-500/15 text-sky-400 border border-sky-500/25 hover:bg-sky-500/25"
+              }`}
+            >
+              {confirmAction?.confirmLabel || "تأكيد"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -72,12 +72,28 @@ export async function PUT(request: NextRequest) {
         const pkg = await getPackageById(packageId);
         if (!pkg) return NextResponse.json({ success: false, error: "الباقة غير موجودة" }, { status: 404 });
 
+        // ── Check if same package is already active and not expired ──
+        const existingUser = await getUserById(id);
+        if (existingUser?.packageId === packageId && existingUser?.subscriptionExpiry) {
+          const expiryDate = new Date(existingUser.subscriptionExpiry);
+          if (expiryDate > new Date()) {
+            const remainingDays = Math.ceil((expiryDate.getTime() - Date.now()) / 86400000);
+            return NextResponse.json({
+              success: false,
+              alreadyActive: true,
+              error: `هذه الباقة مفعلة بالفعل لهذا المستخدم ولم تنتهِ بعد. متبقي ${remainingDays} يوم على الانتهاء.`,
+              packageName: existingUser.packageName,
+              subscriptionExpiry: existingUser.subscriptionExpiry,
+              remainingDays,
+            }, { status: 409 });
+          }
+        }
+
         // ── Free trial protection ──
         const settings = await getAppSettings();
         const isFreeTrialPkg = settings.freeTrialPackageId === packageId;
         if (isFreeTrialPkg) {
-          const user = await getUserById(id);
-          if (user && user.hadFreeTrial) {
+          if (existingUser && existingUser.hadFreeTrial) {
             return NextResponse.json({
               success: false,
               error: "هذا المستخدم سبق له الاستفادة من الخطة المجانية. لا يمكن تفعيلها مرة أخرى.",
