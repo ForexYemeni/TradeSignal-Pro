@@ -65,6 +65,7 @@ export interface StoredUser {
   role: "admin" | "user";
   status: "pending" | "active" | "blocked" | "expired";
   mustChangePwd: boolean;
+  emailVerified: boolean;
   createdAt: string;
   updatedAt: string;
   /* Subscription fields */
@@ -299,6 +300,7 @@ export async function migrateAdminToUsers(): Promise<void> {
       role: "admin",
       status: "active",
       mustChangePwd: admin.mustChangePwd,
+      emailVerified: true,
       hadFreeTrial: false,
       subscriptionType: "none",
       subscriptionExpiry: null,
@@ -307,6 +309,9 @@ export async function migrateAdminToUsers(): Promise<void> {
       createdAt: admin.createdAt,
       updatedAt: admin.updatedAt,
     });
+  } else if (!existing.emailVerified) {
+    // Existing user missing emailVerified — mark admin accounts as verified
+    await updateUser(existing.id, { emailVerified: true });
   }
 }
 

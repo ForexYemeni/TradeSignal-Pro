@@ -31,26 +31,28 @@ async function handleLogin(body: Record<string, unknown>) {
   // Ensure admin is migrated to users
   await migrateAdminToUsers();
 
-  // ── OTP Verification: verifyToken must be valid ──
-  if (!verifyToken) {
+  // ── OTP Verification ──
+  // If user already verified their email before, skip OTP requirement
+  const existingUser = await getUserByEmail(emailVal.sanitized);
+  if (existingUser && existingUser.emailVerified) {
+    // Skip OTP — user has already verified their email in the past
+  } else if (!verifyToken) {
     return NextResponse.json({ success: false, error: "يجب التحقق من البريد الإلكتروني أولاً", needOtp: true }, { status: 403 });
+  } else {
+    // Verify the token
+    const verifyKey = `otp_verified:login:${emailVal.sanitized}`;
+    let storedToken = await kv.get<string>(verifyKey);
+    if (!storedToken) {
+      const regKey = `otp_verified:register:${emailVal.sanitized}`;
+      storedToken = await kv.get<string>(regKey);
+      if (storedToken) await kv.del(regKey);
+    }
+    // Use String() to handle KV auto-deserialization (numbers vs strings)
+    if (!storedToken || String(storedToken) !== String(verifyToken)) {
+      return NextResponse.json({ success: false, error: "رمز التحقق غير صالح أو انتهت صلاحيته", needOtp: true }, { status: 403 });
+    }
+    await kv.del(verifyKey);
   }
-
-  // Check verify token — try both login and register types for robustness
-  const verifyKey = `otp_verified:login:${emailVal.sanitized}`;
-  let storedToken = await kv.get<string>(verifyKey);
-  if (!storedToken) {
-    // Fallback: check if token was stored under 'register' type
-    const regKey = `otp_verified:register:${emailVal.sanitized}`;
-    storedToken = await kv.get<string>(regKey);
-    if (storedToken) await kv.del(regKey);
-  }
-  // Use String() to handle KV auto-deserialization (numbers vs strings)
-  if (!storedToken || String(storedToken) !== String(verifyToken)) {
-    return NextResponse.json({ success: false, error: "رمز التحقق غير صالح أو انتهت صلاحيته", needOtp: true }, { status: 403 });
-  }
-  // Delete the verify token (one-time use)
-  await kv.del(verifyKey);
 
   // Check if account is currently locked
   const attemptStatus = await getLoginAttempts(email);
@@ -67,8 +69,8 @@ async function handleLogin(body: Record<string, unknown>) {
     }, { status: 423 });
   }
 
-  // Try to find user in users list
-  const user = await getUserByEmail(email);
+  // Use the user we already fetched above
+  const user = existingUser;
 
   if (user) {
     // Check if user account has a status block
@@ -100,6 +102,11 @@ async function handleLogin(body: Record<string, unknown>) {
 
     // Reset login attempts on success
     await resetLoginAttempts(email);
+
+    // Mark email as verified after first OTP login (so OTP won't be required again)
+    if (!user.emailVerified) {
+      await updateUser(user.id, { emailVerified: true });
+    }
 
     // Check subscription expiry for regular users
     if (user.role === "user" && user.subscriptionType !== "none" && user.subscriptionExpiry) {
