@@ -252,3 +252,24 @@ Stage Summary:
 - User must delete old app and install new APK (different signing key)
 - App will now send a test notification 3-5s after launch to verify notifications work
 - Notification channels are reset on every launch to prevent OEM lowering
+---
+Task ID: 1
+Agent: Main Agent
+Task: Switch email service from Resend to Google Apps Script (free)
+
+Work Log:
+- Read existing email.ts, OTP routes, register/login routes, signals route
+- Confirmed OTP system already exists and works for registration + login
+- Confirmed signal email broadcasting already exists with professional HTML templates
+- Created google-apps-script/Email-Sender.js — full GAS web app for email sending
+- Modified src/lib/email.ts — replaced Resend SDK with HTTP calls to GAS
+- Supports single email (OTP codes) and batch email (signal broadcasts to all subscribers)
+- Uninstalled 'resend' npm package
+- Updated .env.example with GOOGLE_APPS_SCRIPT_EMAIL_URL and GOOGLE_APPS_SCRIPT_EMAIL_KEY
+- Pushed to GitHub (commit d974f1f)
+
+Stage Summary:
+- Email transport layer switched from Resend (paid) to Google Apps Script (free via Gmail)
+- All existing features preserved: OTP at registration, OTP at login, signal broadcast emails
+- Professional HTML templates kept as-is
+- User needs to: deploy Email-Sender.js as GAS web app, set env vars in Vercel
