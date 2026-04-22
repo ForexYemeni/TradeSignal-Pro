@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { addSignal, getSignals, updateSignal, getUserById } from "@/lib/store";
+import { addSignal, getSignals, updateSignal, getUserById, getPackageById } from "@/lib/store";
 import { parseTradingViewSignal, validateSignal } from "@/lib/signal-parser";
 import { notifyNewSignal, notifyTpHit, notifySlHit } from "@/lib/push";
 import { notifySignalEvent } from "./stream/route";
@@ -403,14 +403,107 @@ function isSlLike(cat: string) {
   return cat === "SL_HIT" || cat === "REENTRY_SL" || cat === "PYRAMID_SL";
 }
 
+/**
+ * Map signal pair name to instrument category.
+ * Used for per-user package filtering.
+ */
+function getInstrumentCategory(pair: string): string {
+  const p = (pair || "").toUpperCase();
+  if (/XAU|GOLD/.test(p)) return "gold";
+  if (/XAG|SILVER/.test(p)) return "metals";
+  if (/USOIL|CRUDE|OIL/.test(p)) return "oil";
+  if (/BTC|ETH|SOL|BNB|XRP|ADA|DOGE/.test(p)) return "crypto";
+  if (/NAS|US30|DAX|US500|SPX|NDX/.test(p)) return "indices";
+  if (/[A-Z]{3,6}(USD|EUR|GBP|JPY|AUD|NZD|CAD|CHF)/.test(p)) return "currencies";
+  return "other";
+}
+
+/**
+ * Extract user ID from request (session cookie or auth header).
+ * Returns null if not authenticated.
+ */
+function getRequestUserId(request: NextRequest): string | null {
+  // 1. Session cookie
+  const sessionCookie = request.cookies.get('fy_session')?.value;
+  if (sessionCookie) return sessionCookie;
+  // 2. Authorization header
+  const authHeader = request.headers.get("authorization");
+  if (authHeader) {
+    const token = authHeader.replace(/^Bearer\s+/i, "");
+    if (token) return token;
+  }
+  return null;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const limit = parseInt(searchParams.get("limit") || "50");
-    const signals = await getSignals(limit);
+    const limit = parseInt(searchParams.get("limit") || "100");
+    const allSignals = await getSignals(limit);
+
+    // ── Identify user and determine filtering ──
+    const userId = getRequestUserId(request);
+    const user = userId ? await getUserById(userId) : null;
+    const isAdmin = user?.role === "admin";
+
+    let filteredSignals = allSignals;
+
+    // Apply per-user filtering only for non-admin users with a valid active subscription
+    if (!isAdmin && user && user.status === "active" && user.packageId) {
+      const pkg = await getPackageById(user.packageId);
+      if (pkg) {
+        // 1. Filter by instruments
+        if (pkg.instruments && pkg.instruments.length > 0) {
+          const allowedInstruments = new Set(pkg.instruments);
+          filteredSignals = filteredSignals.filter(s => {
+            const cat = getInstrumentCategory(s.pair);
+            return allowedInstruments.has(cat);
+          });
+        }
+
+        // 2. Filter by maxSignals per day (limit NEW entry signals only)
+        if (pkg.maxSignals > 0) {
+          const todayStart = new Date();
+          todayStart.setHours(0, 0, 0, 0);
+          const todayISO = todayStart.toISOString();
+
+          // Count entry signals created today for this user's instruments
+          const todayEntryIds: string[] = [];
+          for (const s of filteredSignals) {
+            if (
+              isEntry(String(s.signalCategory)) &&
+              s.createdAt >= todayISO &&
+              s.status === "ACTIVE"
+            ) {
+              todayEntryIds.push(s.id);
+            }
+          }
+
+          // If exceeds limit, only keep first N entry signals of today
+          if (todayEntryIds.length > pkg.maxSignals) {
+            const allowedEntryIds = new Set(todayEntryIds.slice(0, pkg.maxSignals));
+            filteredSignals = filteredSignals.filter(s => {
+              // Always show non-entry signals (they're parent updates, not separate)
+              if (!isEntry(String(s.signalCategory))) return true;
+              // Always show closed signals (user already saw them)
+              if (s.status !== "ACTIVE") return true;
+              // For active entry signals: only show first N of today
+              return allowedEntryIds.has(s.id);
+            });
+          }
+        }
+      }
+    }
+
+    // If user is not authenticated or has no valid subscription, show nothing
+    // (admin already handled above with no filtering)
+    if (!isAdmin && (!user || user.status !== "active" || !user.packageId)) {
+      filteredSignals = [];
+    }
+
     return NextResponse.json({
       success: true,
-      signals: signals.map(s => {
+      signals: filteredSignals.map(s => {
         let tps: { tp: number; rr: number }[] = [];
         try { tps = JSON.parse(s.takeProfits); } catch { tps = []; }
         return { ...s, takeProfits: tps };
