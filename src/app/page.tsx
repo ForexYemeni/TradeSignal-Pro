@@ -748,14 +748,15 @@ export default function HomePage() {
     }
   }
 
-  async function handleVerifyOtp() {
-    if (otpCode.length !== 6) { setOtpErr("أدخل الكود كاملاً (6 أرقام)"); return; }
+  async function handleVerifyOtp(codeOverride?: string) {
+    const code = codeOverride || otpCode;
+    if (code.length !== 6) { setOtpErr("أدخل الكود كاملاً (6 أرقام)"); return; }
     setOtpErr("");
     try {
       const res = await fetch("/api/otp/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: otpEmail, otp: otpCode, type: otpPurpose }),
+        body: JSON.stringify({ email: otpEmail, otp: code, type: otpPurpose }),
       });
       const data = await res.json();
       if (data.success) {
@@ -1574,43 +1575,25 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* OTP Input */}
+            {/* OTP Input — Single Field */}
             <div className="space-y-4">
-              <div className="flex justify-center gap-3" dir="ltr">
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <input
-                    key={i}
-                    ref={el => { if (i === 0) otpInputRef.current = el; }}
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={1}
-                    value={otpCode[i] || ""}
-                    onChange={e => {
-                      const val = e.target.value.replace(/[^0-9]/g, "");
-                      if (val && otpCode.length >= 6) return;
-                      const newCode = otpCode.split("");
-                      newCode[i] = val;
-                      const joined = newCode.join("");
-                      setOtpCode(joined);
-                      // Auto-focus next input
-                      if (val && i < 5) {
-                        const next = e.target.nextElementSibling as HTMLInputElement;
-                        if (next) next.focus();
-                      }
-                      // Auto-verify when all 6 digits entered
-                      if (joined.length === 6) {
-                        setTimeout(() => handleVerifyOtp(), 300);
-                      }
-                    }}
-                    onKeyDown={e => {
-                      if (e.key === "Backspace" && !otpCode[i] && i > 0) {
-                        const prev = (e.target as HTMLInputElement).previousElementSibling as HTMLInputElement;
-                        if (prev) { prev.focus(); }
-                      }
-                    }}
-                    className="w-[52px] h-[60px] text-center text-xl font-bold rounded-xl input-glass text-foreground bg-transparent border-none outline-none focus:ring-2 focus:ring-amber-400/50 transition-all"
-                  />
-                ))}
+              <div className="flex justify-center" dir="ltr">
+                <input
+                  ref={el => { otpInputRef.current = el; }}
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={otpCode}
+                  onChange={e => {
+                    const val = e.target.value.replace(/[^0-9]/g, "").slice(0, 6);
+                    setOtpCode(val);
+                    if (val.length === 6) {
+                      setTimeout(() => handleVerifyOtp(val), 300);
+                    }
+                  }}
+                  placeholder="000000"
+                  className="w-full max-w-[280px] h-[64px] text-center text-2xl font-bold tracking-[0.4em] rounded-2xl input-glass text-foreground bg-transparent border-none outline-none focus:ring-2 focus:ring-amber-400/50 transition-all placeholder:text-muted-foreground/30"
+                />
               </div>
 
               {/* Error */}
