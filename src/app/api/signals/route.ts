@@ -196,11 +196,23 @@ async function handleUpdateSignal(parsed: any) {
   else if (parsed.signalCategory === "PYRAMID_TP" || parsed.signalCategory === "PYRAMID_SL") parentCat = "PYRAMID";
   else return null;
 
+  // Pair alias mapping — GOLD/XAUUSD/XAUUSDUSD, SILVER/XAGUSD, BTC/BTCUSDT, etc.
+  function normalizePair(p: string): string {
+    const aliases: Record<string, string> = {
+      "GOLD": "XAUUSD", "XAUUSDUSD": "XAUUSD", "XAU": "XAUUSD",
+      "SILVER": "XAGUSD", "XAG": "XAGUSD",
+      "BTCUSDT": "BTCUSD", "BTCUSD": "BTCUSDT",
+      "ETHUSDT": "ETHUSD", "ETHUSD": "ETHUSDT",
+    };
+    return aliases[p] || p;
+  }
+  const normalizedPair = normalizePair(pair);
+
   // Find the most recent active signal matching pair + parent category
   const parent = allSignals
     .filter(s => {
-      const sPair = String(s.pair || "").toUpperCase();
-      return sPair === pair && s.signalCategory === parentCat && s.status === "ACTIVE";
+      const sPair = normalizePair(String(s.pair || "").toUpperCase());
+      return sPair === normalizedPair && s.signalCategory === parentCat && s.status === "ACTIVE";
     })
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
 

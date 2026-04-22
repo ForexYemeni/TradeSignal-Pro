@@ -480,10 +480,24 @@ function extractSignalType(text: string): "BUY" | "SELL" | null {
   return null;
 }
 
+// ═══════════════════════════════════════════════════════════════
+//  Normalize pair names — ensure consistent storage
+// ═══════════════════════════════════════════════════════════════
+function normalizePairName(pair: string): string {
+  const aliases: Record<string, string> = {
+    "GOLD": "XAUUSD", "XAU": "XAUUSD", "XAUUSDUSD": "XAUUSD",
+    "SILVER": "XAGUSD", "XAG": "XAGUSD",
+    "BTCUSDT": "BTCUSDT", "BTCUSD": "BTCUSDT",
+    "ETHUSDT": "ETHUSDT", "ETHUSD": "ETHUSDT",
+    "US30": "US30", "NAS100": "NAS100",
+  };
+  return aliases[pair] || pair;
+}
+
 function extractPair(text: string): string | null {
   // الأولوية 1: بعد 📌 (الأكثر دقة - من تنسيق FOREXYEMENI)
   const pinMatch = text.match(/📌\s*([A-Za-z]{3,12}(?:\/[A-Za-z]{3})?)/i);
-  if (pinMatch) return pinMatch[1].replace(/\s/g, "").toUpperCase();
+  if (pinMatch) return normalizePairName(pinMatch[1].replace(/\s/g, "").toUpperCase());
 
   // الأولوية 2: أنماط محددة (نبحث في النص ما عدا الروابط)
   // نزيل الروابط أولاً لمنع تطابق كلمة GOLD من رابط تليجرام
@@ -500,7 +514,7 @@ function extractPair(text: string): string | null {
   ];
   for (const p of patterns) {
     const m = cleanText.match(p);
-    if (m) return m[0].replace(/\s/g, "").toUpperCase();
+    if (m) return normalizePairName(m[0].replace(/\s/g, "").toUpperCase());
   }
 
   // الأولوية 3: أي رمز أزواج
