@@ -24,7 +24,7 @@ import {
 
 // ═══ EXTRACTED MODULES ═══
 import type { Signal, AdminSession, Stats, View, Tab, Filter, SubPackage, AppSettingsData } from "@/lib/types";
-import { timeAgo, isEntry, entryAccent, isTpLike, isSlLike, nativeNotify, playSound, registerPushNotification, unregisterPushNotification, formatCountdown, warmAudio, ensureNotificationPermission, showBrowserNotification, notifySignal } from "@/lib/utils";
+import { timeAgo, isEntry, entryAccent, isTpLike, isSlLike, nativeNotify, playSound, registerPushNotification, unregisterPushNotification, formatCountdown, warmAudio, ensureNotificationPermission, showBrowserNotification, notifySignal, shareSessionToken } from "@/lib/utils";
 import { Stars, Div, Glass, SkeletonCard, SignalsLoadingSkeleton, StatsLoadingSkeleton, EmptyState, Confetti, useOnlineStatus, usePullToRefresh } from "@/components/shared";
 import { TpMiniCard, TradeStatusBanner, EntryCard, ClosedSignalCard, SplashScreen } from "@/components/SignalCards";
 
@@ -306,6 +306,8 @@ export default function HomePage() {
               setView("main");
               // Register push notifications automatically
               registerPushNotification(s.id).catch(() => {});
+              // Share session token with Android native service for authenticated API calls
+              shareSessionToken(s.id);
             }
             return;
           }
@@ -465,11 +467,35 @@ export default function HomePage() {
     // Try to connect to SSE for instant updates
     try {
       const es = new EventSource("/api/signals/stream");
+      // Track last SSE event timestamp to prevent duplicate alerts
+      const lastSseEventRef = useRef<string>("");
       es.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          if (data.type === "signal" || data.type === "new_signal" || data.type === "tp_hit" || data.type === "sl_hit") {
-            // New signal event from server - refresh immediately
+          const eventType = data.type;
+          if (eventType === "signal" || eventType === "new_signal" || eventType === "tp_hit" || eventType === "sl_hit") {
+            // ── INSTANT: Play sound + native notification IMMEDIATELY from SSE ──
+            // Don't wait for fetchSignals() — use SSE data directly for speed
+            const pair = data.pair || "";
+            const sigType = data.signalType || "";
+            const tpIndex = data.tpIndex;
+
+            // Deduplicate: skip if same event processed recently
+            const eventKey = `${eventType}:${pair}:${tpIndex || ""}`;
+            if (eventKey !== lastSseEventRef.current && !audioMuted) {
+              lastSseEventRef.current = eventKey;
+
+              if (eventType === "tp_hit") {
+                notifySignal("tp", "🎯 تحقق هدف — " + pair, "هدف " + (tpIndex || "?") + " تم تحقيقه", "tp_hit");
+              } else if (eventType === "sl_hit") {
+                notifySignal("sl", "🛑 وقف خسارة — " + pair, "تم ضرب وقف الخسارة", "sl_hit");
+              } else if (eventType === "signal" || eventType === "new_signal") {
+                // Use signalDirection (BUY/SELL) from SSE event
+                const isBuy = data.signalDirection === "BUY";
+                notifySignal(isBuy ? "buy" : "sell", (isBuy ? "📊 إشارة شراء — " : "📊 إشارة بيع — ") + pair, isBuy ? "شراء" : "بيع", isBuy ? "buy" : "sell");
+              }
+            }
+            // Then fetch full signals to update UI (runs in parallel with notification)
             fetchSignals();
           }
         } catch { /* ignore */ }
@@ -606,6 +632,8 @@ export default function HomePage() {
         setView("main");
         // Register push notifications automatically after login
         registerPushNotification(s.id).catch(() => {});
+        // Share session token with Android native service
+        shareSessionToken(s.id);
         toast.success("تم تسجيل الدخول بنجاح");
       }
     } catch { setLoginErr("خطأ في الاتصال بالخادم"); toast.error("خطأ في الاتصال بالخادم"); }

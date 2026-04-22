@@ -31,9 +31,10 @@ import android.webkit.SslErrorHandler;
 /**
  * ForexYemeni VIP Trading Signals - Android App v1.10
  * - WebView wrapping the Next.js PWA
- * - Foreground Service for real-time signal monitoring (every 5 seconds)
- * - Native notification bridge for JS -> Android notifications
- * - Different notification sounds per event type
+ * - Foreground Service for instant signal monitoring (2-second poll)
+ * - Native notification bridge: JS -> Android notifications
+ * - Session token sharing: WebView -> Service (for authenticated API calls)
+ * - Boot receiver: auto-restart service after device reboot
  */
 public class MainActivity extends Activity {
 
@@ -59,15 +60,15 @@ public class MainActivity extends Activity {
             // Request notification permission for Android 13+
             requestNotificationPermission();
 
-            // Start the foreground service for real-time signal monitoring
+            // Start the foreground service for instant signal monitoring
             startSignalService();
 
             // Setup WebView
             webView = new WebView(this);
             configureWebView(webView);
 
-            // Add JavaScript interface for native notifications
-            webView.addJavascriptInterface(new NativeNotificationInterface(this), "AndroidNotify");
+            // Add JavaScript interface for native notifications + session sharing
+            webView.addJavascriptInterface(new NativeBridge(this), "AndroidNotify");
 
             webView.setWebViewClient(new AppWebViewClient());
             webView.setWebChromeClient(new WebChromeClient() {
@@ -124,11 +125,6 @@ public class MainActivity extends Activity {
         }
     }
 
-    /**
-     * Start the foreground service for real-time signal monitoring
-     * This service checks for new signals every 5 seconds
-     * and shows notifications even when the app is closed
-     */
     private void startSignalService() {
         try {
             Intent serviceIntent = new Intent(this, SignalService.class);
@@ -140,7 +136,6 @@ public class MainActivity extends Activity {
             android.util.Log.d("ForexYemeni", "SignalService started");
         } catch (Exception e) {
             android.util.Log.e("ForexYemeni", "Failed to start SignalService", e);
-            // Fallback: start AlarmManager polling
             SignalPollReceiver.startPolling(this);
         }
     }
@@ -162,8 +157,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        // Do NOT stop the service - it should keep running
-        // to monitor signals even when app is closed
+        // Do NOT stop the service — it should keep running
         if (webView != null) {
             webView.destroy();
             webView = null;
@@ -194,14 +188,22 @@ public class MainActivity extends Activity {
         }
     }
 
-    // JavaScript Interface for Native Notifications
-    public class NativeNotificationInterface {
+    /**
+     * JavaScript Bridge — connects WebView to native Android features
+     * - sendNotification(): instant native notification with custom sound
+     * - setSessionToken(): passes auth token to SignalService for API calls
+     */
+    public class NativeBridge {
         private Context context;
 
-        public NativeNotificationInterface(Context ctx) {
+        public NativeBridge(Context ctx) {
             this.context = ctx;
         }
 
+        /**
+         * Show a native Android notification with custom sound
+         * Called from WebView when a new signal is detected
+         */
         @JavascriptInterface
         public void sendNotification(final String title, final String body, final String soundType) {
             new Handler(Looper.getMainLooper()).post(new Runnable() {
@@ -214,6 +216,25 @@ public class MainActivity extends Activity {
                     }
                 }
             });
+        }
+
+        /**
+         * Pass the session token from WebView to the native SignalService
+         * This allows the service to make authenticated API calls
+         */
+        @JavascriptInterface
+        public void setSessionToken(final String token) {
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        SignalService.setSessionToken(context, token);
+                        android.util.Log.d("ForexYemeni", "Session token passed to service");
+                    } catch (Exception e) {
+                        android.util.Log.e("ForexYemeni", "Token sharing error", e);
+                    }
+                }
+            }).start();
         }
     }
 

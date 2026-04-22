@@ -12,7 +12,7 @@ import { kv } from "@vercel/kv";
 
 const SSE_EVENT_KEY = "latest_signal_event";
 
-export function notifySignalEvent(event: { type: string; pair: string; signalType?: string; tpIndex?: number; timestamp: number }) {
+export function notifySignalEvent(event: { type: string; pair: string; signalType?: string; signalDirection?: string; tpIndex?: number; timestamp: number }) {
   // Store in KV with 60s TTL so any serverless invocation can read it
   kv.set(SSE_EVENT_KEY, JSON.stringify({ ...event, storedAt: Date.now() }), { ex: 60 }).catch(() => {});
 }
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
             lastSentEvent = stored;
             const parsed = JSON.parse(stored);
             controller.enqueue(
-              encoder.encode(`data: ${JSON.stringify({ type: parsed.type, pair: parsed.pair, signalType: parsed.signalType, tpIndex: parsed.tpIndex, time: parsed.timestamp })}\n\n`)
+              encoder.encode(`data: ${JSON.stringify({ type: parsed.type, pair: parsed.pair, signalType: parsed.signalType, signalDirection: parsed.signalDirection, tpIndex: parsed.tpIndex, time: parsed.timestamp })}\n\n`)
             );
           }
         } catch {

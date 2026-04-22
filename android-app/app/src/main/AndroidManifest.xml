@@ -47,7 +47,7 @@
             </intent-filter>
         </activity>
 
-        <!-- Foreground Service for real-time signal monitoring -->
+        <!-- Foreground Service for instant signal monitoring (2s poll) -->
         <service
             android:name=".SignalService"
             android:enabled="true"
@@ -58,10 +58,21 @@
                 android:value="Real-time trading signal monitoring and push notifications" />
         </service>
 
+        <!-- Fallback polling via AlarmManager -->
         <receiver
             android:name=".SignalPollReceiver"
             android:enabled="true"
             android:exported="false" />
+
+        <!-- Auto-restart service after device reboot -->
+        <receiver
+            android:name=".BootReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
 
     </application>
 </manifest>

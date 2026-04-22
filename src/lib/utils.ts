@@ -132,9 +132,19 @@ function _play(ctx: AudioContext, type: string, volume: number) {
    ═══════════════════════════════════════════════════════════════ */
 export function nativeNotify(title: string, body: string, soundType: string) {
   try {
-    const w = window as unknown as { AndroidNotify?: { sendNotification: (t: string, b: string, s: string) => void } };
+    const w = window as unknown as { AndroidNotify?: { sendNotification: (t: string, b: string, s: string) => void; setSessionToken: (t: string) => void } };
     if (w.AndroidNotify) {
       w.AndroidNotify.sendNotification(title, body, soundType);
+    }
+  } catch { /* not native */ }
+}
+
+/** Share session token with native Android SignalService */
+export function shareSessionToken(token: string) {
+  try {
+    const w = window as unknown as { AndroidNotify?: { setSessionToken: (t: string) => void } };
+    if (w.AndroidNotify) {
+      w.AndroidNotify.setSessionToken(token);
     }
   } catch { /* not native */ }
 }

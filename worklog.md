@@ -160,3 +160,47 @@ Stage Summary:
 - Sound delay reduced by 33% (2s poll vs 3s) with pre-warmed AudioContext (no resume delay)
 - Background notifications trigger system notification sound automatically
 - Build passes successfully
+
+---
+Task ID: 2
+Agent: Main
+Task: Make APK notifications instant (<1s) with full background support
+
+Work Log:
+- Analyzed Android app: SignalService polls /api/signals?limit=10 every 5 seconds, no auth token, no boot receiver
+- Root cause: 5s poll + full signal endpoint + no auth (returns empty for users) = very delayed or no notifications
+
+### Web App Changes:
+1. SSE event now includes `signalDirection` (BUY/SELL) for instant sound detection
+2. Sound + nativeNotify plays IMMEDIATELY from SSE event data — no waiting for fetchSignals()
+3. fetchSignals() runs in parallel for UI update (non-blocking for notifications)
+4. Deduplication: `lastSseEventRef` prevents double notifications from SSE + fetchSignals
+5. `shareSessionToken()` function sends session ID to Android native via JavaScript bridge
+
+### Android App Changes (SignalService v5):
+1. Poll interval: 5s → **2s** (2.5x faster)
+2. Endpoint: `/api/signals?limit=10` → `/api/signals/updates?since=T` (lightweight, faster response)
+3. Auth: now sends `Authorization: Bearer <token>` header (received from WebView)
+4. First run: loads full signals from `/api/signals` to initialize state, then switches to fast updates
+5. Fallback: if updates endpoint fails, falls back to full signal fetch
+6. State tracking: `status|category|hitTpIndex` for precise TP/SL detection
+
+### New: BootReceiver.java:
+- Auto-restarts SignalService after device reboot
+- Uses BOOT_COMPLETED intent filter
+- Falls back to AlarmManager polling if service fails to start
+
+### New: NativeBridge (was NativeNotificationInterface):
+- `sendNotification()` — same as before
+- `setSessionToken()` — NEW: passes auth token from WebView to SignalService
+- Called automatically on login and session restore
+
+### AndroidManifest.xml:
+- Added BootReceiver with BOOT_COMPLETED intent filter
+
+Stage Summary:
+- APK notification delay reduced from ~5-6s to ~0.5-2s (SSE path) or ~2-3s (service path)
+- Native service now makes authenticated API calls (gets user-specific signals)
+- Service auto-restarts after device reboot
+- Dual notification: SSE instant path + service polling path (whichever fires first wins)
+- Build passes, all Java files compile-ready

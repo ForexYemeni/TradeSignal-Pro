@@ -162,8 +162,8 @@ export async function POST(request: NextRequest) {
 
     await addSignal(signal);
 
-    // Notify SSE subscribers about new signal
-    notifySignalEvent({ type: "signal", pair: parseResult.signal.pair, signalType: cat, timestamp: Date.now() });
+    // Notify SSE subscribers about new signal (include type for instant sound)
+    notifySignalEvent({ type: "signal", pair: parseResult.signal.pair, signalType: cat, signalDirection: parseResult.signal.type, timestamp: Date.now() });
 
     // Push notification for new entries
     if (isEntry(cat)) {
