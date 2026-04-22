@@ -41,6 +41,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "البريد غير مسجل في النظام" }, { status: 404 });
     }
 
+    // Check if email service is configured
+    if (!process.env.GOOGLE_APPS_SCRIPT_EMAIL_URL) {
+      return NextResponse.json({
+        success: false,
+        error: "خدمة الإيميل غير مفعلة. تواصل مع الإدارة.",
+        emailNotConfigured: true,
+      }, { status: 503 });
+    }
+
     // Rate limiting: check how many OTPs were sent to this email in the last minute
     const rateLimitKey = `otp_rate:${sanitizedEmail}`;
     const rateLimitData = await kv.get<string>(rateLimitKey);
@@ -66,19 +75,23 @@ export async function POST(request: NextRequest) {
       ex: RATE_LIMIT_WINDOW,
     });
 
-    // Send OTP email (fire-and-forget, don't block on email failure)
+    // Send OTP email — MUST succeed, otherwise return error
     const emailSent = await sendOtpEmail(sanitizedEmail, otp, type, name);
 
     if (!emailSent) {
-      // Still return success but warn about email — OTP is stored and can be verified
-      console.warn(`OTP generated but email may have failed to ${sanitizedEmail}`);
+      // Delete the stored OTP since email failed
+      await kv.del(otpKey);
+      console.error(`OTP email FAILED to send to ${sanitizedEmail}`);
+      return NextResponse.json({
+        success: false,
+        error: "فشل إرسال كود التحقق. تأكد من إعدادات خدمة الإيميل.",
+        emailFailed: true,
+      }, { status: 500 });
     }
 
     return NextResponse.json({
       success: true,
-      message: type === "register"
-        ? "تم إرسال كود التحقق إلى بريدك الإلكتروني"
-        : "تم إرسال كود التحقق إلى بريدك الإلكتروني",
+      message: "تم إرسال كود التحقق إلى بريدك الإلكتروني",
     });
   } catch (error) {
     console.error("OTP send error:", error);
