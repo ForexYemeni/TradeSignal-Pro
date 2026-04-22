@@ -19,7 +19,7 @@ import {
   BarChart3, User, Volume2, VolumeX, Bell,
   Crown, Package, Users, CalendarDays, Settings,
   Home, Flame, Trophy, ArrowUpRight, ArrowDownRight, Hash, Globe, PieChart, Sparkles, Timer, Wallet,
-  MoreHorizontal,
+  MoreHorizontal, CreditCard, Upload, CheckCircle2, XCircle, Image,
 } from "lucide-react";
 
 // ═══ EXTRACTED MODULES ═══
@@ -234,7 +234,7 @@ export default function HomePage() {
 
   /* ── Packages & Settings ── */
   const [packages, setPackages] = useState<SubPackage[]>([]);
-  const [appSettings, setAppSettings] = useState<AppSettingsData>({ freeTrialPackageId: null, autoApproveOnRegister: true });
+  const [appSettings, setAppSettings] = useState<AppSettingsData>({ freeTrialPackageId: null, autoApproveOnRegister: true, usdtWalletAddress: null, usdtNetwork: null, localCurrencyName: null, localCurrencyCode: null, usdtToLocalRate: null });
   const [showPkgForm, setShowPkgForm] = useState(false);
   const [editingPkgId, setEditingPkgId] = useState<string | null>(null);
   const [pkgFormName, setPkgFormName] = useState("");
@@ -252,6 +252,19 @@ export default function HomePage() {
   const [showAssignPkg, setShowAssignPkg] = useState<string | null>(null);
   const [assignDays, setAssignDays] = useState("");
   const SUPER_ADMIN_EMAIL = "mhmdlybdhshay@gmail.com";
+
+  /* ── Payment & Subscription ── */
+  const [selectedPkg, setSelectedPkg] = useState<SubPackage | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<"usdt" | "local" | null>(null);
+  const [usdtTxid, setUsdtTxid] = useState("");
+  const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
+  const [paymentProofPreview, setPaymentProofPreview] = useState<string | null>(null);
+  const [paymentLoad, setPaymentLoad] = useState(false);
+  const [paymentResult, setPaymentResult] = useState<null | "success" | "pending">(null);
+  const [paymentRequests, setPaymentRequests] = useState<{ id: string; userId: string; userName: string; userEmail: string; packageId: string; packageName: string; amount: number; paymentMethod: string; txid?: string; proofUrl?: string; status: string; createdAt: string }[]>([]);
+  const [payReqLoad, setPayReqLoad] = useState(false);
+  const [showPaymentSettings, setShowPaymentSettings] = useState(false);
+  const [paySettingsForm, setPaySettingsForm] = useState({ usdtWalletAddress: "", usdtNetwork: "TRC20", localCurrencyName: "", localCurrencyCode: "", usdtToLocalRate: "" });
 
   /* ── Session Init: restore from localStorage ── */
   const [dbReady, setDbReady] = useState(false);
@@ -582,8 +595,9 @@ export default function HomePage() {
       fetchUsers();
       fetchEmailRequests();
     }
-    if (view === "main" && tab === "packages" && isAdmin) {
+    if (view === "main" && tab === "packages") {
       fetchPackages();
+      if (isAdmin) fetchPaymentRequests();
     }
   }, [tab, view]);
 
@@ -1026,6 +1040,122 @@ export default function HomePage() {
     } catch (e) { console.error("Set auto approve:", e); }
   }
 
+  /* ── Payment Settings Handlers ── */
+  async function handleSavePaymentSettings() {
+    const payload: Record<string, string | number | null> = {};
+    if (paySettingsForm.usdtWalletAddress) payload.usdtWalletAddress = paySettingsForm.usdtWalletAddress;
+    if (paySettingsForm.usdtNetwork) payload.usdtNetwork = paySettingsForm.usdtNetwork;
+    if (paySettingsForm.localCurrencyName) payload.localCurrencyName = paySettingsForm.localCurrencyName;
+    if (paySettingsForm.localCurrencyCode) payload.localCurrencyCode = paySettingsForm.localCurrencyCode;
+    if (paySettingsForm.usdtToLocalRate) payload.usdtToLocalRate = Number(paySettingsForm.usdtToLocalRate) || null;
+    try {
+      const res = await fetch("/api/settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      const data = await res.json();
+      if (data.success) {
+        setAppSettings(data.settings);
+        toast.success("تم حفظ إعدادات الدفع");
+      } else {
+        toast.error(data.error || "فشل حفظ الإعدادات");
+      }
+    } catch (e) { console.error("Save payment settings:", e); toast.error("خطأ في الاتصال"); }
+  }
+
+  /* ── Payment Request Handlers ── */
+  async function fetchPaymentRequests() {
+    setPayReqLoad(true);
+    try {
+      const res = await fetch("/api/payments");
+      const data = await res.json();
+      if (data.success) setPaymentRequests(data.requests || []);
+    } catch (e) { console.error("Fetch payment requests:", e); }
+    finally { setPayReqLoad(false); }
+  }
+
+  async function handlePaymentAction(id: string, action: "approve" | "reject") {
+    const req = paymentRequests.find(r => r.id === id);
+    const userName = req?.userName || "";
+    const pkgName = req?.packageName || "";
+    askConfirm({
+      title: action === "approve" ? "قبول طلب الدفع" : "رفض طلب الدفع",
+      description: action === "approve" ? `هل تريد قبول طلب الدفع من "${userName}" لباقة "${pkgName}"؟ سيتم تفعيل الاشتراك فوراً.` : `هل تريد رفض طلب الدفع من "${userName}" لباقة "${pkgName}"؟ سيتم إبلاغ المستخدم بالرفض.`,
+      variant: action === "approve" ? "info" : "danger",
+      confirmLabel: action === "approve" ? "نعم، قبول" : "نعم، رفض",
+      icon: action === "approve" ? <CheckCircle2 className="w-5 h-5 text-emerald-400" /> : <XCircle className="w-5 h-5 text-red-400" />,
+      action: async () => {
+        try {
+          const res = await fetch("/api/payments", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, action }) });
+          const data = await res.json();
+          if (data.success) { fetchPaymentRequests(); toast.success(action === "approve" ? "تم قبول طلب الدفع وتفعيل الاشتراك" : "تم رفض طلب الدفع"); }
+          else { toast.error(data.error || "فشل تحديث الطلب"); }
+        } catch (e) { console.error("Payment action:", e); toast.error("خطأ في الاتصال"); }
+      },
+    });
+  }
+
+  /* ── User Payment Handlers ── */
+  async function handleUsdtPayment() {
+    if (!selectedPkg || !usdtTxid.trim() || !session) return;
+    setPaymentLoad(true);
+    try {
+      const res = await fetch("/api/payments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: session.id, packageId: selectedPkg.id, amount: selectedPkg.price, paymentMethod: "usdt", txid: usdtTxid.trim() }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPaymentResult("success");
+        toast.success("تم تفعيل الاشتراك بنجاح! استمتع بالباقة.");
+        setTimeout(() => { fetchPackages(); handleLogout(); }, 3000);
+      } else {
+        toast.error(data.error || "فشل تفعيل الاشتراك");
+      }
+    } catch (e) { console.error("USDT payment:", e); toast.error("خطأ في الاتصال"); }
+    finally { setPaymentLoad(false); }
+  }
+
+  async function handleLocalPayment() {
+    if (!selectedPkg || !paymentProofFile || !session) return;
+    setPaymentLoad(true);
+    try {
+      // Upload proof image first
+      const reader = new FileReader();
+      const fileDataUrl: string = await new Promise((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(paymentProofFile);
+      });
+      const uploadRes = await fetch("/api/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ file: fileDataUrl, fileName: paymentProofFile.name }),
+      });
+      const uploadData = await uploadRes.json();
+      if (!uploadData.success || !uploadData.url) { toast.error("فشل رفع صورة الإثبات"); setPaymentLoad(false); return; }
+
+      // Submit payment request
+      const res = await fetch("/api/payments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: session.id, packageId: selectedPkg.id, amount: selectedPkg.price, paymentMethod: "local", proofUrl: uploadData.url }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPaymentResult("pending");
+        toast.success("تم إرسال طلب الدفع بنجاح! سيتم مراجعته من قبل الإدارة.");
+      } else {
+        toast.error(data.error || "فشل إرسال طلب الدفع");
+      }
+    } catch (e) { console.error("Local payment:", e); toast.error("خطأ في الاتصال"); }
+    finally { setPaymentLoad(false); }
+  }
+
+  function resetPaymentState() {
+    setSelectedPkg(null); setPaymentMethod(null); setUsdtTxid("");
+    setPaymentProofFile(null); setPaymentProofPreview(null);
+    setPaymentLoad(false); setPaymentResult(null);
+  }
+
   async function handleAssignPackage(userId: string, packageId: string) {
     const user = users.find(u => u.id === userId);
     const userName = user?.name || user?.email || "";
@@ -1324,6 +1454,11 @@ export default function HomePage() {
   const isAdmin = session?.role === "admin";
 
   function getFiltered(): Signal[] {
+    // ── Subscription gate: unsubscribed users see NO signals ──
+    if (!isAdmin && session) {
+      const hasSub = session.subscriptionType === "subscriber" && session.subscriptionExpiry && new Date(session.subscriptionExpiry).getTime() > Date.now();
+      if (!hasSub) return [];
+    }
     // Instrument category mapping — covers all formats from TradingView Pine Script
     const instMap: Record<string, string> = {
       "ذهب": "gold", "الذهب": "gold", "gold": "gold",
@@ -2155,7 +2290,7 @@ export default function HomePage() {
     { key: "dashboard", label: "الإحصائيات", icon: <BarChart3 className="w-5 h-5" /> },
     ...(isAdmin ? [{ key: "analyst" as Tab, label: "المحلل", icon: <Send className="w-5 h-5" /> }] : []),
     ...(isAdmin ? [{ key: "users" as Tab, label: "المستخدمين", icon: <User className="w-5 h-5" />, adminOnly: true }] : []),
-    ...(isAdmin ? [{ key: "packages" as Tab, label: "الباقات", icon: <Package className="w-5 h-5" /> }] : []),
+    { key: "packages" as Tab, label: isAdmin ? "الباقات" : "الاشتراك", icon: <Package className="w-5 h-5" /> },
     { key: "account", label: "الحساب", icon: <User className="w-5 h-5" /> },
   ];
 
@@ -2957,6 +3092,115 @@ export default function HomePage() {
         {/* ══════ TAB: PACKAGES (Admin) ══════ */}
         {tab === "packages" && isAdmin && (
           <motion.div key="packages" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }} className="space-y-4">
+            {/* ── Payment Settings (Collapsible) ── */}
+            <div className="rounded-2xl border border-amber-500/15 overflow-hidden" style={{ background: "linear-gradient(135deg, rgba(255,215,0,0.06) 0%, rgba(255,140,0,0.02) 100%)" }}>
+              <button onClick={() => { setShowPaymentSettings(!showPaymentSettings); if (!showPaymentSettings) { setPaySettingsForm({ usdtWalletAddress: appSettings.usdtWalletAddress || "", usdtNetwork: appSettings.usdtNetwork || "TRC20", localCurrencyName: appSettings.localCurrencyName || "", localCurrencyCode: appSettings.localCurrencyCode || "", usdtToLocalRate: appSettings.usdtToLocalRate ? String(appSettings.usdtToLocalRate) : "" }); } }} className="w-full p-4 flex items-center justify-between text-sm text-foreground/80 hover:bg-muted/30 transition-colors">
+                <span className="flex items-center gap-2"><Wallet className="w-4 h-4 text-amber-400" />إعدادات الدفع</span>
+                <span className={`text-[10px] transition-transform duration-200 ${showPaymentSettings ? "rotate-180" : ""}`}>▼</span>
+              </button>
+              {showPaymentSettings && (
+                <div className="px-4 pb-4 space-y-3 animate-[fadeIn_0.2s_ease-out]">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="col-span-2">
+                      <label className="text-[9px] text-muted-foreground mb-1 block font-medium">عنوان محفظة USDT</label>
+                      <Input value={paySettingsForm.usdtWalletAddress} onChange={e => setPaySettingsForm(p => ({ ...p, usdtWalletAddress: e.target.value }))} placeholder="T..."
+                        className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-10 rounded-xl text-[11px] font-mono" dir="ltr" />
+                    </div>
+                    <div>
+                      <label className="text-[9px] text-muted-foreground mb-1 block font-medium">الشبكة</label>
+                      <div className="flex gap-1.5 h-[40px]">
+                        {(["TRC20", "BEP20", "ERC20"] as const).map(n => (
+                          <button key={n} onClick={() => setPaySettingsForm(p => ({ ...p, usdtNetwork: n }))}
+                            className={`flex-1 rounded-xl text-[10px] font-semibold transition-all border ${paySettingsForm.usdtNetwork === n ? "bg-amber-500/20 text-amber-400 border-amber-500/30" : "bg-muted/50 text-muted-foreground border-border"}`}>
+                            {n}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-[9px] text-muted-foreground mb-1 block font-medium">اسم العملة المحلية</label>
+                      <Input value={paySettingsForm.localCurrencyName} onChange={e => setPaySettingsForm(p => ({ ...p, localCurrencyName: e.target.value }))} placeholder="مثال: الريال اليمني"
+                        className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-10 rounded-xl text-[11px]" dir="rtl" />
+                    </div>
+                    <div>
+                      <label className="text-[9px] text-muted-foreground mb-1 block font-medium">رمز العملة المحلية</label>
+                      <Input value={paySettingsForm.localCurrencyCode} onChange={e => setPaySettingsForm(p => ({ ...p, localCurrencyCode: e.target.value }))} placeholder="مثال: YER"
+                        className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-10 rounded-xl text-[11px] font-mono" dir="ltr" />
+                    </div>
+                    <div>
+                      <label className="text-[9px] text-muted-foreground mb-1 block font-medium">سعر USDT → عملة محلية</label>
+                      <Input type="number" value={paySettingsForm.usdtToLocalRate} onChange={e => setPaySettingsForm(p => ({ ...p, usdtToLocalRate: e.target.value }))} placeholder="مثال: 535"
+                        className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-10 rounded-xl text-[11px] font-mono" dir="ltr" />
+                    </div>
+                  </div>
+                  <button onClick={handleSavePaymentSettings} className="w-full h-10 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-black text-[11px] font-bold active:scale-[0.98] transition-transform flex items-center justify-center gap-1.5">
+                    <Settings className="w-3.5 h-3.5" /> حفظ إعدادات الدفع
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* ── Payment Requests Review ── */}
+            {(() => {
+              const pendingReqs = paymentRequests.filter(r => r.status === "pending");
+              return pendingReqs.length > 0 ? (
+                <div className="rounded-2xl border border-amber-500/20 overflow-hidden" style={{ background: "linear-gradient(135deg, rgba(255,215,0,0.04) 0%, rgba(255,140,0,0.01) 100%)" }}>
+                  <div className="p-4 pb-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-xl bg-amber-500/15 border border-amber-500/15 flex items-center justify-center">
+                          <Clock className="w-4 h-4 text-amber-400" />
+                        </div>
+                        <div>
+                          <h3 className="text-xs font-bold text-foreground">طلبات الدفع المعلقة</h3>
+                          <p className="text-[9px] text-muted-foreground">{pendingReqs.length} طلب بانتظار المراجعة</p>
+                        </div>
+                      </div>
+                      <span className="text-[10px] bg-amber-500/15 text-amber-400 px-2 py-0.5 rounded-full font-bold">{pendingReqs.length}</span>
+                    </div>
+                  </div>
+                  <div className="px-4 pb-3 space-y-2 max-h-96 overflow-y-auto">
+                    {pendingReqs.map(req => (
+                      <div key={req.id} className="rounded-xl border border-border bg-muted/30 p-3 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[11px] font-bold text-foreground truncate">{req.userName}</div>
+                            <div className="text-[9px] text-muted-foreground font-mono truncate" dir="ltr">{req.userEmail}</div>
+                          </div>
+                          <div className="text-left flex-shrink-0">
+                            <div className="text-sm font-black text-amber-400 font-mono">${req.amount}</div>
+                            <div className="text-[8px] text-muted-foreground">{req.packageName}</div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 text-[9px] text-muted-foreground">
+                          <span className="px-1.5 py-0.5 rounded-md bg-sky-500/10 text-sky-400 font-medium">
+                            {req.paymentMethod === "usdt" ? "USDT" : "محلي"}
+                          </span>
+                          {req.txid && <span className="truncate font-mono" dir="ltr">TX: {req.txid}</span>}
+                          <span className="mr-auto">{new Date(req.createdAt).toLocaleDateString("ar-SA", { month: "short", day: "numeric" })}</span>
+                        </div>
+                        {req.proofUrl && (
+                          <div className="mt-1">
+                            <button onClick={() => window.open(req.proofUrl, "_blank")} className="flex items-center gap-1.5 text-[10px] text-sky-400 hover:text-sky-300 transition-colors">
+                              <Image className="w-3.5 h-3.5" aria-hidden="true" /> عرض صورة الإثبات
+                            </button>
+                          </div>
+                        )}
+                        <div className="flex gap-2 pt-1">
+                          <button onClick={() => handlePaymentAction(req.id, "approve")} className="flex-1 py-1.5 rounded-lg text-[9px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 active:scale-95 transition-transform flex items-center justify-center gap-1">
+                            <CheckCircle2 className="w-3 h-3" /> قبول
+                          </button>
+                          <button onClick={() => handlePaymentAction(req.id, "reject")} className="flex-1 py-1.5 rounded-lg text-[9px] font-medium bg-red-500/10 text-red-400 border border-red-500/15 active:scale-95 transition-transform flex items-center justify-center gap-1">
+                            <XCircle className="w-3 h-3" /> رفض
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null;
+            })()}
+
             {/* ── App Settings Card ── */}
             <div className="rounded-2xl border border-amber-500/15 overflow-hidden" style={{ background: "linear-gradient(135deg, rgba(255,215,0,0.06) 0%, rgba(255,140,0,0.02) 100%)" }}>
               <div className="p-4 space-y-3">
@@ -3250,6 +3494,245 @@ export default function HomePage() {
                   })();
                 })}
               </div>
+            )}
+          </motion.div>
+        )}
+
+        {/* ══════ TAB: PACKAGES (User) ══════ */}
+        {tab === "packages" && !isAdmin && (
+          <motion.div key="packages-user" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }} className="space-y-4">
+            {/* ── Header ── */}
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/10 border border-amber-500/15 flex items-center justify-center">
+                <Crown className="w-4 h-4 text-amber-400" />
+              </div>
+              <div>
+                <h2 className="text-sm font-bold text-foreground">الاشتراك في الباقات</h2>
+                <p className="text-[9px] text-muted-foreground">اختر الباقة المناسبة لك وابدأ رحلة التداول</p>
+              </div>
+            </div>
+
+            {/* ── Payment Result ── */}
+            <AnimatePresence>
+            {paymentResult === "success" && (
+              <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="rounded-2xl border border-emerald-500/30 p-6 text-center space-y-3" style={{ background: "linear-gradient(135deg, rgba(16,185,129,0.08) 0%, rgba(16,185,129,0.02) 100%)" }}>
+                <div className="w-16 h-16 rounded-full bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center mx-auto">
+                  <CheckCircle2 className="w-8 h-8 text-emerald-400" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-emerald-400">تم تفعيل الاشتراك بنجاح!</h3>
+                  <p className="text-xs text-muted-foreground mt-1">سيتم تسجيل خروجك تلقائياً لتسجيل الدخول بالباقة الجديدة</p>
+                </div>
+              </motion.div>
+            )}
+            {paymentResult === "pending" && (
+              <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="rounded-2xl border border-amber-500/30 p-6 text-center space-y-3" style={{ background: "linear-gradient(135deg, rgba(245,158,11,0.08) 0%, rgba(245,158,11,0.02) 100%)" }}>
+                <div className="w-16 h-16 rounded-full bg-amber-500/15 border border-amber-500/25 flex items-center justify-center mx-auto">
+                  <Clock className="w-8 h-8 text-amber-400" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-amber-400">تم إرسال طلب الدفع</h3>
+                  <p className="text-xs text-muted-foreground mt-1">سيتم مراجعة طلبك من قبل الإدارة وسيتم تفعيل الاشتراك بعد القبول. يمكنك متابعة الحالة من صفحة الحساب.</p>
+                </div>
+                <button onClick={resetPaymentState} className="px-4 py-2 rounded-xl text-xs font-semibold bg-muted/60 text-foreground border border-border active:scale-95 transition-transform">تصفح الباقات</button>
+              </motion.div>
+            )}
+            </AnimatePresence>
+
+            {/* ── Payment Flow (USDT or Local) ── */}
+            <AnimatePresence>
+            {selectedPkg && !paymentResult && (
+              <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-3">
+                {/* Back button */}
+                <button onClick={resetPaymentState} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                  ← العودة للباقات
+                </button>
+
+                {/* Selected Package Summary */}
+                <div className="rounded-2xl border border-amber-500/20 p-4" style={{ background: "linear-gradient(135deg, rgba(255,215,0,0.06) 0%, rgba(255,140,0,0.02) 100%)" }}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-bold text-foreground">{selectedPkg.name}</h3>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">{selectedPkg.durationDays} يوم</p>
+                    </div>
+                    <div className="text-2xl font-black text-amber-400 font-mono">${selectedPkg.price}</div>
+                  </div>
+                  {appSettings.usdtToLocalRate && appSettings.localCurrencyCode && (
+                    <div className="mt-2 pt-2 border-t border-border/50 text-xs text-muted-foreground">
+                      ≈ {(selectedPkg.price * appSettings.usdtToLocalRate).toLocaleString()} {appSettings.localCurrencyCode}
+                    </div>
+                  )}
+                </div>
+
+                {/* Payment Method Selection (if not chosen yet) */}
+                {!paymentMethod && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-bold text-foreground">اختر طريقة الدفع</p>
+                    {/* USDT Payment Card */}
+                    <button onClick={() => setPaymentMethod("usdt")} className="w-full rounded-2xl border border-border bg-muted/30 p-4 flex items-center gap-3 active:scale-[0.98] transition-transform hover:border-amber-500/25">
+                      <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/20 flex items-center justify-center flex-shrink-0">
+                        <Wallet className="w-5 h-5 text-amber-400" />
+                      </div>
+                      <div className="flex-1 text-right">
+                        <div className="text-xs font-bold text-foreground">USDT (تITHER)</div>
+                        <div className="text-[10px] text-muted-foreground mt-0.5">تحويل مباشر — تفعيل فوري تلقائي</div>
+                      </div>
+                    </button>
+                    {/* Local Currency Payment Card */}
+                    {(appSettings.localCurrencyName || appSettings.localCurrencyCode) && (
+                      <button onClick={() => setPaymentMethod("local")} className="w-full rounded-2xl border border-border bg-muted/30 p-4 flex items-center gap-3 active:scale-[0.98] transition-transform hover:border-sky-500/25">
+                        <div className="w-10 h-10 rounded-xl bg-sky-500/15 border border-sky-500/20 flex items-center justify-center flex-shrink-0">
+                          <CreditCard className="w-5 h-5 text-sky-400" />
+                        </div>
+                        <div className="flex-1 text-right">
+                          <div className="text-xs font-bold text-foreground">{appSettings.localCurrencyName || appSettings.localCurrencyCode || "عملة محلية"}</div>
+                          <div className="text-[10px] text-muted-foreground mt-0.5">تحويل محلي — مراجعة يدوية خلال 24 ساعة</div>
+                        </div>
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* USDT Payment Form */}
+                {paymentMethod === "usdt" && (
+                  <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
+                    <div className="rounded-2xl border border-amber-500/20 bg-muted/40 p-4 space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Wallet className="w-4 h-4 text-amber-400" />
+                        <span className="text-xs font-bold text-amber-400">دفع USDT</span>
+                      </div>
+                      {appSettings.usdtWalletAddress ? (
+                        <>
+                          <div className="bg-muted/60 rounded-xl p-3 border border-border">
+                            <div className="text-[9px] text-muted-foreground mb-1">عنوان المحفظة ({appSettings.usdtNetwork || "TRC20"})</div>
+                            <div className="text-[11px] font-mono text-foreground break-all" dir="ltr">{appSettings.usdtWalletAddress}</div>
+                            <button onClick={() => { navigator.clipboard.writeText(appSettings.usdtWalletAddress || ""); toast.success("تم نسخ العنوان"); }} className="mt-2 text-[10px] text-amber-400 font-medium hover:text-amber-300 transition-colors">نسخ العنوان</button>
+                          </div>
+                          <div>
+                            <label className="text-[9px] text-muted-foreground mb-1 block font-medium">رقم العملية (TXID) *</label>
+                            <Input value={usdtTxid} onChange={e => setUsdtTxid(e.target.value)} placeholder="أدخل رقم العملية..."
+                              className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-10 rounded-xl text-[11px] font-mono" dir="ltr" />
+                          </div>
+                          <button onClick={handleUsdtPayment} disabled={paymentLoad || !usdtTxid.trim()}
+                            className="w-full h-11 rounded-xl gold-gradient text-black text-xs font-bold disabled:opacity-40 active:scale-[0.98] transition-transform flex items-center justify-center gap-2">
+                            {paymentLoad ? <Loader2 className="w-4 h-4 animate-spin" /> : <><CheckCircle2 className="w-4 h-4" /> تفعيل الآن</>}
+                          </button>
+                        </>
+                      ) : (
+                        <div className="text-center py-2">
+                          <p className="text-xs text-muted-foreground">عنوان المحفظة غير متاح حالياً</p>
+                          <p className="text-[10px] text-muted-foreground mt-1">تواصل مع الإدارة للاشتراك</p>
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* Local Payment Form */}
+                {paymentMethod === "local" && (
+                  <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
+                    <div className="rounded-2xl border border-sky-500/20 bg-muted/40 p-4 space-y-3">
+                      <div className="flex items-center gap-2">
+                        <CreditCard className="w-4 h-4 text-sky-400" />
+                        <span className="text-xs font-bold text-sky-400">دفع بالعملة المحلية</span>
+                      </div>
+                      {appSettings.usdtToLocalRate && appSettings.localCurrencyCode ? (
+                        <div className="bg-muted/60 rounded-xl p-3 border border-border">
+                          <div className="text-[9px] text-muted-foreground mb-1">المبلغ المطلوب</div>
+                          <div className="text-lg font-black text-foreground">
+                            {(selectedPkg.price * appSettings.usdtToLocalRate).toLocaleString()} <span className="text-sm text-muted-foreground">{appSettings.localCurrencyCode}</span>
+                          </div>
+                          <div className="text-[9px] text-muted-foreground mt-1">{selectedPkg.price} USDT × {appSettings.usdtToLocalRate}</div>
+                        </div>
+                      ) : null}
+                      <div>
+                        <label className="text-[9px] text-muted-foreground mb-1.5 block font-medium">صورة إثبات التحويل *</label>
+                        <div className="relative">
+                          <input type="file" accept="image/*" className="hidden" id="payment-proof" onChange={e => {
+                            const f = e.target.files?.[0]; if (!f) return;
+                            setPaymentProofFile(f);
+                            const r = new FileReader(); r.onload = () => setPaymentProofPreview(r.result as string); r.readAsDataURL(f);
+                          }} />
+                          {paymentProofPreview ? (
+                            <div className="relative rounded-xl overflow-hidden border border-border">
+                              <img src={paymentProofPreview} alt="إثبات الدفع" className="w-full h-40 object-cover" />
+                              <button onClick={() => { setPaymentProofFile(null); setPaymentProofPreview(null); }} className="absolute top-2 left-2 w-7 h-7 rounded-full bg-black/60 flex items-center justify-center">
+                                <XCircle className="w-4 h-4 text-white" />
+                              </button>
+                            </div>
+                          ) : (
+                            <label htmlFor="payment-proof" className="flex flex-col items-center justify-center gap-2 h-32 rounded-xl border-2 border-dashed border-border bg-muted/30 cursor-pointer hover:border-sky-500/30 transition-colors">
+                              <Upload className="w-6 h-6 text-muted-foreground" />
+                              <span className="text-[10px] text-muted-foreground">اضغط لرفع صورة الإثبات</span>
+                            </label>
+                          )}
+                        </div>
+                      </div>
+                      <button onClick={handleLocalPayment} disabled={paymentLoad || !paymentProofFile}
+                        className="w-full h-11 rounded-xl bg-gradient-to-r from-sky-500 to-cyan-500 text-white text-xs font-bold disabled:opacity-40 active:scale-[0.98] transition-transform flex items-center justify-center gap-2">
+                        {paymentLoad ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Upload className="w-4 h-4" /> إرسال طلب الدفع</>}
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </motion.div>
+            )}
+            </AnimatePresence>
+
+            {/* ── Package Cards (only show when no payment flow active) ── */}
+            {!selectedPkg && !paymentResult && (
+              packages.length === 0 ? (
+                <EmptyState icon={<Package className="w-7 h-7" />} title="لا توجد باقات متاحة حالياً" subtitle="يتم إضافة الباقات قريباً. تواصل مع الإدارة." />
+              ) : (
+                <div className="space-y-3">
+                  {packages.filter(p => p.isActive && p.type === "paid").map((pkg, idx) => {
+                    const pkgBg = "linear-gradient(135deg, rgba(255,215,0,0.06) 0%, rgba(255,140,0,0.02) 100%)";
+                    return (
+                      <motion.div key={pkg.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }}
+                        className="rounded-2xl border border-amber-500/20 overflow-hidden" style={{ background: pkgBg }}>
+                        <div className="p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1 min-w-0">
+                              <span className="text-base font-extrabold text-foreground">{pkg.name}</span>
+                              {pkg.description && <p className="text-[10px] text-muted-foreground mt-1 leading-relaxed">{pkg.description}</p>}
+                            </div>
+                            <div className="text-left flex-shrink-0">
+                              <div className="text-2xl font-black text-amber-400 font-mono leading-tight">${pkg.price}</div>
+                              <div className="text-[8px] text-muted-foreground mt-0.5">{pkg.durationDays} يوم</div>
+                              {appSettings.usdtToLocalRate && appSettings.localCurrencyCode && (
+                                <div className="text-[8px] text-muted-foreground mt-0.5">≈ {(pkg.price * appSettings.usdtToLocalRate).toLocaleString()} {appSettings.localCurrencyCode}</div>
+                              )}
+                            </div>
+                          </div>
+                          {(pkg.features && pkg.features.length > 0) && (
+                            <div className="mt-3 space-y-1">
+                              {pkg.features.map((f, i) => (
+                                <div key={i} className="flex items-center gap-2">
+                                  <div className="w-4 h-4 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                                    <svg className="w-2.5 h-2.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                                  </div>
+                                  <span className="text-[10px] text-foreground/80">{f}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {pkg.instruments && pkg.instruments.length > 0 && (
+                            <div className="flex items-center gap-1.5 mt-3 flex-wrap">
+                              {pkg.instruments.map(instId => { const c = INST_CATS.find(x => x.id === instId); return c ? (<span key={instId} className="inline-flex items-center gap-0.5 px-2 py-1 rounded-lg bg-white/[0.05] border border-white/[0.08] text-[9px] text-foreground/80"><span>{c.icon}</span> {c.label}</span>) : null; })}
+                            </div>
+                          )}
+                        </div>
+                        <div className="px-4 py-2.5 border-t border-border/40 bg-muted/20">
+                          <button onClick={() => { setSelectedPkg(pkg); setPaymentMethod(null); setUsdtTxid(""); setPaymentProofFile(null); setPaymentProofPreview(null); setPaymentResult(null); }}
+                            className="w-full h-10 rounded-xl gold-gradient text-black text-[11px] font-bold active:scale-[0.98] transition-transform flex items-center justify-center gap-1.5">
+                            <Crown className="w-3.5 h-3.5" /> اشترك الآن
+                          </button>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              )
             )}
           </motion.div>
         )}
@@ -3632,7 +4115,9 @@ export default function HomePage() {
                 ) : (
                   <div className="text-center py-2">
                     <div className="text-xs text-muted-foreground">لا يوجد اشتراك نشط حالياً</div>
-                    <div className="text-[10px] text-muted-foreground mt-1">تواصل مع الإدارة للاشتراك في إحدى الباقات</div>
+                    <button onClick={() => setTab("packages")} className="text-[10px] text-amber-400 mt-1 font-medium hover:text-amber-300 transition-colors flex items-center gap-1 mx-auto">
+                      <Crown className="w-3 h-3" /> تصفح الباقات والاشتراك
+                    </button>
                   </div>
                 )}
               </Glass>

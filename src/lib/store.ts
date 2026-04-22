@@ -507,11 +507,17 @@ export async function resetLoginAttempts(email: string): Promise<void> {
 export interface AppSettings {
   freeTrialPackageId: string | null;
   autoApproveOnRegister: boolean;
+  /* Payment settings */
+  usdtWalletAddress: string | null;
+  usdtNetwork: string | null;         // e.g. "TRC20", "BEP20", "ERC20"
+  localCurrencyName: string | null;   // e.g. "ريال يمني", "جنيه مصري"
+  localCurrencyCode: string | null;   // e.g. "YER", "EGP"
+  usdtToLocalRate: number | null;     // e.g. 550 (1 USDT = 550 YER)
 }
 
 export async function getAppSettings(): Promise<AppSettings> {
   const data = await kv.get<AppSettings>('app_settings');
-  return data || { freeTrialPackageId: null, autoApproveOnRegister: true };
+  return data || { freeTrialPackageId: null, autoApproveOnRegister: true, usdtWalletAddress: null, usdtNetwork: null, localCurrencyName: null, localCurrencyCode: null, usdtToLocalRate: null };
 }
 
 export async function updateAppSettings(updates: Partial<AppSettings>): Promise<AppSettings> {
@@ -541,4 +547,62 @@ export async function enforceSubscriptions(): Promise<string[]> {
   }
   if (changed) await kv.set('users', users);
   return expiredIds;
+}
+
+// ─── Payment Requests (Subscription Purchases) ─────────
+export interface PaymentRequest {
+  id: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  packageId: string;
+  packageName: string;
+  packagePrice: number;           // Price in USDT
+  paymentMethod: "usdt" | "local";
+  status: "pending" | "approved" | "rejected" | "expired";
+  // USDT fields
+  txId?: string;                  // Transaction ID
+  // Local currency fields
+  localAmount?: number;           // Amount in local currency
+  paymentProofUrl?: string;       // Uploaded image URL
+  // Metadata
+  createdAt: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  rejectReason?: string;
+}
+
+export async function getPaymentRequests(): Promise<PaymentRequest[]> {
+  const data = await kv.get<PaymentRequest[]>('payment_requests');
+  return data || [];
+}
+
+export async function getPaymentRequestsByUser(userId: string): Promise<PaymentRequest[]> {
+  const all = await getPaymentRequests();
+  return all.filter(r => r.userId === userId);
+}
+
+export async function getPendingPaymentRequests(): Promise<PaymentRequest[]> {
+  const all = await getPaymentRequests();
+  return all.filter(r => r.status === "pending");
+}
+
+export async function addPaymentRequest(req: PaymentRequest): Promise<PaymentRequest> {
+  return withLock('payment_requests', async () => {
+    const all = await getPaymentRequests();
+    all.unshift(req);
+    await kv.set('payment_requests', all.slice(0, 500));
+    return req;
+  });
+}
+
+export async function updatePaymentRequest(id: string, updates: Partial<PaymentRequest>): Promise<PaymentRequest | null> {
+  return withLock('payment_requests', async () => {
+    const all = await getPaymentRequests();
+    const idx = all.findIndex(r => r.id === id);
+    if (idx === -1) return null;
+    all[idx] = { ...all[idx], ...updates };
+    await kv.set('payment_requests', all);
+    return all[idx];
+  });
 }
