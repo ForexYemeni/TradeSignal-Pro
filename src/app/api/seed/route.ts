@@ -1,8 +1,17 @@
 import { NextResponse } from "next/server";
 import { getAdmin, setAdmin, addSignal, getPackages, addPackage, updateAppSettings } from "@/lib/store";
 
-export async function POST() {
+export async function POST(request?: Request) {
   try {
+    // Check for force reset
+    let forceReset = false;
+    try {
+      if (request) {
+        const body = await request.json();
+        forceReset = !!body.force;
+      }
+    } catch { /* no body */ }
+
     // Ensure admin exists
     let admin = await getAdmin();
     if (!admin) {
@@ -75,7 +84,7 @@ export async function POST() {
 
     // Seed default packages with real features
     const existing = await getPackages();
-    if (existing.length === 0) {
+    if (existing.length === 0 || forceReset) {
       const defaultPackages = [
         {
           id: crypto.randomUUID(),
@@ -97,6 +106,7 @@ export async function POST() {
           maxSignals: 3,
           prioritySupport: false,
           showEntryEarly: false,
+          instruments: ["gold"],
         },
         {
           id: crypto.randomUUID(),
@@ -120,6 +130,7 @@ export async function POST() {
           maxSignals: 5,
           prioritySupport: false,
           showEntryEarly: false,
+          instruments: ["gold", "currencies"],
         },
         {
           id: crypto.randomUUID(),
@@ -145,6 +156,7 @@ export async function POST() {
           maxSignals: 10,
           prioritySupport: true,
           showEntryEarly: false,
+          instruments: ["gold", "currencies", "indices"],
         },
         {
           id: crypto.randomUUID(),
@@ -172,6 +184,7 @@ export async function POST() {
           maxSignals: 0,
           prioritySupport: true,
           showEntryEarly: true,
+          instruments: ["gold", "currencies", "indices", "oil", "crypto"],
         },
         {
           id: crypto.randomUUID(),
@@ -202,6 +215,7 @@ export async function POST() {
           maxSignals: 0,
           prioritySupport: true,
           showEntryEarly: true,
+          instruments: ["gold", "currencies", "indices", "oil", "crypto", "metals"],
         },
       ];
 

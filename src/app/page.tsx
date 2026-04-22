@@ -2297,6 +2297,12 @@ export default function HomePage() {
                 className="px-3 py-1.5 rounded-xl text-[10px] font-bold bg-gradient-to-r from-amber-500/20 to-orange-500/15 text-amber-400 border border-amber-500/25 active:scale-95 transition-transform flex items-center gap-1">
                 {showPkgForm && editingPkgId ? "✕ إلغاء التعديل" : showPkgForm ? "✕ إلغاء" : <><span className="text-amber-300">+</span> إنشاء باقة</>}
               </button>
+              <div className="flex gap-1.5">
+              <button onClick={async () => { if (!confirm("هل تريد إضافة الباقات الافتراضية؟ الباقات الحالية لن تُحذف.")) return; await fetch("/api/seed", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ force: false }) }); fetchPackages(); toast.success("تم إنشاء الباقات الافتراضية"); }}
+                className="px-3 py-1.5 rounded-xl text-[10px] font-bold bg-gradient-to-r from-emerald-500/20 to-green-500/15 text-emerald-400 border border-emerald-500/25 active:scale-95 transition-transform flex items-center gap-1">
+                <Sparkles className="w-3 h-3" /> باقات افتراضية
+              </button>
+              </div>
             </div>
 
             {/* ── Create/Edit Package Form ── */}
@@ -2694,7 +2700,7 @@ export default function HomePage() {
                             </div>
                           </div>
 
-                          {/* Action Buttons - NOT for super admin or promoted admins */}
+                          {/* Action Buttons - Regular users (NOT super admin, NOT promoted admins) */}
                           {!isSuperAdmin && !isPromotedAdmin && (
                           <div className="flex gap-1.5 mt-2.5 pt-2.5 border-t border-border/40 flex-wrap">
                             <button onClick={() => setShowAssignPkg(u.id)}
@@ -2710,6 +2716,14 @@ export default function HomePage() {
                             </button>
                             <button onClick={() => handleUserAction(u.id, "block")} className="px-2 py-1 rounded-lg text-[9px] font-medium bg-red-500/10 text-red-400 border border-red-500/15 active:scale-95 transition-transform">حظر</button>
                             <button onClick={() => handleDeleteUser(u.id)} className="px-2 py-1 rounded-lg text-[9px] font-medium bg-red-500/5 text-red-300/50 border border-red-500/10 active:scale-95 transition-transform mr-auto">حذف</button>
+                          </div>
+                          )}
+                          {/* Action Buttons - Promoted admins only: can demote back */}
+                          {isPromotedAdmin && (
+                          <div className="flex gap-1.5 mt-2.5 pt-2.5 border-t border-border/40 flex-wrap">
+                            <button onClick={() => handleUserAction(u.id, "remove_admin")} className="px-2.5 py-1 rounded-lg text-[9px] font-medium bg-red-500/10 text-red-400 border border-red-500/15 active:scale-95 transition-transform flex items-center gap-1">
+                              <Crown className="w-3 h-3" /> إزالة المدير
+                            </button>
                           </div>
                           )}
                           {/* Assign Package Dropdown */}
