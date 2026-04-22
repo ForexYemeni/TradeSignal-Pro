@@ -197,10 +197,10 @@ export default function HomePage() {
   const [regErr, setRegErr] = useState("");
   const [regSuccess, setRegSuccess] = useState("");
 
-  /* ── OTP (shared by login & register) ── */
+  /* ── OTP (shared by login & register & reset) ── */
   const [otpStep, setOtpStep] = useState<"none" | "sending" | "verifying" | "done">("none");
   const [otpVerifying, setOtpVerifying] = useState(false);
-  const [otpPurpose, setOtpPurpose] = useState<"register" | "login">("register");
+  const [otpPurpose, setOtpPurpose] = useState<"register" | "login" | "reset">("register");
   const [otpEmail, setOtpEmail] = useState("");
   const [otpCode, setOtpCode] = useState("");
   const [otpName, setOtpName] = useState("");
@@ -210,6 +210,16 @@ export default function HomePage() {
   const [otpTimer, setOtpTimer] = useState(0);
   const [otpIntervalId, setOtpIntervalId] = useState<ReturnType<typeof setInterval> | null>(null);
   const otpInputRef = useRef<HTMLInputElement | null>(null);
+
+  /* ── Forgot Password ── */
+  const [fpEmail, setFpEmail] = useState("");
+  const [fpLoad, setFpLoad] = useState(false);
+  const [fpErr, setFpErr] = useState("");
+  const [fpNewPwd, setFpNewPwd] = useState("");
+  const [fpConfirmPwd, setFpConfirmPwd] = useState("");
+  const [fpResetLoad, setFpResetLoad] = useState(false);
+  const [fpShowPwd, setFpShowPwd] = useState(false);
+  const [fpSuccess, setFpSuccess] = useState(false);
 
   /* ── Users Management ── */
   const [users, setUsers] = useState<{ id: string; name: string; email: string; role: string; status: string; createdAt: string; subscriptionType?: string; subscriptionExpiry?: string; packageName?: string; packageId?: string }[]>([]);
@@ -717,7 +727,7 @@ export default function HomePage() {
     setOtpIntervalId(id);
   }
 
-  async function handleSendOtp(purpose: "register" | "login", targetEmail: string, targetName?: string, targetPwd?: string) {
+  async function handleSendOtp(purpose: "register" | "login" | "reset", targetEmail: string, targetName?: string, targetPwd?: string) {
     setOtpErr("");
     setOtpStep("sending");
     setOtpPurpose(purpose);
@@ -739,7 +749,6 @@ export default function HomePage() {
         startOtpTimer();
         toast.success(data.message);
       } else {
-        // Set loginFeedback for login errors so cards show on login page
         if (purpose === "login") {
           if (data.error.includes("غير مسجل")) {
             setLoginFeedback({ type: "email_not_found", email: targetEmail });
@@ -748,6 +757,9 @@ export default function HomePage() {
           } else {
             setLoginErr(data.error || "فشل إرسال الكود");
           }
+        } else if (purpose === "reset") {
+          setFpErr(data.error || "فشل إرسال الكود");
+          toast.error(data.error || "فشل إرسال الكود");
         } else {
           setOtpErr(data.error || "فشل إرسال الكود");
           toast.error(data.error || "فشل إرسال الكود");
@@ -783,8 +795,13 @@ export default function HomePage() {
       }
       // OTP verified successfully
       setOtpVerifyToken(data.verifyToken);
-      // Step 2: Complete the action (register or login)
-      if (otpPurpose === "register") {
+      // Step 2: Complete the action based on purpose
+      if (otpPurpose === "reset") {
+        // For password reset — go to forgot password view with token ready
+        setOtpStep("done");
+        setView("forgotPwd");
+        toast.success("تم التحقق بنجاح. أدخل كلمة المرور الجديدة.");
+      } else if (otpPurpose === "register") {
         setRegLoad(true);
         try {
           const regRes = await fetch("/api/register", {
@@ -854,6 +871,44 @@ export default function HomePage() {
     setOtpStep("none"); setOtpCode(""); setOtpVerifyToken(""); setOtpErr("");
     if (otpIntervalId) clearInterval(otpIntervalId);
     setOtpTimer(0);
+  }
+
+  /* ── Forgot Password Handler ── */
+  async function handleForgotPasswordSend() {
+    if (!fpEmail.trim()) { setFpErr("أدخل البريد الإلكتروني"); return; }
+    setFpErr(""); setFpSuccess(false);
+    setFpNewPwd(""); setFpConfirmPwd("");
+    // Send OTP with type "reset"
+    handleSendOtp("reset", fpEmail.trim());
+  }
+
+  async function handleResetPassword() {
+    if (fpNewPwd.length < 6) { setFpErr("كلمة المرور يجب أن تكون 6 أحرف على الأقل"); return; }
+    if (fpNewPwd !== fpConfirmPwd) { setFpErr("كلمة المرور وتأكيدها غير متطابقتين"); return; }
+    if (!otpVerifyToken) { setFpErr("انتهت صلاحية رمز التحقق. أعد المحاولة."); return; }
+    setFpResetLoad(true); setFpErr("");
+    try {
+      const res = await fetch("/api/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: otpEmail, verifyToken: otpVerifyToken, newPassword: fpNewPwd }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setFpSuccess(true);
+        toast.success(data.message);
+        setTimeout(() => {
+          setView("login"); setFpEmail(""); setFpNewPwd(""); setFpConfirmPwd("");
+          setFpSuccess(false); resetOtp();
+        }, 2500);
+      } else {
+        setFpErr(data.error || "فشل إعادة تعيين كلمة المرور");
+        toast.error(data.error || "فشل إعادة تعيين كلمة المرور");
+      }
+    } catch {
+      setFpErr("خطأ في الاتصال");
+      toast.error("خطأ في الاتصال");
+    } finally { setFpResetLoad(false); }
   }
 
   function completeLogin(data: { success: boolean; admin: AdminSession; token: string }) {
@@ -1557,6 +1612,16 @@ export default function HomePage() {
               </button>
             </div>
 
+            {/* Forgot Password Link */}
+            <div className="text-center">
+              <button
+                onClick={() => { setView("forgotPwd"); setFpErr(""); setFpSuccess(false); setFpEmail(""); setFpNewPwd(""); setFpConfirmPwd(""); resetOtp(); }}
+                className="text-xs text-muted-foreground hover:text-foreground/80 transition-colors"
+              >
+                نسيت كلمة المرور؟
+              </button>
+            </div>
+
             {/* Register Link */}
             <div className="text-center">
               <button
@@ -1668,10 +1733,134 @@ export default function HomePage() {
             {/* Back Button */}
             <div className="text-center">
               <button
-                onClick={() => { resetOtp(); setView(otpPurpose === "register" ? "register" : "login"); }}
+                onClick={() => { resetOtp(); setView(otpPurpose === "register" ? "register" : otpPurpose === "reset" ? "forgotPwd" : "login"); }}
                 className="text-sm text-muted-foreground hover:text-foreground/70 transition-colors"
               >
                 رجوع
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     RENDER: FORGOT PASSWORD
+     ═══════════════════════════════════════════════════════════════ */
+  if (view === "forgotPwd") {
+    const showNewPwdForm = otpVerifyToken && otpStep === "done";
+    if (fpSuccess) {
+      return (
+        <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-background">
+          <div className="absolute top-[-20%] left-[-10%] w-72 h-72 rounded-full opacity-20" style={{ background: "radial-gradient(circle, #FFD700 0%, transparent 70%)", filter: "blur(80px)" }} />
+          <div className="absolute bottom-[-15%] right-[-10%] w-64 h-64 rounded-full opacity-15" style={{ background: "radial-gradient(circle, #00E676 0%, transparent 70%)", filter: "blur(80px)" }} />
+          <div className="w-full max-w-[480px] animate-[fadeInUp_0.5s_ease-out] relative z-10">
+            <div className="backdrop-blur-2xl bg-muted/50 border border-border shadow-2xl rounded-3xl p-8 space-y-6 text-center">
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-16 h-16 rounded-2xl bg-green-500/20 flex items-center justify-center">
+                  <Sparkles className="w-8 h-8 text-green-400" />
+                </div>
+                <h2 className="text-xl font-bold text-foreground">تم بنجاح</h2>
+                <p className="text-sm text-muted-foreground">تم إعادة تعيين كلمة المرور. جاري التحويل...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-background">
+        <div className="absolute top-[-20%] left-[-10%] w-72 h-72 rounded-full opacity-20" style={{ background: "radial-gradient(circle, #FFD700 0%, transparent 70%)", filter: "blur(80px)" }} />
+        <div className="absolute bottom-[-15%] right-[-10%] w-64 h-64 rounded-full opacity-15" style={{ background: "radial-gradient(circle, #00E676 0%, transparent 70%)", filter: "blur(80px)" }} />
+        <div className="w-full max-w-[480px] animate-[fadeInUp_0.5s_ease-out] relative z-10">
+          <div className="backdrop-blur-2xl bg-muted/50 border border-border shadow-2xl rounded-3xl p-8 space-y-6">
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-500/25">
+                <Lock className="w-8 h-8 text-black" />
+              </div>
+              <h1 className="text-xl font-bold text-foreground">
+                {showNewPwdForm ? "كلمة المرور الجديدة" : "نسيت كلمة المرور"}
+              </h1>
+              <p className="text-xs text-muted-foreground text-center leading-relaxed">
+                {showNewPwdForm
+                  ? "أدخل كلمة المرور الجديدة مع التأكيد"
+                  : "أدخل بريدك الإلكتروني وسنرسل لك كود تحقق لإعادة تعيين كلمة المرور"}
+              </p>
+            </div>
+
+            {fpErr && (
+              <div className="bg-red-500/10 border border-red-500/20 rounded-2xl px-4 py-3 text-[12px] text-red-400 text-center break-all leading-relaxed">
+                {fpErr}
+              </div>
+            )}
+
+            {!showNewPwdForm ? (
+              <div className="space-y-4">
+                <div className="input-glass rounded-2xl px-4 h-[60px] flex items-center gap-3">
+                  <Mail className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+                  <input
+                    type="email"
+                    value={fpEmail}
+                    onChange={e => { setFpEmail(e.target.value); setFpErr(""); }}
+                    placeholder="البريد الإلكتروني"
+                    className="flex-1 bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground text-sm"
+                    dir="ltr"
+                    onKeyDown={e => e.key === "Enter" && !fpLoad && handleForgotPasswordSend()}
+                  />
+                </div>
+                <button
+                  onClick={handleForgotPasswordSend}
+                  disabled={fpLoad || !fpEmail.trim()}
+                  className="w-full h-[56px] rounded-2xl gold-gradient text-black font-bold text-base hover:opacity-90 transition-all active:scale-[0.98] disabled:opacity-50 shadow-lg shadow-amber-500/20"
+                >
+                  {fpLoad ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : "إرسال كود التحقق"}
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="input-glass rounded-2xl px-4 h-[60px] flex items-center gap-3">
+                  <Lock className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+                  <input
+                    type={fpShowPwd ? "text" : "password"}
+                    value={fpNewPwd}
+                    onChange={e => { setFpNewPwd(e.target.value); setFpErr(""); }}
+                    placeholder="كلمة المرور الجديدة"
+                    className="flex-1 bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground text-sm"
+                    dir="ltr"
+                  />
+                  <button type="button" onClick={() => setFpShowPwd(!fpShowPwd)} className="text-muted-foreground hover:text-foreground/80 transition-colors">
+                    {fpShowPwd ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+                <div className="input-glass rounded-2xl px-4 h-[60px] flex items-center gap-3">
+                  <Lock className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+                  <input
+                    type={fpShowPwd ? "text" : "password"}
+                    value={fpConfirmPwd}
+                    onChange={e => { setFpConfirmPwd(e.target.value); setFpErr(""); }}
+                    placeholder="تأكيد كلمة المرور"
+                    className="flex-1 bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground text-sm"
+                    dir="ltr"
+                    onKeyDown={e => e.key === "Enter" && !fpResetLoad && handleResetPassword()}
+                  />
+                </div>
+                <button
+                  onClick={handleResetPassword}
+                  disabled={fpResetLoad || !fpNewPwd || !fpConfirmPwd}
+                  className="w-full h-[56px] rounded-2xl gold-gradient text-black font-bold text-base hover:opacity-90 transition-all active:scale-[0.98] disabled:opacity-50 shadow-lg shadow-amber-500/20"
+                >
+                  {fpResetLoad ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : "إعادة تعيين كلمة المرور"}
+                </button>
+              </div>
+            )}
+
+            <div className="text-center">
+              <button
+                onClick={() => { setView("login"); setFpErr(""); setFpSuccess(false); setFpEmail(""); setFpNewPwd(""); setFpConfirmPwd(""); resetOtp(); }}
+                className="text-sm text-muted-foreground hover:text-foreground/70 transition-colors"
+              >
+                رجوع لتسجيل الدخول
               </button>
             </div>
           </div>

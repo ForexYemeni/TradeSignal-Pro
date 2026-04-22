@@ -28,7 +28,7 @@ export interface Stats {
   topPairs: { pair: string; count: number }[];
 }
 
-export type View = "login" | "register" | "pending" | "blocked" | "expired" | "main" | "changePwd";
+export type View = "login" | "register" | "forgotPwd" | "pending" | "blocked" | "expired" | "main" | "changePwd";
 export type Tab = "home" | "signals" | "dashboard" | "analyst" | "users" | "packages" | "account";
 export type Filter = "all" | "buy" | "sell" | "active" | "closed";
 export interface SubPackage { id: string; name: string; durationDays: number; price: number; type: string; description: string; isActive: boolean; order: number; features: string[]; maxSignals: number; prioritySupport: boolean; showEntryEarly: boolean; instruments?: string[]; }

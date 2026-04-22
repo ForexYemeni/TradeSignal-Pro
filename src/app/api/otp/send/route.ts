@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "البريد الإلكتروني والنوع مطلوبان" }, { status: 400 });
     }
 
-    if (!["register", "login"].includes(type)) {
+    if (!["register", "login", "reset"].includes(type)) {
       return NextResponse.json({ success: false, error: "نوع غير صالح" }, { status: 400 });
     }
 
@@ -29,6 +29,10 @@ export async function POST(request: NextRequest) {
     }
 
     if (type === "login" && !existingUser) {
+      return NextResponse.json({ success: false, error: "البريد غير مسجل في النظام" }, { status: 404 });
+    }
+
+    if (type === "reset" && !existingUser) {
       return NextResponse.json({ success: false, error: "البريد غير مسجل في النظام" }, { status: 404 });
     }
 

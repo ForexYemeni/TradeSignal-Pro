@@ -125,14 +125,18 @@ async function sendBatchViaGAS(emails: EmailPayload[]): Promise<{ sent: number; 
 //  OTP EMAIL
 // ═══════════════════════════════════════════════════════════════
 
-export function buildOtpEmail(otp: string, type: 'register' | 'login', name?: string): {
+export function buildOtpEmail(otp: string, type: 'register' | 'login' | 'reset', name?: string): {
   subject: string;
   html: string;
 } {
-  const title = type === 'register' ? 'تأكيد إنشاء الحساب' : 'تسجيل الدخول';
-  const subtitle = type === 'register'
-    ? 'شكراً لك على التسجيل في ForexYemeni VIP. أدخل الكود التالي لإكمال إنشاء حسابك.'
-    : `مرحباً ${name || ''}، أدخل الكود التالي لتسجيل الدخول إلى حسابك.`;
+  const titleMap = { register: 'تأكيد إنشاء الحساب', login: 'تسجيل الدخول', reset: 'إعادة تعيين كلمة المرور' };
+  const subtitleMap = {
+    register: 'شكراً لك على التسجيل في ForexYemeni VIP. أدخل الكود التالي لإكمال إنشاء حسابك.',
+    login: `مرحباً ${name || ''}، أدخل الكود التالي لتسجيل الدخول إلى حسابك.`,
+    reset: `مرحباً ${name || ''}، أدخل الكود التالي لإعادة تعيين كلمة مرور حسابك.`,
+  };
+  const title = titleMap[type];
+  const subtitle = subtitleMap[type];
 
   return {
     subject: `ForexYemeni — كود التحقق: ${otp}`,
@@ -197,7 +201,7 @@ export function buildOtpEmail(otp: string, type: 'register' | 'login', name?: st
   };
 }
 
-export async function sendOtpEmail(to: string, otp: string, type: 'register' | 'login', name?: string): Promise<{ ok: boolean; error?: string }> {
+export async function sendOtpEmail(to: string, otp: string, type: 'register' | 'login' | 'reset', name?: string): Promise<{ ok: boolean; error?: string }> {
   const { subject, html } = buildOtpEmail(otp, type, name);
   return await sendViaGAS({ to, subject, html });
 }
