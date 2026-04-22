@@ -97,6 +97,16 @@ export default function HomePage() {
   /* ── Online Status ── */
   const isOnline = useOnlineStatus();
 
+  /* ── Instrument Categories (inside component to avoid prerender TDZ) ── */
+  const INST_CATS = [
+    { id: "gold", label: "الذهب", icon: "🥇" },
+    { id: "currencies", label: "عملات", icon: "💱" },
+    { id: "indices", label: "مؤشرات", icon: "📊" },
+    { id: "oil", label: "نفط وطاقة", icon: "🛢️" },
+    { id: "crypto", label: "عملات رقمية", icon: "₿" },
+    { id: "metals", label: "معادن", icon: "🥈" },
+  ];
+
   /* ── View: login shows first ── */
   const [view, setView] = useState<View>("login");
   const [session, setSession] = useState<AdminSession | null>(null);
@@ -181,6 +191,7 @@ export default function HomePage() {
   const [pkgFormMaxSignals, setPkgFormMaxSignals] = useState("0");
   const [pkgFormPriority, setPkgFormPriority] = useState(false);
   const [pkgFormEarlyEntry, setPkgFormEarlyEntry] = useState(false);
+  const [pkgFormInstruments, setPkgFormInstruments] = useState(["gold", "currencies"]);
   const [pkgLoad, setPkgLoad] = useState(false);
   const [showAssignPkg, setShowAssignPkg] = useState<string | null>(null);
   const [assignDays, setAssignDays] = useState("");
@@ -626,6 +637,7 @@ export default function HomePage() {
     setPkgFormName(""); setPkgFormDays(""); setPkgFormPrice(""); setPkgFormType("paid");
     setPkgFormDesc(""); setPkgFormActive(true); setPkgFormFeatures("");
     setPkgFormMaxSignals("0"); setPkgFormPriority(false); setPkgFormEarlyEntry(false);
+    setPkgFormInstruments(["gold", "currencies"]);
     setEditingPkgId(null); setShowPkgForm(false);
   }
 
@@ -635,7 +647,7 @@ export default function HomePage() {
     setPkgFormType(pkg.type as "free" | "trial" | "paid"); setPkgFormDesc(pkg.description);
     setPkgFormActive(pkg.isActive); setPkgFormFeatures((pkg.features || []).join("\n"));
     setPkgFormMaxSignals(String(pkg.maxSignals || 0)); setPkgFormPriority(!!pkg.prioritySupport);
-    setPkgFormEarlyEntry(!!pkg.showEntryEarly); setShowPkgForm(true);
+    setPkgFormEarlyEntry(!!pkg.showEntryEarly); setPkgFormInstruments(pkg.instruments || ["gold", "currencies"]); setShowPkgForm(true);
   }
 
   async function handleSavePackage() {
@@ -646,6 +658,7 @@ export default function HomePage() {
       name: pkgFormName, durationDays: Number(pkgFormDays), price: Number(pkgFormPrice || 0),
       type: pkgFormType, description: pkgFormDesc, isActive: pkgFormActive,
       features, maxSignals: Number(pkgFormMaxSignals), prioritySupport: pkgFormPriority, showEntryEarly: pkgFormEarlyEntry,
+      instruments: pkgFormInstruments,
     };
     try {
       const url = editingPkgId ? "/api/packages" : "/api/packages";
@@ -867,13 +880,18 @@ export default function HomePage() {
   }
 
   function getFiltered(): Signal[] {
+    const instMap: Record<string, string> = { "ذهب": "gold", "عملات": "currencies", "مؤشرات": "indices", "نفط": "oil", "عملات رقمية": "crypto", "معادن": "metals" };
+    const upkg = packages.find(p => p.id === session?.packageId);
+    const allowed = (!isAdmin && upkg?.instruments?.length) ? upkg.instruments : null;
+    let result = signals;
     switch (filter) {
-      case "buy": return signals.filter(s => s.type === "BUY");
-      case "sell": return signals.filter(s => s.type === "SELL");
-      case "active": return signals.filter(s => s.status === "ACTIVE");
-      case "closed": return signals.filter(s => s.status !== "ACTIVE");
-      default: return signals;
+      case "buy": result = result.filter(s => s.type === "BUY"); break;
+      case "sell": result = result.filter(s => s.type === "SELL"); break;
+      case "active": result = result.filter(s => s.status === "ACTIVE"); break;
+      case "closed": result = result.filter(s => s.status !== "ACTIVE"); break;
     }
+    if (allowed) result = result.filter(s => !s.instrument || allowed.includes(instMap[s.instrument] || ""));
+    return result;
   }
 
   const activeCount = signals.filter(s => s.status === "ACTIVE").length;
@@ -2357,6 +2375,23 @@ export default function HomePage() {
                   </button>
                 </div>
 
+                {/* Instrument Categories Selector */}
+                <div>
+                  <label className="text-[9px] text-muted-foreground mb-1.5 block font-medium">فئات الأدوات المتاحة للباقة</label>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {INST_CATS.map(cat => {
+                      const sel = pkgFormInstruments.includes(cat.id);
+                      return (
+                        <button key={cat.id} onClick={() => setPkgFormInstruments(p => sel ? p.filter(i => i !== cat.id) : [...p, cat.id])}
+                          className={`flex items-center gap-1.5 py-2 px-2 rounded-xl text-[10px] font-medium border transition-all active:scale-[0.98] ${sel ? "bg-amber-500/15 text-amber-400 border-amber-500/25" : "bg-muted/40 text-muted-foreground border-border opacity-60"}`}>
+                          <span className="text-sm">{cat.icon}</span>
+                          <span className="truncate">{cat.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 {/* Features list */}
                 <div>
                   <label className="text-[9px] text-muted-foreground mb-1 block font-medium">المميزات (كل سطر = مميزة واحدة)</label>
@@ -2447,6 +2482,13 @@ export default function HomePage() {
                                 <span className="text-[10px] text-foreground/80 leading-relaxed">{f}</span>
                               </div>
                             ))}
+                          </div>
+                        )}
+
+                        {/* Instruments */}
+                        {pkg.instruments && pkg.instruments.length > 0 && (
+                          <div className="flex items-center gap-1.5 mt-3 flex-wrap">
+                            {pkg.instruments.map(instId => { const c = INST_CATS.find(x => x.id === instId); return c ? (<span key={instId} className="inline-flex items-center gap-0.5 px-2 py-1 rounded-lg bg-white/[0.05] border border-white/[0.08] text-[9px] text-foreground/80"><span>{c.icon}</span> {c.label}</span>) : null; })}
                           </div>
                         )}
 
