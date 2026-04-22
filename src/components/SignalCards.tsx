@@ -391,6 +391,30 @@ function EntryCard({ s, idx, isAdmin, onUpdate, onDelete, isNew, statusChanged }
           {/* ── Trade Close Status Banner ── */}
           <TradeStatusBanner s={s} />
 
+          {/* ── Trade Progress Bar (for active signals with TPs) ── */}
+          {s.status === "ACTIVE" && s.takeProfits && s.takeProfits.length > 0 && (
+            <div className="mt-1">
+              <div className="h-2 rounded-full bg-muted overflow-hidden flex">
+                {s.takeProfits.map((tp, i) => {
+                  const isHit = s.hitTpIndex > 0 && i < s.hitTpIndex;
+                  return (
+                    <div
+                      key={i}
+                      className={`h-full transition-all duration-500 ${i === 0 ? "rounded-r-full" : ""} ${i === s.takeProfits.length - 1 ? "rounded-l-full" : ""} ${
+                        isHit ? "bg-emerald-500" : "bg-muted"
+                      }`}
+                      style={{ width: `${100 / s.takeProfits.length}%` }}
+                    />
+                  );
+                })}
+              </div>
+              <div className="flex items-center justify-between mt-1">
+                <span className="text-[8px] text-emerald-400 font-semibold">{hitCount}/{s.takeProfits.length} أهداف</span>
+                <span className="text-[8px] text-red-400/60 font-medium">SL</span>
+              </div>
+            </div>
+          )}
+
           {/* ── Admin Actions ── */}
           {isAdmin && s.status === "ACTIVE" && (
             <>
