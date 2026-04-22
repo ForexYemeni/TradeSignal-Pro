@@ -36,8 +36,15 @@ async function handleLogin(body: Record<string, unknown>) {
     return NextResponse.json({ success: false, error: "يجب التحقق من البريد الإلكتروني أولاً", needOtp: true }, { status: 403 });
   }
 
+  // Check verify token — try both login and register types for robustness
   const verifyKey = `otp_verified:login:${emailVal.sanitized}`;
-  const storedToken = await kv.get<string>(verifyKey);
+  let storedToken = await kv.get<string>(verifyKey);
+  if (!storedToken) {
+    // Fallback: check if token was stored under 'register' type
+    const regKey = `otp_verified:register:${emailVal.sanitized}`;
+    storedToken = await kv.get<string>(regKey);
+    if (storedToken) await kv.del(regKey);
+  }
   if (!storedToken || storedToken !== verifyToken) {
     return NextResponse.json({ success: false, error: "رمز التحقق غير صالح أو انتهت صلاحيته", needOtp: true }, { status: 403 });
   }

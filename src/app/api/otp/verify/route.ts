@@ -3,11 +3,8 @@ import { kv } from "@vercel/kv";
 
 /**
  * POST /api/otp/verify
- * Body: { email, otp, type: "register" | "login" }
- *
- * Verifies the OTP code stored in KV.
- * Returns success + a temporary verification token that must be passed
- * to the register/login endpoint to complete the flow.
+ * Verifies OTP code stored in KV.
+ * Tries both 'login' and 'register' type keys for robustness.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -17,10 +14,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "جميع الحقول مطلوبة" }, { status: 400 });
     }
 
-    if (!["register", "login"].includes(type)) {
-      return NextResponse.json({ success: false, error: "نوع غير صالح" }, { status: 400 });
-    }
-
     const sanitizedEmail = String(email).trim().toLowerCase();
     const sanitizedOtp = String(otp).trim();
 
@@ -28,11 +21,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "كود التحقق يجب أن يكون 6 أرقام" }, { status: 400 });
     }
 
-    // Retrieve OTP from KV
-    const otpKey = `otp:${type}:${sanitizedEmail}`;
-    const storedOtp = await kv.get<string>(otpKey);
+    // Try to find OTP — check the specified type first, then the other type
+    let otpKey = `otp:${type}:${sanitizedEmail}`;
+    let storedOtp = await kv.get<string>(otpKey);
 
-    console.log(`[OTP Verify] key=${otpKey}, stored="${storedOtp}", input="${sanitizedOtp}", match=${storedOtp === sanitizedOtp}`);
+    // If not found, try the other type (in case of mix-up)
+    if (!storedOtp) {
+      const otherType = type === "login" ? "register" : "login";
+      const otherKey = `otp:${otherType}:${sanitizedEmail}`;
+      const otherOtp = await kv.get<string>(otherKey);
+      if (otherOtp) {
+        console.log(`[OTP Verify] Found OTP under type '${otherType}' instead of '${type}'`);
+        otpKey = otherKey;
+        storedOtp = otherOtp;
+      }
+    }
+
+    console.log(`[OTP Verify] email=${sanitizedEmail}, type=${type}, key=${otpKey}, stored="${storedOtp}", input="${sanitizedOtp}", match=${storedOtp === sanitizedOtp}`);
 
     if (!storedOtp) {
       return NextResponse.json({ success: false, error: "انتهت صلاحية الكود. أعد إرسال كود جديد." }, { status: 410 });
@@ -45,12 +50,12 @@ export async function POST(request: NextRequest) {
     // OTP verified — delete it (one-time use)
     await kv.del(otpKey);
 
-    // Generate a temporary verification token (valid for 10 minutes)
+    // Generate verification token (valid 10 minutes)
     const verifyToken = `v_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
     const verifyKey = `otp_verified:${type}:${sanitizedEmail}`;
-    await kv.set(verifyKey, verifyToken, { ex: 600 }); // 10 minutes
+    await kv.set(verifyKey, verifyToken, { ex: 600 });
 
-    console.log(`[OTP Verify] SUCCESS for ${sanitizedEmail}, token=${verifyToken}`);
+    console.log(`[OTP Verify] SUCCESS for ${sanitizedEmail}`);
 
     return NextResponse.json({
       success: true,

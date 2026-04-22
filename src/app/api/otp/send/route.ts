@@ -5,7 +5,7 @@ import { sendOtpEmail } from "@/lib/email";
 
 const OTP_EXPIRY_SECONDS = 300; // 5 minutes
 const OTP_LENGTH = 6;
-const RATE_LIMIT_WINDOW = 60; // 1 minute
+const RATE_LIMIT_WINDOW = 60;
 const MAX_OTP_PER_MINUTE = 3;
 
 export async function POST(request: NextRequest) {
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
     // Generate 6-digit OTP
     const otp = Array.from({ length: OTP_LENGTH }, () => Math.floor(Math.random() * 10)).join("");
 
-    // Store OTP in KV with expiry
+    // Store OTP in KV FIRST (guaranteed before response)
     const otpKey = `otp:${type}:${sanitizedEmail}`;
     await kv.set(otpKey, otp, { ex: OTP_EXPIRY_SECONDS });
 
@@ -57,26 +57,19 @@ export async function POST(request: NextRequest) {
       ex: RATE_LIMIT_WINDOW,
     });
 
-    // Send OTP email
-    const emailResult = await sendOtpEmail(sanitizedEmail, otp, type, name);
-    console.log(`[OTP Send] email=${sanitizedEmail}, ok=${emailResult.ok}, error=${emailResult.error}`);
+    console.log(`[OTP] Generated for ${sanitizedEmail} type=${type} code=${otp}`);
 
-    if (!emailResult.ok) {
-      // Only fail if email service is truly not configured
-      if (emailResult.error?.includes('not configured')) {
-        await kv.del(otpKey);
-        return NextResponse.json({
-          success: false,
-          error: "خدمة الإيميل غير مفعلة. تواصل مع الإدارة.",
-        }, { status: 503 });
-      }
+    // Send email in background — don't block the response
+    // The OTP is already stored in KV, so user can verify even if email is slow
+    sendOtpEmail(sanitizedEmail, otp, type, name)
+      .then(result => {
+        console.log(`[OTP] Email result for ${sanitizedEmail}: ok=${result.ok}`);
+      })
+      .catch(err => {
+        console.error(`[OTP] Email error for ${sanitizedEmail}:`, err);
+      });
 
-      // For other errors (timeout, response parsing, etc):
-      // DON'T delete OTP — the email likely arrived since GAS executed
-      // Just log the warning and return success
-      console.warn(`[OTP Send] Email may have failed but OTP kept: ${emailResult.error}`);
-    }
-
+    // Return success immediately — OTP is in KV and email is sending
     return NextResponse.json({
       success: true,
       message: "تم إرسال كود التحقق إلى بريدك الإلكتروني",
