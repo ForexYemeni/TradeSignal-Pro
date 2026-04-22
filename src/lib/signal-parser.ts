@@ -717,6 +717,10 @@ function extractPnLDollar(text: string): number | null {
     /(?:ربح تقريبي|ربح)\s*[:\s\-–]*[+\-]?\$\s*([\d,.]+)/,
     /(?:الخسارة|خسارة)\s*[:\s\-–]*[+\-]?\$\s*([\d,.]+)/,
     /\$\s*[+\-]?([\d,.]+)\s*(?:ربح|خسارة|نقطة)/,
+    // Extra patterns for various TP hit alert formats
+    /(?:إجمالي الربح|الربح الإجمالي|إجمالي ربح)\s*[:\s\-–]*[+\-]?\$\s*([\d,.]+)/,
+    /(?:الربح|ربح)\s*[:\s]*[+\-]?\$\s*([\d,.]+)/,
+    /(?:Profit|P&L|PnL)\s*[:\s\-–]*[+\-]?\$\s*([\d,.]+)/i,
   ];
   for (const p of patterns) {
     const match = text.match(p);
@@ -725,7 +729,7 @@ function extractPnLDollar(text: string): number | null {
       if (!isFinite(val) || val === 0) continue;
       if (Math.abs(val) > 50000) continue;
       // Loss patterns return negative, profit patterns return positive
-      const isLoss = /الخسارة|خسارة/.test(match[0]);
+      const isLoss = /الخسارة|خسارة|Loss/i.test(match[0]);
       const hasPlusSign = /\+/.test(match[0]);
       if (isLoss && !hasPlusSign) return -val;
       return val;
