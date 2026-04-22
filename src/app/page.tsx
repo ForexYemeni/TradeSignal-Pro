@@ -199,6 +199,7 @@ export default function HomePage() {
 
   /* ── OTP (shared by login & register) ── */
   const [otpStep, setOtpStep] = useState<"none" | "sending" | "verifying" | "done">("none");
+  const [otpVerifying, setOtpVerifying] = useState(false);
   const [otpPurpose, setOtpPurpose] = useState<"register" | "login">("register");
   const [otpEmail, setOtpEmail] = useState("");
   const [otpCode, setOtpCode] = useState("");
@@ -725,6 +726,7 @@ export default function HomePage() {
     setOtpPwd(targetPwd || "");
     setOtpCode("");
     setOtpVerifyToken("");
+    setOtpVerifying(false);
     try {
       const res = await fetch("/api/otp/send", {
         method: "POST",
@@ -737,8 +739,19 @@ export default function HomePage() {
         startOtpTimer();
         toast.success(data.message);
       } else {
-        setOtpErr(data.error || "فشل إرسال الكود");
-        toast.error(data.error || "فشل إرسال الكود");
+        // Set loginFeedback for login errors so cards show on login page
+        if (purpose === "login") {
+          if (data.error.includes("غير مسجل")) {
+            setLoginFeedback({ type: "email_not_found", email: targetEmail });
+          } else if (data.error.includes("غير صالح") || data.error.includes("انتهت")) {
+            toast.error(data.error);
+          } else {
+            setLoginErr(data.error || "فشل إرسال الكود");
+          }
+        } else {
+          setOtpErr(data.error || "فشل إرسال الكود");
+          toast.error(data.error || "فشل إرسال الكود");
+        }
         setOtpStep("none");
       }
     } catch {
@@ -751,6 +764,8 @@ export default function HomePage() {
   async function handleVerifyOtp(codeOverride?: string) {
     const code = codeOverride || otpCode;
     if (code.length !== 6) { setOtpErr("أدخل الكود كاملاً (6 أرقام)"); return; }
+    if (otpVerifying) return; // Prevent double-submit
+    setOtpVerifying(true);
     setOtpErr("");
     try {
       const res = await fetch("/api/otp/verify", {
@@ -814,8 +829,9 @@ export default function HomePage() {
         }
       } else {
         setOtpErr(data.error || "كود غير صحيح");
+        setOtpVerifying(false);
       }
-    } catch { setOtpErr("خطأ في الاتصال"); }
+    } catch { setOtpErr("خطأ في الاتصال"); setOtpVerifying(false); }
   }
 
   function resetOtp() {
@@ -1587,8 +1603,11 @@ export default function HomePage() {
                   onChange={e => {
                     const val = e.target.value.replace(/[^0-9]/g, "").slice(0, 6);
                     setOtpCode(val);
-                    if (val.length === 6) {
-                      setTimeout(() => handleVerifyOtp(val), 300);
+                    setOtpVerifying(false);
+                  }}
+                  onKeyDown={e => {
+                    if (e.key === "Enter" && otpCode.length === 6 && !otpVerifying) {
+                      handleVerifyOtp();
                     }
                   }}
                   placeholder="000000"
@@ -1601,11 +1620,11 @@ export default function HomePage() {
 
               {/* Verify Button */}
               <button
-                onClick={handleVerifyOtp}
-                disabled={otpCode.length !== 6 || otpStep === "done"}
+                onClick={() => handleVerifyOtp()}
+                disabled={otpCode.length !== 6 || otpStep === "done" || otpVerifying}
                 className="w-full h-[56px] rounded-2xl gold-gradient text-black font-bold text-base hover:opacity-90 transition-all active:scale-[0.98] disabled:opacity-50 shadow-lg shadow-amber-500/20"
               >
-                {otpStep === "sending" ? (
+                {otpVerifying ? (
                   <Loader2 className="w-5 h-5 animate-spin mx-auto" />
                 ) : (
                   "تحقق"
