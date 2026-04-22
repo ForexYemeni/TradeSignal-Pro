@@ -1,4 +1,4 @@
-const CACHE_NAME = 'forexyemeni-v2';
+const CACHE_NAME = 'forexyemeni-v3';
 const OFFLINE_URL = '/';
 
 const PRECACHE_ASSETS = [
@@ -33,10 +33,13 @@ self.addEventListener('activate', (event) => {
 });
 
 /* ═══════════════════════════════════════════════════════════════
-   FETCH (Cache First, Network Fallback)
+   FETCH (Network First, Cache Fallback)
    ═══════════════════════════════════════════════════════════════ */
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
+
+  // Skip API calls — always fetch fresh
+  if (event.request.url.includes('/api/')) return;
 
   event.respondWith(
     fetch(event.request)
@@ -61,6 +64,8 @@ self.addEventListener('fetch', (event) => {
 
 /* ═══════════════════════════════════════════════════════════════
    PUSH NOTIFICATION HANDLER
+   - Shows native browser notification with vibration
+   - System notification sound plays automatically on most devices
    ═══════════════════════════════════════════════════════════════ */
 self.addEventListener('push', (event) => {
   let data = {
@@ -73,7 +78,6 @@ self.addEventListener('push', (event) => {
     requireInteraction: true,
     data: {},
     actions: [],
-    vibrate: [200, 100, 200],
   };
 
   if (event.data) {
@@ -84,11 +88,13 @@ self.addEventListener('push', (event) => {
     }
   }
 
-  // Define vibration patterns per sound type
+  // Define vibration patterns per notification type
   const vibrationPatterns = {
     new_signal: [200, 100, 200, 100, 200],
     tp_hit: [100, 50, 100, 50, 100, 50, 300],
     sl_hit: [300, 100, 300, 100, 300],
+    buy: [200, 100, 200, 100, 200],
+    sell: [200, 100, 200, 100, 200],
   };
 
   const options = {
@@ -107,6 +113,8 @@ self.addEventListener('push', (event) => {
     actions: data.actions || [
       { action: 'open', title: 'فتح التطبيق' },
     ],
+    // Silent: false ensures system notification sound plays
+    silent: false,
   };
 
   event.waitUntil(
@@ -126,14 +134,12 @@ self.addEventListener('notificationclick', (event) => {
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true })
       .then((clientList) => {
-        // If app is already open, focus it
+        // If app is already open, focus it and send a message to refresh
         for (const client of clientList) {
-          if (client.url.includes('trade-signal-pro.vercel.app') || client.url.includes(self.location.origin)) {
+          if (client.url.includes(self.location.origin)) {
             client.focus();
-            // Navigate to the target URL
-            if (data.url) {
-              client.navigate(data.url);
-            }
+            // Send message to main app to refresh signals immediately
+            client.postMessage({ type: 'SIGNAL_UPDATE', timestamp: Date.now() });
             return;
           }
         }
@@ -146,63 +152,34 @@ self.addEventListener('notificationclick', (event) => {
 });
 
 /* ═══════════════════════════════════════════════════════════════
-   BACKGROUND SYNC FOR AUDIO NOTIFICATIONS
+   MESSAGE HANDLER — Communication from main app
    ═══════════════════════════════════════════════════════════════ */
-// Audio context for playing notification sounds in service worker
-let audioContext = null;
-
-function getAudioContext() {
-  if (!audioContext) {
-    audioContext = new (self.AudioContext || self.webkitAudioContext)();
-  }
-  return audioContext;
-}
-
-function playTone(freq, duration, startTime, ctx, vol) {
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.type = 'sine';
-  osc.frequency.setValueAtTime(freq, startTime);
-  gain.gain.setValueAtTime(vol, startTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
-  osc.connect(gain);
-  gain.connect(ctx.destination);
-  osc.start(startTime);
-  osc.stop(startTime + duration);
-}
-
-// Play different sounds based on notification type
 self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'PLAY_NOTIFICATION_SOUND') {
-    try {
-      const ctx = getAudioContext();
-      const v = 0.3;
-      const t = ctx.currentTime;
-      const soundType = event.data.sound || 'new_signal';
+  if (!event.data) return;
 
-      switch (soundType) {
-        case 'buy':
-          playTone(523.25, 0.15, t, ctx, v);
-          playTone(659.25, 0.15, t + 0.12, ctx, v);
-          break;
-        case 'sell':
-          playTone(659.25, 0.15, t, ctx, v);
-          playTone(523.25, 0.15, t + 0.12, ctx, v);
-          break;
-        case 'tp_hit':
-          playTone(523.25, 0.12, t, ctx, v);
-          playTone(659.25, 0.12, t + 0.1, ctx, v);
-          playTone(783.99, 0.2, t + 0.2, ctx, v);
-          break;
-        case 'sl_hit':
-          playTone(261.63, 0.2, t, ctx, v);
-          playTone(220, 0.3, t + 0.18, ctx, v);
-          break;
-        default:
-          playTone(523.25, 0.4, t, ctx, v);
-      }
-    } catch (e) {
-      // Audio not supported in this context
-    }
+  // When main app gets a signal update, it tells us to notify if in background
+  if (event.data.type === 'BACKGROUND_NOTIFY') {
+    const { title, body, sound, tag } = event.data;
+    if (!title) return;
+
+    const vibrationPatterns = {
+      new_signal: [200, 100, 200, 100, 200],
+      tp_hit: [100, 50, 100, 50, 100, 50, 300],
+      sl_hit: [300, 100, 300, 100, 300],
+      buy: [200, 100, 200, 100, 200],
+      sell: [200, 100, 200, 100, 200],
+    };
+
+    self.registration.showNotification(title, {
+      body: body || '',
+      icon: '/icon-192x192.png',
+      badge: '/icon-192x192.png',
+      tag: tag || `fy-${Date.now()}`,
+      requireInteraction: true,
+      vibrate: vibrationPatterns[sound] || vibrationPatterns.new_signal,
+      silent: false,
+      data: { sound, url: '/', timestamp: Date.now() },
+      actions: [{ action: 'open', title: 'فتح التطبيق' }],
+    });
   }
 });

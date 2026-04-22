@@ -136,3 +136,27 @@ Stage Summary:
 - الإصدار: v1.10 (versionCode 10)
 - جميع الأيقونات من الصورة المرفوعة
 - 5 أنواع تنبيهات صوتية مميزة لكل حدث
+
+---
+Task ID: 1
+Agent: Main
+Task: Fix notification delay and add background notification support
+
+Work Log:
+- Analyzed entire notification chain: Signal created → KV → SSE (3s poll) → fetchSignals → compare → play sound
+- Identified issues: AudioContext recreated per call (browser blocks after ~6), 3s polling too slow, no background notifications
+- Refactored audio system in src/lib/utils.ts: single persistent AudioContext with pre-warming, auto-resume on user interaction
+- Added Web Notification API support (showBrowserNotification) for background notification with system sound
+- Created notifySignal() combo function: plays Web Audio sound + sends native Android + shows browser notification + tells service worker
+- Reduced polling from 3s to 2s, full refresh from 15s to 10s, SSE KV poll from 3s to 2s
+- Added visibilitychange handler: when app returns to foreground, immediately warm audio and fetch signals
+- Updated service worker (sw.js v3): added BACKGROUND_NOTIFY message handler, silent:false for system sound, sends SIGNAL_UPDATE back to app on notification click
+- Added service worker message listener in main app for push notification click → refresh signals
+- Updated service worker registration to check for updates hourly
+- Enhanced sound patterns: buy/sell now 3-note ascending/descending, tp has triumphant high note, sl has 3-note descending
+
+Stage Summary:
+- Notifications now work in background via Web Notification API + service worker
+- Sound delay reduced by 33% (2s poll vs 3s) with pre-warmed AudioContext (no resume delay)
+- Background notifications trigger system notification sound automatically
+- Build passes successfully

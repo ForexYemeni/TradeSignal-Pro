@@ -37,20 +37,38 @@ export function isSlLike(c: SignalCategory | undefined | null) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   NATIVE ANDROID NOTIFICATION BRIDGE
+   AUDIO NOTIFICATIONS (Web Audio API)
+   - Uses a single persistent AudioContext (pre-warmed)
+   - Resumes automatically on user interaction
+   - No more creating new context per sound (browser limits)
    ═══════════════════════════════════════════════════════════════ */
-export function nativeNotify(title: string, body: string, soundType: string) {
-  try {
-    const w = window as unknown as { AndroidNotify?: { sendNotification: (t: string, b: string, s: string) => void } };
-    if (w.AndroidNotify) {
-      w.AndroidNotify.sendNotification(title, body, soundType);
-    }
-  } catch { /* not native */ }
+let _audioCtx: AudioContext | null = null;
+let _audioWarm = false;
+
+function getAudioContext(): AudioContext {
+  if (!_audioCtx) {
+    _audioCtx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+  }
+  return _audioCtx;
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   AUDIO NOTIFICATIONS (Web Audio API)
-   ═══════════════════════════════════════════════════════════════ */
+/** Pre-warm AudioContext on first user interaction so no delay on first sound */
+export function warmAudio() {
+  if (_audioWarm) return;
+  _audioWarm = true;
+  try {
+    const ctx = getAudioContext();
+    if (ctx.state === "suspended") {
+      ctx.resume().catch(() => {});
+    }
+    // Add global listeners to resume AudioContext on any interaction
+    const resume = () => { if (ctx.state === "suspended") ctx.resume().catch(() => {}); };
+    document.addEventListener("click", resume, { once: false, passive: true });
+    document.addEventListener("touchstart", resume, { once: false, passive: true });
+    document.addEventListener("keydown", resume, { once: false, passive: true });
+  } catch { /* not supported */ }
+}
+
 export function playTone(freq: number, duration: number, startTime: number, ctx: AudioContext, vol: number) {
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
@@ -66,33 +84,115 @@ export function playTone(freq: number, duration: number, startTime: number, ctx:
 
 export function playSound(type: "buy" | "sell" | "tp" | "sl" | "message", volume: number) {
   try {
-    const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
-    const v = volume * 0.3;
-    const t = ctx.currentTime;
-    switch (type) {
-      case "buy":
-        playTone(523.25, 0.15, t, ctx, v);
-        playTone(659.25, 0.15, t + 0.12, ctx, v);
-        break;
-      case "sell":
-        playTone(659.25, 0.15, t, ctx, v);
-        playTone(523.25, 0.15, t + 0.12, ctx, v);
-        break;
-      case "tp":
-        playTone(523.25, 0.12, t, ctx, v);
-        playTone(659.25, 0.12, t + 0.1, ctx, v);
-        playTone(783.99, 0.2, t + 0.2, ctx, v);
-        break;
-      case "sl":
-        playTone(261.63, 0.2, t, ctx, v);
-        playTone(220, 0.3, t + 0.18, ctx, v);
-        break;
-      case "message":
-        playTone(523.25, 0.4, t, ctx, v);
-        break;
+    const ctx = getAudioContext();
+    // Resume context if suspended (autoplay policy)
+    if (ctx.state === "suspended") {
+      ctx.resume().then(() => _play(ctx, type, volume)).catch(() => {});
+      return;
     }
+    _play(ctx, type, volume);
   } catch {
     // Web Audio not supported
+  }
+}
+
+function _play(ctx: AudioContext, type: string, volume: number) {
+  const v = volume * 0.3;
+  const t = ctx.currentTime;
+  switch (type) {
+    case "buy":
+      playTone(523.25, 0.15, t, ctx, v);
+      playTone(659.25, 0.15, t + 0.12, ctx, v);
+      playTone(783.99, 0.2, t + 0.24, ctx, v);
+      break;
+    case "sell":
+      playTone(783.99, 0.15, t, ctx, v);
+      playTone(659.25, 0.15, t + 0.12, ctx, v);
+      playTone(523.25, 0.2, t + 0.24, ctx, v);
+      break;
+    case "tp":
+      playTone(523.25, 0.12, t, ctx, v);
+      playTone(659.25, 0.12, t + 0.1, ctx, v);
+      playTone(783.99, 0.2, t + 0.2, ctx, v);
+      playTone(1046.5, 0.25, t + 0.35, ctx, v); // High triumphant note
+      break;
+    case "sl":
+      playTone(392, 0.2, t, ctx, v);
+      playTone(311.13, 0.25, t + 0.18, ctx, v);
+      playTone(220, 0.4, t + 0.38, ctx, v);
+      break;
+    case "message":
+      playTone(523.25, 0.4, t, ctx, v);
+      break;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   NATIVE ANDROID NOTIFICATION BRIDGE
+   ═══════════════════════════════════════════════════════════════ */
+export function nativeNotify(title: string, body: string, soundType: string) {
+  try {
+    const w = window as unknown as { AndroidNotify?: { sendNotification: (t: string, b: string, s: string) => void } };
+    if (w.AndroidNotify) {
+      w.AndroidNotify.sendNotification(title, body, soundType);
+    }
+  } catch { /* not native */ }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   BROWSER NOTIFICATION API
+   - Works in both foreground AND background (via service worker push)
+   - Triggers system notification sound automatically on most devices
+   ═══════════════════════════════════════════════════════════════ */
+let _notifPermissionGranted = false;
+
+/** Request notification permission and cache result */
+export async function ensureNotificationPermission(): Promise<boolean> {
+  if (!("Notification" in window)) return false;
+  if (Notification.permission === "granted") {
+    _notifPermissionGranted = true;
+    return true;
+  }
+  if (Notification.permission === "denied") return false;
+  const result = await Notification.requestPermission();
+  _notifPermissionGranted = result === "granted";
+  return _notifPermissionGranted;
+}
+
+/** Show a browser notification (works in foreground + triggers system sound) */
+export function showBrowserNotification(title: string, body: string, tag?: string) {
+  try {
+    if (!("Notification" in window) || Notification.permission !== "granted") return;
+    // Don't show duplicate if app is in foreground and already handled
+    if (document.hasFocus()) return; // Only show when app is in background
+    new Notification(title, {
+      body,
+      icon: "/icon-192x192.png",
+      badge: "/icon-192x192.png",
+      tag: tag || `fy-${Date.now()}`,
+      requireInteraction: true,
+      vibrate: [200, 100, 200, 100, 200],
+    });
+  } catch { /* not supported */ }
+}
+
+/** Play sound + show notification combo (instant, no delay) */
+export function notifySignal(type: "buy" | "sell" | "tp" | "sl" | "message", title: string, body: string, soundType: string) {
+  // 1. Play sound immediately (Web Audio API - foreground)
+  playSound(type, typeof window !== "undefined" ? (JSON.parse(localStorage.getItem("fy_audioVol") || "0.7") as number) : 0.7);
+  // 2. Native Android bridge
+  nativeNotify(title, body, soundType);
+  // 3. Browser Notification (background / system notification)
+  showBrowserNotification(title, body, `fy-${soundType}-${Date.now()}`);
+  // 4. Tell service worker to show notification if page is hidden
+  if (typeof navigator !== "undefined" && navigator.serviceWorker && navigator.serviceWorker.controller) {
+    navigator.serviceWorker.controller.postMessage({
+      type: "BACKGROUND_NOTIFY",
+      title,
+      body,
+      sound: soundType,
+      tag: `fy-${soundType}-${Date.now()}`,
+    });
   }
 }
 
@@ -119,9 +219,9 @@ export async function registerPushNotification(userId: string): Promise<boolean>
       return false;
     }
 
-    // Check current permission
-    const permission = await Notification.requestPermission();
-    if (permission !== "granted") {
+    // Request notification permission (this also enables browser notifications)
+    const granted = await ensureNotificationPermission();
+    if (!granted) {
       console.warn("[Push] Notification permission denied");
       return false;
     }

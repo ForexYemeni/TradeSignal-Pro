@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
       // Send initial connection message
       controller.enqueue(encoder.encode(`data: {"type":"connected","time":${Date.now()}}\n\n`));
 
-      // Poll KV every 3 seconds for new signal events
+      // Poll KV every 2 seconds for new signal events (was 3 — faster detection)
       const pollInterval = setInterval(async () => {
         if (closed) return;
         try {
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
         } catch {
           /* KV read error — ignore, polling handles it */
         }
-      }, 3000);
+      }, 2000);
 
       // Send keepalive every 15 seconds
       const keepalive = setInterval(() => {

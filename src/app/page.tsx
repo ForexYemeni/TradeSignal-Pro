@@ -24,7 +24,7 @@ import {
 
 // ═══ EXTRACTED MODULES ═══
 import type { Signal, AdminSession, Stats, View, Tab, Filter, SubPackage, AppSettingsData } from "@/lib/types";
-import { timeAgo, isEntry, entryAccent, isTpLike, isSlLike, nativeNotify, playSound, registerPushNotification, unregisterPushNotification, formatCountdown } from "@/lib/utils";
+import { timeAgo, isEntry, entryAccent, isTpLike, isSlLike, nativeNotify, playSound, registerPushNotification, unregisterPushNotification, formatCountdown, warmAudio, ensureNotificationPermission, showBrowserNotification, notifySignal } from "@/lib/utils";
 import { Stars, Div, Glass, SkeletonCard, SignalsLoadingSkeleton, StatsLoadingSkeleton, EmptyState, Confetti, useOnlineStatus, usePullToRefresh } from "@/components/shared";
 import { TpMiniCard, TradeStatusBanner, EntryCard, ClosedSignalCard, SplashScreen } from "@/components/SignalCards";
 
@@ -342,17 +342,15 @@ export default function HomePage() {
         if (oldIds.size > 0) {
           for (const s of newSignals) {
             if (!oldIds.has(s.id)) {
-              // Brand new signal — play sound + native notification
+              // Brand new signal — play sound + native notification + browser notification
               if (!audioMuted) {
                 if (isEntry(s.signalCategory)) {
-                  playSound(s.type === "BUY" ? "buy" : "sell", audioVol);
-                  nativeNotify(s.type === "BUY" ? "📊 إشارة شراء — " + s.pair : "📊 إشارة بيع — " + s.pair, s.type === "BUY" ? "شراء @" + s.entry : "بيع @" + s.entry, s.type === "BUY" ? "buy" : "sell");
+                  const isBuy = s.type === "BUY";
+                  notifySignal(isBuy ? "buy" : "sell", isBuy ? "📊 إشارة شراء — " + s.pair : "📊 إشارة بيع — " + s.pair, isBuy ? "شراء @" + s.entry : "بيع @" + s.entry, isBuy ? "buy" : "sell");
                 } else if (isTpLike(s.signalCategory)) {
-                  playSound("tp", audioVol);
-                  nativeNotify("🎯 تحقق هدف — " + s.pair, "هدف " + s.hitTpIndex + " تم تحقيقه", "tp_hit");
+                  notifySignal("tp", "🎯 تحقق هدف — " + s.pair, "هدف " + s.hitTpIndex + " تم تحقيقه", "tp_hit");
                 } else if (isSlLike(s.signalCategory)) {
-                  playSound("sl", audioVol);
-                  nativeNotify("🛑 وقف خسارة — " + s.pair, "تم ضرب وقف الخسارة", "sl_hit");
+                  notifySignal("sl", "🛑 وقف خسارة — " + s.pair, "تم ضرب وقف الخسارة", "sl_hit");
                 } else {
                   playSound("message", audioVol);
                 }
@@ -366,15 +364,12 @@ export default function HomePage() {
                 // Detect partial win: SL hit but status shows HIT_TP (TPs were achieved first)
                 const partialWinChanged = prev.status === "ACTIVE" && s.status === "HIT_TP" && s.partialWin;
                 if (tpChanged && !audioMuted) {
-                  playSound("tp", audioVol);
-                  nativeNotify("🎯 تحقق هدف — " + s.pair, "هدف " + s.hitTpIndex + " تم تحقيقه", "tp_hit");
+                  notifySignal("tp", "🎯 تحقق هدف — " + s.pair, "هدف " + s.hitTpIndex + " تم تحقيقه", "tp_hit");
                 } else if (slChanged && !audioMuted) {
-                  playSound("sl", audioVol);
-                  nativeNotify("🛑 وقف خسارة — " + s.pair, "تم ضرب وقف الخسارة", "sl_hit");
+                  notifySignal("sl", "🛑 وقف خسارة — " + s.pair, "تم ضرب وقف الخسارة", "sl_hit");
                 } else if (partialWinChanged && !audioMuted) {
                   // Partial win: TPs were hit, then SL → still a win
-                  playSound("tp", audioVol);
-                  nativeNotify("🎯 ربح جزئي — " + s.pair, "تم تحقيق " + s.hitTpIndex + " أهداف ثم ضرب الوقف", "tp_hit");
+                  notifySignal("tp", "🎯 ربح جزئي — " + s.pair, "تم تحقيق " + s.hitTpIndex + " أهداف ثم ضرب الوقف", "tp_hit");
                 }
               }
             }
@@ -421,7 +416,21 @@ export default function HomePage() {
   const lastCheckTimeRef = useRef<number>(Date.now());
   const eventSourceRef = useRef<EventSource | null>(null);
 
-  // Fast polling for new signals (every 3 seconds)
+  // Listen for messages from service worker (push notification clicked)
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !navigator.serviceWorker) return;
+    const handler = (event: MessageEvent) => {
+      if (event.data?.type === "SIGNAL_UPDATE") {
+        // Push notification was clicked — refresh signals immediately
+        fetchSignals();
+        fetchStats();
+      }
+    };
+    navigator.serviceWorker.addEventListener("message", handler);
+    return () => navigator.serviceWorker.removeEventListener("message", handler);
+  }, [fetchSignals, fetchStats]);
+
+  // Fast polling for new signals (every 2 seconds — reduced from 3 for faster detection)
   const checkForUpdates = useCallback(async () => {
     try {
       const res = await fetch(`/api/signals/updates?since=${lastCheckTimeRef.current}`);
@@ -442,11 +451,16 @@ export default function HomePage() {
     setLoading(true);
     Promise.all([fetchSignals(), fetchStats()]).finally(() => setLoading(false));
 
-    // Fast update check every 3 seconds (lightweight - only checks timestamps)
-    const updateInterval = setInterval(checkForUpdates, 3000);
+    // Pre-warm audio context on first load
+    warmAudio();
+    // Ensure notification permission is granted
+    ensureNotificationPermission().catch(() => {});
 
-    // Full signal refresh every 15 seconds
-    const fullInterval = setInterval(() => { fetchSignals(); fetchStats(); }, 15000);
+    // Fast update check every 2 seconds (was 3 — faster detection)
+    const updateInterval = setInterval(checkForUpdates, 2000);
+
+    // Full signal refresh every 10 seconds (was 15 — more responsive)
+    const fullInterval = setInterval(() => { fetchSignals(); fetchStats(); }, 10000);
 
     // Try to connect to SSE for instant updates
     try {
@@ -464,9 +478,22 @@ export default function HomePage() {
       eventSourceRef.current = es;
     } catch { /* SSE not available - polling is the fallback */ }
 
+    // When app returns to foreground, immediately check for updates
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        // Resume audio context (browser may suspend it in background)
+        warmAudio();
+        // Immediately fetch latest signals
+        fetchSignals();
+        fetchStats();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
     return () => {
       clearInterval(updateInterval);
       clearInterval(fullInterval);
+      document.removeEventListener("visibilitychange", handleVisibility);
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
         eventSourceRef.current = null;
@@ -3135,26 +3162,22 @@ export default function HomePage() {
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <button onClick={() => {
-                  nativeNotify("📊 إشارة شراء — EURUSD", "شراء @ 1.0850", "buy");
-                  playSound("buy", audioVol);
+                  notifySignal("buy", "📊 إشارة شراء — EURUSD", "شراء @ 1.0850", "buy");
                 }} className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-semibold active:scale-95 transition-transform hover:bg-emerald-500/20">
                   📊 إشارة شراء
                 </button>
                 <button onClick={() => {
-                  nativeNotify("📊 إشارة بيع — GBPUSD", "بيع @ 1.2650", "sell");
-                  playSound("sell", audioVol);
+                  notifySignal("sell", "📊 إشارة بيع — GBPUSD", "بيع @ 1.2650", "sell");
                 }} className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-[11px] font-semibold active:scale-95 transition-transform hover:bg-red-500/20">
                   📊 إشارة بيع
                 </button>
                 <button onClick={() => {
-                  nativeNotify("🎯 هدف محقق — EURUSD", "TP1 تم تحقيقه بنجاح!", "tp_hit");
-                  playSound("tp", audioVol);
+                  notifySignal("tp", "🎯 هدف محقق — EURUSD", "TP1 تم تحقيقه بنجاح!", "tp_hit");
                 }} className="p-2.5 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-400 text-[11px] font-semibold active:scale-95 transition-transform hover:bg-sky-500/20">
                   🎯 تحقيق هدف
                 </button>
                 <button onClick={() => {
-                  nativeNotify("🛑 وقف خسارة — EURUSD", "تم ضرب وقف الخسارة!", "sl_hit");
-                  playSound("sl", audioVol);
+                  notifySignal("sl", "🛑 وقف خسارة — EURUSD", "تم ضرب وقف الخسارة!", "sl_hit");
                 }} className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[11px] font-semibold active:scale-95 transition-transform hover:bg-amber-500/20">
                   🛑 وقف خسارة
                 </button>
