@@ -37,27 +37,27 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * SignalService v10 — FINAL APPROACH
+ * SignalService v3.1 — CLEAN & RELIABLE
  *
- * COMPLETELY NEW STRATEGY:
- * - The foreground service notification IS the alert mechanism
- * - Service channel is IMPORTANCE_HIGH with SOUND (not LOW silent)
- * - When signal detected: service notification text changes + sound plays + vibration
- * - Also sends regular notification as backup
- * - Self-test every 60 seconds to prove service is alive
- * - Shows live diagnostics: poll count, API status, signal count
- *
- * WHY THIS WILL WORK:
- * The foreground service notification is GUARANTEED to show by Android.
- * By making its channel HIGH importance with sound, updating it WILL alert the user.
+ * Based on v3.0 token-from-localStorage approach (which works!).
+ * Fixes from v3.0:
+ * - Fixed TP/SL notifications not being sent (dedup was using signalId only,
+ *   blocking re-notification on state change)
+ * - Dedup key is now signalId + ":" + state (allows same signal to notify
+ *   on entry, then again on TP hit, SL hit, etc.)
+ * - Uses commit() instead of apply() for critical state saves (prevents
+ *   race condition where next poll reads stale state)
+ * - Removed Poll # counter from notification (cleaner UX)
+ * - Increased poll interval to 10s (reduces API load, more reliable)
+ * - Clean, professional notification text
  */
 public class SignalService extends Service {
 
     private static final String TAG = "SignalService";
     private static final String PREFS_NAME = "forexyemeni_signal_prefs";
-    private static final String KEY_KNOWN_STATES = "service_signal_states_v10";
-    private static final String KEY_INITIALIZED = "service_initialized_v10";
-    private static final String KEY_NOTIFIED_IDS = "service_notified_ids_v10"; // Dedup: signal IDs already notified
+    private static final String KEY_KNOWN_STATES = "service_signal_states_v31";
+    private static final String KEY_INITIALIZED = "service_initialized_v31";
+    private static final String KEY_NOTIFIED_IDS = "service_notified_ids_v31";
     private static final String KEY_SESSION_TOKEN = "fy_session_token";
     private static final String KEY_LAST_HEARTBEAT = "service_last_heartbeat";
     private static final String KEY_TOKEN_VERIFIED = "service_token_verified";
@@ -66,8 +66,7 @@ public class SignalService extends Service {
     private static final String SIGNALS_URL = API_BASE + "/api/signals";
     private static final String CHANNEL_ID = "forexyemeni_service";
     private static final int NOTIFICATION_ID = 9999;
-    private static final int SELF_TEST_ID = 9998;
-    private static final int POLL_INTERVAL_MS = 3000;
+    private static final int POLL_INTERVAL_MS = 10000; // 10 seconds — reliable, not too fast
     private static final String WAKE_LOCK_TAG = "ForexYemeni:SignalPoll";
 
     private Handler handler;
@@ -75,7 +74,7 @@ public class SignalService extends Service {
     private volatile boolean isRunning = false;
     private PowerManager.WakeLock wakeLock;
 
-    // Diagnostics
+    // Diagnostics (internal only, not shown in notification)
     private int pollCount = 0;
     private int signalsFound = 0;
     private int notificationsSent = 0;
@@ -83,8 +82,9 @@ public class SignalService extends Service {
     private String lastApiError = "";
     private String lastSignalDetected = "";
     private boolean tokenVerified = false;
-    private String tokenStatus = "NO TOKEN";
-    private int selfTestCount = 0;
+
+    // In-memory dedup cache (survives between polls within same session)
+    private final java.util.Set<String> notifiedThisSession = new java.util.HashSet<>();
 
     private File logFile;
     private PrintStream logStream;
@@ -128,7 +128,7 @@ public class SignalService extends Service {
         isRunning = true;
         initLogger();
 
-        log("═══════ SignalService v10 STARTING ═══════");
+        log("═══════ SignalService v3.1 STARTING ═══════");
         log("Device: " + Build.MANUFACTURER + " " + Build.MODEL + " Android " + Build.VERSION.SDK_INT);
 
         // 1. Create service channel with HIGH importance + SOUND
@@ -185,11 +185,7 @@ public class SignalService extends Service {
         log("Token: " + (token.isEmpty() ? "NONE!" : token.substring(0, Math.min(12, token.length())) + "..."));
 
         // 8. Log ready
-        log("═══════ Service v10 READY ═══════");
-
-        // 9. Start diagnostics (every 60s, no sound)
-        startSelfTest();
-        updateDiagNotification();
+        log("═══════ Service v3.1 READY ═══════");
     }
 
     @Override
@@ -222,24 +218,6 @@ public class SignalService extends Service {
     }
 
     // ═══════════════════════════════════════════════════════════════
-    //  SELF-TEST — proves service is alive and notifications work
-    // ═══════════════════════════════════════════════════════════════
-
-    private void startSelfTest() {
-        // Self-test only updates diagnostics - NO BEEP (was annoying user)
-        handler.postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                if (!isRunning) return;
-                selfTestCount++;
-                log("DIAG #" + selfTestCount + " polls=" + pollCount + " found=" + signalsFound + " sent=" + notificationsSent + " token=" + tokenStatus);
-                updateDiagNotification();
-                handler.postDelayed(this, 60000);
-            }
-        }, 60000);
-    }
-
-    // ═══════════════════════════════════════════════════════════════
     //  WAKE LOCK
     // ═══════════════════════════════════════════════════════════════
 
@@ -267,12 +245,11 @@ public class SignalService extends Service {
     }
 
     // ═══════════════════════════════════════════════════════════════
-    //  NOTIFICATION CHANNEL — HIGH IMPORTANCE WITH SOUND!
+    //  NOTIFICATION CHANNEL — HIGH IMPORTANCE WITH SOUND
     // ═══════════════════════════════════════════════════════════════
 
     private void createServiceChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            // CRITICAL: Use HIGH importance with SOUND so updates make noise
             NotificationChannel channel = new NotificationChannel(
                     CHANNEL_ID, "تنبيهات فوري Yemeni", NotificationManager.IMPORTANCE_HIGH);
             channel.setDescription("تنبيهات الإشارات والمتابعة");
@@ -282,7 +259,6 @@ public class SignalService extends Service {
             channel.enableVibration(true);
             channel.setVibrationPattern(new long[]{100, 200, 100, 200, 100, 200});
 
-            // Add sound to the channel
             Uri soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
             AudioAttributes audio = new AudioAttributes.Builder()
                     .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
@@ -293,7 +269,6 @@ public class SignalService extends Service {
 
             NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
             if (nm != null) {
-                // Delete old LOW importance channel first
                 nm.deleteNotificationChannel(CHANNEL_ID);
                 nm.createNotificationChannel(channel);
             }
@@ -305,9 +280,6 @@ public class SignalService extends Service {
     //  NOTIFICATION BUILDING
     // ═══════════════════════════════════════════════════════════════
 
-    /**
-     * Build a service notification. Can be either diagnostic or signal alert.
-     */
     private Notification buildServiceNotification(String title, String text, boolean isSignalAlert) {
         Intent intent = new Intent(this, MainActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
@@ -333,18 +305,17 @@ public class SignalService extends Service {
                 .setShowWhen(true);
 
         if (isSignalAlert) {
-            // When it's a signal alert, make it loud and visible
             builder.setDefaults(Notification.DEFAULT_SOUND | Notification.DEFAULT_VIBRATE | Notification.DEFAULT_LIGHTS);
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                 builder.setColor(Color.parseColor("#FFD700"));
                 builder.setVibrate(new long[]{0, 300, 200, 300, 200, 500});
             }
         } else {
-            // Normal diagnostic mode — silent
+            // Normal mode — silent
             builder.setDefaults(0);
             builder.setSound(null, null);
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                builder.setColor(Color.parseColor("#333333"));
+                builder.setColor(Color.parseColor("#1a1a2e"));
             }
         }
 
@@ -352,105 +323,101 @@ public class SignalService extends Service {
     }
 
     /**
-     * Update the notification with diagnostic info (no sound).
+     * Update the foreground notification with clean, professional text.
+     * NO Poll #, NO technical diagnostics visible to user.
      */
-    private void updateDiagNotification() {
-        String token = getSessionToken();
-        StringBuilder title = new StringBuilder("ForexYemeni VIP");
-        StringBuilder text = new StringBuilder();
-
-        if (token.isEmpty()) {
-            text.append("في انتظار تسجيل الدخول...");
-        } else if (!tokenVerified) {
-            text.append("جاري التحقق من الجلسة... [Poll #").append(pollCount).append("]");
-        } else {
-            text.append("مراقبة الاشارات [Poll #").append(pollCount).append("]");
-        }
-
-        if (lastSignalDetected.length() > 0) {
-            text.append(" | اخيرا: ").append(lastSignalDetected);
-        }
-
-        // Show diagnostics every 10 polls
-        if (pollCount > 0 && pollCount % 10 == 0) {
-            text.append("\nAPI: ").append(lastApiCode);
-            if (!lastApiError.isEmpty()) text.append(" Err:").append(lastApiError);
-            text.append(" | Found: ").append(signalsFound);
-            text.append(" | Sent: ").append(notificationsSent);
-            text.append(" | States: ").append(loadKnownStates().size());
-        }
-
-        Notification notif = buildServiceNotification(title.toString(), text.toString(), false);
+    private void updateServiceNotification(String text) {
+        Notification notif = buildServiceNotification("ForexYemeni VIP", text, false);
         NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         if (nm != null) nm.notify(NOTIFICATION_ID, notif);
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    //  SIGNAL ALERT — ONE NOTIFICATION PER SIGNAL+STATE COMBINATION
+    // ═══════════════════════════════════════════════════════════════
+
     /**
-     * CRITICAL: When a signal is detected, notify with deduplication.
-     * Same signal ID will NOT be notified again within the same session.
+     * CRITICAL: Dedup key is now signalId + ":" + signalState.
+     * This allows the same signal to be re-notified when its state changes
+     * (e.g., entry → TP1 hit → TP2 hit → SL hit).
+     * Previously, only signalId was used, which blocked ALL notifications
+     * after the first one for a given signal (TP/SL never worked!).
+     *
      * Returns true if notification was actually sent (not duplicate).
      */
-    private boolean alertSignalDetected(String signalId, String signalInfo) {
-        // Dedup: check if this signal ID was already notified
-        if (wasAlreadyNotified(signalId)) {
-            return false; // Already notified — skip
+    private boolean alertSignalDetected(String signalId, String signalState, String signalInfo) {
+        // Build composite dedup key
+        String dedupKey = signalId + ":" + signalState;
+
+        // Check in-memory cache first (fast, no I/O)
+        if (notifiedThisSession.contains(dedupKey)) {
+            return false;
         }
 
+        // Check persistent storage (survives service restarts)
+        if (wasAlreadyNotified(dedupKey)) {
+            notifiedThisSession.add(dedupKey); // Cache it
+            return false;
+        }
+
+        // NEW notification — send it!
         lastSignalDetected = signalInfo;
         notificationsSent++;
-        markAsNotified(signalId);
+        markAsNotified(dedupKey);
+        notifiedThisSession.add(dedupKey); // Cache in memory
 
-        log(">>>>>>> SIGNAL ALERT: " + signalInfo + " <<<<<<<<");
+        log(">>>>>>> SIGNAL: " + signalInfo + " (state=" + signalState + ") <<<<<<<<");
 
-        // 1. Update service notification (visual only, no sound from notification itself)
+        // 1. Build alert message
+        String time = new SimpleDateFormat("HH:mm:ss", Locale.US).format(new Date());
         String title = "اشارة جديدة! " + signalInfo;
-        String text = "تم اكتشاف: " + signalInfo + " — في: " +
-                new SimpleDateFormat("HH:mm:ss", Locale.US).format(new Date());
+        String text = "تم اكتشاف: " + signalInfo + " — " + time;
+
+        // 2. Update foreground service notification (visual only, no sound from this)
         Notification alertNotif = buildServiceNotification(title, text, false);
         NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         if (nm != null) {
             nm.notify(NOTIFICATION_ID, alertNotif);
-            log("Service notification updated with alert (sound + vibration)");
         }
 
-        // 2. Send regular notification (visual + channel sound)
+        // 3. Send regular notification (with sound from channel)
         NotificationHelper.showNotification(this, title, text, "buy");
 
-        // 3. Play distinctive sound via ToneGenerator (ONE time only)
+        // 4. Play distinctive sound via ToneGenerator
         playSignalSound();
 
         return true;
     }
 
-    // ── Deduplication helpers ──
+    // ── Deduplication helpers (persistent storage) ──
 
-    private boolean wasAlreadyNotified(String signalId) {
+    private boolean wasAlreadyNotified(String dedupKey) {
         try {
             String notified = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
                     .getString(KEY_NOTIFIED_IDS, "");
-            return notified.contains(signalId + ",");
+            return notified.contains("[" + dedupKey + "]");
         } catch (Exception e) { return false; }
     }
 
-    private void markAsNotified(String signalId) {
+    private void markAsNotified(String dedupKey) {
         try {
             String notified = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
                     .getString(KEY_NOTIFIED_IDS, "");
-            notified += signalId + ",";
-            // Keep last 50 entries max
-            String[] parts = notified.split(",");
-            StringBuilder sb = new StringBuilder();
-            int start = Math.max(0, parts.length - 50);
-            for (int i = start; i < parts.length; i++) {
-                if (!parts[i].isEmpty()) sb.append(parts[i]).append(",");
+            notified += "[" + dedupKey + "]";
+            // Keep last 200 entries max
+            // Each entry format: [signalId:state]
+            int maxLen = 15000; // ~200 entries of ~75 chars each
+            if (notified.length() > maxLen) {
+                notified = notified.substring(notified.length() - maxLen);
             }
+            // Use commit() — CRITICAL: synchronous write prevents race condition
             getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-                    .edit().putString(KEY_NOTIFIED_IDS, sb.toString()).apply();
+                    .edit().putString(KEY_NOTIFIED_IDS, notified).commit();
         } catch (Exception e) {}
     }
 
     /**
-     * Play a loud, distinctive sound pattern for signal alerts.
+     * Play a distinctive sound pattern for signal alerts.
      * 3 quick ascending beeps + 1 long final beep.
      */
     private void playSignalSound() {
@@ -459,18 +426,15 @@ public class SignalService extends Service {
             public void run() {
                 try {
                     ToneGenerator tg = new ToneGenerator(android.media.AudioManager.STREAM_NOTIFICATION, 100);
-                    // Quick ascending triplet
                     tg.startTone(ToneGenerator.TONE_CDMA_PIP, 200);
                     Thread.sleep(250);
                     tg.startTone(ToneGenerator.TONE_CDMA_PIP, 200);
                     Thread.sleep(250);
                     tg.startTone(ToneGenerator.TONE_CDMA_PIP, 200);
                     Thread.sleep(250);
-                    // Long final note
                     tg.startTone(ToneGenerator.TONE_CDMA_PIP, 600);
                     Thread.sleep(700);
                     tg.release();
-                    log("Sound played: 3 beeps + 1 long");
                 } catch (Exception e) {
                     log("Sound error: " + e.getMessage());
                 }
@@ -504,8 +468,10 @@ public class SignalService extends Service {
                 .putString(KEY_SESSION_TOKEN, token)
                 .putBoolean(KEY_TOKEN_VERIFIED, false)
                 .apply();
+
             Log.d(TAG, "Token saved: " + (token.isEmpty() ? "EMPTY" : token.substring(0, Math.min(12, token.length())) + "..."));
 
+            // Reset initialization if we got a new token (need to re-learn signal states)
             boolean wasInit = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                 .getBoolean(KEY_INITIALIZED, false);
             boolean oldToken = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -515,7 +481,7 @@ public class SignalService extends Service {
                     .edit()
                     .putBoolean(KEY_INITIALIZED, false)
                     .putString(KEY_KNOWN_STATES, "")
-                    .apply();
+                    .commit();
                 Log.d(TAG, "Token arrived — re-initializing");
             }
         } catch (Exception e) {
@@ -538,13 +504,10 @@ public class SignalService extends Service {
             pollCount++;
             String token = getSessionToken();
 
-            // Update token status for diagnostics
+            // Show status in foreground notification (clean text, no Poll #)
             if (token.isEmpty()) {
-                tokenStatus = "NO TOKEN";
-            } else if (!tokenVerified) {
-                tokenStatus = "CHECKING...";
-            } else {
-                tokenStatus = "VERIFIED";
+                updateServiceNotification("في انتظار تسجيل الدخول...");
+                return;
             }
 
             // Call API
@@ -552,21 +515,23 @@ public class SignalService extends Service {
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("GET");
             conn.setRequestProperty("Content-Type", "application/json");
-            conn.setRequestProperty("User-Agent", "ForexYemeni/App/2.1");
+            conn.setRequestProperty("User-Agent", "ForexYemeni/App/3.1");
             conn.setRequestProperty("Accept", "application/json");
             if (!token.isEmpty()) {
                 conn.setRequestProperty("Authorization", "Bearer " + token);
             }
-            conn.setConnectTimeout(6000);
-            conn.setReadTimeout(6000);
+            conn.setConnectTimeout(8000);
+            conn.setReadTimeout(8000);
 
             lastApiCode = conn.getResponseCode();
 
             if (lastApiCode != 200) {
                 lastApiError = "HTTP_" + lastApiCode;
                 conn.disconnect();
-                if (pollCount % 10 == 1) log("API error: " + lastApiCode + " token=" + tokenStatus);
-                updateDiagNotification();
+                if (pollCount <= 3 || pollCount % 10 == 0) {
+                    log("API error: " + lastApiCode + " token=" + (token.isEmpty() ? "NONE" : "OK"));
+                    updateServiceNotification("جاري الاتصال...");
+                }
                 return;
             }
 
@@ -584,7 +549,7 @@ public class SignalService extends Service {
             int totalSignals = json.optInt("totalSignals", 0);
 
             // Token verification
-            if (!token.isEmpty() && totalSignals > 0 && !tokenVerified) {
+            if (!tokenVerified && totalSignals > 0) {
                 tokenVerified = true;
                 getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
                     .edit().putBoolean(KEY_TOKEN_VERIFIED, true).apply();
@@ -592,14 +557,19 @@ public class SignalService extends Service {
             }
 
             if (!hasNew || totalSignals == 0) {
-                if (pollCount % 10 == 1) log("Poll #" + pollCount + ": no new signals (total=" + totalSignals + ")");
-                updateDiagNotification();
+                // No new signals — show clean status
+                if (!tokenVerified) {
+                    updateServiceNotification("جاري التحقق...");
+                } else if (lastSignalDetected.isEmpty()) {
+                    updateServiceNotification("مراقبة الاشارات");
+                }
+                // else keep last signal info visible
+                if (pollCount <= 3) log("No new signals (total=" + totalSignals + ")");
                 return;
             }
 
             JSONArray newSignals = json.optJSONArray("newSignals");
             if (newSignals == null || newSignals.length() == 0) {
-                updateDiagNotification();
                 return;
             }
 
@@ -619,29 +589,26 @@ public class SignalService extends Service {
                 String type = signal.optString("type", "BUY");
                 double entry = signal.optDouble("entry", 0);
 
-                boolean isTpHit = "HIT_TP".equals(status) || "TP_HIT".equals(category)
-                        || "REENTRY_TP".equals(category) || "PYRAMID_TP".equals(category)
-                        || hitTpIndex > 0;
-                boolean isSlHit = "HIT_SL".equals(status) || "SL_HIT".equals(category)
-                        || "REENTRY_SL".equals(category) || "PYRAMID_SL".equals(category);
-
                 if (isFirstRun) {
                     if (i == 0) log("FIRST RUN — tracking " + newSignals.length() + " signals (no alert)");
                 } else if (!knownStates.containsKey(id)) {
                     // BRAND NEW SIGNAL DETECTED!
                     String info = pair + " " + ("BUY".equals(type) ? "شراء" : "بيع") + " @" + entry;
-                    alertSignalDetected(id, info);
+                    alertSignalDetected(id, state, info);
                 } else if (!state.equals(knownStates.get(id))) {
-                    // STATE CHANGE!
+                    // STATE CHANGE (TP hit, SL hit, etc.)
                     String info;
-                    if (isTpHit) {
+                    if ("HIT_TP".equals(status) || "TP_HIT".equals(category)
+                            || "REENTRY_TP".equals(category) || "PYRAMID_TP".equals(category)
+                            || hitTpIndex > 0) {
                         info = pair + " هدف " + hitTpIndex + " محقق!";
-                    } else if (isSlHit) {
+                    } else if ("HIT_SL".equals(status) || "SL_HIT".equals(category)
+                            || "REENTRY_SL".equals(category) || "PYRAMID_SL".equals(category)) {
                         info = pair + " وقف خسارة!";
                     } else {
                         info = pair + " تحديث: " + status;
                     }
-                    alertSignalDetected(id, info);
+                    alertSignalDetected(id, state, info);
                 }
                 newStates.put(id, state);
             }
@@ -653,20 +620,25 @@ public class SignalService extends Service {
                 log("Initialized: tracking " + newStates.size() + " signal states");
             }
 
-            saveKnownStates(newStates, 100);
+            // Use commit() — CRITICAL: synchronous write prevents race condition
+            // where the next poll reads stale states and re-notifies the same signals
+            saveKnownStates(newStates, 200);
 
-            // Return notification to diagnostic mode after 10 seconds
+            // Return notification to clean status after 8 seconds
             handler.postDelayed(new Runnable() {
                 @Override
                 public void run() {
-                    if (isRunning) updateDiagNotification();
+                    if (isRunning) {
+                        if (lastSignalDetected.isEmpty()) {
+                            updateServiceNotification("مراقبة الاشارات");
+                        }
+                    }
                 }
-            }, 10000);
+            }, 8000);
 
         } catch (Exception e) {
             lastApiError = e.getClass().getSimpleName();
             log("FATAL: " + e.getMessage());
-            e.printStackTrace();
         }
     }
 
@@ -680,8 +652,10 @@ public class SignalService extends Service {
     }
 
     private void markInitialized() {
-        try { getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit().putBoolean(KEY_INITIALIZED, true).apply(); }
-        catch (Exception e) { log("markInit error: " + e.getMessage()); }
+        try {
+            // Use commit() — must be synchronous so next poll sees initialized=true
+            getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit().putBoolean(KEY_INITIALIZED, true).commit();
+        } catch (Exception e) { log("markInit error: " + e.getMessage()); }
     }
 
     private Map<String, String> loadKnownStates() {
@@ -708,7 +682,8 @@ public class SignalService extends Service {
                 sb.append(entry.getKey()).append("=").append(entry.getValue());
                 count++;
             }
-            getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit().putString(KEY_KNOWN_STATES, sb.toString()).apply();
+            // Use commit() — CRITICAL: synchronous write prevents race condition
+            getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit().putString(KEY_KNOWN_STATES, sb.toString()).commit();
         } catch (Exception e) { log("saveStates: " + e.getMessage()); }
     }
 
@@ -718,10 +693,10 @@ public class SignalService extends Service {
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("GET");
             conn.setRequestProperty("Content-Type", "application/json");
-            conn.setRequestProperty("User-Agent", "ForexYemeni/App/2.1");
+            conn.setRequestProperty("User-Agent", "ForexYemeni/App/3.1");
             if (!token.isEmpty()) conn.setRequestProperty("Authorization", "Bearer " + token);
-            conn.setConnectTimeout(6000);
-            conn.setReadTimeout(6000);
+            conn.setConnectTimeout(8000);
+            conn.setReadTimeout(8000);
             if (conn.getResponseCode() != 200) { conn.disconnect(); return new HashMap<>(); }
             BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
             StringBuilder sb = new StringBuilder();
