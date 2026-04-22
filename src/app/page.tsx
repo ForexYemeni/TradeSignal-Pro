@@ -3,6 +3,8 @@
 // ═══ IMPORTS ═══
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useTheme } from "next-themes";
+import { toast } from "sonner";
+import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,13 +16,13 @@ import {
   BarChart3, User, Volume2, VolumeX, Bell,
   Crown, Package, Users, CalendarDays, Settings,
   Home, Flame, Trophy, ArrowUpRight, ArrowDownRight, Hash, Globe, PieChart, Sparkles, Timer, Wallet,
-  Sun, Moon,
+  Sun, Moon, MoreHorizontal,
 } from "lucide-react";
 
 // ═══ EXTRACTED MODULES ═══
 import type { Signal, AdminSession, Stats, View, Tab, Filter, SubPackage, AppSettingsData } from "@/lib/types";
 import { timeAgo, isEntry, entryAccent, isTpLike, isSlLike, nativeNotify, playSound, registerPushNotification, unregisterPushNotification, formatCountdown } from "@/lib/utils";
-import { Stars, Div, Glass, SkeletonCard, Confetti, useOnlineStatus, usePullToRefresh } from "@/components/shared";
+import { Stars, Div, Glass, SkeletonCard, SignalsLoadingSkeleton, StatsLoadingSkeleton, EmptyState, Confetti, useOnlineStatus, usePullToRefresh } from "@/components/shared";
 import { TpMiniCard, TradeStatusBanner, EntryCard, ClosedSignalCard, SplashScreen } from "@/components/SignalCards";
 
 
@@ -431,8 +433,9 @@ export default function HomePage() {
         setView("main");
         // Register push notifications automatically after login
         registerPushNotification(s.id).catch(() => {});
+        toast.success("تم تسجيل الدخول بنجاح");
       }
-    } catch { setLoginErr("خطأ في الاتصال بالخادم"); }
+    } catch { setLoginErr("خطأ في الاتصال بالخادم"); toast.error("خطأ في الاتصال بالخادم"); }
     finally { setLoginLoad(false); }
   }
 
@@ -455,6 +458,7 @@ export default function HomePage() {
       localStorage.setItem("adminSession", JSON.stringify(s));
       setView("main");
       setCpCur(""); setCpEmail(""); setCpNew(""); setCpConf("");
+      toast.success("تم تغيير كلمة المرور");
     } catch { setCpErr("خطأ في الاتصال بالخادم"); }
     finally { setCpLoad(false); }
   }
@@ -468,6 +472,7 @@ export default function HomePage() {
     setView("login");
     setTab("signals");
     prevIdsRef.current = new Set();
+    toast("تم تسجيل الخروج");
   }
 
   async function handleRegister() {
@@ -485,10 +490,12 @@ export default function HomePage() {
       if (data.success) {
         setRegSuccess("تم إنشاء الحساب بنجاح! في انتظار موافقة الإدارة.");
         setRegName(""); setRegEmail(""); setRegPwd("");
+        toast.success("تم إنشاء الحساب بنجاح");
       } else {
         setRegErr(data.error || "فشل إنشاء الحساب");
+        toast.error(data.error || "فشل إنشاء الحساب");
       }
-    } catch { setRegErr("خطأ في الاتصال بالخادم"); }
+    } catch { setRegErr("خطأ في الاتصال بالخادم"); toast.error("خطأ في الاتصال بالخادم"); }
     finally { setRegLoad(false); }
   }
 
@@ -518,7 +525,7 @@ export default function HomePage() {
     try {
       const res = await fetch("/api/packages", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: pkgFormName, durationDays: Number(pkgFormDays), price: Number(pkgFormPrice || 0), type: pkgFormType, description: pkgFormDesc, isActive: pkgFormActive }) });
       const data = await res.json();
-      if (data.success) { setShowPkgForm(false); setPkgFormName(""); setPkgFormDays(""); setPkgFormPrice(""); setPkgFormDesc(""); fetchPackages(); }
+      if (data.success) { setShowPkgForm(false); setPkgFormName(""); setPkgFormDays(""); setPkgFormPrice(""); setPkgFormDesc(""); fetchPackages(); toast.success("تم إنشاء الباقة بنجاح"); }
     } catch (e) { console.error("Create package:", e); }
     finally { setPkgLoad(false); }
   }
@@ -574,6 +581,7 @@ export default function HomePage() {
         body: JSON.stringify({ id, action }),
       });
       fetchUsers();
+      toast.success("تم تحديث حالة المستخدم");
     } catch (e) { console.error("User action:", e); }
   }
 
@@ -645,6 +653,7 @@ export default function HomePage() {
     try {
       await fetch(`/api/signals/${id}`, { method: "DELETE" });
       fetchSignals(); fetchStats();
+      toast.success("تم حذف الإشارة");
     } catch (e) { console.error("Delete:", e); }
   }
 
@@ -653,6 +662,7 @@ export default function HomePage() {
       await Promise.allSettled(signals.map(s => fetch(`/api/signals/${s.id}`, { method: "DELETE" })));
       setConfirmClear(false);
       fetchSignals(); fetchStats();
+      toast.success("تم حذف جميع الإشارات");
     } catch (e) { console.error("Clear:", e); }
   }
 
@@ -685,6 +695,7 @@ export default function HomePage() {
       if (data.success) {
         setRawText(""); setParseResult(null); setParseError("");
         fetchSignals(); fetchStats();
+        toast.success("تم إرسال الإشارة بنجاح");
       }
     } catch (e) { console.error("Send:", e); }
     finally { setSendLoad(false); }
@@ -1149,10 +1160,10 @@ export default function HomePage() {
       </header>
 
       {/* ── Content ── */}
-      <main className="flex-1 px-4 pb-24 pt-3 max-w-lg mx-auto w-full">
+      <main className="flex-1 px-4 pb-20 md:pb-24 pt-3 max-w-lg mx-auto w-full">
 
         {/* ══════ TAB: HOME — PROFESSIONAL DASHBOARD ══════ */}
-        {tab === "home" && (() => {
+        {tab === "home" && (<motion.div key="home" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>{(() => {
           const activeSignals = signals.filter(s => s.status === "ACTIVE");
           const closedSignals = signals.filter(s => s.status !== "ACTIVE");
           const winClosed = closedSignals.filter(s => s.status === "HIT_TP");
@@ -1617,10 +1628,10 @@ export default function HomePage() {
 
           </div>
           );
-        })()}
+        })()}</motion.div>)}
 
         {/* ══════ TAB: SIGNALS — PREMIUM DESIGN ══════ */}
-        {tab === "signals" && (() => {
+        {tab === "signals" && (<motion.div key="signals" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>{(() => {
           const activeSignals = filtered.filter(s => isEntry(s.signalCategory) && s.status === "ACTIVE");
           const closedSignals = filtered.filter(s => !isEntry(s.signalCategory) || s.status !== "ACTIVE");
           const winClosed = closedSignals.filter(s => s.status === "HIT_TP");
@@ -1708,15 +1719,13 @@ export default function HomePage() {
             </div>
 
             {loading && filtered.length === 0 ? (
-              <div className="space-y-3">{[1, 2, 3].map(i => <SkeletonCard key={i} />)}</div>
+              <SignalsLoadingSkeleton />
             ) : filtered.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-                <div className="w-16 h-16 rounded-2xl bg-muted/50 border border-border flex items-center justify-center mb-4">
-                  <Activity className="w-7 h-7 text-muted-foreground" />
-                </div>
-                <p className="text-sm font-semibold text-muted-foreground">لا توجد إشارات</p>
-                <p className="text-[10px] text-muted-foreground mt-1">ستظهر الإشارات الجديدة هنا تلقائياً</p>
-              </div>
+              <EmptyState
+                icon={<Activity className="w-7 h-7" />}
+                title={filter === "active" ? "لا توجد إشارات نشطة حالياً" : filter === "closed" ? "لا توجد إشارات مغلقة" : filter === "buy" ? "لا توجد إشارات شراء" : filter === "sell" ? "لا توجد إشارات بيع" : "لا توجد إشارات حالياً"}
+                subtitle="سيتم عرض الإشارات هنا فور إرسالها"
+              />
             ) : (
               <>
                 {/* ── Active Signals Section ── */}
@@ -1769,13 +1778,13 @@ export default function HomePage() {
             )}
           </div>
           );
-        })()}
+        })()}</motion.div>)}
 
         {/* ══════ TAB: DASHBOARD ══════ */}
         {tab === "dashboard" && (
-          <div className="space-y-4">
+          <motion.div key="dashboard" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }} className="space-y-4">
             {loading && !stats ? (
-              <div className="space-y-3"><SkeletonCard /><SkeletonCard /></div>
+              <StatsLoadingSkeleton />
             ) : stats ? (
               <>
                 {/* Stats Grid */}
@@ -1859,12 +1868,12 @@ export default function HomePage() {
                 )}
               </>
             ) : null}
-          </div>
+          </motion.div>
         )}
 
         {/* ══════ TAB: ANALYST ══════ */}
         {tab === "analyst" && (
-          <div className="space-y-4">
+          <motion.div key="analyst" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }} className="space-y-4">
             <Glass className="p-4 space-y-3">
               <div className="text-xs font-semibold text-foreground/80 flex items-center gap-1.5"><Send className="w-3.5 h-3.5 text-amber-400" />تحليل إشارة يدوي</div>
               <Textarea value={rawText} onChange={e => setRawText(e.target.value)}
@@ -1891,12 +1900,12 @@ export default function HomePage() {
                 <SignalCard s={parseResult} idx={0} isAdmin={false} onUpdate={() => {}} onDelete={() => {}} />
               </div>
             )}
-          </div>
+          </motion.div>
         )}
 
         {/* ══════ TAB: PACKAGES (Admin) ══════ */}
         {tab === "packages" && isAdmin && (
-          <div className="space-y-4">
+          <motion.div key="packages" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }} className="space-y-4">
             {/* ── App Settings Card ── */}
             <div className="rounded-2xl border border-amber-500/15 overflow-hidden" style={{ background: "linear-gradient(135deg, rgba(255,215,0,0.06) 0%, rgba(255,140,0,0.02) 100%)" }}>
               <div className="p-4 space-y-3">
@@ -1978,10 +1987,10 @@ export default function HomePage() {
 
             {/* ── Package Cards ── */}
             {packages.length === 0 ? (
-              <div className="text-center py-12">
-                <Package className="w-10 h-10 text-muted-foreground mx-auto mb-2" />
-                <p className="text-xs text-muted-foreground">لا توجد باقات بعد. أضف باقة لتشغيل نظام الاشتراكات.</p>
-              </div>
+              <EmptyState
+                icon={<Package className="w-7 h-7" />}
+                title="لا توجد باقات. أنشئ باقة جديدة للبدء"
+              />
             ) : (
               <div className="space-y-2.5">
                 {packages.map(pkg => {
@@ -2027,25 +2036,26 @@ export default function HomePage() {
                 })}
               </div>
             )}
-          </div>
+          </motion.div>
         )}
 
-        {/* ══════ TAB: ACCOUNT ══════ */}
+        {/* TAB: ACCOUNT */}
+
         {tab === "users" && isAdmin && (
-          <div className="space-y-4">
+          <motion.div key="users" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }} className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-bold text-foreground flex items-center gap-2"><User className="w-4 h-4 text-amber-400" />إدارة المستخدمين</h2>
               <button onClick={fetchUsers} className="px-3 py-1.5 rounded-lg text-[10px] font-medium bg-muted/60 text-muted-foreground border border-border active:scale-95 transition-transform hover:bg-muted/80">
                 تحديث
               </button>
             </div>
-            {usersLoad && <div className="space-y-3"><SkeletonCard /><SkeletonCard /></div>}
+            {usersLoad && <SignalsLoadingSkeleton />}
             {!usersLoad && users.length === 0 && (
-              <Glass className="p-6 text-center">
-                <User className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                <p className="text-xs text-muted-foreground">لا يوجد مستخدمين بعد</p>
-                <p className="text-[10px] text-muted-foreground mt-1">المستخدمون الجدد سيظهرون هنا بعد التسجيل</p>
-              </Glass>
+              <EmptyState
+                icon={<Users className="w-7 h-7" />}
+                title="لا يوجد مستخدمين مسجلين حالياً"
+                subtitle="المستخدمون الجدد سيظهرون هنا بعد التسجيل"
+              />
             )}
             {!usersLoad && users.length > 0 && (
               <div className="space-y-2">
@@ -2229,10 +2239,10 @@ export default function HomePage() {
                 ))}
               </div>
             )}
-          </div>
+          </motion.div>
         )}
         {tab === "account" && session && (
-          <div className="space-y-4">
+          <motion.div key="account" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }} className="space-y-4">
             {/* Profile Info */}
             <Glass className="p-4">
               <div className="flex items-center gap-3">
@@ -2443,12 +2453,33 @@ export default function HomePage() {
               <LogOut className="w-4 h-4" />
               تسجيل الخروج
             </button>
-          </div>
+          </motion.div>
         )}
       </main>
 
-      {/* ── Bottom Navigation ── */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-background/90 backdrop-blur-lg safe-area-bottom">
+      {/* ── Mobile Bottom Navigation (glass effect, visible on mobile only) ── */}
+      <nav className="fixed bottom-0 left-0 right-0 z-40 md:hidden glass-nav safe-area-bottom">
+        <div className="max-w-lg mx-auto flex items-stretch">
+          {tabs.map(t => (
+            <button key={t.key} onClick={() => setTab(t.key)}
+              className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 relative transition-colors ${tab === t.key ? "" : "text-muted-foreground"}`}>
+              <div className={`flex items-center justify-center w-8 h-8 rounded-xl transition-all duration-200 ${tab === t.key ? "bg-[#FFD700]/15" : ""}`}>
+                <span className={tab === t.key ? "text-[#FFD700]" : ""}>{t.icon}</span>
+              </div>
+              <span className={`text-[9px] font-semibold transition-colors ${tab === t.key ? "text-[#FFD700]" : ""}`}>{t.label}</span>
+              {tab === t.key && <div className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-[3px] rounded-full bg-[#FFD700]" />}
+              {t.badge !== undefined && t.badge > 0 && (
+                <span className="absolute top-1 left-1/2 translate-x-5 min-w-[18px] h-[18px] rounded-full bg-[#FFD700] text-[8px] font-bold text-black flex items-center justify-center px-1">
+                  {t.badge > 99 ? "99+" : t.badge}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      </nav>
+
+      {/* ── Desktop Bottom Navigation ── */}
+      <nav className="hidden md:block fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-background/90 backdrop-blur-lg safe-area-bottom">
         <div className="max-w-lg mx-auto flex">
           {tabs.map(t => (
             <button key={t.key} onClick={() => setTab(t.key)}

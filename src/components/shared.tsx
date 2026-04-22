@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { Star } from "lucide-react";
+import { Star, Activity, BarChart3, Package, Users, Inbox } from "lucide-react";
 
 /* ═══════════════════════════════════════════════════════════════
    STAR RATING
@@ -35,6 +35,88 @@ export function SkeletonCard() {
         <div className="h-14 rounded-xl bg-muted/60" />
         <div className="h-14 rounded-xl bg-muted/60" />
       </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SIGNAL LOADING SKELETON (mimics signal card structure)
+   ═══════════════════════════════════════════════════════════════ */
+export function SignalsLoadingSkeleton() {
+  return (
+    <div className="space-y-3">
+      {Array.from({ length: 3 }).map((_, i) => (
+        <div key={i} className="rounded-2xl border border-border bg-muted/50 p-4 space-y-3 animate-pulse">
+          {/* Top accent bar */}
+          <div className="h-[3px] rounded-full bg-muted/60 w-3/4" />
+          {/* Header row */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-muted" />
+              <div className="space-y-2">
+                <div className="h-4 w-20 rounded bg-muted/60" />
+                <div className="h-2.5 w-12 rounded bg-muted/40" />
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="h-6 w-14 rounded-lg bg-muted/40" />
+              <div className="h-6 w-12 rounded-full bg-muted/40" />
+            </div>
+          </div>
+          {/* Price boxes */}
+          <div className="grid grid-cols-2 gap-2.5">
+            <div className="h-[68px] rounded-xl bg-muted/60" />
+            <div className="h-[68px] rounded-xl bg-muted/60" />
+          </div>
+          {/* TP targets */}
+          <div className="space-y-1.5">
+            <div className="h-3 w-16 rounded bg-muted/40" />
+            <div className="h-10 rounded-xl bg-muted/40" />
+            <div className="h-10 rounded-xl bg-muted/30" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   STATS LOADING SKELETON
+   ═══════════════════════════════════════════════════════════════ */
+export function StatsLoadingSkeleton() {
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-3">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="rounded-2xl border border-border bg-muted/50 p-3.5 space-y-2 animate-pulse">
+            <div className="h-2.5 w-16 rounded bg-muted/60" />
+            <div className="h-6 w-12 rounded bg-muted/40" />
+          </div>
+        ))}
+      </div>
+      <div className="rounded-2xl border border-border bg-muted/50 p-4 space-y-3 animate-pulse">
+        <div className="h-3 w-24 rounded bg-muted/60" />
+        <div className="h-3 rounded-full bg-muted/40" />
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   EMPTY STATE COMPONENT
+   ═══════════════════════════════════════════════════════════════ */
+export function EmptyState({ icon, title, subtitle }: {
+  icon: React.ReactNode;
+  title: string;
+  subtitle?: string;
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+      <div className="w-16 h-16 rounded-2xl bg-muted/50 border border-border flex items-center justify-center mb-4">
+        {icon}
+      </div>
+      <p className="text-sm font-semibold text-muted-foreground">{title}</p>
+      {subtitle && <p className="text-[11px] text-muted-foreground/70 mt-1.5 text-center max-w-[240px]">{subtitle}</p>}
     </div>
   );
 }
