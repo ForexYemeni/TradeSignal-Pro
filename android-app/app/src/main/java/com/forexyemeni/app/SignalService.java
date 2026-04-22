@@ -57,6 +57,7 @@ public class SignalService extends Service {
     private static final String PREFS_NAME = "forexyemeni_signal_prefs";
     private static final String KEY_KNOWN_STATES = "service_signal_states_v10";
     private static final String KEY_INITIALIZED = "service_initialized_v10";
+    private static final String KEY_NOTIFIED_IDS = "service_notified_ids_v10"; // Dedup: signal IDs already notified
     private static final String KEY_SESSION_TOKEN = "fy_session_token";
     private static final String KEY_LAST_HEARTBEAT = "service_last_heartbeat";
     private static final String KEY_TOKEN_VERIFIED = "service_token_verified";
@@ -385,31 +386,67 @@ public class SignalService extends Service {
     }
 
     /**
-     * CRITICAL: When a signal is detected, show it in the SERVICE NOTIFICATION with SOUND.
-     * This is the PRIMARY alert mechanism — the foreground notification is guaranteed to show.
+     * CRITICAL: When a signal is detected, notify with deduplication.
+     * Same signal ID will NOT be notified again within the same session.
+     * Returns true if notification was actually sent (not duplicate).
      */
-    private void alertSignalDetected(String signalInfo) {
+    private boolean alertSignalDetected(String signalId, String signalInfo) {
+        // Dedup: check if this signal ID was already notified
+        if (wasAlreadyNotified(signalId)) {
+            return false; // Already notified — skip
+        }
+
         lastSignalDetected = signalInfo;
         notificationsSent++;
+        markAsNotified(signalId);
 
         log(">>>>>>> SIGNAL ALERT: " + signalInfo + " <<<<<<<<");
 
-        // 1. Update service notification with sound
+        // 1. Update service notification (visual only, no sound from notification itself)
         String title = "اشارة جديدة! " + signalInfo;
         String text = "تم اكتشاف: " + signalInfo + " — في: " +
                 new SimpleDateFormat("HH:mm:ss", Locale.US).format(new Date());
-        Notification alertNotif = buildServiceNotification(title, text, true);
+        Notification alertNotif = buildServiceNotification(title, text, false);
         NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         if (nm != null) {
             nm.notify(NOTIFICATION_ID, alertNotif);
             log("Service notification updated with alert (sound + vibration)");
         }
 
-        // 2. Also send regular notification as backup
+        // 2. Send regular notification (visual + channel sound)
         NotificationHelper.showNotification(this, title, text, "buy");
 
-        // 3. Play distinctive sound pattern via ToneGenerator
+        // 3. Play distinctive sound via ToneGenerator (ONE time only)
         playSignalSound();
+
+        return true;
+    }
+
+    // ── Deduplication helpers ──
+
+    private boolean wasAlreadyNotified(String signalId) {
+        try {
+            String notified = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+                    .getString(KEY_NOTIFIED_IDS, "");
+            return notified.contains(signalId + ",");
+        } catch (Exception e) { return false; }
+    }
+
+    private void markAsNotified(String signalId) {
+        try {
+            String notified = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+                    .getString(KEY_NOTIFIED_IDS, "");
+            notified += signalId + ",";
+            // Keep last 50 entries max
+            String[] parts = notified.split(",");
+            StringBuilder sb = new StringBuilder();
+            int start = Math.max(0, parts.length - 50);
+            for (int i = start; i < parts.length; i++) {
+                if (!parts[i].isEmpty()) sb.append(parts[i]).append(",");
+            }
+            getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+                    .edit().putString(KEY_NOTIFIED_IDS, sb.toString()).apply();
+        } catch (Exception e) {}
     }
 
     /**
@@ -593,7 +630,7 @@ public class SignalService extends Service {
                 } else if (!knownStates.containsKey(id)) {
                     // BRAND NEW SIGNAL DETECTED!
                     String info = pair + " " + ("BUY".equals(type) ? "شراء" : "بيع") + " @" + entry;
-                    alertSignalDetected(info);
+                    alertSignalDetected(id, info);
                 } else if (!state.equals(knownStates.get(id))) {
                     // STATE CHANGE!
                     String info;
@@ -604,7 +641,7 @@ public class SignalService extends Service {
                     } else {
                         info = pair + " تحديث: " + status;
                     }
-                    alertSignalDetected(info);
+                    alertSignalDetected(id, info);
                 }
                 newStates.put(id, state);
             }

@@ -185,23 +185,17 @@ public class NotificationHelper {
     }
 
     /**
-     * Show a signal notification with TRIPLE delivery:
-     * 1. On the fresh unique channel (IMPORTANCE_HIGH)
-     * 2. On the static channel (IMPORTANCE_HIGH)
-     * 3. Play sound via ToneGenerator (always works regardless of notification permission)
+     * Show ONE signal notification (no duplicate).
+     * Sound is NOT played here — SignalService handles sound via ToneGenerator.
      */
     public static void showNotification(Context context, String title, String body, String soundType) {
         try {
-            Log.d("NotifHelper", "showNotification: " + title + " | sound=" + soundType
-                    + " | perm=" + hasNotificationPermission(context));
-
             // Determine color based on type
             int color;
             if ("tp_hit".equals(soundType)) color = Color.parseColor("#00E676");
             else if ("sl_hit".equals(soundType)) color = Color.parseColor("#FF5252");
             else if ("buy".equals(soundType)) color = Color.parseColor("#00E676");
             else if ("sell".equals(soundType)) color = Color.parseColor("#FF5252");
-            else if ("admin".equals(soundType)) color = Color.parseColor("#FFD700");
             else color = Color.parseColor("#FFD700");
 
             notificationCounter++;
@@ -220,22 +214,11 @@ public class NotificationHelper {
             Bitmap largeIcon = BitmapFactory.decodeResource(context.getResources(), iconRes);
             if (largeIcon == null) largeIcon = createColoredBitmap(color);
 
-            // ── ATTEMPT 1: Show on FRESH unique channel (guaranteed IMPORTANCE_HIGH) ──
+            // Show on ONE channel only (fresh unique channel)
             String freshChannel = getFreshSignalChannelId(context);
             showNotifOnChannel(context, notifId, freshChannel, title, body, color, iconRes, largeIcon, pendingIntent);
 
-            // ── ATTEMPT 2: Show on static type-specific channel ──
-            String staticChannel;
-            if ("tp_hit".equals(soundType)) staticChannel = CHANNEL_TP_HIT;
-            else if ("sl_hit".equals(soundType)) staticChannel = CHANNEL_SL_HIT;
-            else if ("admin".equals(soundType)) staticChannel = CHANNEL_ADMIN;
-            else staticChannel = CHANNEL_NEW_SIGNAL;
-            showNotifOnChannel(context, notifId + 1, staticChannel, title, body, color, iconRes, largeIcon, pendingIntent);
-
-            // ── ATTEMPT 3: Play sound via ToneGenerator (works regardless of notification permission) ──
-            playNotificationTone(context, soundType);
-
-            Log.d("NotifHelper", "Notification sent on " + freshChannel + " and " + staticChannel);
+            Log.d("NotifHelper", "Notification sent on " + freshChannel);
 
         } catch (Exception e) {
             Log.e("NotifHelper", "showNotification FATAL: " + e.getMessage(), e);
