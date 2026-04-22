@@ -17,10 +17,20 @@ android {
         }
     }
 
+    signingConfigs {
+        release {
+            storeFile file('../release-key-new.jks')
+            storePassword 'fy2024sign'
+            keyAlias 'forexyemeni'
+            keyPassword 'fy2024sign'
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
             shrinkResources false
+            signingConfig signingConfigs.release
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
         debug {
