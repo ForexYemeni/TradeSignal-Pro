@@ -3178,54 +3178,6 @@ export default function HomePage() {
               </Glass>
             )}
 
-            {/* ── Test Notifications (Admin Only) ── */}
-            {isAdmin && (
-            <Glass className="p-4 space-y-3">
-              <div className="flex items-center gap-2 text-sm font-bold text-foreground/80">
-                <Bell className="w-4 h-4 text-amber-400" />
-                اختبار الإشعارات
-              </div>
-              <div className="text-[10px] text-muted-foreground">
-                اضغط على أي زر لتجربة الإشعار والصوت
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <button onClick={() => {
-                  notifySignal("buy", "📊 إشارة شراء — EURUSD", "شراء @ 1.0850", "buy");
-                }} className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-semibold active:scale-95 transition-transform hover:bg-emerald-500/20">
-                  📊 إشارة شراء
-                </button>
-                <button onClick={() => {
-                  notifySignal("sell", "📊 إشارة بيع — GBPUSD", "بيع @ 1.2650", "sell");
-                }} className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-[11px] font-semibold active:scale-95 transition-transform hover:bg-red-500/20">
-                  📊 إشارة بيع
-                </button>
-                <button onClick={() => {
-                  notifySignal("tp", "🎯 هدف محقق — EURUSD", "TP1 تم تحقيقه بنجاح!", "tp_hit");
-                }} className="p-2.5 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-400 text-[11px] font-semibold active:scale-95 transition-transform hover:bg-sky-500/20">
-                  🎯 تحقيق هدف
-                </button>
-                <button onClick={() => {
-                  notifySignal("sl", "🛑 وقف خسارة — EURUSD", "تم ضرب وقف الخسارة!", "sl_hit");
-                }} className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[11px] font-semibold active:scale-95 transition-transform hover:bg-amber-500/20">
-                  🛑 وقف خسارة
-                </button>
-              </div>
-              <div className="pt-1 border-t border-border">
-                <button onClick={async () => {
-                  try {
-                    const res = await fetch("/api/test-notification", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "buy" }) });
-                    const data = await res.json();
-                    if (data.success) {
-                      alert("تم إرسال إشارة اختبار!");
-                    }
-                  } catch { /* ignore */ }
-                }} className="w-full p-2.5 rounded-xl bg-gradient-to-r from-amber-500/15 to-orange-500/15 border border-amber-500/25 text-amber-400 text-[11px] font-semibold active:scale-95 transition-transform hover:from-amber-500/25 hover:to-orange-500/25">
-                  إرسال إشارة اختبار من الخادم
-                </button>
-              </div>
-            </Glass>
-            )}
-
             {/* ── USER: Request Email Change ── */}
             {!isAdmin && (
               <Glass className="overflow-hidden">
