@@ -2,7 +2,6 @@
 
 // ═══ IMPORTS ═══
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +15,7 @@ import {
   BarChart3, User, Volume2, VolumeX, Bell,
   Crown, Package, Users, CalendarDays, Settings,
   Home, Flame, Trophy, ArrowUpRight, ArrowDownRight, Hash, Globe, PieChart, Sparkles, Timer, Wallet,
-  Sun, Moon, MoreHorizontal,
+  MoreHorizontal,
 } from "lucide-react";
 
 // ═══ EXTRACTED MODULES ═══
@@ -47,11 +46,6 @@ function SignalCard({ s, idx, isAdmin, onUpdate, onDelete, isNew, statusChanged 
    ═══════════════════════════════════════════════════════════════ */
 
 export default function HomePage() {
-  /* ── Theme ── */
-  const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => { setMounted(true); }, []);
-
   /* ── Online Status ── */
   const isOnline = useOnlineStatus();
 
@@ -1130,12 +1124,6 @@ export default function HomePage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {/* Theme Toggle */}
-            {mounted && (
-              <button onClick={() => setTheme(theme === "dark" ? "light" : "dark")} className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
-                {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-              </button>
-            )}
             {/* Audio Controls */}
             <button onClick={() => setAudioMuted(!audioMuted)} className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
               {audioMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
