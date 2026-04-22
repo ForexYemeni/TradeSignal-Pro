@@ -47,6 +47,7 @@ export async function POST(request: NextRequest) {
       role: "user",
       status: settings.autoApproveOnRegister ? "active" : "pending",
       mustChangePwd: false,
+      hadFreeTrial: !!trialExpiry,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       subscriptionType: trialExpiry ? "subscriber" : "none",

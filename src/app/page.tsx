@@ -659,10 +659,16 @@ export default function HomePage() {
 
   async function handleAssignPackage(userId: string, packageId: string) {
     try {
-      await fetch("/api/users", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: userId, action: "assign_package", packageId, days: assignDays ? Number(assignDays) : undefined }) });
+      const res = await fetch("/api/users", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: userId, action: "assign_package", packageId, days: assignDays ? Number(assignDays) : undefined }) });
+      const data = await res.json();
+      if (!data.success) {
+        toast.error(data.error || "فشل تعيين الباقة");
+        return;
+      }
       setShowAssignPkg(null); setAssignDays("");
       fetchUsers();
-    } catch (e) { console.error("Assign package:", e); }
+      toast.success("تم تعيين الباقة بنجاح");
+    } catch (e) { console.error("Assign package:", e); toast.error("خطأ في الاتصال"); }
   }
 
   async function handleSetAgency(userId: string) {
@@ -673,15 +679,30 @@ export default function HomePage() {
   }
 
   async function handleUserAction(id: string, action: string) {
+    const user = users.find(u => u.id === id);
+    const userName = user?.name || user?.email || "";
+
+    if (action === "remove_admin") {
+      if (!confirm(`هل أنت متأكد من إزالة صلاحية المدير من ${userName}؟ سيصبح مستخدم عادي.`)) return;
+    }
+    if (action === "block") {
+      if (!confirm(`هل أنت متأكد من حظر ${userName}؟`)) return;
+    }
+
     try {
-      await fetch("/api/users", {
+      const res = await fetch("/api/users", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, action }),
       });
+      const data = await res.json();
+      if (!data.success) {
+        toast.error(data.error || "فشل تحديث المستخدم");
+        return;
+      }
       fetchUsers();
-      toast.success("تم تحديث حالة المستخدم");
-    } catch (e) { console.error("User action:", e); }
+      toast.success(action === "remove_admin" ? "تم إزالة صلاحية المدير" : action === "make_admin" ? `تم ترقية ${userName} لمدير` : "تم تحديث حالة المستخدم");
+    } catch (e) { console.error("User action:", e); toast.error("خطأ في الاتصال"); }
   }
 
   async function handleDeleteUser(id: string) {
@@ -2408,6 +2429,9 @@ export default function HomePage() {
                                 {u.packageName && (
                                   <div className="flex items-center gap-1.5 mt-1 text-[9px]">
                                     <span className="text-muted-foreground">{u.packageName}</span>
+                                    {u.hadFreeTrial && (
+                                      <span className="text-[7px] bg-amber-500/15 text-amber-400/70 px-1 py-0.5 rounded font-bold">سبق أخذ تجربة</span>
+                                    )}
                                     {expDays !== null && (
                                       <span className={`font-bold ${expDays > 3 ? "text-emerald-400" : expDays > 0 ? "text-amber-400" : "text-red-400"}`}>
                                         {expDays > 0 ? `${expDays} يوم متبقي` : "منتهي!"}
@@ -2419,31 +2443,63 @@ export default function HomePage() {
                             </div>
                           </div>
                           {/* Action Buttons */}
-                          {u.role !== "admin" && (
-                            <div className="flex gap-1.5 mt-2.5 pt-2.5 border-t border-border flex-wrap">
-                              <button onClick={() => setShowAssignPkg(u.id)}
-                                className="px-2 py-1 rounded-lg text-[9px] font-medium bg-sky-500/10 text-sky-400 border border-sky-500/15 active:scale-95 transition-transform">
-                                تعيين باقة
-                              </button>
-                              <button onClick={() => handleSetAgency(u.id)}
-                                className={`px-2 py-1 rounded-lg text-[9px] font-medium active:scale-95 transition-transform ${isAgency ? "bg-purple-500/20 text-purple-400 border border-purple-500/25" : "bg-purple-500/10 text-purple-400 border border-purple-500/15"}`}>
-                                {isAgency ? "✓ وكالة" : "تحويل لوكالة"}
-                              </button>
-                              {u.role !== "admin" && <button onClick={() => handleUserAction(u.id, "make_admin")} className="px-2 py-1.5 rounded-lg text-[9px] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/15 active:scale-95 transition-transform">ترقية</button>}
-                              <button onClick={() => handleUserAction(u.id, "block")} className="px-2 py-1.5 rounded-lg text-[9px] font-medium bg-red-500/10 text-red-400 border border-red-500/15 active:scale-95 transition-transform">حظر</button>
-                              <button onClick={() => handleDeleteUser(u.id)} className="px-2 py-1.5 rounded-lg text-[9px] font-medium bg-red-500/5 text-red-300/60 border border-red-500/10 active:scale-95 transition-transform">حذف</button>
-                            </div>
-                          )}
+                          <div className="flex gap-1.5 mt-2.5 pt-2.5 border-t border-border flex-wrap">
+                            {u.role === "admin" ? (
+                              <>
+                                <button onClick={() => handleUserAction(u.id, "remove_admin")}
+                                  className="px-2 py-1.5 rounded-lg text-[9px] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/15 active:scale-95 transition-transform">
+                                  إزالة صلاحية المدير
+                                </button>
+                                <button onClick={() => setShowAssignPkg(u.id)}
+                                  className="px-2 py-1 rounded-lg text-[9px] font-medium bg-sky-500/10 text-sky-400 border border-sky-500/15 active:scale-95 transition-transform">
+                                  تعيين باقة
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <button onClick={() => setShowAssignPkg(u.id)}
+                                  className="px-2 py-1 rounded-lg text-[9px] font-medium bg-sky-500/10 text-sky-400 border border-sky-500/15 active:scale-95 transition-transform">
+                                  تعيين باقة
+                                </button>
+                                <button onClick={() => handleSetAgency(u.id)}
+                                  className={`px-2 py-1 rounded-lg text-[9px] font-medium active:scale-95 transition-transform ${isAgency ? "bg-purple-500/20 text-purple-400 border border-purple-500/25" : "bg-purple-500/10 text-purple-400 border border-purple-500/15"}`}>
+                                  {isAgency ? "✓ وكالة" : "تحويل لوكالة"}
+                                </button>
+                                <button onClick={() => handleUserAction(u.id, "make_admin")} className="px-2 py-1.5 rounded-lg text-[9px] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/15 active:scale-95 transition-transform">ترقية</button>
+                                <button onClick={() => handleUserAction(u.id, "block")} className="px-2 py-1.5 rounded-lg text-[9px] font-medium bg-red-500/10 text-red-400 border border-red-500/15 active:scale-95 transition-transform">حظر</button>
+                                <button onClick={() => handleDeleteUser(u.id)} className="px-2 py-1.5 rounded-lg text-[9px] font-medium bg-red-500/5 text-red-300/60 border border-red-500/10 active:scale-95 transition-transform">حذف</button>
+                              </>
+                            )}
+                          </div>
                           {/* Assign Package Dropdown */}
                           {showAssignPkg === u.id && packages.filter(p => p.isActive).length > 0 && (
                             <div className="mt-2 p-2.5 rounded-xl bg-muted/50 border border-border space-y-2 animate-[fadeIn_0.2s_ease-out]">
+                              {u.hadFreeTrial && (
+                                <div className="flex items-center gap-1.5 bg-amber-500/10 rounded-lg px-2.5 py-2">
+                                  <AlertTriangle className="w-3 h-3 text-amber-400 flex-shrink-0" />
+                                  <span className="text-[9px] text-amber-300/80 leading-relaxed">
+                                    هذا المستخدم سبق له أخذ تجربة مجانية. لا يمكن تفعيل الباقة المجانية مرة أخرى.
+                                  </span>
+                                </div>
+                              )}
                               <div className="flex gap-1.5 flex-wrap">
-                                {packages.filter(p => p.isActive).map(pkg => (
-                                  <button key={pkg.id} onClick={() => handleAssignPackage(u.id, pkg.id)}
-                                    className="px-2.5 py-1.5 rounded-lg text-[9px] font-semibold bg-sky-500/10 text-sky-400 border border-sky-500/15 active:scale-95 transition-transform">
-                                    {pkg.name} ({pkg.durationDays}ي)
-                                  </button>
-                                ))}
+                                {packages.filter(p => p.isActive).map(pkg => {
+                                  const isTrial = appSettings.freeTrialPackageId === pkg.id;
+                                  const disabled = isTrial && u.hadFreeTrial;
+                                  return (
+                                    <button key={pkg.id}
+                                      onClick={() => !disabled && handleAssignPackage(u.id, pkg.id)}
+                                      className={`px-2.5 py-1.5 rounded-lg text-[9px] font-semibold border active:scale-95 transition-transform ${
+                                        disabled
+                                          ? "bg-white/3 text-muted-foreground/40 border-border cursor-not-allowed line-through opacity-50"
+                                          : "bg-sky-500/10 text-sky-400 border-sky-500/15"
+                                      }`}
+                                      disabled={disabled}>
+                                      {pkg.name} ({pkg.durationDays}ي)
+                                      {isTrial && <span className="text-[7px] mr-1 opacity-60">مجاني</span>}
+                                    </button>
+                                  );
+                                })}
                               </div>
                               <div className="flex items-center gap-2">
                                 <Input type="number" value={assignDays} onChange={e => setAssignDays(e.target.value)} placeholder="أيام مخصصة (اختياري)"

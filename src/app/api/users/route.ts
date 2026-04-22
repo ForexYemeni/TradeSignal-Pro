@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getUsers, updateUser, deleteUser, getUserById, getPackageById, enforceSubscriptions } from "@/lib/store";
+import { getUsers, updateUser, deleteUser, getUserById, getPackageById, getAppSettings, enforceSubscriptions } from "@/lib/store";
 import { sendPushToAdmins } from "@/lib/push";
 
 export async function GET() {
@@ -22,6 +22,7 @@ export async function PUT(request: NextRequest) {
     }
 
     let updates: Record<string, unknown> = {};
+    let warning: string | null = null;
 
     switch (action) {
       case "approve":
@@ -43,10 +44,27 @@ export async function PUT(request: NextRequest) {
         if (!packageId) return NextResponse.json({ success: false, error: "معرف الباقة مطلوب" }, { status: 400 });
         const pkg = await getPackageById(packageId);
         if (!pkg) return NextResponse.json({ success: false, error: "الباقة غير موجودة" }, { status: 404 });
+
+        // ── Free trial protection ──
+        const settings = await getAppSettings();
+        const isFreeTrialPkg = settings.freeTrialPackageId === packageId;
+        if (isFreeTrialPkg) {
+          const user = await getUserById(id);
+          if (user && user.hadFreeTrial) {
+            return NextResponse.json({
+              success: false,
+              error: "هذا المستخدم سبق له الاستفادة من الخطة المجانية. لا يمكن تفعيلها مرة أخرى.",
+              hadFreeTrial: true,
+            }, { status: 403 });
+          }
+          updates.hadFreeTrial = true;
+        }
+
         const duration = days ?? pkg.durationDays;
         const expiry = new Date();
         expiry.setDate(expiry.getDate() + duration);
         updates = {
+          ...updates,
           status: "active",
           subscriptionType: "subscriber",
           subscriptionExpiry: expiry.toISOString(),
@@ -82,13 +100,18 @@ export async function PUT(request: NextRequest) {
 
     // ── Notify admins about important actions ──
     if (action === "approve") {
-      sendPushToAdmins({ title: "✅ تم قبول مستخدم", body: `${user.name} — ${user.email}`, tag: `user-${id}`, sound: 'tp_hit' }).catch(() => {});
+      sendPushToAdmins({ title: "تم قبول مستخدم", body: `${user.name} — ${user.email}`, tag: `user-${id}`, sound: 'tp_hit' }).catch(() => {});
     } else if (action === "block") {
-      sendPushToAdmins({ title: "🚫 تم حظر مستخدم", body: `${user.name} — ${user.email}`, tag: `user-${id}`, sound: 'sl_hit' }).catch(() => {});
+      sendPushToAdmins({ title: "تم حظر مستخدم", body: `${user.name} — ${user.email}`, tag: `user-${id}`, sound: 'sl_hit' }).catch(() => {});
+    } else if (action === "make_admin") {
+      sendPushToAdmins({ title: "تم ترقية مستخدم لمدير", body: `${user.name} — ${user.email}`, tag: `user-${id}`, sound: 'tp_hit' }).catch(() => {});
+    } else if (action === "remove_admin") {
+      sendPushToAdmins({ title: "تم إزالة صلاحية مدير", body: `${user.name} — ${user.email}`, tag: `user-${id}`, sound: 'sl_hit' }).catch(() => {});
     }
 
     return NextResponse.json({
       success: true,
+      warning,
       user: {
         id: user.id, name: user.name, email: user.email,
         role: user.role, status: user.status,
@@ -96,6 +119,7 @@ export async function PUT(request: NextRequest) {
         subscriptionExpiry: user.subscriptionExpiry,
         packageId: user.packageId,
         packageName: user.packageName,
+        hadFreeTrial: user.hadFreeTrial,
       },
     });
   } catch (error) {
@@ -116,7 +140,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ success: false, error: "المستخدم غير موجود" }, { status: 404 });
     }
     if (user) {
-      sendPushToAdmins({ title: "🗑 تم حذف مستخدم", body: `${user.name} — ${user.email}`, tag: `user-${id}`, sound: 'sl_hit' }).catch(() => {});
+      sendPushToAdmins({ title: "تم حذف مستخدم", body: `${user.name} — ${user.email}`, tag: `user-${id}`, sound: 'sl_hit' }).catch(() => {});
     }
     return NextResponse.json({ success: true });
   } catch (error) {

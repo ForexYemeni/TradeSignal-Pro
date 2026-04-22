@@ -72,6 +72,7 @@ export interface StoredUser {
   subscriptionExpiry: string | null;
   packageId: string | null;
   packageName: string | null;
+  hadFreeTrial: boolean;
 }
 
 // ─── Signals ────────────────────────────────────────────
@@ -298,6 +299,11 @@ export async function migrateAdminToUsers(): Promise<void> {
       role: "admin",
       status: "active",
       mustChangePwd: admin.mustChangePwd,
+      hadFreeTrial: false,
+      subscriptionType: "none",
+      subscriptionExpiry: null,
+      packageId: null,
+      packageName: null,
       createdAt: admin.createdAt,
       updatedAt: admin.updatedAt,
     });
