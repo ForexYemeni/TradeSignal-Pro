@@ -375,6 +375,10 @@ export interface SubscriptionPackage {
   isActive: boolean;
   createdAt: string;
   order: number;
+  features: string[];
+  maxSignals: number;
+  prioritySupport: boolean;
+  showEntryEarly: boolean;
 }
 
 export async function getPackages(): Promise<SubscriptionPackage[]> {

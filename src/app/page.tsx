@@ -170,15 +170,21 @@ export default function HomePage() {
   const [packages, setPackages] = useState<SubPackage[]>([]);
   const [appSettings, setAppSettings] = useState<AppSettingsData>({ freeTrialPackageId: null, autoApproveOnRegister: true });
   const [showPkgForm, setShowPkgForm] = useState(false);
+  const [editingPkgId, setEditingPkgId] = useState<string | null>(null);
   const [pkgFormName, setPkgFormName] = useState("");
   const [pkgFormDays, setPkgFormDays] = useState("");
   const [pkgFormPrice, setPkgFormPrice] = useState("");
   const [pkgFormType, setPkgFormType] = useState<"free" | "trial" | "paid">("paid");
   const [pkgFormDesc, setPkgFormDesc] = useState("");
   const [pkgFormActive, setPkgFormActive] = useState(true);
+  const [pkgFormFeatures, setPkgFormFeatures] = useState("");
+  const [pkgFormMaxSignals, setPkgFormMaxSignals] = useState("0");
+  const [pkgFormPriority, setPkgFormPriority] = useState(false);
+  const [pkgFormEarlyEntry, setPkgFormEarlyEntry] = useState(false);
   const [pkgLoad, setPkgLoad] = useState(false);
   const [showAssignPkg, setShowAssignPkg] = useState<string | null>(null);
   const [assignDays, setAssignDays] = useState("");
+  const SUPER_ADMIN_EMAIL = "admin@forexyemeni.com";
 
   /* ── Session Init: restore from localStorage ── */
   const [dbReady, setDbReady] = useState(false);
@@ -616,14 +622,40 @@ export default function HomePage() {
     } catch (e) { console.error("Fetch packages:", e); }
   }
 
-  async function handleCreatePackage() {
+  function resetPkgForm() {
+    setPkgFormName(""); setPkgFormDays(""); setPkgFormPrice(""); setPkgFormType("paid");
+    setPkgFormDesc(""); setPkgFormActive(true); setPkgFormFeatures("");
+    setPkgFormMaxSignals("0"); setPkgFormPriority(false); setPkgFormEarlyEntry(false);
+    setEditingPkgId(null); setShowPkgForm(false);
+  }
+
+  function openEditPkg(pkg: SubPackage) {
+    setEditingPkgId(pkg.id);
+    setPkgFormName(pkg.name); setPkgFormDays(String(pkg.durationDays)); setPkgFormPrice(String(pkg.price));
+    setPkgFormType(pkg.type as "free" | "trial" | "paid"); setPkgFormDesc(pkg.description);
+    setPkgFormActive(pkg.isActive); setPkgFormFeatures((pkg.features || []).join("\n"));
+    setPkgFormMaxSignals(String(pkg.maxSignals || 0)); setPkgFormPriority(!!pkg.prioritySupport);
+    setPkgFormEarlyEntry(!!pkg.showEntryEarly); setShowPkgForm(true);
+  }
+
+  async function handleSavePackage() {
     if (!pkgFormName || !pkgFormDays) return;
     setPkgLoad(true);
+    const features = pkgFormFeatures.split("\n").map(f => f.trim()).filter(Boolean);
+    const body = {
+      name: pkgFormName, durationDays: Number(pkgFormDays), price: Number(pkgFormPrice || 0),
+      type: pkgFormType, description: pkgFormDesc, isActive: pkgFormActive,
+      features, maxSignals: Number(pkgFormMaxSignals), prioritySupport: pkgFormPriority, showEntryEarly: pkgFormEarlyEntry,
+    };
     try {
-      const res = await fetch("/api/packages", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: pkgFormName, durationDays: Number(pkgFormDays), price: Number(pkgFormPrice || 0), type: pkgFormType, description: pkgFormDesc, isActive: pkgFormActive }) });
+      const url = editingPkgId ? "/api/packages" : "/api/packages";
+      const method = editingPkgId ? "PUT" : "POST";
+      const payload = editingPkgId ? { id: editingPkgId, ...body } : body;
+      const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const data = await res.json();
-      if (data.success) { setShowPkgForm(false); setPkgFormName(""); setPkgFormDays(""); setPkgFormPrice(""); setPkgFormDesc(""); fetchPackages(); toast.success("تم إنشاء الباقة بنجاح"); }
-    } catch (e) { console.error("Create package:", e); }
+      if (data.success) { resetPkgForm(); fetchPackages(); toast.success(editingPkgId ? "تم تحديث الباقة بنجاح" : "تم إنشاء الباقة بنجاح"); }
+      else toast.error(data.error || "فشل حفظ الباقة");
+    } catch (e) { console.error("Save package:", e); toast.error("خطأ في الاتصال"); }
     finally { setPkgLoad(false); }
   }
 
@@ -2219,18 +2251,15 @@ export default function HomePage() {
                   <Settings className="w-4 h-4 text-amber-400" />
                   <span className="text-xs font-bold text-amber-400">إعدادات التسجيل</span>
                 </div>
-                <div className="space-y-2.5">
-                  {/* Auto approve toggle */}
-                  <div className="flex items-center justify-between bg-muted/50 rounded-xl p-3 border border-border">
-                    <div>
-                      <div className="text-[11px] font-semibold text-foreground">تفعيل تلقائي عند التسجيل</div>
-                      <div className="text-[9px] text-muted-foreground mt-0.5">يتم تفعيل الحساب والباقة المجانية تلقائياً بدون موافقة</div>
-                    </div>
-                    <button onClick={() => handleSetAutoApprove(!appSettings.autoApproveOnRegister)}
-                      className={`w-11 h-6 rounded-full transition-all duration-300 relative ${appSettings.autoApproveOnRegister ? "bg-amber-500" : "bg-white/10"}`}>
-                      <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-md transition-all duration-300 ${appSettings.autoApproveOnRegister ? "left-[22px]" : "left-0.5"}`} />
-                    </button>
+                <div className="flex items-center justify-between bg-muted/50 rounded-xl p-3 border border-border">
+                  <div>
+                    <div className="text-[11px] font-semibold text-foreground">تفعيل تلقائي عند التسجيل</div>
+                    <div className="text-[9px] text-muted-foreground mt-0.5">يتم تفعيل الحساب والباقة المجانية تلقائياً بدون موافقة</div>
                   </div>
+                  <button onClick={() => handleSetAutoApprove(!appSettings.autoApproveOnRegister)}
+                    className={`w-11 h-6 rounded-full transition-all duration-300 relative ${appSettings.autoApproveOnRegister ? "bg-amber-500" : "bg-white/10"}`}>
+                    <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-md transition-all duration-300 ${appSettings.autoApproveOnRegister ? "left-[22px]" : "left-0.5"}`} />
+                  </button>
                 </div>
               </div>
             </div>
@@ -2242,19 +2271,20 @@ export default function HomePage() {
                 إدارة الباقات
                 <span className="text-[9px] bg-amber-500/15 text-amber-400 px-1.5 py-0.5 rounded-md font-bold">{packages.length}</span>
               </h2>
-              <button onClick={() => setShowPkgForm(!showPkgForm)}
+              <button onClick={() => { if (showPkgForm && editingPkgId) resetPkgForm(); else setShowPkgForm(!showPkgForm); }}
                 className="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/20 active:scale-95 transition-transform">
-                {showPkgForm ? "إلغاء" : "+ إضافة باقة"}
+                {showPkgForm && editingPkgId ? "إلغاء التعديل" : showPkgForm ? "إلغاء" : "+ إضافة باقة"}
               </button>
             </div>
 
-            {/* ── Create Package Form ── */}
+            {/* ── Create/Edit Package Form ── */}
             {showPkgForm && (
               <div className="rounded-2xl border border-border bg-muted/50 p-4 space-y-3 animate-[fadeIn_0.2s_ease-out]">
+                <div className="text-[10px] font-bold text-amber-400">{editingPkgId ? "تعديل الباقة" : "إنشاء باقة جديدة"}</div>
                 <div className="grid grid-cols-2 gap-2.5">
-                  <div>
+                  <div className="col-span-2">
                     <label className="text-[9px] text-muted-foreground mb-1 block">اسم الباقة</label>
-                    <Input value={pkgFormName} onChange={e => setPkgFormName(e.target.value)} placeholder="مثال: شهرية VIP"
+                    <Input value={pkgFormName} onChange={e => setPkgFormName(e.target.value)} placeholder="مثال: الشهرية VIP"
                       className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-9 rounded-lg text-[11px]" dir="rtl" />
                   </div>
                   <div>
@@ -2278,64 +2308,135 @@ export default function HomePage() {
                       ))}
                     </div>
                   </div>
+                  <div>
+                    <label className="text-[9px] text-muted-foreground mb-1 block">الحد الأقصى للإشارات (0 = غير محدود)</label>
+                    <Input type="number" value={pkgFormMaxSignals} onChange={e => setPkgFormMaxSignals(e.target.value)} placeholder="0"
+                      className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-9 rounded-lg text-[11px]" dir="ltr" />
+                  </div>
                 </div>
+
+                {/* Feature toggles */}
+                <div className="flex gap-2">
+                  <button onClick={() => setPkgFormPriority(!pkgFormPriority)}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[10px] font-bold border transition-all active:scale-[0.98] ${pkgFormPriority ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/25" : "bg-muted/40 text-muted-foreground border-border"}`}>
+                    <Zap className="w-3.5 h-3.5" />
+                    دعم أولوي
+                  </button>
+                  <button onClick={() => setPkgFormEarlyEntry(!pkgFormEarlyEntry)}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[10px] font-bold border transition-all active:scale-[0.98] ${pkgFormEarlyEntry ? "bg-sky-500/15 text-sky-400 border-sky-500/25" : "bg-muted/40 text-muted-foreground border-border"}`}>
+                    <Timer className="w-3.5 h-3.5" />
+                    دخول مبكر للإشارات
+                  </button>
+                  <button onClick={() => setPkgFormActive(!pkgFormActive)}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[10px] font-bold border transition-all active:scale-[0.98] ${pkgFormActive ? "bg-amber-500/15 text-amber-400 border-amber-500/25" : "bg-muted/40 text-muted-foreground border-border"}`}>
+                    {pkgFormActive ? "مفعلة" : "معطلة"}
+                  </button>
+                </div>
+
+                {/* Features list */}
+                <div>
+                  <label className="text-[9px] text-muted-foreground mb-1 block">المميزات (كل سطر = مميزة واحدة)</label>
+                  <Textarea value={pkgFormFeatures} onChange={e => setPkgFormFeatures(e.target.value)}
+                    placeholder={"إشارات ذهبية يومية\nتحليل فني متقدم\nدعم مباشر 24/7\nوصول لجميع الأزواج"}
+                    className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground min-h-[80px] rounded-lg text-[11px] resize-none" dir="rtl" rows={3} />
+                </div>
+
                 <Input value={pkgFormDesc} onChange={e => setPkgFormDesc(e.target.value)} placeholder="وصف مختصر للباقة..."
                   className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-9 rounded-lg text-[11px]" dir="rtl" />
+
                 <div className="flex gap-2">
-                  <button onClick={handleCreatePackage} disabled={pkgLoad || !pkgFormName || !pkgFormDays}
+                  <button onClick={handleSavePackage} disabled={pkgLoad || !pkgFormName || !pkgFormDays}
                     className="flex-1 h-9 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-black text-[11px] font-bold disabled:opacity-50 active:scale-[0.98] transition-transform">
-                    {pkgLoad ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "إنشاء الباقة"}
+                    {pkgLoad ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : editingPkgId ? "حفظ التعديلات" : "إنشاء الباقة"}
                   </button>
-                  <button onClick={() => setShowPkgForm(false)} className="px-4 h-9 rounded-xl bg-muted/60 text-muted-foreground text-[11px]">إلغاء</button>
+                  <button onClick={resetPkgForm} className="px-4 h-9 rounded-xl bg-muted/60 text-muted-foreground text-[11px]">إلغاء</button>
                 </div>
               </div>
             )}
 
             {/* ── Package Cards ── */}
             {packages.length === 0 ? (
-              <EmptyState
-                icon={<Package className="w-7 h-7" />}
-                title="لا توجد باقات. أنشئ باقة جديدة للبدء"
-              />
+              <EmptyState icon={<Package className="w-7 h-7" />} title="لا توجد باقات. أنشئ باقة جديدة للبدء" />
             ) : (
-              <div className="space-y-2.5">
+              <div className="space-y-3">
                 {packages.map(pkg => {
                   const isTrial = appSettings.freeTrialPackageId === pkg.id;
                   return (
-                    <div key={pkg.id} className={`rounded-xl border overflow-hidden transition-all ${isTrial ? "border-amber-500/30 bg-gradient-to-r from-amber-500/[0.08] to-orange-500/[0.03]" : pkg.isActive ? "border-border bg-muted/50" : "border-white/[0.03] bg-white/[0.01] opacity-50"}`}>
-                      <div className="p-3.5">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex-1">
+                    <div key={pkg.id} className={`rounded-2xl border overflow-hidden transition-all ${isTrial ? "border-amber-500/30" : pkg.isActive ? "border-border" : "border-white/[0.03] opacity-50"}`}
+                      style={{ background: isTrial ? "linear-gradient(135deg, rgba(255,215,0,0.08) 0%, rgba(255,140,0,0.03) 100%)" : "rgba(255,255,255,0.02)" }}>
+                      {/* Header */}
+                      <div className="p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-sm font-bold text-foreground">{pkg.name}</span>
+                              <span className="text-base font-extrabold text-foreground">{pkg.name}</span>
                               {isTrial && <span className="text-[8px] bg-amber-500/25 text-amber-400 px-1.5 py-0.5 rounded-md font-bold animate-pulse">التجربة التلقائية</span>}
                               {!pkg.isActive && <span className="text-[8px] bg-red-500/15 text-red-400 px-1.5 py-0.5 rounded-md font-bold">معطلة</span>}
                               <span className={`text-[8px] px-1.5 py-0.5 rounded-md font-bold ${pkg.type === "free" ? "bg-emerald-500/15 text-emerald-400" : pkg.type === "trial" ? "bg-sky-500/15 text-sky-400" : "bg-purple-500/15 text-purple-400"}`}>
                                 {pkg.type === "free" ? "مجانية" : pkg.type === "trial" ? "تجربة" : "مدفوعة"}
                               </span>
                             </div>
-                            {pkg.description && <p className="text-[10px] text-muted-foreground mt-1">{pkg.description}</p>}
-                            <div className="flex items-center gap-3 mt-2 text-[10px]">
-                              <span className="flex items-center gap-1 text-muted-foreground"><CalendarDays className="w-3 h-3" />{pkg.durationDays} يوم</span>
-                              <span className="flex items-center gap-1 font-mono font-bold text-amber-400">${pkg.price}</span>
-                            </div>
+                            {pkg.description && <p className="text-[10px] text-muted-foreground mt-1.5 leading-relaxed">{pkg.description}</p>}
+                          </div>
+                          {/* Price badge */}
+                          <div className="text-left flex-shrink-0">
+                            {pkg.price > 0 ? (
+                              <div>
+                                <div className="text-xl font-black text-amber-400 font-mono">${pkg.price}</div>
+                                <div className="text-[9px] text-muted-foreground text-center">{pkg.durationDays} يوم</div>
+                              </div>
+                            ) : (
+                              <div className="px-3 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/20">
+                                <span className="text-[11px] font-bold text-emerald-400">مجاني</span>
+                              </div>
+                            )}
                           </div>
                         </div>
-                        {/* Actions */}
-                        <div className="flex gap-1.5 mt-3 pt-3 border-t border-border flex-wrap">
-                          <button onClick={() => handleSetTrialPkg(pkg.id)}
-                            className={`px-2.5 py-1 rounded-lg text-[9px] font-bold transition-all active:scale-95 ${isTrial ? "bg-amber-500/20 text-amber-400 border border-amber-500/30" : "bg-muted/60 text-muted-foreground border border-border"}`}>
-                            {isTrial ? "✓ تجربة تلقائية" : "تعيين كتجربة"}
-                          </button>
-                          <button onClick={() => handleTogglePackage(pkg.id, !pkg.isActive)}
-                            className="px-2.5 py-1 rounded-lg text-[9px] font-medium bg-muted/60 text-muted-foreground border border-border active:scale-95 transition-transform">
-                            {pkg.isActive ? "تعطيل" : "تفعيل"}
-                          </button>
-                          <button onClick={() => handleDeletePackage(pkg.id)}
-                            className="px-2.5 py-1 rounded-lg text-[9px] font-medium bg-red-500/5 text-red-300/60 border border-red-500/10 active:scale-95 transition-transform">
-                            حذف
-                          </button>
+
+                        {/* Feature badges */}
+                        {(pkg.features && pkg.features.length > 0) && (
+                          <div className="flex flex-wrap gap-1.5 mt-3">
+                            {pkg.features.map((f, i) => (
+                              <div key={i} className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/[0.04] border border-white/[0.06]">
+                                <Sparkles className="w-2.5 h-2.5 text-amber-400/70" />
+                                <span className="text-[9px] text-foreground/80">{f}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Extra features row */}
+                        <div className="flex items-center gap-3 mt-3 text-[9px]">
+                          {pkg.prioritySupport && (
+                            <div className="flex items-center gap-1 text-emerald-400"><Zap className="w-3 h-3" />دعم أولوي</div>
+                          )}
+                          {pkg.showEntryEarly && (
+                            <div className="flex items-center gap-1 text-sky-400"><Timer className="w-3 h-3" />دخول مبكر</div>
+                          )}
+                          {pkg.maxSignals > 0 && (
+                            <div className="flex items-center gap-1 text-purple-400"><Target className="w-3 h-3" />{pkg.maxSignals} إشارة/يوم</div>
+                          )}
                         </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex gap-1.5 px-4 py-2.5 border-t border-border/50 flex-wrap bg-muted/30">
+                        <button onClick={() => openEditPkg(pkg)}
+                          className="px-2.5 py-1 rounded-lg text-[9px] font-bold bg-sky-500/10 text-sky-400 border border-sky-500/15 active:scale-95 transition-transform">
+                          تعديل
+                        </button>
+                        <button onClick={() => handleSetTrialPkg(pkg.id)}
+                          className={`px-2.5 py-1 rounded-lg text-[9px] font-bold transition-all active:scale-95 ${isTrial ? "bg-amber-500/20 text-amber-400 border border-amber-500/30" : "bg-muted/60 text-muted-foreground border border-border"}`}>
+                          {isTrial ? "✓ تجربة تلقائية" : "تعيين كتجربة"}
+                        </button>
+                        <button onClick={() => handleTogglePackage(pkg.id, !pkg.isActive)}
+                          className={`px-2.5 py-1 rounded-lg text-[9px] font-medium border active:scale-95 transition-transform ${pkg.isActive ? "bg-amber-500/10 text-amber-300/70 border-amber-500/15" : "bg-emerald-500/10 text-emerald-400 border-emerald-500/15"}`}>
+                          {pkg.isActive ? "تعطيل" : "تفعيل"}
+                        </button>
+                        <button onClick={() => handleDeletePackage(pkg.id)}
+                          className="px-2.5 py-1 rounded-lg text-[9px] font-medium bg-red-500/5 text-red-300/60 border border-red-500/10 active:scale-95 transition-transform mr-auto">
+                          حذف
+                        </button>
                       </div>
                     </div>
                   );
@@ -2411,17 +2512,20 @@ export default function HomePage() {
                       const isAgency = u.subscriptionType === "agency";
                       const isSub = u.subscriptionType === "subscriber";
                       const expDays = u.subscriptionExpiry ? Math.ceil((new Date(u.subscriptionExpiry).getTime() - Date.now()) / 86400000) : null;
+                      const isSuperAdmin = u.email?.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
+                      const isPromotedAdmin = u.role === "admin" && !isSuperAdmin;
                       return (
-                        <Glass key={u.id} className="p-3 mb-2">
+                        <Glass key={u.id} className={`p-3 mb-2 ${isSuperAdmin ? "border-amber-500/20" : ""}`}>
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2.5">
-                              <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${u.role === "admin" ? "bg-amber-500/15" : isAgency ? "bg-purple-500/15" : "bg-emerald-500/10"}`}>
-                                <User className={`w-4 h-4 ${u.role === "admin" ? "text-amber-400" : isAgency ? "text-purple-400" : "text-emerald-400"}`} />
+                              <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${isSuperAdmin ? "bg-gradient-to-br from-amber-500/25 to-orange-500/15" : u.role === "admin" ? "bg-amber-500/15" : isAgency ? "bg-purple-500/15" : "bg-emerald-500/10"}`}>
+                                <Crown className={`w-4 h-4 ${isSuperAdmin ? "text-amber-300" : u.role === "admin" ? "text-amber-400" : isAgency ? "text-purple-400" : "text-emerald-400"}`} />
                               </div>
                               <div>
                                 <div className="flex items-center gap-1.5">
                                   <span className="text-xs font-bold text-foreground">{u.name}</span>
-                                  {u.role === "admin" && <span className="text-[8px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded-md font-bold">مدير</span>}
+                                  {isSuperAdmin && <span className="text-[8px] bg-gradient-to-r from-amber-500/30 to-orange-500/20 text-amber-300 px-1.5 py-0.5 rounded-md font-bold">المدير الأعلى</span>}
+                                  {isPromotedAdmin && <span className="text-[8px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded-md font-bold">مدير</span>}
                                   {isAgency && <span className="text-[8px] bg-purple-500/15 text-purple-400 px-1.5 py-0.5 rounded-md font-bold">وكالة</span>}
                                   {isSub && <span className="text-[8px] bg-sky-500/15 text-sky-400 px-1.5 py-0.5 rounded-md font-bold">مشترك</span>}
                                 </div>
@@ -2433,7 +2537,7 @@ export default function HomePage() {
                                       <span className="text-[7px] bg-amber-500/15 text-amber-400/70 px-1 py-0.5 rounded font-bold">سبق أخذ تجربة</span>
                                     )}
                                     {expDays !== null && (
-                                      <span className={`font-bold ${expDays > 3 ? "text-emerald-400" : expDays > 0 ? "text-amber-400" : "text-red-400"}`}>
+                                      <span className={`font-bold ${expDays > 7 ? "text-emerald-400" : expDays > 3 ? "text-sky-400" : expDays > 0 ? "text-amber-400" : "text-red-400"}`}>
                                         {expDays > 0 ? `${expDays} يوم متبقي` : "منتهي!"}
                                       </span>
                                     )}
@@ -2441,10 +2545,15 @@ export default function HomePage() {
                                 )}
                               </div>
                             </div>
+                            {/* Registration date */}
+                            <div className="text-[9px] text-muted-foreground/60 text-left">
+                              {new Date(u.createdAt).toLocaleDateString("ar-SA", { year: "numeric", month: "short", day: "numeric" })}
+                            </div>
                           </div>
-                          {/* Action Buttons */}
+                          {/* Action Buttons - NOT for super admin */}
+                          {!isSuperAdmin && (
                           <div className="flex gap-1.5 mt-2.5 pt-2.5 border-t border-border flex-wrap">
-                            {u.role === "admin" ? (
+                            {isPromotedAdmin ? (
                               <>
                                 <button onClick={() => handleUserAction(u.id, "remove_admin")}
                                   className="px-2 py-1.5 rounded-lg text-[9px] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/15 active:scale-95 transition-transform">
@@ -2471,6 +2580,7 @@ export default function HomePage() {
                               </>
                             )}
                           </div>
+                          )}
                           {/* Assign Package Dropdown */}
                           {showAssignPkg === u.id && packages.filter(p => p.isActive).length > 0 && (
                             <div className="mt-2 p-2.5 rounded-xl bg-muted/50 border border-border space-y-2 animate-[fadeIn_0.2s_ease-out]">

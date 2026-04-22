@@ -12,7 +12,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const { name, durationDays, price, type, description, isActive, order } = await request.json();
+    const { name, durationDays, price, type, description, isActive, order, features, maxSignals, prioritySupport, showEntryEarly } = await request.json();
     if (!name || durationDays === undefined || price === undefined) {
       return NextResponse.json({ success: false, error: "الاسم والمدة والسعر مطلوبة" }, { status: 400 });
     }
@@ -26,6 +26,10 @@ export async function POST(request: NextRequest) {
       isActive: isActive !== false,
       order: order ?? 99,
       createdAt: new Date().toISOString(),
+      features: Array.isArray(features) ? features : [],
+      maxSignals: Number(maxSignals) || 0,
+      prioritySupport: !!prioritySupport,
+      showEntryEarly: !!showEntryEarly,
     });
     return NextResponse.json({ success: true, package: pkg });
   } catch (error) {
@@ -37,6 +41,10 @@ export async function PUT(request: NextRequest) {
   try {
     const { id, ...updates } = await request.json();
     if (!id) return NextResponse.json({ success: false, error: "معرف الباقة مطلوب" }, { status: 400 });
+    if (updates.features !== undefined) updates.features = Array.isArray(updates.features) ? updates.features : [];
+    if (updates.maxSignals !== undefined) updates.maxSignals = Number(updates.maxSignals) || 0;
+    if (updates.prioritySupport !== undefined) updates.prioritySupport = !!updates.prioritySupport;
+    if (updates.showEntryEarly !== undefined) updates.showEntryEarly = !!updates.showEntryEarly;
     const pkg = await updatePackage(id, updates);
     if (!pkg) return NextResponse.json({ success: false, error: "الباقة غير موجودة" }, { status: 404 });
     return NextResponse.json({ success: true, package: pkg });
