@@ -256,20 +256,34 @@ async function handleUpdateSignal(parsed: any) {
     // so subsequent TP hits can still find this parent signal
     // signalCategory stays as parentCat (the original entry type)
 
+    // ── FIX: Calculate CUMULATIVE P&L across ALL hit TPs ──
+    // Determine how many TPs to include in the cumulative sum
+    const tpsToSum = isFullClose ? totalTPsCount : Math.max(tpNum, 1);
+    let cumPoints = 0;
+    let cumDollars = 0;
+    for (let i = 0; i < Math.min(tpsToSum, tps.length); i++) {
+      const tpPrice = tps[i].tp;
+      const pts = Math.abs(tpPrice - entry);
+      cumPoints += pts;
+      if (lotSize > 0) {
+        cumDollars += pts * pipVal * lotSize;
+      } else if (balance > 0 && slDist > 0) {
+        cumDollars += (pts / slDist) * (balance * 0.02) * tps[i].rr;
+      } else if (balance > 0) {
+        // Fallback: use R:R ratio directly with 2% risk per TP
+        cumDollars += (balance * 0.02) * tps[i].rr;
+      }
+    }
+
     if (tpArrayIdx >= 0 && tps[tpArrayIdx]) {
       const tpPrice = tps[tpArrayIdx].tp;
-      const points = Math.abs(tpPrice - entry);
-      let dollars = 0;
-      if (lotSize > 0) dollars = points * pipVal * lotSize;
-      else if (balance > 0 && slDist > 0) dollars = (points / slDist) * (balance * 0.02) * tps[tpArrayIdx].rr;
-
       updateData.hitPrice = parsed.hitPrice || tpPrice;
-      updateData.pnlPoints = parsed.pnlPoints || parseFloat(points.toFixed(1));
-      updateData.pnlDollars = validatedParsedDollar != null ? capPnL(validatedParsedDollar) : capPnL(dollars);
+      updateData.pnlPoints = parsed.pnlPoints || parseFloat(cumPoints.toFixed(1));
+      updateData.pnlDollars = validatedParsedDollar != null ? capPnL(validatedParsedDollar) : capPnL(cumDollars);
     } else {
       updateData.hitPrice = parsed.hitPrice || 0;
-      updateData.pnlPoints = parsed.pnlPoints || 0;
-      updateData.pnlDollars = validatedParsedDollar != null ? capPnL(validatedParsedDollar) : 0;
+      updateData.pnlPoints = parsed.pnlPoints || parseFloat(cumPoints.toFixed(1));
+      updateData.pnlDollars = validatedParsedDollar != null ? capPnL(validatedParsedDollar) : capPnL(cumDollars);
     }
 
     updateData.totalTPs = totalTPsCount;
@@ -304,6 +318,7 @@ async function handleUpdateSignal(parsed: any) {
         tpProfitPoints += pts;
         if (lotSize > 0) tpProfitDollars += pts * pipVal * lotSize;
         else if (balance > 0 && slDist > 0) tpProfitDollars += (pts / slDist) * (balance * 0.02) * tps[i].rr;
+        else if (balance > 0) tpProfitDollars += (balance * 0.02) * tps[i].rr;
       }
       // SL loss on remaining fraction
       const slPoints = slDist;
