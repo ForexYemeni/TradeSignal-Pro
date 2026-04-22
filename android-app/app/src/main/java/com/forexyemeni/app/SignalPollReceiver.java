@@ -20,7 +20,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * SignalPollReceiver v5 — Heartbeat + Fallback Signal Monitor
+ * SignalPollReceiver v6 — Heartbeat + Fallback Signal Monitor
  *
  * TWO CRITICAL JOBS:
  * 1. HEARTBEAT: Checks if SignalService is alive. If dead → RESTARTS it.
@@ -36,8 +36,8 @@ public class SignalPollReceiver extends BroadcastReceiver {
 
     private static final String TAG = "Heartbeat";
     private static final String PREFS_NAME = "forexyemeni_signal_prefs";
-    private static final String KEY_POLL_STATES = "heartbeat_signal_states";
-    private static final String KEY_POLL_INIT = "heartbeat_initialized_v5";
+    private static final String KEY_POLL_STATES = "heartbeat_signal_states_v6";
+    private static final String KEY_POLL_INIT = "heartbeat_initialized_v6";
     private static final String KEY_LAST_SERVICE_HB = "service_last_heartbeat";
     private static final String KEY_SESSION_TOKEN = "fy_session_token";
     private static final String API_UPDATES = "https://trade-signal-pro.vercel.app/api/signals/updates";
@@ -79,10 +79,8 @@ public class SignalPollReceiver extends BroadcastReceiver {
 
             long triggerAt = System.currentTimeMillis() + HEARTBEAT_INTERVAL;
 
-            // Use exact alarm for precise timing (Android 12+)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    // Android 12+ — canUseExactAlarms() checks permission
                     if (am.canScheduleExactAlarms()) {
                         am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi);
                     } else {
@@ -95,15 +93,12 @@ public class SignalPollReceiver extends BroadcastReceiver {
                 am.set(AlarmManager.RTC_WAKEUP, triggerAt, pi);
             }
 
-            Log.d(TAG, "Heartbeat started — next in 15s (exact alarm)");
+            Log.d(TAG, "Heartbeat started — next in 15s");
         } catch (Exception e) {
             Log.e(TAG, "Failed to start heartbeat", e);
         }
     }
 
-    /**
-     * Schedule the NEXT heartbeat after this one fires
-     */
     private void scheduleNext(Context context) {
         try {
             AlarmManager am = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
@@ -130,22 +125,16 @@ public class SignalPollReceiver extends BroadcastReceiver {
         }
     }
 
-    /**
-     * Check if SignalService heartbeat is recent
-     */
     private boolean isServiceAlive(Context context) {
         try {
             long last = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                     .getLong(KEY_LAST_SERVICE_HB, 0);
-            return (System.currentTimeMillis() - last) < 20000; // 20s threshold
+            return (System.currentTimeMillis() - last) < 20000;
         } catch (Exception e) {
             return false;
         }
     }
 
-    /**
-     * Restart SignalService
-     */
     private void restartService(Context context) {
         try {
             Intent serviceIntent = new Intent(context, SignalService.class);
@@ -160,18 +149,12 @@ public class SignalPollReceiver extends BroadcastReceiver {
         }
     }
 
-    /**
-     * Backup signal check — runs when heartbeat fires
-     * Uses lightweight /api/signals/updates endpoint
-     */
     private void checkForSignals(final Context context) {
-        // Schedule next heartbeat FIRST (so it's not delayed by network)
         scheduleNext(context);
 
         new Thread(new Runnable() {
             @Override
             public void run() {
-                // Acquire WakeLock for this operation
                 PowerManager pm = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
                 PowerManager.WakeLock wl = null;
                 if (pm != null) {
@@ -182,12 +165,13 @@ public class SignalPollReceiver extends BroadcastReceiver {
 
                 try {
                     String token = getSessionToken(context);
-                    String sinceParam = "?since=0"; // Always check from start
+                    String sinceParam = "?since=0"; // Always check all signals
                     URL url = new URL(API_UPDATES + sinceParam);
                     HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                     conn.setRequestMethod("GET");
                     conn.setRequestProperty("Content-Type", "application/json");
                     conn.setRequestProperty("User-Agent", "ForexYemeni/App/1.10");
+                    conn.setRequestProperty("Accept", "application/json");
                     if (!token.isEmpty()) {
                         conn.setRequestProperty("Authorization", "Bearer " + token);
                     }
@@ -210,7 +194,9 @@ public class SignalPollReceiver extends BroadcastReceiver {
 
                     JSONObject json = new JSONObject(response.toString());
                     boolean hasNew = json.optBoolean("hasNew", false);
-                    if (!hasNew) return;
+                    int totalSignals = json.optInt("totalSignals", 0);
+
+                    if (!hasNew || totalSignals == 0) return;
 
                     JSONArray signals = json.optJSONArray("newSignals");
                     if (signals == null || signals.length() == 0) return;
@@ -232,10 +218,10 @@ public class SignalPollReceiver extends BroadcastReceiver {
                         String type = sig.optString("type", "BUY");
                         double entry = sig.optDouble("entry", 0);
 
-                        // TP detection: includes FULL TP and PARTIAL TP (hitTpIndex > 0 with ACTIVE status)
+                        // TP detection: includes FULL TP and PARTIAL TP
                         boolean isTp = "HIT_TP".equals(status) || "TP_HIT".equals(category)
                                 || "REENTRY_TP".equals(category) || "PYRAMID_TP".equals(category)
-                                || hitTpIndex > 0; // Partial TP — status stays ACTIVE but hitTpIndex increases
+                                || hitTpIndex > 0;
                         boolean isSl = "HIT_SL".equals(status) || "SL_HIT".equals(category)
                                 || "REENTRY_SL".equals(category) || "PYRAMID_SL".equals(category);
 
@@ -257,7 +243,7 @@ public class SignalPollReceiver extends BroadcastReceiver {
                         markPollInitialized(context);
                         Log.d(TAG, "Heartbeat initialized with " + newStates.size() + " signals");
                     }
-                    saveStates(context, newStates, 50);
+                    saveStates(context, newStates, 100);
 
                     if (notified > 0) {
                         Log.d(TAG, "Heartbeat detected " + notified + " new signals");
@@ -338,7 +324,6 @@ public class SignalPollReceiver extends BroadcastReceiver {
         } catch (Exception e) {}
     }
 
-    /** Legacy startPolling — now just starts the heartbeat */
     public static void startPolling(Context context) {
         startHeartbeat(context);
     }
