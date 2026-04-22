@@ -29,7 +29,7 @@ import android.webkit.WebViewClient;
 import android.webkit.SslErrorHandler;
 
 /**
- * ForexYemeni VIP Trading Signals - Android App v4.0
+ * ForexYemeni VIP Trading Signals - Android App v1.10
  * - WebView wrapping the Next.js PWA
  * - Foreground Service for real-time signal monitoring (every 5 seconds)
  * - Native notification bridge for JS -> Android notifications
@@ -107,7 +107,7 @@ public class MainActivity extends Activity {
         s.setMediaPlaybackRequiresUserGesture(false);
         s.setBuiltInZoomControls(false);
         s.setDisplayZoomControls(false);
-        s.setUserAgentString(s.getUserAgentString() + " ForexYemeni/App/4.0");
+        s.setUserAgentString(s.getUserAgentString() + " ForexYemeni/App/1.10");
         wv.setBackgroundColor(Color.parseColor("#070b14"));
         wv.setLayerType(View.LAYER_TYPE_HARDWARE, null);
     }

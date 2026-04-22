@@ -115,6 +115,9 @@ public class SignalService extends Service {
         PendingIntent pi = PendingIntent.getActivity(this, 0, intent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
+        int iconRes = getResources().getIdentifier("ic_launcher", "mipmap", getPackageName());
+        if (iconRes == 0) iconRes = android.R.drawable.ic_dialog_info;
+
         Notification.Builder builder;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             builder = new Notification.Builder(this, CHANNEL_ID);
@@ -124,7 +127,7 @@ public class SignalService extends Service {
         }
         builder.setContentTitle("ForexYemeni VIP")
                 .setContentText(text)
-                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setSmallIcon(iconRes)
                 .setContentIntent(pi)
                 .setOngoing(true);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
@@ -139,7 +142,7 @@ public class SignalService extends Service {
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("GET");
             conn.setRequestProperty("Content-Type", "application/json");
-            conn.setRequestProperty("User-Agent", "ForexYemeni/App/4.4");
+            conn.setRequestProperty("User-Agent", "ForexYemeni/App/1.10");
             conn.setConnectTimeout(8000);
             conn.setReadTimeout(8000);
 

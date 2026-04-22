@@ -53,7 +53,7 @@ public class SignalPollReceiver extends BroadcastReceiver {
                     HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                     conn.setRequestMethod("GET");
                     conn.setRequestProperty("Content-Type", "application/json");
-                    conn.setRequestProperty("User-Agent", "ForexYemeni/App/4.4");
+                    conn.setRequestProperty("User-Agent", "ForexYemeni/App/1.10");
                     conn.setConnectTimeout(10000);
                     conn.setReadTimeout(10000);
 
