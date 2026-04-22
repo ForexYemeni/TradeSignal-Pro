@@ -1,20 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getUsers, updateUser, deleteUser, getUserById, getPackageById, getAppSettings, enforceSubscriptions } from "@/lib/store";
+import { getUsers, updateUser, deleteUser, getUserById, getPackageById, getAppSettings, enforceSubscriptions, getAdmin } from "@/lib/store";
 import { sendPushToAdmins } from "@/lib/push";
 
-const SUPER_ADMIN_EMAIL = "admin@forexyemeni.com";
+/**
+ * Get the real super admin ID from the admin KV record.
+ * The ID never changes even if the email is updated.
+ */
+async function getSuperAdminId(): Promise<string | null> {
+  const admin = await getAdmin();
+  return admin?.id || null;
+}
 
 async function isSuperAdmin(userId: string): Promise<boolean> {
-  const user = await getUserById(userId);
-  return !!user && user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
+  const superId = await getSuperAdminId();
+  if (!superId) return false;
+  return userId === superId;
 }
 
 export async function GET() {
   try {
     await enforceSubscriptions();
     const users = await getUsers();
-    // Hide system admin from users list — only show regular users and promoted admins
-    const visible = users.filter(u => u.email.toLowerCase() !== SUPER_ADMIN_EMAIL.toLowerCase());
+    // Hide the system admin from users list — identify by ID (never changes, unlike email)
+    const superId = await getSuperAdminId();
+    const visible = superId
+      ? users.filter(u => u.id !== superId)
+      : users;
     return NextResponse.json({ success: true, users: visible });
   } catch (error) {
     console.error("Get users error:", error);
@@ -150,12 +161,8 @@ export async function DELETE(request: NextRequest) {
     if (!id) {
       return NextResponse.json({ success: false, error: "معرف المستخدم مطلوب" }, { status: 400 });
     }
-    const user = await getUserById(id);
-    if (!user) {
-      return NextResponse.json({ success: false, error: "المستخدم غير موجود" }, { status: 404 });
-    }
-    // Protect super admin from deletion
-    if (user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) {
+    // Protect super admin from deletion — check by ID not email
+    if (await isSuperAdmin(id)) {
       return NextResponse.json({ success: false, error: "لا يمكن حذف المدير الأعلى" }, { status: 403 });
     }
     const deleted = await deleteUser(id);
