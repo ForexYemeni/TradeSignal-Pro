@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     const verifyKey = `otp_verified:register:${emailVal.sanitized}`;
     const storedToken = await kv.get<string>(verifyKey);
 
-    if (!storedToken || storedToken !== verifyToken) {
+    if (!storedToken || String(storedToken) !== String(verifyToken)) {
       return NextResponse.json({ success: false, error: "رمز التحقق غير صالح أو انتهت صلاحيته. أعد المحاولة." }, { status: 403 });
     }
 

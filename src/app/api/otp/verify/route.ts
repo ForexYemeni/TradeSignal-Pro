@@ -37,13 +37,19 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    console.log(`[OTP Verify] email=${sanitizedEmail}, type=${type}, key=${otpKey}, stored="${storedOtp}", input="${sanitizedOtp}", match=${storedOtp === sanitizedOtp}`);
+    // CRITICAL FIX: @vercel/kv uses @upstash/redis which JSON-parses values.
+    // A string "123456" becomes number 123456 after kv.get().
+    // We must convert both sides to strings before comparison.
+    const storedStr = String(storedOtp || "").trim();
+    const inputStr = sanitizedOtp.trim();
 
-    if (!storedOtp) {
+    console.log(`[OTP Verify] email=${sanitizedEmail}, type=${type}, key=${otpKey}, stored="${storedStr}" (raw type: ${typeof storedOtp}), input="${inputStr}", match=${storedStr === inputStr}`);
+
+    if (!storedStr) {
       return NextResponse.json({ success: false, error: "انتهت صلاحية الكود. أعد إرسال كود جديد." }, { status: 410 });
     }
 
-    if (storedOtp !== sanitizedOtp) {
+    if (storedStr !== inputStr) {
       return NextResponse.json({ success: false, error: "كود التحقق غير صحيح" }, { status: 401 });
     }
 

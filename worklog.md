@@ -273,3 +273,28 @@ Stage Summary:
 - All existing features preserved: OTP at registration, OTP at login, signal broadcast emails
 - Professional HTML templates kept as-is
 - User needs to: deploy Email-Sender.js as GAS web app, set env vars in Vercel
+
+---
+Task ID: 1
+Agent: Main Agent
+Task: Fix OTP verification always returning "incorrect code" despite correct input
+
+Work Log:
+- Analyzed the full OTP flow: send → store in KV → verify → compare
+- Traced through @vercel/kv → @upstash/redis internals
+- Found root cause in `parseRecursive()` function in `@upstash/redis/chunk-IH7W44G6.mjs` (lines 37-49)
+- The function calls `JSON.parse()` on every value retrieved from Redis
+- When OTP "123456" is stored as string, `JSON.parse("123456")` returns number `123456`
+- The guard `typeof parsed === "number" && parsed.toString() !== obj` fails for 6-digit numbers because `123456.toString() === "123456"`
+- Result: `kv.get()` returns number, but frontend sends string → `123456 !== "123456"` → always fails
+- Fixed `otp/verify/route.ts` to use `String(storedOtp)` before comparison
+- Also fixed same potential issue in `admin/route.ts` and `register/route.ts` for verifyToken comparison
+- Build successful
+
+Stage Summary:
+- Root cause: @upstash/redis auto-deserializes numeric strings to numbers via JSON.parse
+- Fix: Convert both sides to string using `String()` before comparison
+- Files modified:
+  - `/home/z/my-project/src/app/api/otp/verify/route.ts` - main OTP comparison fix
+  - `/home/z/my-project/src/app/api/admin/route.ts` - verifyToken comparison fix
+  - `/home/z/my-project/src/app/api/register/route.ts` - verifyToken comparison fix

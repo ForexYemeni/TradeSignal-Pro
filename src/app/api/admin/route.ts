@@ -45,7 +45,8 @@ async function handleLogin(body: Record<string, unknown>) {
     storedToken = await kv.get<string>(regKey);
     if (storedToken) await kv.del(regKey);
   }
-  if (!storedToken || storedToken !== verifyToken) {
+  // Use String() to handle KV auto-deserialization (numbers vs strings)
+  if (!storedToken || String(storedToken) !== String(verifyToken)) {
     return NextResponse.json({ success: false, error: "رمز التحقق غير صالح أو انتهت صلاحيته", needOtp: true }, { status: 403 });
   }
   // Delete the verify token (one-time use)
