@@ -1,26 +1,115 @@
 /**
- * Email Service — Resend integration
+ * Email Service — Google Apps Script integration
  *
  * Handles all email operations:
  * - OTP verification codes (registration + login)
  * - Signal notifications to subscribers
  *
- * Uses Resend (https://resend.com) for reliable email delivery.
- * Free tier: 3,000 emails/month, 100 emails/day.
+ * Uses Google Apps Script + GmailApp for FREE email delivery.
+ * No API keys or paid services needed.
+ *
+ * Setup:
+ * 1. Deploy google-apps-script/Email-Sender.js as Web App
+ * 2. Set GOOGLE_APPS_SCRIPT_EMAIL_URL in Vercel env
  */
 
-import { Resend } from 'resend';
+const EMAIL_URL = process.env.GOOGLE_APPS_SCRIPT_EMAIL_URL || '';
+const EMAIL_KEY = process.env.GOOGLE_APPS_SCRIPT_EMAIL_KEY || '';
 
-let _resend: Resend | null = null;
-function getResend(): Resend {
-  if (!_resend) {
-    _resend = new Resend(process.env.RESEND_API_KEY || '');
-  }
-  return _resend;
+// ═══════════════════════════════════════════════════════════════
+//  Core Email Sending (via Google Apps Script)
+// ═══════════════════════════════════════════════════════════════
+
+interface EmailPayload {
+  to: string;
+  subject: string;
+  html: string;
 }
 
-const FROM_NAME = 'ForexYemeni VIP';
-const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'noreply@forexyemeni.com';
+/**
+ * Send a single email via Google Apps Script
+ */
+async function sendViaGAS(payload: EmailPayload): Promise<boolean> {
+  if (!EMAIL_URL) {
+    console.error('GOOGLE_APPS_SCRIPT_EMAIL_URL is not configured');
+    return false;
+  }
+
+  try {
+    const body = {
+      action: 'send',
+      to: payload.to,
+      subject: payload.subject,
+      html: payload.html,
+      ...(EMAIL_KEY ? { key: EMAIL_KEY } : {}),
+    };
+
+    const response = await fetch(EMAIL_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      console.error(`GAS email error: HTTP ${response.status}`);
+      return false;
+    }
+
+    const data = await response.json();
+    if (!data.success) {
+      console.error('GAS email error:', data.error);
+      return false;
+    }
+
+    console.log(`Email sent to ${payload.to} via GAS`);
+    return true;
+  } catch (error) {
+    console.error('sendViaGAS error:', error);
+    return false;
+  }
+}
+
+/**
+ * Send batch emails via Google Apps Script (for signal broadcasts)
+ */
+async function sendBatchViaGAS(emails: EmailPayload[]): Promise<{ sent: number; failed: number }> {
+  if (!EMAIL_URL) {
+    console.error('GOOGLE_APPS_SCRIPT_EMAIL_URL is not configured');
+    return { sent: 0, failed: emails.length };
+  }
+
+  try {
+    const body = {
+      action: 'batch',
+      emails: emails.map(e => ({
+        to: e.to,
+        subject: e.subject,
+        html: e.html,
+      })),
+      ...(EMAIL_KEY ? { key: EMAIL_KEY } : {}),
+    };
+
+    const response = await fetch(EMAIL_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      console.error(`GAS batch error: HTTP ${response.status}`);
+      return { sent: 0, failed: emails.length };
+    }
+
+    const data = await response.json();
+    return {
+      sent: data.batch?.sent || 0,
+      failed: data.batch?.failed || emails.length,
+    };
+  } catch (error) {
+    console.error('sendBatchViaGAS error:', error);
+    return { sent: 0, failed: emails.length };
+  }
+}
 
 // ═══════════════════════════════════════════════════════════════
 //  OTP EMAIL
@@ -75,7 +164,7 @@ export function buildOtpEmail(otp: string, type: 'register' | 'login', name?: st
               <div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,215,0,0.2);border-radius:16px;padding:28px 24px;text-align:center;">
                 <p style="margin:0 0 16px;font-size:12px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:2px;">كود التحقق</p>
                 <p style="margin:0;font-size:40px;font-weight:900;color:#FFD700;letter-spacing:12px;font-family:'Courier New',monospace;">${otp}</p>
-                <p style="margin:16px 0 0;font-size:12px;color:rgba(255,255,255,0.35;">صالح لمدة 5 دقائق</p>
+                <p style="margin:16px 0 0;font-size:12px;color:rgba(255,255,255,0.35);">صالح لمدة 5 دقائق</p>
               </div>
             </td>
           </tr>
@@ -107,18 +196,7 @@ export function buildOtpEmail(otp: string, type: 'register' | 'login', name?: st
 export async function sendOtpEmail(to: string, otp: string, type: 'register' | 'login', name?: string): Promise<boolean> {
   try {
     const { subject, html } = buildOtpEmail(otp, type, name);
-    const { data, error } = await getResend().emails.send({
-      from: `${FROM_NAME} <${FROM_EMAIL}>`,
-      to: [to],
-      subject,
-      html,
-    });
-    if (error) {
-      console.error('Resend error:', error);
-      return false;
-    }
-    console.log(`OTP email sent to ${to} (id: ${data?.id})`);
-    return true;
+    return await sendViaGAS({ to, subject, html });
   } catch (error) {
     console.error('sendOtpEmail error:', error);
     return false;
@@ -145,7 +223,6 @@ export function buildSignalEmail(signal: {
   const isBuy = signal.type === 'BUY';
   const directionColor = isBuy ? '#00E676' : '#FF5252';
   const directionText = isBuy ? 'شراء' : 'بيع';
-  const directionIcon = isBuy ? '&#9650;' : '&#9660;';
 
   // Build TP rows
   const tpRows = signal.takeProfits.map((tp, i) => `
@@ -159,10 +236,10 @@ export function buildSignalEmail(signal: {
   const confPct = signal.confidence;
   const confColor = confPct >= 75 ? '#00E676' : confPct >= 50 ? '#FFD700' : '#FF5252';
 
-  const subject = `${isBuy ? '&#9650;' : '&#9660;'} ${directionText} ${signal.pair} @ ${signal.entry} — ForexYemeni VIP`;
+  const subject = `${isBuy ? '▲' : '▼'} ${directionText} ${signal.pair} @ ${signal.entry}`;
 
   return {
-    subject: `${isBuy ? '▲' : '▼'} ${directionText} ${signal.pair} @ ${signal.entry}`,
+    subject,
     html: `<!DOCTYPE html>
 <html dir="rtl" lang="ar">
 <head>
@@ -209,7 +286,7 @@ export function buildSignalEmail(signal: {
                         <div style="font-size:26px;font-weight:800;color:#ffffff;letter-spacing:0.5px;">${signal.pair}</div>
                       </td>
                       <td align="left" style="vertical-align:middle;">
-                        <div style="width:56px;height:56px;border-radius:16px;background:${directionColor}18;border:1px solid ${directionColor}35;display:flex;align-items:center;justify-content:center;text-align:center;line-height:56px;">
+                        <div style="width:56px;height:56px;border-radius:16px;background:${directionColor}18;border:1px solid ${directionColor}35;text-align:center;line-height:56px;">
                           <span style="font-size:22px;color:${directionColor};font-weight:900;">${directionText}</span>
                         </div>
                       </td>
@@ -232,9 +309,9 @@ export function buildSignalEmail(signal: {
                       </td>
                       <td style="padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.04);text-align:right;">
                         <span style="font-size:12px;color:rgba(255,255,255,0.35);display:block;margin-bottom:4px;">Confidence</span>
-                        <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px;">
+                        <div style="text-align:right;">
                           <span style="font-size:18px;font-weight:700;color:${confColor};">${confPct}%</span>
-                          <div style="width:48px;height:6px;border-radius:3px;background:rgba(255,255,255,0.08);overflow:hidden;">
+                          <div style="width:48px;height:6px;border-radius:3px;background:rgba(255,255,255,0.08);overflow:hidden;margin-top:4px;">
                             <div style="width:${confPct}%;height:100%;border-radius:3px;background:${confColor};"></div>
                           </div>
                         </div>
@@ -297,18 +374,7 @@ export async function sendSignalEmail(to: string, signal: {
 }): Promise<boolean> {
   try {
     const { subject, html } = buildSignalEmail(signal);
-    const { data, error } = await getResend().emails.send({
-      from: `${FROM_NAME} <${FROM_EMAIL}>`,
-      to: [to],
-      subject,
-      html,
-    });
-    if (error) {
-      console.error('Resend signal email error:', error);
-      return false;
-    }
-    console.log(`Signal email sent to ${to} (id: ${data?.id})`);
-    return true;
+    return await sendViaGAS({ to, subject, html });
   } catch (error) {
     console.error('sendSignalEmail error:', error);
     return false;
@@ -317,6 +383,7 @@ export async function sendSignalEmail(to: string, signal: {
 
 /**
  * Send signal notification to all active subscribers (fire-and-forget).
+ * Uses batch sending via Google Apps Script for efficiency.
  * Returns the number of emails successfully sent.
  */
 export async function broadcastSignalToSubscribers(signal: {
@@ -338,22 +405,31 @@ export async function broadcastSignalToSubscribers(signal: {
     u.email
   );
 
-  let sent = 0;
-  let failed = 0;
-
-  // Send in parallel (max 10 at a time)
-  const batchSize = 10;
-  for (let i = 0; i < subscribers.length; i += batchSize) {
-    const batch = subscribers.slice(i, i + batchSize);
-    const results = await Promise.allSettled(
-      batch.map(u => sendSignalEmail(u.email, signal))
-    );
-    for (const r of results) {
-      if (r.status === 'fulfilled' && r.value) sent++;
-      else failed++;
-    }
+  if (subscribers.length === 0) {
+    return { sent: 0, failed: 0 };
   }
 
-  console.log(`Broadcast signal email: ${sent} sent, ${failed} failed to ${subscribers.length} subscribers`);
-  return { sent, failed };
+  const { subject, html } = buildSignalEmail(signal);
+
+  // Build batch payload
+  const batchEmails = subscribers.map(u => ({
+    to: u.email,
+    subject,
+    html,
+  }));
+
+  // Send in batches of 50 (GAS can handle this)
+  let totalSent = 0;
+  let totalFailed = 0;
+  const batchSize = 50;
+
+  for (let i = 0; i < batchEmails.length; i += batchSize) {
+    const batch = batchEmails.slice(i, i + batchSize);
+    const result = await sendBatchViaGAS(batch);
+    totalSent += result.sent;
+    totalFailed += result.failed;
+  }
+
+  console.log(`Broadcast signal email: ${totalSent} sent, ${totalFailed} failed to ${subscribers.length} subscribers`);
+  return { sent: totalSent, failed: totalFailed };
 }
