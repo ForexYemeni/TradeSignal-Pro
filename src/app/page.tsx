@@ -140,6 +140,34 @@ export default function HomePage() {
   /* ── Track status change signals for pulse animation ── */
   const statusChangeIdsRef = useRef<Set<string>>(new Set());
 
+  /* ── Session Auto-Logout (30 min inactivity) ── */
+  const SESSION_TIMEOUT_MS = 30 * 60 * 1000;
+  const lastActivityRef = useRef(Date.now());
+  const logoutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const resetActivityTimer = useCallback(() => {
+    lastActivityRef.current = Date.now();
+    if (logoutTimerRef.current) clearTimeout(logoutTimerRef.current);
+    logoutTimerRef.current = setTimeout(() => {
+      setView("login");
+      setSession(null);
+      localStorage.removeItem("adminSession");
+      toast.warning("تم تسجيل الخروج تلقائياً بسبب عدم النشاط");
+    }, SESSION_TIMEOUT_MS);
+  }, []);
+
+  useEffect(() => {
+    if (!session) return;
+    const events = ["mousedown", "keydown", "touchstart", "scroll"] as const;
+    const handler = () => resetActivityTimer();
+    for (const e of events) window.addEventListener(e, handler, { passive: true });
+    resetActivityTimer();
+    return () => {
+      for (const e of events) window.removeEventListener(e, handler);
+      if (logoutTimerRef.current) clearTimeout(logoutTimerRef.current);
+    };
+  }, [session, resetActivityTimer]);
+
   useEffect(() => {
     // Auto-setup database tables on first load
     async function initDb() {
@@ -437,7 +465,7 @@ export default function HomePage() {
     setCpErr("");
     if (!cpCur || !cpEmail || !cpNew || !cpConf) { setCpErr("جميع الحقول مطلوبة"); return; }
     if (cpNew !== cpConf) { setCpErr("كلمة المرور غير متطابقة"); return; }
-    if (cpNew.length < 4) { setCpErr("كلمة المرور يجب أن تكون 4 أحرف على الأقل"); return; }
+    if (cpNew.length < 6) { setCpErr("كلمة المرور يجب أن تكون 6 أحرف على الأقل"); return; }
     setCpLoad(true);
     try {
       const res = await fetch("/api/admin", {
@@ -472,7 +500,7 @@ export default function HomePage() {
   async function handleRegister() {
     setRegErr(""); setRegSuccess("");
     if (!regName || !regEmail || !regPwd) { setRegErr("جميع الحقول مطلوبة"); return; }
-    if (regPwd.length < 4) { setRegErr("كلمة المرور يجب أن تكون 4 أحرف على الأقل"); return; }
+    if (regPwd.length < 6) { setRegErr("كلمة المرور يجب أن تكون 6 أحرف على الأقل"); return; }
     setRegLoad(true);
     try {
       const res = await fetch("/api/register", {
@@ -525,9 +553,11 @@ export default function HomePage() {
   }
 
   async function handleDeletePackage(id: string) {
+    if (!confirm("هل أنت متأكد من حذف هذه الباقة؟")) return;
     try {
       await fetch("/api/packages", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
       fetchPackages();
+      toast.success("تم حذف الباقة");
     } catch (e) { console.error("Delete package:", e); }
   }
 
@@ -580,6 +610,9 @@ export default function HomePage() {
   }
 
   async function handleDeleteUser(id: string) {
+    const user = users.find(u => u.id === id);
+    const userName = user?.name || user?.email || "";
+    if (!confirm(`هل أنت متأكد من حذف المستخدم ${userName}؟ لا يمكن التراجع.`)) return;
     try {
       await fetch("/api/users", {
         method: "DELETE",
@@ -587,6 +620,7 @@ export default function HomePage() {
         body: JSON.stringify({ id }),
       });
       fetchUsers();
+      toast.success("تم حذف المستخدم");
     } catch (e) { console.error("Delete user:", e); }
   }
 
@@ -633,6 +667,12 @@ export default function HomePage() {
   }
 
   async function handleUpdate(id: string, status: string, tpIdx?: number) {
+    // Confirm before manual close
+    if (status === "HIT_TP" || status === "HIT_SL") {
+      const pair = signals.find(s => s.id === id)?.pair || "";
+      const action = status === "HIT_TP" ? "إغلاق بربح" : "إغلاق بخسارة";
+      if (!confirm(`هل أنت متأكد من ${action} إشارة ${pair}؟`)) return;
+    }
     try {
       await fetch(`/api/signals/${id}`, {
         method: "PUT",
@@ -640,10 +680,13 @@ export default function HomePage() {
         body: JSON.stringify({ status, hitTpIndex: tpIdx }),
       });
       fetchSignals(); fetchStats();
+      toast.success(status === "HIT_TP" ? "تم إغلاق الإشارة بربح" : status === "HIT_SL" ? "تم إغلاق الإشارة بخسارة" : "تم التحديث");
     } catch (e) { console.error("Update:", e); }
   }
 
   async function handleDelete(id: string) {
+    const pair = signals.find(s => s.id === id)?.pair || "";
+    if (!confirm(`هل أنت متأكد من حذف إشارة ${pair}؟ لا يمكن التراجع عن هذا الإجراء.`)) return;
     try {
       await fetch(`/api/signals/${id}`, { method: "DELETE" });
       fetchSignals(); fetchStats();

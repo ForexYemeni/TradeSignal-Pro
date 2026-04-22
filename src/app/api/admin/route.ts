@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdmin, setAdmin, getUserByEmail, migrateAdminToUsers, comparePassword, hashPassword, getUserById, updateUser } from "@/lib/store";
+import { validateEmail, validatePassword, validateAction, validateUUID } from "@/lib/validation";
 
 export async function POST(request: NextRequest) {
   try {
@@ -9,7 +10,8 @@ export async function POST(request: NextRequest) {
     if (action === "login") return handleLogin(body);
     if (action === "change-password") return handleChangePassword(body);
 
-    return NextResponse.json({ success: false, error: "Action not found" }, { status: 400 });
+    const actionVal = validateAction(action, ["login", "change-password"]);
+    if (!actionVal.valid) return NextResponse.json({ success: false, error: actionVal.error }, { status: 400 });
   } catch (error) {
     console.error("Admin API error:", error);
     return NextResponse.json({ success: false, error: "خطأ في الخادم" }, { status: 500 });
@@ -19,9 +21,11 @@ export async function POST(request: NextRequest) {
 async function handleLogin(body: Record<string, unknown>) {
   const { email, password } = body as { email: string; password: string };
 
-  if (!email || !password) {
-    return NextResponse.json({ success: false, error: "البريد وكلمة المرور مطلوبان" }, { status: 400 });
-  }
+  // Validate inputs
+  const emailVal = validateEmail(email);
+  if (!emailVal.valid) return NextResponse.json({ success: false, error: emailVal.error }, { status: 400 });
+  const pwdVal = validatePassword(password);
+  if (!pwdVal.valid) return NextResponse.json({ success: false, error: pwdVal.error }, { status: 400 });
 
   // Ensure admin is migrated to users
   await migrateAdminToUsers();
@@ -133,9 +137,15 @@ async function handleChangePassword(body: Record<string, unknown>) {
     id: string; currentPassword: string; newEmail: string; newPassword: string;
   };
 
-  if (!id || !currentPassword || !newEmail || !newPassword) {
-    return NextResponse.json({ success: false, error: "جميع الحقول مطلوبة" }, { status: 400 });
-  }
+  // Validate inputs
+  const idVal = validateUUID(id);
+  if (!idVal.valid) return NextResponse.json({ success: false, error: idVal.error }, { status: 400 });
+  const emailVal = validateEmail(newEmail);
+  if (!emailVal.valid) return NextResponse.json({ success: false, error: emailVal.error }, { status: 400 });
+  const curPwd = validatePassword(currentPassword);
+  if (!curPwd.valid) return NextResponse.json({ success: false, error: curPwd.error }, { status: 400 });
+  const newPwd = validatePassword(newPassword);
+  if (!newPwd.valid) return NextResponse.json({ success: false, error: newPwd.error }, { status: 400 });
 
   const userById = await getUserById(id);
   const admin = await getAdmin();

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserByEmail, addUser, migrateAdminToUsers, getAppSettings, getPackageById } from "@/lib/store";
 import { sendPushToAdmins } from "@/lib/push";
+import { validateText, validateEmail, validatePassword } from "@/lib/validation";
 
 export async function POST(request: NextRequest) {
   try {
@@ -8,19 +9,15 @@ export async function POST(request: NextRequest) {
 
     const { name, email, password } = await request.json();
 
-    if (!name || !email || !password) {
-      return NextResponse.json({ success: false, error: "جميع الحقول مطلوبة" }, { status: 400 });
-    }
+    // Validate inputs
+    const nameVal = validateText(name, "الاسم", 100);
+    if (!nameVal.valid) return NextResponse.json({ success: false, error: nameVal.error }, { status: 400 });
+    const emailVal = validateEmail(email);
+    if (!emailVal.valid) return NextResponse.json({ success: false, error: emailVal.error }, { status: 400 });
+    const pwdVal = validatePassword(password);
+    if (!pwdVal.valid) return NextResponse.json({ success: false, error: pwdVal.error }, { status: 400 });
 
-    if (password.length < 4) {
-      return NextResponse.json({ success: false, error: "كلمة المرور يجب أن تكون 4 أحرف على الأقل" }, { status: 400 });
-    }
-
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return NextResponse.json({ success: false, error: "البريد الإلكتروني غير صالح" }, { status: 400 });
-    }
-
-    const existing = await getUserByEmail(email);
+    const existing = await getUserByEmail(emailVal.sanitized);
     if (existing) {
       return NextResponse.json({ success: false, error: "هذا البريد مسجل مسبقا" }, { status: 409 });
     }
@@ -44,8 +41,8 @@ export async function POST(request: NextRequest) {
 
     const user = await addUser({
       id: crypto.randomUUID(),
-      name,
-      email: email.toLowerCase(),
+      name: nameVal.sanitized,
+      email: emailVal.sanitized,
       passwordHash: password,
       role: "user",
       status: settings.autoApproveOnRegister ? "active" : "pending",
@@ -61,12 +58,12 @@ export async function POST(request: NextRequest) {
     // ── Notify admins about new registration ──
     sendPushToAdmins({
       title: `👤 مستخدم جديد${settings.autoApproveOnRegister ? " (تم التفعيل)" : " بانتظار الموافقة"}`,
-      body: `${name} — ${email.toLowerCase()}${trialPkgName ? ` | تجربة: ${trialPkgName}` : ""}`,
+      body: `${nameVal.sanitized} — ${emailVal.sanitized}${trialPkgName ? ` | تجربة: ${trialPkgName}` : ""}`,
       tag: `new-user-${user.id}`,
       sound: 'new_signal',
       requireInteraction: true,
       urgency: 'high',
-      data: { type: 'new_registration', userName: name, userEmail: email.toLowerCase(), userId: user.id },
+      data: { type: 'new_registration', userName: nameVal.sanitized, userEmail: emailVal.sanitized, userId: user.id },
     }).catch(() => {});
 
     return NextResponse.json({
