@@ -882,7 +882,15 @@ export default function HomePage() {
   const isAdmin = session?.role === "admin";
 
   function getFiltered(): Signal[] {
-    const instMap: Record<string, string> = { "ذهب": "gold", "عملات": "currencies", "مؤشرات": "indices", "نفط": "oil", "عملات رقمية": "crypto", "معادن": "metals" };
+    // Instrument category mapping — covers all formats from TradingView Pine Script
+    const instMap: Record<string, string> = {
+      "ذهب": "gold", "الذهب": "gold", "gold": "gold",
+      "عملات": "currencies", "فوركس": "currencies", "الفوركس": "currencies",
+      "مؤشرات": "indices",
+      "نفط": "oil",
+      "عملات رقمية": "crypto", "كريبتو": "crypto",
+      "معادن": "metals",
+    };
     const upkg = packages.find(p => p.id === session?.packageId);
     const allowed = (!isAdmin && upkg?.instruments?.length) ? upkg.instruments : null;
     let result = signals;
@@ -892,7 +900,19 @@ export default function HomePage() {
       case "active": result = result.filter(s => s.status === "ACTIVE"); break;
       case "closed": result = result.filter(s => s.status !== "ACTIVE"); break;
     }
-    if (allowed) result = result.filter(s => !s.instrument || allowed.includes(instMap[s.instrument] || ""));
+    if (allowed) {
+      result = result.filter(s => {
+        if (!s.instrument) return true; // no instrument info → show to all
+        const normalized = (s.instrument || "").toLowerCase();
+        // Check if any instrument category keyword matches
+        for (const [keyword, cat] of Object.entries(instMap)) {
+          if (normalized.includes(keyword.toLowerCase()) && allowed.includes(cat)) return true;
+        }
+        // If instrument doesn't match any known category, show it (don't hide unknown instruments)
+        const matched = Object.entries(instMap).some(([keyword]) => normalized.includes(keyword.toLowerCase()));
+        return !matched; // If not matched to any category, show it
+      });
+    }
     return result;
   }
 

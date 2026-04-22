@@ -101,13 +101,10 @@ export async function POST(request: NextRequest) {
 
       const existing = await getSignals(50);
       const rawText = parseResult.signal.rawText.trim();
+      // Only deduplicate by exact rawText match — never block a new signal
+      // just because another signal for the same pair exists
       const isDuplicate = existing.some(s => {
         if (s.rawText.trim() === rawText) return true;
-        // Only deduplicate against ACTIVE signals with same pair + category
-        // Closed signals (HIT_TP, HIT_SL, MANUAL_CLOSE) should NOT block new entries
-        if (s.status === "ACTIVE" && String(s.pair).toUpperCase() === String(parseResult.signal.pair).toUpperCase() && s.signalCategory === cat) {
-          return true;
-        }
         return false;
       });
       if (isDuplicate) {

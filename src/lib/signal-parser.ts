@@ -667,9 +667,19 @@ function extractRiskData(text: string): RiskData {
   const rrMatch = text.match(/R:R الأقصى\s*[:\-–]?\s*1:([\d,.]+)/);
   if (rrMatch) data.maxRR = parseFloat(rrMatch[1].replace(/,/g, ""));
 
-  // Instrument
+  // Instrument — try both Arabic label and full format from Pine Script
   const instMatch = text.match(/(?:الأداة|instrument)\s*[:\-–]?\s*(.+?)(?:\n|$)/);
   if (instMatch) data.instrument = instMatch[1].trim();
+  // Fallback: detect instrument from pair name if not found
+  if (!data.instrument) {
+    const upperPair = text.toUpperCase();
+    if (/XAU|GOLD/.test(upperPair)) data.instrument = "الذهب (XAUUSD)";
+    else if (/XAG|SILVER/.test(upperPair)) data.instrument = "الفضة (XAGUSD)";
+    else if (/BTC|ETH|SOL|BNB|XRP|ADA|DOGE/.test(upperPair)) data.instrument = "عملات رقمية";
+    else if (/NAS|US30|DAX|US500|SPX|NDX/.test(upperPair)) data.instrument = "مؤشرات (NAS/DOW)";
+    else if (/USOIL|CRUDE|OIL/.test(upperPair)) data.instrument = "نفط";
+    else data.instrument = "فوركس";
+  }
 
   return data;
 }
