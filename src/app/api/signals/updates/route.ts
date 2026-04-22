@@ -81,6 +81,7 @@ export async function GET(request: NextRequest) {
       id: s.id,
       pair: s.pair,
       type: s.type,
+      entry: s.entry || 0,
       signalCategory: s.signalCategory,
       hitTpIndex: s.hitTpIndex,
       createdAt: s.createdAt,

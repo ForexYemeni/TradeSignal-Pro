@@ -204,3 +204,24 @@ Stage Summary:
 - Service auto-restarts after device reboot
 - Dual notification: SSE instant path + service polling path (whichever fires first wins)
 - Build passes, all Java files compile-ready
+---
+Task ID: 1
+Agent: Main Agent
+Task: Fix Android notification system - signals and TP/SL hits not detected when app closed
+
+Work Log:
+- Explored full project structure and identified 5 critical issues
+- Fixed syntax error in SignalService.java line 272: "entry, 0" → "entry", 0
+- Changed SignalService to always use ?since=0 to detect ALL signal changes (new signals AND TP/SL status updates)
+- Added onTaskRemoved() override to keep service alive when user swipes app from recent apps
+- Added restartService() method called from onDestroy() and onTaskRemoved()
+- Fixed TP hit detection to include partial TPs (hitTpIndex > 0 with ACTIVE status)
+- Added entry field to /api/signals/updates response for notification body
+- Applied same TP detection fix to SignalPollReceiver.java
+
+Stage Summary:
+- SignalService.java: Fixed compile error, added service restart logic, improved TP detection
+- SignalPollReceiver.java: Fixed partial TP detection
+- updates/route.ts: Added entry field to API response
+- All changes ensure notifications work when app is closed/swiped away
+

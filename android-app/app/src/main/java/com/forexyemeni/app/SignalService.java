@@ -128,7 +128,37 @@ public class SignalService extends Service {
         if (wakeLock != null && wakeLock.isHeld()) {
             try { wakeLock.release(); } catch (Exception ignored) {}
         }
-        Log.d(TAG, "SignalService destroyed — AlarmManager will restart within 15s");
+        Log.d(TAG, "SignalService destroyed — restarting immediately");
+        // Restart service immediately when destroyed (survives Android kill)
+        restartService();
+    }
+
+    @Override
+    public void onTaskRemoved(Intent rootIntent) {
+        super.onTaskRemoved(rootIntent);
+        Log.d(TAG, "Task removed (app swiped away) — keeping service alive");
+        // Update notification to show service is still running
+        NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        if (nm != null) {
+            nm.notify(NOTIFICATION_ID, buildServiceNotification("جاري مراقبة الإشارات في الخلفية..."));
+        }
+        // Restart service to ensure it survives task removal
+        restartService();
+    }
+
+    private void restartService() {
+        try {
+            Intent intent = new Intent(this, SignalService.class);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(intent);
+            } else {
+                startService(intent);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to restart service", e);
+            // Ultimate fallback: heartbeat will restart within 15s
+            SignalPollReceiver.startHeartbeat(this);
+        }
     }
 
     /** Update heartbeat so AlarmManager knows the service is alive */
@@ -219,7 +249,9 @@ public class SignalService extends Service {
     private void checkSignalsFast() {
         try {
             String token = getSessionToken();
-            String sinceParam = lastCheckTime > 0 ? "?since=" + lastCheckTime : "?since=0";
+            // ALWAYS fetch all signals — detects new signals AND status changes (TP/SL hits)
+            // Using ?since=0 ensures we catch in-place updates where createdAt doesn't change
+            String sinceParam = "?since=0";
             URL url = new URL(UPDATES_URL + sinceParam);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("GET");
@@ -269,10 +301,12 @@ public class SignalService extends Service {
                 String state = status + "|" + category + "|" + hitTpIndex;
                 String pair = signal.optString("pair", "N/A");
                 String type = signal.optString("type", "BUY");
-                double entry = signal.optDouble("entry, 0");
+                double entry = signal.optDouble("entry", 0);
 
+                // TP hit detection: includes FULL TP (HIT_TP status) AND PARTIAL TP (hitTpIndex > 0 with ACTIVE status)
                 boolean isTpHit = "HIT_TP".equals(status) || "TP_HIT".equals(category)
-                        || "REENTRY_TP".equals(category) || "PYRAMID_TP".equals(category);
+                        || "REENTRY_TP".equals(category) || "PYRAMID_TP".equals(category)
+                        || hitTpIndex > 0; // Partial TP hit — status stays ACTIVE but hitTpIndex increases
                 boolean isSlHit = "HIT_SL".equals(status) || "SL_HIT".equals(category)
                         || "REENTRY_SL".equals(category) || "PYRAMID_SL".equals(category);
 

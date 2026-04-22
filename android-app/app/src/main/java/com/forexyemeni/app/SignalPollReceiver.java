@@ -232,8 +232,10 @@ public class SignalPollReceiver extends BroadcastReceiver {
                         String type = sig.optString("type", "BUY");
                         double entry = sig.optDouble("entry", 0);
 
+                        // TP detection: includes FULL TP and PARTIAL TP (hitTpIndex > 0 with ACTIVE status)
                         boolean isTp = "HIT_TP".equals(status) || "TP_HIT".equals(category)
-                                || "REENTRY_TP".equals(category) || "PYRAMID_TP".equals(category);
+                                || "REENTRY_TP".equals(category) || "PYRAMID_TP".equals(category)
+                                || hitTpIndex > 0; // Partial TP — status stays ACTIVE but hitTpIndex increases
                         boolean isSl = "HIT_SL".equals(status) || "SL_HIT".equals(category)
                                 || "REENTRY_SL".equals(category) || "PYRAMID_SL".equals(category);
 
