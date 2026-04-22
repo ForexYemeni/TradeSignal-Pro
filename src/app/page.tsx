@@ -1156,8 +1156,8 @@ export default function HomePage() {
           const closedSignals = signals.filter(s => s.status !== "ACTIVE");
           const winClosed = closedSignals.filter(s => s.status === "HIT_TP");
           const lossClosed = closedSignals.filter(s => s.status === "HIT_SL");
-          const totalPnl = closedSignals.reduce((acc, s) => acc + (s.pnlDollars ?? 0), 0);
-          const totalPoints = closedSignals.reduce((acc, s) => acc + (s.pnlPoints ?? 0), 0);
+          const totalPnl = signals.reduce((acc, s) => acc + (s.pnlDollars ?? 0), 0);
+          const totalPoints = signals.reduce((acc, s) => acc + (s.pnlPoints ?? 0), 0);
           const todaySignals = signals.filter(s => {
             const d = new Date(s.createdAt);
             const now = new Date();
@@ -1165,7 +1165,7 @@ export default function HomePage() {
           });
           const todayWins = todaySignals.filter(s => s.status === "HIT_TP").length;
           const todayLosses = todaySignals.filter(s => s.status === "HIT_SL").length;
-          const todayPnl = todaySignals.filter(s => s.status !== "ACTIVE").reduce((acc, s) => acc + (s.pnlDollars ?? 0), 0);
+          const todayPnl = todaySignals.reduce((acc, s) => acc + (s.pnlDollars ?? 0), 0);
           const subDaysLeft = session?.subscriptionExpiry ? Math.max(0, Math.ceil((new Date(session.subscriptionExpiry).getTime() - Date.now()) / 86400000)) : null;
           const totalActiveUsers = users.filter(u => u.status === "active" && u.role === "user").length;
           const totalSubscribers = users.filter(u => u.subscriptionType === "subscriber").length;
