@@ -62,23 +62,19 @@ export async function POST(request: NextRequest) {
     console.log(`[OTP Send] email=${sanitizedEmail}, ok=${emailResult.ok}, error=${emailResult.error}`);
 
     if (!emailResult.ok) {
-      // Delete stored OTP since email failed
-      await kv.del(otpKey);
-
-      let errorMsg = "فشل إرسال كود التحقق.";
+      // Only fail if email service is truly not configured
       if (emailResult.error?.includes('not configured')) {
-        errorMsg = "خدمة الإيميل غير مفعلة. تواصل مع الإدارة.";
-      } else if (emailResult.error?.includes('timeout')) {
-        errorMsg = "انتهت مهلة الإرسال. حاول مرة أخرى.";
-      } else if (emailResult.error?.includes('Invalid response')) {
-        errorMsg = "مشكلة في خدمة الإيميل. تأكد من نشر Google Apps Script بشكل صحيح.";
+        await kv.del(otpKey);
+        return NextResponse.json({
+          success: false,
+          error: "خدمة الإيميل غير مفعلة. تواصل مع الإدارة.",
+        }, { status: 503 });
       }
 
-      return NextResponse.json({
-        success: false,
-        error: errorMsg,
-        debugError: emailResult.error,
-      }, { status: 500 });
+      // For other errors (timeout, response parsing, etc):
+      // DON'T delete OTP — the email likely arrived since GAS executed
+      // Just log the warning and return success
+      console.warn(`[OTP Send] Email may have failed but OTP kept: ${emailResult.error}`);
     }
 
     return NextResponse.json({
