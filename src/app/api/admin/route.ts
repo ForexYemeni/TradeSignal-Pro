@@ -32,10 +32,16 @@ async function handleLogin(body: Record<string, unknown>) {
   await migrateAdminToUsers();
 
   // ── OTP Verification ──
-  // If user already verified their email before, skip OTP requirement
+  // If user already verified their email before, skip OTP requirement.
+  // emailVerified !== false means: true (verified) OR undefined (field doesn't exist yet
+  // for legacy accounts → treat as verified since they were created before this feature).
   const existingUser = await getUserByEmail(emailVal.sanitized);
-  if (existingUser && existingUser.emailVerified) {
-    // Skip OTP — user has already verified their email in the past
+  if (existingUser && existingUser.emailVerified !== false) {
+    // Skip OTP — user is already verified or is a legacy account (pre-OTP feature)
+    // Also backfill the field for legacy accounts
+    if (!existingUser.emailVerified) {
+      await updateUser(existingUser.id, { emailVerified: true });
+    }
   } else if (!verifyToken) {
     return NextResponse.json({ success: false, error: "يجب التحقق من البريد الإلكتروني أولاً", needOtp: true }, { status: 403 });
   } else {
