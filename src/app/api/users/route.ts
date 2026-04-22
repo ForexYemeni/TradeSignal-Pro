@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUsers, updateUser, deleteUser, getUserById, getPackageById, getAppSettings, enforceSubscriptions } from "@/lib/store";
 import { sendPushToAdmins } from "@/lib/push";
 
+const SUPER_ADMIN_EMAIL = "admin@forexyemeni.com";
+
+async function isSuperAdmin(userId: string): Promise<boolean> {
+  const user = await getUserById(userId);
+  return !!user && user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
+}
+
 export async function GET() {
   try {
     await enforceSubscriptions();
@@ -19,6 +26,13 @@ export async function PUT(request: NextRequest) {
 
     if (!id || !action) {
       return NextResponse.json({ success: false, error: "البيانات مطلوبة" }, { status: 400 });
+    }
+
+    // Protect super admin from being demoted, blocked, or removed
+    if (await isSuperAdmin(id)) {
+      if (action === "remove_admin" || action === "block") {
+        return NextResponse.json({ success: false, error: "لا يمكن تعديل صلاحيات المدير الأعلى" }, { status: 403 });
+      }
     }
 
     let updates: Record<string, unknown> = {};
@@ -135,6 +149,13 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ success: false, error: "معرف المستخدم مطلوب" }, { status: 400 });
     }
     const user = await getUserById(id);
+    if (!user) {
+      return NextResponse.json({ success: false, error: "المستخدم غير موجود" }, { status: 404 });
+    }
+    // Protect super admin from deletion
+    if (user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) {
+      return NextResponse.json({ success: false, error: "لا يمكن حذف المدير الأعلى" }, { status: 403 });
+    }
     const deleted = await deleteUser(id);
     if (!deleted) {
       return NextResponse.json({ success: false, error: "المستخدم غير موجود" }, { status: 404 });
