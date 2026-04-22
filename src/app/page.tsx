@@ -197,6 +197,19 @@ export default function HomePage() {
   const [regErr, setRegErr] = useState("");
   const [regSuccess, setRegSuccess] = useState("");
 
+  /* ── OTP (shared by login & register) ── */
+  const [otpStep, setOtpStep] = useState<"none" | "sending" | "verifying" | "done">("none");
+  const [otpPurpose, setOtpPurpose] = useState<"register" | "login">("register");
+  const [otpEmail, setOtpEmail] = useState("");
+  const [otpCode, setOtpCode] = useState("");
+  const [otpName, setOtpName] = useState("");
+  const [otpPwd, setOtpPwd] = useState("");
+  const [otpVerifyToken, setOtpVerifyToken] = useState("");
+  const [otpErr, setOtpErr] = useState("");
+  const [otpTimer, setOtpTimer] = useState(0);
+  const [otpIntervalId, setOtpIntervalId] = useState<ReturnType<typeof setInterval> | null>(null);
+  const otpInputRef = useRef<HTMLInputElement | null>(null);
+
   /* ── Users Management ── */
   const [users, setUsers] = useState<{ id: string; name: string; email: string; role: string; status: string; createdAt: string; subscriptionType?: string; subscriptionExpiry?: string; packageName?: string; packageId?: string }[]>([]);
   const [usersLoad, setUsersLoad] = useState(false);
@@ -589,6 +602,12 @@ export default function HomePage() {
           setView("expired");
           return;
         }
+        // If needOtp — redirect to OTP step
+        if (data.needOtp) {
+          handleSendOtp("login", email, undefined, pwd);
+          setLoginLoad(false);
+          return;
+        }
         // Smart login feedback
         if (data.error === "email_not_found") {
           setLoginFeedback({ type: "email_not_found", email: data.email });
@@ -680,24 +699,140 @@ export default function HomePage() {
     setRegErr(""); setRegSuccess("");
     if (!regName || !regEmail || !regPwd) { setRegErr("جميع الحقول مطلوبة"); return; }
     if (regPwd.length < 6) { setRegErr("كلمة المرور يجب أن تكون 6 أحرف على الأقل"); return; }
-    setRegLoad(true);
+    // Send OTP to verify email before registration
+    handleSendOtp("register", regEmail, regName, regPwd);
+  }
+
+  /* ── OTP Helper Functions ── */
+  function startOtpTimer() {
+    setOtpTimer(60);
+    if (otpIntervalId) clearInterval(otpIntervalId);
+    const id = setInterval(() => {
+      setOtpTimer(prev => {
+        if (prev <= 1) { clearInterval(id); return 0; }
+        return prev - 1;
+      });
+    }, 1000);
+    setOtpIntervalId(id);
+  }
+
+  async function handleSendOtp(purpose: "register" | "login", targetEmail: string, targetName?: string, targetPwd?: string) {
+    setOtpErr("");
+    setOtpStep("sending");
+    setOtpPurpose(purpose);
+    setOtpEmail(targetEmail);
+    setOtpName(targetName || "");
+    setOtpPwd(targetPwd || "");
+    setOtpCode("");
+    setOtpVerifyToken("");
     try {
-      const res = await fetch("/api/register", {
+      const res = await fetch("/api/otp/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: regName, email: regEmail, password: regPwd }),
+        body: JSON.stringify({ email: targetEmail, type: purpose, name: targetName }),
       });
       const data = await res.json();
       if (data.success) {
-        setRegSuccess("تم إنشاء الحساب بنجاح! في انتظار موافقة الإدارة.");
-        setRegName(""); setRegEmail(""); setRegPwd("");
-        toast.success("تم إنشاء الحساب بنجاح");
+        setOtpStep("verifying");
+        startOtpTimer();
+        toast.success(data.message);
       } else {
-        setRegErr(data.error || "فشل إنشاء الحساب");
-        toast.error(data.error || "فشل إنشاء الحساب");
+        setOtpErr(data.error || "فشل إرسال الكود");
+        toast.error(data.error || "فشل إرسال الكود");
+        setOtpStep("none");
       }
-    } catch { setRegErr("خطأ في الاتصال بالخادم"); toast.error("خطأ في الاتصال بالخادم"); }
-    finally { setRegLoad(false); }
+    } catch {
+      setOtpErr("خطأ في الاتصال");
+      toast.error("خطأ في الاتصال");
+      setOtpStep("none");
+    }
+  }
+
+  async function handleVerifyOtp() {
+    if (otpCode.length !== 6) { setOtpErr("أدخل الكود كاملاً (6 أرقام)"); return; }
+    setOtpErr("");
+    try {
+      const res = await fetch("/api/otp/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: otpEmail, otp: otpCode, type: otpPurpose }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setOtpVerifyToken(data.verifyToken);
+        setOtpStep("done");
+        // Auto-proceed based on purpose
+        if (otpPurpose === "register") {
+          // Complete registration with verifyToken
+          setRegLoad(true);
+          try {
+            const regRes = await fetch("/api/register", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ name: otpName, email: otpEmail, password: otpPwd, verifyToken: data.verifyToken }),
+            });
+            const regData = await regRes.json();
+            if (regData.success) {
+              setRegSuccess(regData.message);
+              setRegName(""); setRegEmail(""); setRegPwd("");
+              toast.success(regData.message);
+              setView("login");
+            } else {
+              setOtpErr(regData.error || "فشل إنشاء الحساب");
+              toast.error(regData.error || "فشل إنشاء الحساب");
+            }
+          } catch { setOtpErr("خطأ في إنشاء الحساب"); }
+          finally { setRegLoad(false); }
+        } else if (otpPurpose === "login") {
+          // Complete login with verifyToken
+          setLoginLoad(true);
+          try {
+            const loginRes = await fetch("/api/admin", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ action: "login", email: otpEmail, password: otpPwd, verifyToken: data.verifyToken }),
+            });
+            const loginData = await loginRes.json();
+            if (loginData.success) {
+              completeLogin(loginData);
+            } else if (loginData.pending) { setView("pending"); }
+            else if (loginData.blocked) { setView("blocked"); }
+            else if (loginData.expired) { setView("expired"); }
+            else if (loginData.error === "email_not_found") {
+              setLoginFeedback({ type: "email_not_found", email: loginData.email });
+              setView("login");
+            } else if (loginData.error === "wrong_password") {
+              setLoginFeedback({ type: "wrong_password", attemptsLeft: loginData.attemptsLeft, maxAttempts: loginData.maxAttempts, locked: loginData.locked, lockedUntil: loginData.lockedUntil });
+              setView("login");
+            } else {
+              setOtpErr(loginData.error || "فشل تسجيل الدخول");
+              toast.error(loginData.error || "فشل تسجيل الدخول");
+            }
+          } catch { setOtpErr("خطأ في الاتصال"); }
+          finally { setLoginLoad(false); }
+        }
+      } else {
+        setOtpErr(data.error || "كود غير صحيح");
+      }
+    } catch { setOtpErr("خطأ في الاتصال"); }
+  }
+
+  function resetOtp() {
+    setOtpStep("none"); setOtpCode(""); setOtpVerifyToken(""); setOtpErr("");
+    if (otpIntervalId) clearInterval(otpIntervalId);
+    setOtpTimer(0);
+  }
+
+  function completeLogin(data: { success: boolean; admin: AdminSession; token: string }) {
+    setSession(data.admin);
+    localStorage.setItem("adminSession", JSON.stringify(data.admin));
+    shareSessionToken(data.token);
+    setEmail(""); setPwd(""); setLoginFeedback(null);
+    setView("main");
+    prevIdsRef.current = new Set();
+    prevStateRef.current = new Map();
+    resetOtp();
+    toast.success("تم تسجيل الدخول بنجاح");
   }
 
   async function fetchUsers() {
@@ -1407,6 +1542,120 @@ export default function HomePage() {
                 ⚠️ {dbError}
               </div>
             )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     RENDER: OTP VERIFICATION
+     ═══════════════════════════════════════════════════════════════ */
+  if (otpStep === "sending" || otpStep === "verifying") {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-background">
+        <div className="absolute top-[-20%] left-[-10%] w-72 h-72 rounded-full opacity-20" style={{ background: "radial-gradient(circle, #FFD700 0%, transparent 70%)", filter: "blur(80px)" }} />
+        <div className="absolute bottom-[-15%] right-[-10%] w-64 h-64 rounded-full opacity-15" style={{ background: "radial-gradient(circle, #00E676 0%, transparent 70%)", filter: "blur(80px)" }} />
+
+        <div className="w-full max-w-[480px] animate-[fadeInUp_0.5s_ease-out] relative z-10">
+          <div className="backdrop-blur-2xl bg-muted/50 border border-border shadow-2xl rounded-3xl p-8 space-y-7">
+            {/* Icon */}
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-500/25">
+                <Mail className="w-10 h-10 text-black" />
+              </div>
+              <div className="text-center">
+                <h2 className="text-2xl font-extrabold text-foreground">تحقق من البريد</h2>
+                <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+                  تم إرسال كود تحقق مكون من 6 أرقام إلى
+                  <br />
+                  <span className="text-amber-400 font-mono text-[11px]">{otpEmail}</span>
+                </p>
+              </div>
+            </div>
+
+            {/* OTP Input */}
+            <div className="space-y-4">
+              <div className="flex justify-center gap-3" dir="ltr">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <input
+                    key={i}
+                    ref={el => { if (i === 0) otpInputRef.current = el; }}
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={1}
+                    value={otpCode[i] || ""}
+                    onChange={e => {
+                      const val = e.target.value.replace(/[^0-9]/g, "");
+                      if (val && otpCode.length >= 6) return;
+                      const newCode = otpCode.split("");
+                      newCode[i] = val;
+                      const joined = newCode.join("");
+                      setOtpCode(joined);
+                      // Auto-focus next input
+                      if (val && i < 5) {
+                        const next = e.target.nextElementSibling as HTMLInputElement;
+                        if (next) next.focus();
+                      }
+                      // Auto-verify when all 6 digits entered
+                      if (joined.length === 6) {
+                        setTimeout(() => handleVerifyOtp(), 300);
+                      }
+                    }}
+                    onKeyDown={e => {
+                      if (e.key === "Backspace" && !otpCode[i] && i > 0) {
+                        const prev = (e.target as HTMLInputElement).previousElementSibling as HTMLInputElement;
+                        if (prev) { prev.focus(); }
+                      }
+                    }}
+                    className="w-[52px] h-[60px] text-center text-xl font-bold rounded-xl input-glass text-foreground bg-transparent border-none outline-none focus:ring-2 focus:ring-amber-400/50 transition-all"
+                  />
+                ))}
+              </div>
+
+              {/* Error */}
+              {otpErr && <div className="bg-red-500/10 border border-red-500/20 rounded-2xl px-4 py-3 text-[12px] text-red-400 text-center">{otpErr}</div>}
+
+              {/* Verify Button */}
+              <button
+                onClick={handleVerifyOtp}
+                disabled={otpCode.length !== 6 || otpStep === "done"}
+                className="w-full h-[56px] rounded-2xl gold-gradient text-black font-bold text-base hover:opacity-90 transition-all active:scale-[0.98] disabled:opacity-50 shadow-lg shadow-amber-500/20"
+              >
+                {otpStep === "sending" ? (
+                  <Loader2 className="w-5 h-5 animate-spin mx-auto" />
+                ) : (
+                  "تحقق"
+                )}
+              </button>
+
+              {/* Resend Timer / Resend Link */}
+              <div className="text-center">
+                {otpTimer > 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    إعادة الإرسال بعد <span className="text-amber-400 font-mono">{otpTimer}</span> ثانية
+                  </p>
+                ) : (
+                  <button
+                    onClick={() => handleSendOtp(otpPurpose, otpEmail, otpName || undefined, otpPwd || undefined)}
+                    className="text-sm font-medium transition-colors hover:opacity-80"
+                    style={{ color: "#FFD700" }}
+                  >
+                    إعادة إرسال الكود
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Back Button */}
+            <div className="text-center">
+              <button
+                onClick={() => { resetOtp(); setView(otpPurpose === "register" ? "register" : "login"); }}
+                className="text-sm text-muted-foreground hover:text-foreground/70 transition-colors"
+              >
+                رجوع
+              </button>
+            </div>
           </div>
         </div>
       </div>

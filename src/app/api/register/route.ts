@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { kv } from "@vercel/kv";
 import { getUserByEmail, addUser, migrateAdminToUsers, getAppSettings, getPackageById } from "@/lib/store";
 import { sendPushToAdmins } from "@/lib/push";
 import { validateText, validateEmail, validatePassword } from "@/lib/validation";
@@ -7,7 +8,7 @@ export async function POST(request: NextRequest) {
   try {
     await migrateAdminToUsers();
 
-    const { name, email, password } = await request.json();
+    const { name, email, password, verifyToken } = await request.json();
 
     // Validate inputs
     const nameVal = validateText(name, "الاسم", 100);
@@ -17,6 +18,22 @@ export async function POST(request: NextRequest) {
     const pwdVal = validatePassword(password);
     if (!pwdVal.valid) return NextResponse.json({ success: false, error: pwdVal.error }, { status: 400 });
 
+    // ── OTP Verification: verifyToken must be valid ──
+    if (!verifyToken) {
+      return NextResponse.json({ success: false, error: "يجب التحقق من البريد الإلكتروني أولاً" }, { status: 403 });
+    }
+
+    const verifyKey = `otp_verified:register:${emailVal.sanitized}`;
+    const storedToken = await kv.get<string>(verifyKey);
+
+    if (!storedToken || storedToken !== verifyToken) {
+      return NextResponse.json({ success: false, error: "رمز التحقق غير صالح أو انتهت صلاحيته. أعد المحاولة." }, { status: 403 });
+    }
+
+    // Delete the verify token (one-time use)
+    await kv.del(verifyKey);
+
+    // Check duplicate
     const existing = await getUserByEmail(emailVal.sanitized);
     if (existing) {
       return NextResponse.json({ success: false, error: "هذا البريد مسجل مسبقا" }, { status: 409 });

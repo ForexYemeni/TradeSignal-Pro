@@ -3,6 +3,7 @@ import { addSignal, getSignals, updateSignal, getUserById, getPackageById } from
 import { parseTradingViewSignal, validateSignal } from "@/lib/signal-parser";
 import { notifyNewSignal, notifyTpHit, notifySlHit } from "@/lib/push";
 import { notifySignalEvent } from "./stream/route";
+import { broadcastSignalToSubscribers } from "@/lib/email";
 
 // ─── Auth Guard ───────────────────────────────────────
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || "";
@@ -168,6 +169,21 @@ export async function POST(request: NextRequest) {
     // Push notification for new entries
     if (isEntry(cat)) {
       notifyNewSignal(parseResult.signal.pair, parseResult.signal.type, parseResult.signal.entry, parseResult.signal.timeframe).catch(() => {});
+    }
+
+    // ── Email notification: broadcast signal to all active subscribers ──
+    if (isEntry(cat)) {
+      let parsedTps: { tp: number; rr: number }[] = [];
+      try { parsedTps = JSON.parse(String(signal.takeProfits || "[]")); } catch { parsedTps = []; }
+      broadcastSignalToSubscribers({
+        pair: String(signal.pair),
+        type: parseResult.signal.type as "BUY" | "SELL",
+        entry: Number(signal.entry),
+        stopLoss: Number(signal.stopLoss),
+        takeProfits: parsedTps,
+        confidence: Number(signal.confidence),
+        timeframe: String(signal.timeframe || ""),
+      }).catch(() => {}); // Fire-and-forget — don't block signal creation
     }
 
     return NextResponse.json({ success: true, signal: { ...signal, takeProfits: (() => { try { return JSON.parse(signal.takeProfits); } catch { return []; } })() }, warnings: parseResult.warnings });

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { kv } from "@vercel/kv";
 import { getAdmin, setAdmin, getUserByEmail, migrateAdminToUsers, comparePassword, hashPassword, getUserById, updateUser, trackLoginAttempt, getLoginAttempts, resetLoginAttempts } from "@/lib/store";
 import { validateEmail, validatePassword, validateAction, validateUUID } from "@/lib/validation";
 
@@ -19,7 +20,7 @@ export async function POST(request: NextRequest) {
 }
 
 async function handleLogin(body: Record<string, unknown>) {
-  const { email, password } = body as { email: string; password: string };
+  const { email, password, verifyToken } = body as { email: string; password: string; verifyToken?: string };
 
   // Validate inputs
   const emailVal = validateEmail(email);
@@ -29,6 +30,19 @@ async function handleLogin(body: Record<string, unknown>) {
 
   // Ensure admin is migrated to users
   await migrateAdminToUsers();
+
+  // ── OTP Verification: verifyToken must be valid ──
+  if (!verifyToken) {
+    return NextResponse.json({ success: false, error: "يجب التحقق من البريد الإلكتروني أولاً", needOtp: true }, { status: 403 });
+  }
+
+  const verifyKey = `otp_verified:login:${emailVal.sanitized}`;
+  const storedToken = await kv.get<string>(verifyKey);
+  if (!storedToken || storedToken !== verifyToken) {
+    return NextResponse.json({ success: false, error: "رمز التحقق غير صالح أو انتهت صلاحيته", needOtp: true }, { status: 403 });
+  }
+  // Delete the verify token (one-time use)
+  await kv.del(verifyKey);
 
   // Check if account is currently locked
   const attemptStatus = await getLoginAttempts(email);
