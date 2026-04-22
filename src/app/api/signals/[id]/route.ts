@@ -72,19 +72,24 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const hasRiskData = lotSize > 0 || balance > 0;
     if (!hasRiskData) balance = 1000;
 
-    // Determine pip value based on pair
+    // Determine pip value based on pair (per lot multiplier: $ per 1 price unit per 1 lot)
+    // Gold: 100 oz/lot → $100 per $1 move | Silver: 5000 oz/lot → $5000 per $1 move
+    // Forex 5-digit: 100,000 units/lot → $100,000 per 1.0 move | JPY: ~$1000 per 1.0 move
+    // Crypto: $1 per $1 move | Indices: $1 per $1 move
     const pair = String(existing.pair || "").toUpperCase();
-    let pipValue = 10;
+    let pipValue = 100000; // default: forex (EURUSD, GBPUSD, etc.)
     if (pair.includes("XAU") || pair.includes("GOLD")) {
-      pipValue = 1;
+      pipValue = 100;       // 100 oz per lot
     } else if (pair.includes("XAG") || pair.includes("SILVER")) {
-      pipValue = 50;
+      pipValue = 5000;      // 5000 oz per lot
     } else if (pair.includes("BTC") || pair.includes("ETH") || pair.includes("CRYPTO")) {
       pipValue = 1;
-    } else if (!pair.includes("JPY")) {
-      pipValue = 10;
-    } else {
-      pipValue = 6.5;
+    } else if (pair.includes("US30") || pair.includes("NAS") || pair.includes("DOW") || pair.includes("SPX") || pair.includes("US500")) {
+      pipValue = 1;         // Indices: $1 per point per lot
+    } else if (pair.includes("JPY")) {
+      pipValue = 1000;      // JPY pairs (3 decimals)
+    } else if (pair.includes("OIL") || pair.includes("WTI") || pair.includes("CL")) {
+      pipValue = 1000;      // Oil: 1000 barrels per lot
     }
 
     if (status === "HIT_TP" && hitTpIndex !== undefined && hitTpIndex >= 0) {

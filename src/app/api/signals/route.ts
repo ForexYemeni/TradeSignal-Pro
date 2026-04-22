@@ -230,12 +230,17 @@ async function handleUpdateSignal(parsed: any) {
   let tps: { tp: number; rr: number }[] = [];
   try { tps = JSON.parse(String(parent.takeProfits || "[]")); } catch { tps = []; }
 
-  // Pip value
-  let pipVal = 10;
-  if (pair.includes("XAU") || pair.includes("GOLD")) pipVal = 1;
-  else if (pair.includes("XAG") || pair.includes("SILVER")) pipVal = 50;
+  // Pip value (per lot multiplier: $ per 1 price unit per 1 lot)
+  // Gold: 100 oz/lot → $100 per $1 move | Silver: 5000 oz/lot → $5000 per $1 move
+  // Forex 5-digit: 100,000 units/lot | JPY: ~$1000 per 1.0 move
+  // Crypto: $1 per $1 move | Indices: $1 per $1 move
+  let pipVal = 100000; // default: forex (EURUSD, GBPUSD, etc.)
+  if (pair.includes("XAU") || pair.includes("GOLD")) pipVal = 100;
+  else if (pair.includes("XAG") || pair.includes("SILVER")) pipVal = 5000;
   else if (pair.includes("BTC") || pair.includes("ETH")) pipVal = 1;
-  else if (pair.includes("JPY")) pipVal = 6.5;
+  else if (pair.includes("US30") || pair.includes("NAS") || pair.includes("DOW") || pair.includes("SPX") || pair.includes("US500")) pipVal = 1;
+  else if (pair.includes("JPY")) pipVal = 1000;
+  else if (pair.includes("OIL") || pair.includes("WTI") || pair.includes("CL")) pipVal = 1000;
 
   // Cap function to prevent unrealistic P&L values
   const capPnL = (val: number) => {
