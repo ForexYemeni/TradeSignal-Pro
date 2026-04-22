@@ -183,10 +183,11 @@ public class SignalService extends Service {
         String token = getSessionToken();
         log("Token: " + (token.isEmpty() ? "NONE!" : token.substring(0, Math.min(12, token.length())) + "..."));
 
-        // 8. Start self-test timer (every 60 seconds)
-        startSelfTest();
-
+        // 8. Log ready
         log("═══════ Service v10 READY ═══════");
+
+        // 9. Start diagnostics (every 60s, no sound)
+        startSelfTest();
         updateDiagNotification();
     }
 
@@ -224,40 +225,17 @@ public class SignalService extends Service {
     // ═══════════════════════════════════════════════════════════════
 
     private void startSelfTest() {
+        // Self-test only updates diagnostics - NO BEEP (was annoying user)
         handler.postDelayed(new Runnable() {
             @Override
             public void run() {
                 if (!isRunning) return;
-
                 selfTestCount++;
-                log("SELF-TEST #" + selfTestCount + " — Service alive, polls: " + pollCount + ", found: " + signalsFound + ", sent: " + notificationsSent);
-
-                // Play a short beep to prove sound works
-                playBeep();
-
-                // Update diagnostic notification
+                log("DIAG #" + selfTestCount + " polls=" + pollCount + " found=" + signalsFound + " sent=" + notificationsSent + " token=" + tokenStatus);
                 updateDiagNotification();
-
-                // Schedule next self-test
                 handler.postDelayed(this, 60000);
             }
-        }, 60000); // First test after 60 seconds
-    }
-
-    private void playBeep() {
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    ToneGenerator tg = new ToneGenerator(android.media.AudioManager.STREAM_NOTIFICATION, 80);
-                    tg.startTone(ToneGenerator.TONE_PROP_PROMPT, 300);
-                    Thread.sleep(400);
-                    tg.release();
-                } catch (Exception e) {
-                    log("Beep error: " + e.getMessage());
-                }
-            }
-        }).start();
+        }, 60000);
     }
 
     // ═══════════════════════════════════════════════════════════════

@@ -3,7 +3,6 @@ package com.forexyemeni.app;
 import android.Manifest;
 import android.app.Activity;
 import android.app.AlarmManager;
-import android.app.NotificationManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -23,28 +22,30 @@ import android.view.Window;
 import android.view.WindowManager;
 import android.webkit.ConsoleMessage;
 import android.webkit.JavascriptInterface;
+import android.webkit.SslErrorHandler;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import android.webkit.SslErrorHandler;
 
 /**
- * ForexYemeni VIP Trading Signals - Android App v2.1
+ * ForexYemeni VIP Trading Signals - Android App v3.0
  *
- * CRITICAL FIXES from v2.0:
- * 1. Removed onResume() token clearing bug
- * 2. Added notification permission result handler
- * 3. Battery whitelist request only after notification permission confirmed
- * 4. If notification permission denied, opens app settings directly
- * 5. Channels reset on every launch
+ * CRITICAL FIX: Token is now read DIRECTLY from WebView localStorage
+ * instead of relying on the unreliable JavaScript bridge.
+ *
+ * The JS bridge (AndroidNotify.setSessionToken) was NOT working on some devices.
+ * New approach: onPageFinished reads localStorage('adminSession') and extracts the user ID.
+ * Also repeats this check every 15 seconds via Handler.
  */
 public class MainActivity extends Activity {
 
     private WebView webView;
     private static final String APP_URL = "https://trade-signal-pro.vercel.app";
     private static final int NOTIFICATION_PERMISSION_CODE = 100;
+    private Handler tokenCheckHandler;
+    private Runnable tokenCheckRunnable;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -61,7 +62,6 @@ public class MainActivity extends Activity {
 
             // 1. Reset notification channels
             NotificationHelper.resetSignalChannels(this);
-            NotificationHelper.logChannelStates(this);
 
             // 2. Request notification permission
             requestNotificationPermission();
@@ -69,11 +69,11 @@ public class MainActivity extends Activity {
             // 3. Start signal service
             startSignalService();
 
-            // 4. Setup WebView
+            // 4. Setup WebView with token extraction
             webView = new WebView(this);
             configureWebView(webView);
             webView.addJavascriptInterface(new NativeBridge(this), "AndroidNotify");
-            webView.setWebViewClient(new AppWebViewClient());
+            webView.setWebViewClient(new TokenExtractingWebViewClient());
             webView.setWebChromeClient(new WebChromeClient() {
                 @Override
                 public boolean onConsoleMessage(ConsoleMessage cm) {
@@ -90,21 +90,27 @@ public class MainActivity extends Activity {
                 webView.loadUrl(APP_URL);
             }
 
-            // 5. Show test notification after permission is likely granted (5s delay)
+            // 5. Start periodic token extraction (every 15 seconds)
+            tokenCheckHandler = new Handler(Looper.getMainLooper());
+            tokenCheckRunnable = new Runnable() {
+                @Override
+                public void run() {
+                    if (webView != null) {
+                        extractTokenFromWebView();
+                    }
+                    tokenCheckHandler.postDelayed(this, 15000);
+                }
+            };
+            // Start after 5 seconds (give WebView time to load)
+            tokenCheckHandler.postDelayed(tokenCheckRunnable, 5000);
+
+            // 6. Request battery whitelist after 8 seconds
             new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
                 @Override
                 public void run() {
-                    if (NotificationHelper.hasNotificationPermission(MainActivity.this)) {
-                        NotificationHelper.showTestNotification(MainActivity.this);
-                        Log.d("ForexYemeni", "Test notification sent (permission granted)");
-                        // Now request battery whitelist
-                        requestBatteryWhitelist();
-                    } else {
-                        Log.w("ForexYemeni", "Notification permission DENIED - opening settings");
-                        openNotificationSettings();
-                    }
+                    requestBatteryWhitelist();
                 }
-            }, 5000);
+            }, 8000);
 
         } catch (Exception e) {
             Log.e("ForexYemeni", "onCreate error", e);
@@ -126,18 +132,58 @@ public class MainActivity extends Activity {
         s.setMediaPlaybackRequiresUserGesture(false);
         s.setBuiltInZoomControls(false);
         s.setDisplayZoomControls(false);
-        s.setUserAgentString(s.getUserAgentString() + " ForexYemeni/App/2.1");
+        s.setUserAgentString(s.getUserAgentString() + " ForexYemeni/App/3.0");
         wv.setBackgroundColor(Color.parseColor("#070b14"));
         wv.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+    }
+
+    /**
+     * CRITICAL FIX: Read the session token DIRECTLY from WebView's localStorage.
+     * This bypasses the unreliable JavaScript bridge completely.
+     *
+     * JavaScript executed:
+     *   var s = localStorage.getItem('adminSession');
+     *   if (s) { var p = JSON.parse(s); return p.id || ''; }
+     *   return '';
+     */
+    private void extractTokenFromWebView() {
+        if (webView == null) return;
+        try {
+            webView.evaluateJavascript(
+                "(function(){try{var s=localStorage.getItem('adminSession');if(s){var p=JSON.parse(s);if(p&&p.id){return p.id;}}return'';}catch(e){return'';}})()",
+                new android.webkit.ValueCallback<String>() {
+                    @Override
+                    public void onReceiveValue(String value) {
+                        try {
+                            if (value != null && !value.equals("null") && !value.equals("") && value.length() > 5) {
+                                // Remove surrounding quotes
+                                String token = value.replace("\"", "").trim();
+                                if (token.length() > 10 && !token.startsWith("null")) {
+                                    // Save token to native service
+                                    String oldToken = getSharedPreferences("forexyemeni_signal_prefs", MODE_PRIVATE)
+                                            .getString("fy_session_token", "");
+                                    if (!token.equals(oldToken)) {
+                                        SignalService.setSessionToken(MainActivity.this, token);
+                                        Log.d("ForexYemeni", "TOKEN EXTRACTED FROM LOCALSTORAGE: " +
+                                                token.substring(0, Math.min(12, token.length())) + "...");
+                                    }
+                                }
+                            }
+                        } catch (Exception e) {
+                            Log.e("ForexYemeni", "extractToken error: " + e.getMessage());
+                        }
+                    }
+                }
+            );
+        } catch (Exception e) {
+            Log.e("ForexYemeni", "evaluateJavascript error: " + e.getMessage());
+        }
     }
 
     private void requestNotificationPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                 requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, NOTIFICATION_PERMISSION_CODE);
-                Log.d("ForexYemeni", "Requesting notification permission");
-            } else {
-                Log.d("ForexYemeni", "Notification permission already granted");
             }
         }
     }
@@ -147,24 +193,13 @@ public class MainActivity extends Activity {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == NOTIFICATION_PERMISSION_CODE) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                Log.d("ForexYemeni", "Notification permission GRANTED!");
-                // Reset channels now that we have permission
                 NotificationHelper.resetSignalChannels(this);
-                // Show test notification immediately
-                NotificationHelper.showTestNotification(this);
-                // Request battery whitelist
-                requestBatteryWhitelist();
             } else {
-                Log.w("ForexYemeni", "Notification permission DENIED!");
-                // Open notification settings for the user
                 openNotificationSettings();
             }
         }
     }
 
-    /**
-     * Open app notification settings so user can enable notifications manually
-     */
     private void openNotificationSettings() {
         try {
             Intent intent = new Intent();
@@ -176,10 +211,7 @@ public class MainActivity extends Activity {
                 intent.setData(Uri.parse("package:" + getPackageName()));
             }
             startActivity(intent);
-            Log.d("ForexYemeni", "Opened notification settings for user");
-        } catch (Exception e) {
-            Log.e("ForexYemeni", "Failed to open settings", e);
-        }
+        } catch (Exception ignored) {}
     }
 
     private void requestBatteryWhitelist() {
@@ -187,35 +219,22 @@ public class MainActivity extends Activity {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
                 if (pm != null && !pm.isIgnoringBatteryOptimizations(getPackageName())) {
-                    new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-                        @Override
-                        public void run() {
-                            try {
-                                Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
-                                intent.setData(Uri.parse("package:" + getPackageName()));
-                                startActivity(intent);
-                            } catch (Exception e) {
-                                Log.w("ForexYemeni", "Battery whitelist not supported");
-                            }
-                        }
-                    }, 2000);
-                }
-            }
-
-            // Request exact alarm permission on Android 12+
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                AlarmManager am = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
-                if (am != null && !am.canScheduleExactAlarms()) {
                     try {
-                        Intent intent = new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM);
+                        Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
                         intent.setData(Uri.parse("package:" + getPackageName()));
                         startActivity(intent);
                     } catch (Exception ignored) {}
                 }
             }
-        } catch (Exception e) {
-            Log.e("ForexYemeni", "Battery whitelist error", e);
-        }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                AlarmManager am = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+                if (am != null && !am.canScheduleExactAlarms()) {
+                    try {
+                        startActivity(new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM));
+                    } catch (Exception ignored) {}
+                }
+            }
+        } catch (Exception ignored) {}
     }
 
     private void startSignalService() {
@@ -226,9 +245,7 @@ public class MainActivity extends Activity {
             } else {
                 startService(serviceIntent);
             }
-            Log.d("ForexYemeni", "SignalService start requested");
         } catch (Exception e) {
-            Log.e("ForexYemeni", "Failed to start service", e);
             SignalPollReceiver.startHeartbeat(this);
         }
     }
@@ -242,7 +259,14 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        // DO NOT clear token! Just ensure service is alive.
+        // Extract token when user returns to app
+        new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                extractTokenFromWebView();
+            }
+        }, 2000);
+        // Ensure service is alive
         try {
             if (!SignalService.isServiceAlive(this)) {
                 startSignalService();
@@ -253,11 +277,13 @@ public class MainActivity extends Activity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        if (tokenCheckHandler != null && tokenCheckRunnable != null) {
+            tokenCheckHandler.removeCallbacks(tokenCheckRunnable);
+        }
         if (webView != null) {
             webView.destroy();
             webView = null;
         }
-        Log.d("ForexYemeni", "Activity destroyed — service continues");
     }
 
     @Override
@@ -286,10 +312,7 @@ public class MainActivity extends Activity {
 
     public class NativeBridge {
         private Context context;
-
-        public NativeBridge(Context ctx) {
-            this.context = ctx;
-        }
+        public NativeBridge(Context ctx) { this.context = ctx; }
 
         @JavascriptInterface
         public void sendNotification(final String title, final String body, final String soundType) {
@@ -298,9 +321,7 @@ public class MainActivity extends Activity {
                 public void run() {
                     try {
                         NotificationHelper.showNotification(context, title, body, soundType);
-                    } catch (Exception e) {
-                        Log.e("ForexYemeni", "Notification error", e);
-                    }
+                    } catch (Exception ignored) {}
                 }
             });
         }
@@ -312,26 +333,39 @@ public class MainActivity extends Activity {
                 public void run() {
                     try {
                         SignalService.setSessionToken(context, token);
-                        Log.d("ForexYemeni", "Token shared: " +
+                        Log.d("ForexYemeni", "Token from JS bridge: " +
                                 (token.isEmpty() ? "EMPTY" : token.substring(0, Math.min(12, token.length())) + "..."));
-                    } catch (Exception e) {
-                        Log.e("ForexYemeni", "Token error", e);
-                    }
+                    } catch (Exception ignored) {}
                 }
             }).start();
         }
     }
 
-    private class AppWebViewClient extends WebViewClient {
+    /**
+     * WebViewClient that extracts the session token after EVERY page load.
+     * This is the PRIMARY mechanism for token sharing now.
+     */
+    private class TokenExtractingWebViewClient extends WebViewClient {
+        @Override
+        public void onPageFinished(WebView view, String url) {
+            super.onPageFinished(view, url);
+            Log.d("ForexYemeni", "Page loaded: " + url);
+            // Extract token from localStorage after page loads
+            new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    extractTokenFromWebView();
+                }
+            }, 3000); // Wait 3s for React to render and set localStorage
+        }
+
         @Override
         public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest req) {
             String url = req.getUrl().toString();
             if (url.startsWith(APP_URL)) return false;
             try {
                 startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
-            } catch (Exception e) {
-                Log.e("ForexYemeni", "Cannot open URL", e);
-            }
+            } catch (Exception ignored) {}
             return true;
         }
 
