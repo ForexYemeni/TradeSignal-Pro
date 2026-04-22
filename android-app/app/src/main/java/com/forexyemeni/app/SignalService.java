@@ -12,6 +12,7 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.os.PowerManager;
 import android.util.Log;
 
 import org.json.JSONArray;
@@ -25,31 +26,37 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * SignalService v5 - Ultra-fast foreground service for instant signal monitoring
- * - Polls every 2 seconds using the lightweight /api/signals/updates endpoint
- * - Receives auth token from WebView via SharedPreferences
- * - FIRST RUN: silently records all signals (NO notifications)
- * - STATE CHANGE: detects TP/SL hits by comparing hitTpIndex
- * - Deduplicates with WebView notifications to avoid double alerts
+ * SignalService v6 — Bulletproof foreground service for signal monitoring
+ *
+ * KEY FEATURES:
+ * - Polls every 2s via lightweight /api/signals/updates?since=T
+ * - WAKE_LOCK during each poll to prevent CPU sleep
+ * - stopWithTask=false: survives app swipe on most devices
+ * - Auto-restart: if killed, AlarmManager heartbeat restarts it within 15s
+ * - Auth token received from WebView for user-specific signal filtering
+ * - Deduplicates with WebView to prevent double alerts
  */
 public class SignalService extends Service {
 
     private static final String TAG = "SignalService";
     private static final String PREFS_NAME = "forexyemeni_signal_prefs";
     private static final String KEY_KNOWN_STATES = "service_signal_states";
-    private static final String KEY_INITIALIZED = "service_initialized_v5";
+    private static final String KEY_INITIALIZED = "service_initialized_v6";
     private static final String KEY_SESSION_TOKEN = "fy_session_token";
+    private static final String KEY_LAST_HEARTBEAT = "service_last_heartbeat";
     private static final String API_BASE = "https://trade-signal-pro.vercel.app";
     private static final String UPDATES_URL = API_BASE + "/api/signals/updates";
     private static final String SIGNALS_URL = API_BASE + "/api/signals";
     private static final String CHANNEL_ID = "forexyemeni_service";
     private static final int NOTIFICATION_ID = 9999;
-    private static final int POLL_INTERVAL_MS = 2000; // 2 seconds — ultra-fast
+    private static final int POLL_INTERVAL_MS = 2000;
+    private static final String WAKE_LOCK_TAG = "ForexYemeni:SignalPoll";
 
     private Handler handler;
     private Runnable pollRunnable;
     private volatile boolean isRunning = false;
     private long lastCheckTime = 0;
+    private PowerManager.WakeLock wakeLock;
 
     @Override
     public void onCreate() {
@@ -60,6 +67,14 @@ public class SignalService extends Service {
         createServiceChannel();
         startForeground(NOTIFICATION_ID, buildServiceNotification("جاري مراقبة الإشارات..."));
 
+        // Acquire WakeLock to prevent CPU sleep during polls
+        PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+        if (pm != null) {
+            wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, WAKE_LOCK_TAG);
+            wakeLock.setReferenceCounted(false);
+            wakeLock.acquire(10 * 60 * 1000L); // 10 min max, will re-acquire
+        }
+
         handler = new Handler(Looper.getMainLooper());
 
         pollRunnable = new Runnable() {
@@ -69,6 +84,8 @@ public class SignalService extends Service {
                 new Thread(new Runnable() {
                     @Override
                     public void run() {
+                        // Update heartbeat timestamp so AlarmManager knows we're alive
+                        updateHeartbeat();
                         checkSignalsFast();
                     }
                 }).start();
@@ -79,11 +96,20 @@ public class SignalService extends Service {
         };
 
         handler.post(pollRunnable);
-        Log.d(TAG, "SignalService v5 started — polling every 2s");
+
+        // Also start alarm-based heartbeat as safety net
+        SignalPollReceiver.startHeartbeat(this);
+
+        Log.d(TAG, "SignalService v6 started — 2s poll + WakeLock + heartbeat");
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        updateHeartbeat();
+        // If called by AlarmManager restart, re-acquire wake lock
+        if (wakeLock != null && !wakeLock.isHeld()) {
+            try { wakeLock.acquire(10 * 60 * 1000L); } catch (Exception ignored) {}
+        }
         return START_STICKY;
     }
 
@@ -99,19 +125,37 @@ public class SignalService extends Service {
         if (handler != null && pollRunnable != null) {
             handler.removeCallbacks(pollRunnable);
         }
-        Log.d(TAG, "SignalService destroyed");
+        if (wakeLock != null && wakeLock.isHeld()) {
+            try { wakeLock.release(); } catch (Exception ignored) {}
+        }
+        Log.d(TAG, "SignalService destroyed — AlarmManager will restart within 15s");
     }
 
-    /**
-     * Called from JavaScript bridge to set the auth token
-     * so the service can fetch user-specific signals
-     */
+    /** Update heartbeat so AlarmManager knows the service is alive */
+    private void updateHeartbeat() {
+        try {
+            getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+                .edit().putLong(KEY_LAST_HEARTBEAT, System.currentTimeMillis()).apply();
+        } catch (Exception ignored) {}
+    }
+
+    /** Check if the service heartbeat is recent */
+    public static boolean isServiceAlive(Context context) {
+        try {
+            long last = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getLong(KEY_LAST_HEARTBEAT, 0);
+            // If heartbeat was in the last 20 seconds, service is alive
+            return (System.currentTimeMillis() - last) < 20000;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /** Set auth token from WebView */
     public static void setSessionToken(Context context, String token) {
         try {
             context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                .edit()
-                .putString(KEY_SESSION_TOKEN, token)
-                .apply();
+                .edit().putString(KEY_SESSION_TOKEN, token).apply();
             Log.d(TAG, "Session token saved");
         } catch (Exception e) {
             Log.e(TAG, "Error saving token", e);
@@ -135,6 +179,7 @@ public class SignalService extends Service {
             channel.setShowBadge(false);
             channel.enableVibration(false);
             channel.setSound(null, null);
+            channel.setBypassDnd(true);
             NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
             if (manager != null) manager.createNotificationChannel(channel);
         }
@@ -160,7 +205,8 @@ public class SignalService extends Service {
                 .setContentText(text)
                 .setSmallIcon(iconRes)
                 .setContentIntent(pi)
-                .setOngoing(true);
+                .setOngoing(true)
+                .setShowWhen(false);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             builder.setColor(Color.parseColor("#FFD700"));
         }
@@ -168,8 +214,7 @@ public class SignalService extends Service {
     }
 
     /**
-     * Ultra-fast signal check using lightweight /api/signals/updates?since=T
-     * Only fetches new/changed signals — minimal data transfer
+     * Ultra-fast signal check using /api/signals/updates?since=T
      */
     private void checkSignalsFast() {
         try {
@@ -188,8 +233,8 @@ public class SignalService extends Service {
 
             int code = conn.getResponseCode();
             if (code != 200) {
-                Log.w(TAG, "Updates API returned " + code + " — falling back to full signals");
-                checkSignalsFull(token);
+                Log.w(TAG, "Updates API returned " + code);
+                conn.disconnect();
                 return;
             }
 
@@ -221,11 +266,10 @@ public class SignalService extends Service {
                 String status = signal.optString("status", "ACTIVE");
                 String category = signal.optString("signalCategory", "ENTRY");
                 int hitTpIndex = signal.optInt("hitTpIndex", -1);
-
                 String state = status + "|" + category + "|" + hitTpIndex;
                 String pair = signal.optString("pair", "N/A");
                 String type = signal.optString("type", "BUY");
-                double entry = signal.optDouble("entry", 0);
+                double entry = signal.optDouble("entry, 0");
 
                 boolean isTpHit = "HIT_TP".equals(status) || "TP_HIT".equals(category)
                         || "REENTRY_TP".equals(category) || "PYRAMID_TP".equals(category);
@@ -233,45 +277,26 @@ public class SignalService extends Service {
                         || "REENTRY_SL".equals(category) || "PYRAMID_SL".equals(category);
 
                 if (isFirstRun) {
-                    Log.d(TAG, "FIRST RUN - tracking: " + pair + " [" + state + "]");
+                    Log.d(TAG, "FIRST RUN - tracking: " + pair);
                 } else if (!knownStates.containsKey(id)) {
-                    // Brand new signal — notify immediately
-                    if (isTpHit) {
-                        showTpNotification(pair, hitTpIndex, category);
-                        notifiedCount++;
-                    } else if (isSlHit) {
-                        showSlNotification(pair);
-                        notifiedCount++;
-                    } else {
-                        showEntryNotification(pair, type, entry);
-                        notifiedCount++;
-                    }
+                    if (isTpHit) { showTpNotification(pair, hitTpIndex, category); notifiedCount++; }
+                    else if (isSlHit) { showSlNotification(pair); notifiedCount++; }
+                    else { showEntryNotification(pair, type, entry); notifiedCount++; }
                 } else {
-                    // Existing signal — detect state change
                     String oldState = knownStates.get(id);
                     if (!state.equals(oldState)) {
-                        if (isTpHit) {
-                            showTpNotification(pair, hitTpIndex, category);
-                            notifiedCount++;
-                        } else if (isSlHit) {
-                            showSlNotification(pair);
-                            notifiedCount++;
-                        } else {
-                            showEntryNotification(pair, type, entry);
-                            notifiedCount++;
-                        }
+                        if (isTpHit) { showTpNotification(pair, hitTpIndex, category); notifiedCount++; }
+                        else if (isSlHit) { showSlNotification(pair); notifiedCount++; }
+                        else { showEntryNotification(pair, type, entry); notifiedCount++; }
                     }
                 }
-
                 newStates.put(id, state);
             }
 
-            // Also reload known states from full signals periodically (every 30s via latestTime)
             if (isFirstRun) {
                 markInitialized();
-                // Also do a full load on first run to get all existing signals
                 newStates.putAll(loadFullSignalStates(token));
-                Log.d(TAG, "Initialized with " + newStates.size() + " signals (no notifications sent)");
+                Log.d(TAG, "Initialized with " + newStates.size() + " signals");
             }
 
             saveKnownStates(newStates, 50);
@@ -284,174 +309,60 @@ public class SignalService extends Service {
                     handler.postDelayed(new Runnable() {
                         @Override
                         public void run() {
-                            if (isRunning) {
-                                nm.notify(NOTIFICATION_ID, buildServiceNotification("جاري مراقبة الإشارات..."));
-                            }
+                            if (isRunning) nm.notify(NOTIFICATION_ID, buildServiceNotification("جاري مراقبة الإشارات..."));
                         }
                     }, 5000);
                 }
             }
 
         } catch (Exception e) {
-            Log.e(TAG, "Error checking signals (fast)", e);
+            Log.e(TAG, "Error checking signals", e);
         }
-    }
-
-    /**
-     * Fallback: Full signal fetch (used on first run or when updates API fails)
-     */
-    private void checkSignalsFull(String token) {
-        try {
-            URL url = new URL(SIGNALS_URL + "?limit=15");
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("GET");
-            conn.setRequestProperty("Content-Type", "application/json");
-            conn.setRequestProperty("User-Agent", "ForexYemeni/App/1.10");
-            if (!token.isEmpty()) {
-                conn.setRequestProperty("Authorization", "Bearer " + token);
-            }
-            conn.setConnectTimeout(8000);
-            conn.setReadTimeout(8000);
-
-            int code = conn.getResponseCode();
-            if (code != 200) return;
-
-            BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-            StringBuilder sb = new StringBuilder();
-            String line;
-            while ((line = reader.readLine()) != null) sb.append(line);
-            reader.close();
-            conn.disconnect();
-
-            JSONObject json = new JSONObject(sb.toString());
-            JSONArray signals = json.optJSONArray("signals");
-            if (signals == null) return;
-
-            Map<String, String> states = loadFullSignalStatesFromJson(signals);
-            saveKnownStates(states, 50);
-
-            // Update lastCheckTime to now so we don't re-fetch these
-            lastCheckTime = System.currentTimeMillis();
-
-        } catch (Exception e) {
-            Log.e(TAG, "Error in full signal check", e);
-        }
-    }
-
-    private Map<String, String> loadFullSignalStates(String token) {
-        try {
-            URL url = new URL(SIGNALS_URL + "?limit=15");
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("GET");
-            conn.setRequestProperty("Content-Type", "application/json");
-            conn.setRequestProperty("User-Agent", "ForexYemeni/App/1.10");
-            if (!token.isEmpty()) {
-                conn.setRequestProperty("Authorization", "Bearer " + token);
-            }
-            conn.setConnectTimeout(8000);
-            conn.setReadTimeout(8000);
-
-            if (conn.getResponseCode() != 200) return new HashMap<>();
-
-            BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-            StringBuilder sb = new StringBuilder();
-            String line;
-            while ((line = reader.readLine()) != null) sb.append(line);
-            reader.close();
-            conn.disconnect();
-
-            JSONObject json = new JSONObject(sb.toString());
-            JSONArray signals = json.optJSONArray("signals");
-            if (signals == null) return new HashMap<>();
-            return loadFullSignalStatesFromJson(signals);
-
-        } catch (Exception e) {
-            return new HashMap<>();
-        }
-    }
-
-    private Map<String, String> loadFullSignalStatesFromJson(JSONArray signals) {
-        Map<String, String> states = new HashMap<>();
-        try {
-            for (int i = 0; i < Math.min(signals.length(), 15); i++) {
-                JSONObject signal = signals.getJSONObject(i);
-                String id = signal.getString("id");
-                String status = signal.optString("status", "ACTIVE");
-                String category = signal.optString("signalCategory", "ENTRY");
-                int hitTpIndex = signal.optInt("hitTpIndex", -1);
-                states.put(id, status + "|" + category + "|" + hitTpIndex);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Error parsing states", e);
-        }
-        return states;
     }
 
     private void showEntryNotification(String pair, String type, double entry) {
-        String typeAr = type.equals("BUY") ? "شراء" : "بيع";
+        String typeAr = "BUY".equals(type) ? "شراء" : "بيع";
         NotificationHelper.showNotification(this,
-                "📊 إشارة جديدة — " + pair,
-                typeAr + " @" + entry,
-                type.equals("BUY") ? "buy" : "sell");
+                "📊 إشارة جديدة — " + pair, typeAr + " @" + entry,
+                "BUY".equals(type) ? "buy" : "sell");
     }
 
     private void showTpNotification(String pair, int hitTpIndex, String category) {
         String catIcon, catLabel;
-        if ("REENTRY_TP".equals(category)) {
-            catIcon = "♻️"; catLabel = "تعويض";
-        } else if ("PYRAMID_TP".equals(category)) {
-            catIcon = "🔥"; catLabel = "تعزيز";
-        } else {
-            catIcon = "🎯"; catLabel = "هدف";
-        }
+        if ("REENTRY_TP".equals(category)) { catIcon = "♻️"; catLabel = "تعويض"; }
+        else if ("PYRAMID_TP".equals(category)) { catIcon = "🔥"; catLabel = "تعزيز"; }
+        else { catIcon = "🎯"; catLabel = "هدف"; }
         NotificationHelper.showNotification(this,
                 catIcon + " " + catLabel + " محقق — " + pair,
-                catLabel + " " + hitTpIndex + " تم تحقيقه بنجاح!",
-                "tp_hit");
+                catLabel + " " + hitTpIndex + " تم تحقيقه بنجاح!", "tp_hit");
     }
 
     private void showSlNotification(String pair) {
         NotificationHelper.showNotification(this,
-                "🛑 وقف خسارة — " + pair,
-                "تم ضرب وقف الخسارة!",
-                "sl_hit");
+                "🛑 وقف خسارة — " + pair, "تم ضرب وقف الخسارة!", "sl_hit");
     }
 
     private boolean isInitialized() {
-        try {
-            return getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-                .getBoolean(KEY_INITIALIZED, false);
-        } catch (Exception e) {
-            return false;
-        }
+        try { return getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getBoolean(KEY_INITIALIZED, false); }
+        catch (Exception e) { return false; }
     }
 
     private void markInitialized() {
-        try {
-            getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-                .edit().putBoolean(KEY_INITIALIZED, true).apply();
-        } catch (Exception e) {
-            Log.e(TAG, "Error marking initialized", e);
-        }
+        try { getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit().putBoolean(KEY_INITIALIZED, true).apply(); }
+        catch (Exception e) { Log.e(TAG, "Error marking initialized", e); }
     }
 
     private Map<String, String> loadKnownStates() {
         Map<String, String> states = new HashMap<>();
         try {
-            String stored = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-                .getString(KEY_KNOWN_STATES, "");
+            String stored = getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getString(KEY_KNOWN_STATES, "");
             if (!stored.isEmpty()) {
-                String[] entries = stored.split(",");
-                for (String entry : entries) {
+                for (String entry : stored.split(",")) {
                     int eq = entry.indexOf('=');
-                    if (eq > 0) {
-                        states.put(entry.substring(0, eq), entry.substring(eq + 1));
-                    }
+                    if (eq > 0) states.put(entry.substring(0, eq), entry.substring(eq + 1));
                 }
             }
-        } catch (Exception e) {
-            Log.e(TAG, "Error loading states", e);
-        }
+        } catch (Exception e) { Log.e(TAG, "Error loading states", e); }
         return states;
     }
 
@@ -465,10 +376,36 @@ public class SignalService extends Service {
                 sb.append(entry.getKey()).append("=").append(entry.getValue());
                 count++;
             }
-            getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-                .edit().putString(KEY_KNOWN_STATES, sb.toString()).apply();
-        } catch (Exception e) {
-            Log.e(TAG, "Error saving states", e);
-        }
+            getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit().putString(KEY_KNOWN_STATES, sb.toString()).apply();
+        } catch (Exception e) { Log.e(TAG, "Error saving states", e); }
+    }
+
+    private Map<String, String> loadFullSignalStates(String token) {
+        try {
+            URL url = new URL(SIGNALS_URL + "?limit=15");
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("GET");
+            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setRequestProperty("User-Agent", "ForexYemeni/App/1.10");
+            if (!token.isEmpty()) conn.setRequestProperty("Authorization", "Bearer " + token);
+            conn.setConnectTimeout(8000);
+            conn.setReadTimeout(8000);
+            if (conn.getResponseCode() != 200) { conn.disconnect(); return new HashMap<>(); }
+            BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+            StringBuilder sb = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) sb.append(line);
+            reader.close();
+            conn.disconnect();
+            JSONObject json = new JSONObject(sb.toString());
+            JSONArray signals = json.optJSONArray("signals");
+            if (signals == null) return new HashMap<>();
+            Map<String, String> states = new HashMap<>();
+            for (int i = 0; i < Math.min(signals.length(), 15); i++) {
+                JSONObject s = signals.getJSONObject(i);
+                states.put(s.getString("id"), s.optString("status") + "|" + s.optString("signalCategory") + "|" + s.optInt("hitTpIndex", -1));
+            }
+            return states;
+        } catch (Exception e) { return new HashMap<>(); }
     }
 }

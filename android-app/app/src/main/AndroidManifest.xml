@@ -12,6 +12,11 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Exact alarm permission for Android 12+ — ensures precise polling timing -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <!-- Battery optimization whitelist — prevents OS from killing the service -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <uses-feature android:name="android.hardware.screen.portrait" android:required="false" />
 
@@ -47,18 +52,19 @@
             </intent-filter>
         </activity>
 
-        <!-- Foreground Service for instant signal monitoring (2s poll) -->
+        <!-- Foreground Service for instant signal monitoring -->
         <service
             android:name=".SignalService"
             android:enabled="true"
             android:exported="false"
+            android:stopWithTask="false"
             android:foregroundServiceType="specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Real-time trading signal monitoring and push notifications" />
         </service>
 
-        <!-- Fallback polling via AlarmManager -->
+        <!-- Heartbeat: checks signals + restarts service if killed -->
         <receiver
             android:name=".SignalPollReceiver"
             android:enabled="true"
@@ -71,6 +77,7 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
 

@@ -2,19 +2,20 @@ package com.forexyemeni.app;
 
 import android.Manifest;
 import android.app.Activity;
-import android.app.Notification;
-import android.app.NotificationChannel;
 import android.app.NotificationManager;
-import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.net.http.SslError;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.PowerManager;
+import android.provider.Settings;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.Window;
@@ -30,11 +31,13 @@ import android.webkit.SslErrorHandler;
 
 /**
  * ForexYemeni VIP Trading Signals - Android App v1.10
- * - WebView wrapping the Next.js PWA
- * - Foreground Service for instant signal monitoring (2-second poll)
- * - Native notification bridge: JS -> Android notifications
- * - Session token sharing: WebView -> Service (for authenticated API calls)
- * - Boot receiver: auto-restart service after device reboot
+ *
+ * Architecture:
+ * - WebView wraps the Next.js PWA (primary UI + real-time SSE)
+ * - SignalService: foreground service, 2s polling, survives background
+ * - SignalPollReceiver: heartbeat every 15s, restarts service if killed
+ * - BootReceiver: restarts everything after reboot/update
+ * - NativeBridge: JS → native notifications + session token sharing
  */
 public class MainActivity extends Activity {
 
@@ -54,27 +57,27 @@ public class MainActivity extends Activity {
             getWindow().setStatusBarColor(Color.parseColor("#070b14"));
             getWindow().setNavigationBarColor(Color.parseColor("#070b14"));
 
-            // Create notification channels
+            // 1. Create notification channels
             NotificationHelper.createAllChannels(this);
 
-            // Request notification permission for Android 13+
+            // 2. Request notification permission (Android 13+)
             requestNotificationPermission();
 
-            // Start the foreground service for instant signal monitoring
+            // 3. Request battery optimization whitelist (CRITICAL for background service)
+            requestBatteryWhitelist();
+
+            // 4. Start foreground service + heartbeat
             startSignalService();
 
-            // Setup WebView
+            // 5. Setup WebView
             webView = new WebView(this);
             configureWebView(webView);
-
-            // Add JavaScript interface for native notifications + session sharing
             webView.addJavascriptInterface(new NativeBridge(this), "AndroidNotify");
-
             webView.setWebViewClient(new AppWebViewClient());
             webView.setWebChromeClient(new WebChromeClient() {
                 @Override
                 public boolean onConsoleMessage(ConsoleMessage cm) {
-                    android.util.Log.d("WebView", cm.message());
+                    Log.d("WebView", cm.message());
                     return true;
                 }
             });
@@ -88,8 +91,7 @@ public class MainActivity extends Activity {
             }
 
         } catch (Exception e) {
-            android.util.Log.e("ForexYemeni", "onCreate error", e);
-            android.widget.Toast.makeText(this, "Error: " + e.getMessage(), android.widget.Toast.LENGTH_LONG).show();
+            Log.e("ForexYemeni", "onCreate error", e);
         }
     }
 
@@ -113,6 +115,9 @@ public class MainActivity extends Activity {
         wv.setLayerType(View.LAYER_TYPE_HARDWARE, null);
     }
 
+    /**
+     * Request POST_NOTIFICATIONS permission (Android 13+)
+     */
     private void requestNotificationPermission() {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -121,7 +126,59 @@ public class MainActivity extends Activity {
                 }
             }
         } catch (Exception e) {
-            android.util.Log.e("ForexYemeni", "Permission request error", e);
+            Log.e("ForexYemeni", "Notification permission error", e);
+        }
+    }
+
+    /**
+     * CRITICAL: Request battery optimization whitelist
+     * Without this, Android will kill the service when the app is swiped away.
+     * Opens the system settings page where user can select "Don't optimize".
+     */
+    private void requestBatteryWhitelist() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+                if (pm != null && !pm.isIgnoringBatteryOptimizations(getPackageName())) {
+                    // Show a gentle prompt to the user
+                    new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+                        @Override
+                        public void run() {
+                            try {
+                                // Check if notification permission is granted before showing dialog
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                    if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                                        return; // Don't show battery dialog before notification permission
+                                    }
+                                }
+
+                                Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+                                intent.setData(Uri.parse("package:" + getPackageName()));
+                                startActivity(intent);
+                            } catch (Exception e) {
+                                // Some devices don't support this intent — silently ignore
+                                Log.w("ForexYemeni", "Battery whitelist dialog not supported");
+                            }
+                        }
+                    }, 3000); // Show 3 seconds after app launch
+                }
+            }
+
+            // Also request SCHEDULE_EXACT_ALARM on Android 12+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                AlarmManager am = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+                if (am != null && !am.canScheduleExactAlarms()) {
+                    try {
+                        Intent intent = new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM);
+                        intent.setData(Uri.parse("package:" + getPackageName()));
+                        startActivity(intent);
+                    } catch (Exception e) {
+                        Log.w("ForexYemeni", "Exact alarm permission dialog not supported");
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.e("ForexYemeni", "Battery whitelist error", e);
         }
     }
 
@@ -133,35 +190,37 @@ public class MainActivity extends Activity {
             } else {
                 startService(serviceIntent);
             }
-            android.util.Log.d("ForexYemeni", "SignalService started");
+            Log.d("ForexYemeni", "SignalService started");
         } catch (Exception e) {
-            android.util.Log.e("ForexYemeni", "Failed to start SignalService", e);
-            SignalPollReceiver.startPolling(this);
+            Log.e("ForexYemeni", "Failed to start service, starting heartbeat only", e);
+            SignalPollReceiver.startHeartbeat(this);
         }
     }
 
     @Override
     protected void onSaveInstanceState(Bundle outState) {
-        if (webView != null) {
-            webView.saveState(outState);
-        }
+        if (webView != null) webView.saveState(outState);
         super.onSaveInstanceState(outState);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        // Service keeps running in background
+        // Ensure service is still running when user returns
+        try {
+            SignalService.setSessionToken(this, ""); // Will be set by WebView
+        } catch (Exception ignored) {}
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        // Do NOT stop the service — it should keep running
+        // Do NOT stop the service or heartbeat — they keep running
         if (webView != null) {
             webView.destroy();
             webView = null;
         }
+        Log.d("ForexYemeni", "Activity destroyed — service + heartbeat continue");
     }
 
     @Override
@@ -189,9 +248,11 @@ public class MainActivity extends Activity {
     }
 
     /**
-     * JavaScript Bridge — connects WebView to native Android features
-     * - sendNotification(): instant native notification with custom sound
-     * - setSessionToken(): passes auth token to SignalService for API calls
+     * JavaScript Bridge — WebView ↔ Native communication
+     *
+     * Methods callable from JS:
+     * - AndroidNotify.sendNotification(title, body, soundType)
+     * - AndroidNotify.setSessionToken(token)
      */
     public class NativeBridge {
         private Context context;
@@ -200,10 +261,6 @@ public class MainActivity extends Activity {
             this.context = ctx;
         }
 
-        /**
-         * Show a native Android notification with custom sound
-         * Called from WebView when a new signal is detected
-         */
         @JavascriptInterface
         public void sendNotification(final String title, final String body, final String soundType) {
             new Handler(Looper.getMainLooper()).post(new Runnable() {
@@ -212,16 +269,12 @@ public class MainActivity extends Activity {
                     try {
                         NotificationHelper.showNotification(context, title, body, soundType);
                     } catch (Exception e) {
-                        android.util.Log.e("ForexYemeni", "Notification error", e);
+                        Log.e("ForexYemeni", "Notification error", e);
                     }
                 }
             });
         }
 
-        /**
-         * Pass the session token from WebView to the native SignalService
-         * This allows the service to make authenticated API calls
-         */
         @JavascriptInterface
         public void setSessionToken(final String token) {
             new Thread(new Runnable() {
@@ -229,9 +282,9 @@ public class MainActivity extends Activity {
                 public void run() {
                     try {
                         SignalService.setSessionToken(context, token);
-                        android.util.Log.d("ForexYemeni", "Session token passed to service");
+                        Log.d("ForexYemeni", "Session token shared with service");
                     } catch (Exception e) {
-                        android.util.Log.e("ForexYemeni", "Token sharing error", e);
+                        Log.e("ForexYemeni", "Token error", e);
                     }
                 }
             }).start();
@@ -242,13 +295,11 @@ public class MainActivity extends Activity {
         @Override
         public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest req) {
             String url = req.getUrl().toString();
-            if (url.startsWith(APP_URL)) {
-                return false;
-            }
+            if (url.startsWith(APP_URL)) return false;
             try {
-                startActivity(new Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)));
+                startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
             } catch (Exception e) {
-                android.util.Log.e("ForexYemeni", "Cannot open URL", e);
+                Log.e("ForexYemeni", "Cannot open URL", e);
             }
             return true;
         }
@@ -260,7 +311,7 @@ public class MainActivity extends Activity {
 
         @Override
         public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
-            android.util.Log.e("ForexYemeni", "WebView error: " + errorCode + " " + description);
+            Log.e("ForexYemeni", "WebView error: " + errorCode + " " + description);
         }
     }
 }

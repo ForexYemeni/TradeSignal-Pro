@@ -7,8 +7,11 @@ import android.os.Build;
 import android.util.Log;
 
 /**
- * BootReceiver - Restarts SignalService after device reboot
- * Ensures notifications continue working even after the phone is restarted
+ * BootReceiver — Survives device reboot and app update
+ *
+ * When the device reboots or the app is updated:
+ * 1. Restarts SignalService (foreground service)
+ * 2. Starts heartbeat alarm (backup monitoring + service restart)
  */
 public class BootReceiver extends BroadcastReceiver {
 
@@ -18,20 +21,32 @@ public class BootReceiver extends BroadcastReceiver {
     public void onReceive(Context context, Intent intent) {
         if (intent == null || intent.getAction() == null) return;
 
-        if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) {
-            Log.d(TAG, "Device booted — restarting SignalService");
+        String action = intent.getAction();
+        Log.d(TAG, "Received: " + action);
+
+        if (Intent.ACTION_BOOT_COMPLETED.equals(action)
+                || "android.intent.action.MY_PACKAGE_REPLACED".equals(action)) {
+
             try {
+                // Create notification channels first
+                NotificationHelper.createAllChannels(context);
+
+                // 1. Start the foreground service
                 Intent serviceIntent = new Intent(context, SignalService.class);
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     context.startForegroundService(serviceIntent);
                 } else {
                     context.startService(serviceIntent);
                 }
-                Log.d(TAG, "SignalService restarted after boot");
+
+                // 2. Start heartbeat alarm as safety net
+                SignalPollReceiver.startHeartbeat(context);
+
+                Log.d(TAG, "Service + heartbeat started after " + action);
             } catch (Exception e) {
-                Log.e(TAG, "Failed to restart SignalService after boot", e);
-                // Fallback to alarm polling
-                SignalPollReceiver.startPolling(context);
+                Log.e(TAG, "Failed to restart after " + action, e);
+                // Ultimate fallback: heartbeat only
+                SignalPollReceiver.startHeartbeat(context);
             }
         }
     }
