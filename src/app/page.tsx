@@ -764,74 +764,90 @@ export default function HomePage() {
   async function handleVerifyOtp(codeOverride?: string) {
     const code = codeOverride || otpCode;
     if (code.length !== 6) { setOtpErr("أدخل الكود كاملاً (6 أرقام)"); return; }
-    if (otpVerifying) return; // Prevent double-submit
+    if (otpVerifying) return;
     setOtpVerifying(true);
     setOtpErr("");
     try {
+      // Step 1: Verify OTP code
       const res = await fetch("/api/otp/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: otpEmail, otp: code, type: otpPurpose }),
       });
       const data = await res.json();
-      if (data.success) {
-        setOtpVerifyToken(data.verifyToken);
-        setOtpStep("done");
-        // Auto-proceed based on purpose
-        if (otpPurpose === "register") {
-          // Complete registration with verifyToken
-          setRegLoad(true);
-          try {
-            const regRes = await fetch("/api/register", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ name: otpName, email: otpEmail, password: otpPwd, verifyToken: data.verifyToken }),
-            });
-            const regData = await regRes.json();
-            if (regData.success) {
-              setRegSuccess(regData.message);
-              setRegName(""); setRegEmail(""); setRegPwd("");
-              toast.success(regData.message);
-              setView("login");
-            } else {
-              setOtpErr(regData.error || "فشل إنشاء الحساب");
-              toast.error(regData.error || "فشل إنشاء الحساب");
-            }
-          } catch { setOtpErr("خطأ في إنشاء الحساب"); }
-          finally { setRegLoad(false); }
-        } else if (otpPurpose === "login") {
-          // Complete login with verifyToken
-          setLoginLoad(true);
-          try {
-            const loginRes = await fetch("/api/admin", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ action: "login", email: otpEmail, password: otpPwd, verifyToken: data.verifyToken }),
-            });
-            const loginData = await loginRes.json();
-            if (loginData.success) {
-              completeLogin(loginData);
-            } else if (loginData.pending) { setView("pending"); }
-            else if (loginData.blocked) { setView("blocked"); }
-            else if (loginData.expired) { setView("expired"); }
-            else if (loginData.error === "email_not_found") {
-              setLoginFeedback({ type: "email_not_found", email: loginData.email });
-              setView("login");
-            } else if (loginData.error === "wrong_password") {
-              setLoginFeedback({ type: "wrong_password", attemptsLeft: loginData.attemptsLeft, maxAttempts: loginData.maxAttempts, locked: loginData.locked, lockedUntil: loginData.lockedUntil });
-              setView("login");
-            } else {
-              setOtpErr(loginData.error || "فشل تسجيل الدخول");
-              toast.error(loginData.error || "فشل تسجيل الدخول");
-            }
-          } catch { setOtpErr("خطأ في الاتصال"); }
-          finally { setLoginLoad(false); }
-        }
-      } else {
-        setOtpErr(data.error || "كود غير صحيح");
+      console.log("[OTP Verify]", JSON.stringify(data));
+      if (!data.success) {
+        setOtpErr(data.error || "كود التحقق غير صحيح");
         setOtpVerifying(false);
+        return;
       }
-    } catch { setOtpErr("خطأ في الاتصال"); setOtpVerifying(false); }
+      // OTP verified successfully
+      setOtpVerifyToken(data.verifyToken);
+      // Step 2: Complete the action (register or login)
+      if (otpPurpose === "register") {
+        setRegLoad(true);
+        try {
+          const regRes = await fetch("/api/register", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: otpName, email: otpEmail, password: otpPwd, verifyToken: data.verifyToken }),
+          });
+          const regData = await regRes.json();
+          console.log("[Register]", JSON.stringify(regData));
+          if (regData.success) {
+            setRegSuccess(regData.message);
+            setRegName(""); setRegEmail(""); setRegPwd("");
+            toast.success(regData.message);
+            setView("login");
+          } else {
+            setOtpErr(regData.error || "فشل إنشاء الحساب");
+            toast.error(regData.error || "فشل إنشاء الحساب");
+            setOtpVerifying(false);
+          }
+        } catch (err) {
+          console.error("[Register Error]", err);
+          setOtpErr("خطأ في إنشاء الحساب");
+          setOtpVerifying(false);
+        } finally { setRegLoad(false); }
+      } else if (otpPurpose === "login") {
+        setLoginLoad(true);
+        try {
+          const loginRes = await fetch("/api/admin", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "login", email: otpEmail, password: otpPwd, verifyToken: data.verifyToken }),
+          });
+          const loginData = await loginRes.json();
+          console.log("[Login after OTP]", JSON.stringify(loginData));
+          if (loginData.success) {
+            completeLogin(loginData);
+          } else if (loginData.pending) {
+            setView("pending");
+          } else if (loginData.blocked) {
+            setView("blocked");
+          } else if (loginData.expired) {
+            setView("expired");
+          } else if (loginData.locked) {
+            setOtpErr("الحساب مقفل مؤقتاً. حاول بعد " + (loginData.retryAfterMinutes || 15) + " دقيقة");
+            setOtpVerifying(false);
+          } else {
+            // Show the actual error from the server
+            const errMsg = loginData.error || "فشل تسجيل الدخول";
+            setOtpErr(errMsg);
+            toast.error(errMsg);
+            setOtpVerifying(false);
+          }
+        } catch (err) {
+          console.error("[Login Error]", err);
+          setOtpErr("خطأ في الاتصال بالخادم");
+          setOtpVerifying(false);
+        } finally { setLoginLoad(false); }
+      }
+    } catch (err) {
+      console.error("[OTP Verify Error]", err);
+      setOtpErr("خطأ في الاتصال");
+      setOtpVerifying(false);
+    }
   }
 
   function resetOtp() {

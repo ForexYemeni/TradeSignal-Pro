@@ -32,6 +32,8 @@ export async function POST(request: NextRequest) {
     const otpKey = `otp:${type}:${sanitizedEmail}`;
     const storedOtp = await kv.get<string>(otpKey);
 
+    console.log(`[OTP Verify] key=${otpKey}, stored="${storedOtp}", input="${sanitizedOtp}", match=${storedOtp === sanitizedOtp}`);
+
     if (!storedOtp) {
       return NextResponse.json({ success: false, error: "انتهت صلاحية الكود. أعد إرسال كود جديد." }, { status: 410 });
     }
@@ -47,6 +49,8 @@ export async function POST(request: NextRequest) {
     const verifyToken = `v_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
     const verifyKey = `otp_verified:${type}:${sanitizedEmail}`;
     await kv.set(verifyKey, verifyToken, { ex: 600 }); // 10 minutes
+
+    console.log(`[OTP Verify] SUCCESS for ${sanitizedEmail}, token=${verifyToken}`);
 
     return NextResponse.json({
       success: true,
