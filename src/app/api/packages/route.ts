@@ -12,7 +12,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const { name, durationDays, price, type, description, isActive, order, features, maxSignals, prioritySupport, showEntryEarly } = await request.json();
+    const { name, durationDays, price, type, description, isActive, order, features, maxSignals, prioritySupport, showEntryEarly, instruments } = await request.json();
     if (!name || durationDays === undefined || price === undefined) {
       return NextResponse.json({ success: false, error: "الاسم والمدة والسعر مطلوبة" }, { status: 400 });
     }
@@ -30,6 +30,7 @@ export async function POST(request: NextRequest) {
       maxSignals: Number(maxSignals) || 0,
       prioritySupport: !!prioritySupport,
       showEntryEarly: !!showEntryEarly,
+      instruments: Array.isArray(instruments) ? instruments : undefined,
     });
     return NextResponse.json({ success: true, package: pkg });
   } catch (error) {

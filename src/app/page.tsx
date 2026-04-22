@@ -879,6 +879,8 @@ export default function HomePage() {
     finally { setSendLoad(false); }
   }
 
+  const isAdmin = session?.role === "admin";
+
   function getFiltered(): Signal[] {
     const instMap: Record<string, string> = { "ذهب": "gold", "عملات": "currencies", "مؤشرات": "indices", "نفط": "oil", "عملات رقمية": "crypto", "معادن": "metals" };
     const upkg = packages.find(p => p.id === session?.packageId);
@@ -1451,8 +1453,6 @@ export default function HomePage() {
     { key: "all", label: "الكل" }, { key: "buy", label: "شراء" },
     { key: "sell", label: "بيع" }, { key: "active", label: "نشطة" }, { key: "closed", label: "مغلقة" },
   ];
-
-  const isAdmin = session?.role === "admin";
 
   const tabs: { key: Tab; label: string; icon: React.ReactNode; badge?: number; adminOnly?: boolean }[] = [
     { key: "home", label: "الرئيسية", icon: <Home className="w-5 h-5" /> },

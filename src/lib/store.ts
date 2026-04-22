@@ -379,6 +379,7 @@ export interface SubscriptionPackage {
   maxSignals: number;
   prioritySupport: boolean;
   showEntryEarly: boolean;
+  instruments?: string[];
 }
 
 export async function getPackages(): Promise<SubscriptionPackage[]> {
