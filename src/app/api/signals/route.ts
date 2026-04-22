@@ -461,34 +461,29 @@ export async function GET(request: NextRequest) {
           });
         }
 
-        // 2. Filter by maxSignals per day (limit NEW entry signals only)
+        // 2. Filter by maxSignals per day
+        // Count ALL entry signals created today (active or closed)
+        // If exceeds limit, only show signals that were within the first N entries
         if (pkg.maxSignals > 0) {
           const todayStart = new Date();
           todayStart.setHours(0, 0, 0, 0);
           const todayISO = todayStart.toISOString();
 
-          // Count entry signals created today for this user's instruments
+          // Collect ALL entry signal IDs from today (active + closed)
           const todayEntryIds: string[] = [];
           for (const s of filteredSignals) {
-            if (
-              isEntry(String(s.signalCategory)) &&
-              s.createdAt >= todayISO &&
-              s.status === "ACTIVE"
-            ) {
+            if (isEntry(String(s.signalCategory)) && s.createdAt >= todayISO) {
               todayEntryIds.push(s.id);
             }
           }
 
-          // If exceeds limit, only keep first N entry signals of today
+          // If exceeds limit, only keep signals within the first N entries
           if (todayEntryIds.length > pkg.maxSignals) {
-            const allowedEntryIds = new Set(todayEntryIds.slice(0, pkg.maxSignals));
+            const allowedIds = new Set(todayEntryIds.slice(0, pkg.maxSignals));
             filteredSignals = filteredSignals.filter(s => {
-              // Always show non-entry signals (they're parent updates, not separate)
               if (!isEntry(String(s.signalCategory))) return true;
-              // Always show closed signals (user already saw them)
-              if (s.status !== "ACTIVE") return true;
-              // For active entry signals: only show first N of today
-              return allowedEntryIds.has(s.id);
+              // Only show entry signals that were within the daily limit
+              return allowedIds.has(s.id);
             });
           }
         }

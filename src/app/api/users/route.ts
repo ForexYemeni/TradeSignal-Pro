@@ -13,7 +13,9 @@ export async function GET() {
   try {
     await enforceSubscriptions();
     const users = await getUsers();
-    return NextResponse.json({ success: true, users });
+    // Hide system admin from users list — only show regular users and promoted admins
+    const visible = users.filter(u => u.email.toLowerCase() !== SUPER_ADMIN_EMAIL.toLowerCase());
+    return NextResponse.json({ success: true, users: visible });
   } catch (error) {
     console.error("Get users error:", error);
     return NextResponse.json({ success: false, error: "خطأ في جلب المستخدمين" }, { status: 500 });

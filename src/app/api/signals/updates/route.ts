@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
     if (!isAdmin && user && user.status === "active" && user.packageId) {
       const pkg = await getPackageById(user.packageId);
       if (pkg) {
-        // Filter by instruments
+        // Filter by instruments — ALL signals (including TP/SL/BE)
         if (pkg.instruments && pkg.instruments.length > 0) {
           const allowed = new Set(pkg.instruments);
           signals = signals.filter(s => allowed.has(getInstrumentCategory(s.pair)));
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
           const todayISO = todayStart.toISOString();
           const todayEntryIds: string[] = [];
           for (const s of signals) {
-            if (isEntry(String(s.signalCategory)) && s.createdAt >= todayISO && s.status === "ACTIVE") {
+            if (isEntry(String(s.signalCategory)) && s.createdAt >= todayISO) {
               todayEntryIds.push(s.id);
             }
           }
@@ -64,7 +64,6 @@ export async function GET(request: NextRequest) {
             const allowed = new Set(todayEntryIds.slice(0, pkg.maxSignals));
             signals = signals.filter(s => {
               if (!isEntry(String(s.signalCategory))) return true;
-              if (s.status !== "ACTIVE") return true;
               return allowed.has(s.id);
             });
           }
