@@ -1,24 +1,13 @@
 /**
  * Email Service — Google Apps Script integration
  *
- * Handles all email operations:
- * - OTP verification codes (registration + login)
- * - Signal notifications to subscribers
- *
  * Uses Google Apps Script + GmailApp for FREE email delivery.
- * No API keys or paid services needed.
- *
- * Setup:
- * 1. Deploy google-apps-script/Email-Sender.js as Web App
- * 2. Set GOOGLE_APPS_SCRIPT_EMAIL_URL in Vercel env
+ * Setup: Deploy google-apps-script/Email-Sender.js as Web App
+ * Set GOOGLE_APPS_SCRIPT_EMAIL_URL in Vercel env
  */
 
 const EMAIL_URL = process.env.GOOGLE_APPS_SCRIPT_EMAIL_URL || '';
 const EMAIL_KEY = process.env.GOOGLE_APPS_SCRIPT_EMAIL_KEY || '';
-
-// ═══════════════════════════════════════════════════════════════
-//  Core Email Sending (via Google Apps Script)
-// ═══════════════════════════════════════════════════════════════
 
 interface EmailPayload {
   to: string;
@@ -27,86 +16,107 @@ interface EmailPayload {
 }
 
 /**
- * Send a single email via Google Apps Script
+ * Send a single email via Google Apps Script.
+ * Handles GAS redirect responses and parsing issues.
  */
-async function sendViaGAS(payload: EmailPayload): Promise<boolean> {
+async function sendViaGAS(payload: EmailPayload): Promise<{ ok: boolean; error?: string }> {
   if (!EMAIL_URL) {
-    console.error('GOOGLE_APPS_SCRIPT_EMAIL_URL is not configured');
-    return false;
+    return { ok: false, error: 'GOOGLE_APPS_SCRIPT_EMAIL_URL is not configured' };
   }
 
   try {
-    const body = {
+    const body: Record<string, string> = {
       action: 'send',
       to: payload.to,
       subject: payload.subject,
       html: payload.html,
-      ...(EMAIL_KEY ? { key: EMAIL_KEY } : {}),
     };
+    if (EMAIL_KEY) body.key = EMAIL_KEY;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000); // 15s timeout
 
     const response = await fetch(EMAIL_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify(body),
+      redirect: 'follow',
+      signal: controller.signal,
     });
+    clearTimeout(timeout);
+
+    // Read response as text first (GAS may return HTML redirect page)
+    const responseText = await response.text();
 
     if (!response.ok) {
-      console.error(`GAS email error: HTTP ${response.status}`);
-      return false;
+      console.error(`[GAS Email] HTTP ${response.status}: ${responseText.substring(0, 200)}`);
+      return { ok: false, error: `HTTP ${response.status}` };
     }
 
-    const data = await response.json();
-    if (!data.success) {
-      console.error('GAS email error:', data.error);
-      return false;
+    // Try to parse as JSON — GAS may return HTML redirect page instead
+    try {
+      const data = JSON.parse(responseText);
+      if (data.success) {
+        console.log(`[GAS Email] Sent to ${payload.to}`);
+        return { ok: true };
+      }
+      console.error(`[GAS Email] API error: ${JSON.stringify(data)}`);
+      return { ok: false, error: data.error || 'GAS returned failure' };
+    } catch {
+      // Response is not JSON — likely a redirect HTML page
+      console.error(`[GAS Email] Non-JSON response: ${responseText.substring(0, 200)}`);
+      return { ok: false, error: 'Invalid response from Google Apps Script' };
     }
-
-    console.log(`Email sent to ${payload.to} via GAS`);
-    return true;
   } catch (error) {
-    console.error('sendViaGAS error:', error);
-    return false;
+    const msg = error instanceof Error ? error.message : String(error);
+    if (msg.includes('abort') || msg.includes('timeout')) {
+      console.error(`[GAS Email] Timeout sending to ${payload.to}`);
+      return { ok: false, error: 'timeout' };
+    }
+    console.error(`[GAS Email] Error: ${msg}`);
+    return { ok: false, error: msg };
   }
 }
 
 /**
- * Send batch emails via Google Apps Script (for signal broadcasts)
+ * Send batch emails via Google Apps Script
  */
 async function sendBatchViaGAS(emails: EmailPayload[]): Promise<{ sent: number; failed: number }> {
   if (!EMAIL_URL) {
-    console.error('GOOGLE_APPS_SCRIPT_EMAIL_URL is not configured');
     return { sent: 0, failed: emails.length };
   }
 
   try {
-    const body = {
+    const body: Record<string, unknown> = {
       action: 'batch',
-      emails: emails.map(e => ({
-        to: e.to,
-        subject: e.subject,
-        html: e.html,
-      })),
-      ...(EMAIL_KEY ? { key: EMAIL_KEY } : {}),
+      emails: emails.map(e => ({ to: e.to, subject: e.subject, html: e.html })),
     };
+    if (EMAIL_KEY) (body as Record<string, string>).key = EMAIL_KEY;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
 
     const response = await fetch(EMAIL_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify(body),
+      redirect: 'follow',
+      signal: controller.signal,
     });
+    clearTimeout(timeout);
 
-    if (!response.ok) {
-      console.error(`GAS batch error: HTTP ${response.status}`);
+    const responseText = await response.text();
+
+    try {
+      const data = JSON.parse(responseText);
+      return {
+        sent: data.batch?.sent || 0,
+        failed: data.batch?.failed || emails.length,
+      };
+    } catch {
       return { sent: 0, failed: emails.length };
     }
-
-    const data = await response.json();
-    return {
-      sent: data.batch?.sent || 0,
-      failed: data.batch?.failed || emails.length,
-    };
-  } catch (error) {
-    console.error('sendBatchViaGAS error:', error);
+  } catch {
     return { sent: 0, failed: emails.length };
   }
 }
@@ -138,7 +148,6 @@ export function buildOtpEmail(otp: string, type: 'register' | 'login', name?: st
     <tr>
       <td align="center" style="padding:40px 16px;">
         <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;">
-          <!-- Logo -->
           <tr>
             <td align="center" style="padding-bottom:32px;">
               <div style="width:64px;height:64px;border-radius:16px;background:linear-gradient(135deg,#FFD700,#FFA500);display:inline-flex;align-items:center;justify-content:center;">
@@ -146,19 +155,16 @@ export function buildOtpEmail(otp: string, type: 'register' | 'login', name?: st
               </div>
             </td>
           </tr>
-          <!-- Title -->
           <tr>
             <td align="center" style="padding-bottom:8px;">
               <h1 style="margin:0;font-size:24px;font-weight:800;color:#ffffff;letter-spacing:0.5px;">${title}</h1>
             </td>
           </tr>
-          <!-- Subtitle -->
           <tr>
             <td align="center" style="padding-bottom:36px;">
               <p style="margin:0;font-size:14px;color:rgba(255,255,255,0.6);line-height:1.8;text-align:center;">${subtitle}</p>
             </td>
           </tr>
-          <!-- OTP Box -->
           <tr>
             <td align="center" style="padding-bottom:32px;">
               <div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,215,0,0.2);border-radius:16px;padding:28px 24px;text-align:center;">
@@ -168,7 +174,6 @@ export function buildOtpEmail(otp: string, type: 'register' | 'login', name?: st
               </div>
             </td>
           </tr>
-          <!-- Warning -->
           <tr>
             <td align="center" style="padding-bottom:24px;">
               <p style="margin:0;font-size:12px;color:rgba(255,255,255,0.3);line-height:1.6;">
@@ -176,7 +181,6 @@ export function buildOtpEmail(otp: string, type: 'register' | 'login', name?: st
               </p>
             </td>
           </tr>
-          <!-- Footer -->
           <tr>
             <td align="center" style="padding-top:24px;border-top:1px solid rgba(255,255,255,0.06);">
               <p style="margin:0;font-size:11px;color:rgba(255,255,255,0.2);">
@@ -193,14 +197,9 @@ export function buildOtpEmail(otp: string, type: 'register' | 'login', name?: st
   };
 }
 
-export async function sendOtpEmail(to: string, otp: string, type: 'register' | 'login', name?: string): Promise<boolean> {
-  try {
-    const { subject, html } = buildOtpEmail(otp, type, name);
-    return await sendViaGAS({ to, subject, html });
-  } catch (error) {
-    console.error('sendOtpEmail error:', error);
-    return false;
-  }
+export async function sendOtpEmail(to: string, otp: string, type: 'register' | 'login', name?: string): Promise<{ ok: boolean; error?: string }> {
+  const { subject, html } = buildOtpEmail(otp, type, name);
+  return await sendViaGAS({ to, subject, html });
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -224,7 +223,6 @@ export function buildSignalEmail(signal: {
   const directionColor = isBuy ? '#00E676' : '#FF5252';
   const directionText = isBuy ? 'شراء' : 'بيع';
 
-  // Build TP rows
   const tpRows = signal.takeProfits.map((tp, i) => `
     <tr>
       <td style="padding:10px 16px;border-bottom:1px solid rgba(255,255,255,0.04);font-size:13px;color:rgba(255,255,255,0.5);">TP${i + 1}</td>
@@ -232,7 +230,6 @@ export function buildSignalEmail(signal: {
       <td style="padding:10px 16px;border-bottom:1px solid rgba(255,255,255,0.04);font-size:13px;color:rgba(255,255,255,0.4);">${tp.rr.toFixed(2)} R:R</td>
     </tr>`).join('');
 
-  // Confidence bar
   const confPct = signal.confidence;
   const confColor = confPct >= 75 ? '#00E676' : confPct >= 50 ? '#FFD700' : '#FF5252';
 
@@ -252,8 +249,6 @@ export function buildSignalEmail(signal: {
     <tr>
       <td align="center" style="padding:32px 16px;">
         <table role="presentation" width="520" cellpadding="0" cellspacing="0" style="max-width:520px;width:100%;">
-
-          <!-- Header: Logo + Badge -->
           <tr>
             <td style="padding-bottom:28px;">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
@@ -272,12 +267,9 @@ export function buildSignalEmail(signal: {
               </table>
             </td>
           </tr>
-
-          <!-- Signal Card -->
           <tr>
             <td>
               <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:20px;overflow:hidden;">
-                <!-- Direction Banner -->
                 <div style="background:linear-gradient(135deg,${directionColor}15,${directionColor}08);padding:24px 28px;border-bottom:1px solid rgba(255,255,255,0.04);">
                   <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                     <tr>
@@ -293,11 +285,8 @@ export function buildSignalEmail(signal: {
                     </tr>
                   </table>
                 </div>
-
-                <!-- Signal Details -->
                 <div style="padding:24px 28px;">
                   <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                    <!-- Entry -->
                     <tr>
                       <td style="padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
                         <span style="font-size:12px;color:rgba(255,255,255,0.35);display:block;margin-bottom:4px;">Entry</span>
@@ -318,8 +307,6 @@ export function buildSignalEmail(signal: {
                       </td>
                     </tr>
                   </table>
-
-                  <!-- Take Profits Table -->
                   ${signal.takeProfits.length > 0 ? `
                   <div style="margin-top:20px;border:1px solid rgba(255,255,255,0.06);border-radius:12px;overflow:hidden;">
                     <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
@@ -335,8 +322,6 @@ export function buildSignalEmail(signal: {
               </div>
             </td>
           </tr>
-
-          <!-- Disclaimer -->
           <tr>
             <td align="center" style="padding-top:24px;">
               <p style="margin:0;font-size:11px;color:rgba(255,255,255,0.2);line-height:1.6;text-align:center;max-width:400px;">
@@ -344,8 +329,6 @@ export function buildSignalEmail(signal: {
               </p>
             </td>
           </tr>
-
-          <!-- Footer -->
           <tr>
             <td align="center" style="padding-top:20px;border-top:1px solid rgba(255,255,255,0.06);">
               <p style="margin:0;font-size:11px;color:rgba(255,255,255,0.15);">
@@ -372,20 +355,11 @@ export async function sendSignalEmail(to: string, signal: {
   timeframe: string;
   instrument?: string;
 }): Promise<boolean> {
-  try {
-    const { subject, html } = buildSignalEmail(signal);
-    return await sendViaGAS({ to, subject, html });
-  } catch (error) {
-    console.error('sendSignalEmail error:', error);
-    return false;
-  }
+  const { subject, html } = buildSignalEmail(signal);
+  const result = await sendViaGAS({ to, subject, html });
+  return result.ok;
 }
 
-/**
- * Send signal notification to all active subscribers (fire-and-forget).
- * Uses batch sending via Google Apps Script for efficiency.
- * Returns the number of emails successfully sent.
- */
 export async function broadcastSignalToSubscribers(signal: {
   pair: string;
   type: 'BUY' | 'SELL';
@@ -410,15 +384,8 @@ export async function broadcastSignalToSubscribers(signal: {
   }
 
   const { subject, html } = buildSignalEmail(signal);
+  const batchEmails = subscribers.map(u => ({ to: u.email, subject, html }));
 
-  // Build batch payload
-  const batchEmails = subscribers.map(u => ({
-    to: u.email,
-    subject,
-    html,
-  }));
-
-  // Send in batches of 50 (GAS can handle this)
   let totalSent = 0;
   let totalFailed = 0;
   const batchSize = 50;
@@ -430,6 +397,6 @@ export async function broadcastSignalToSubscribers(signal: {
     totalFailed += result.failed;
   }
 
-  console.log(`Broadcast signal email: ${totalSent} sent, ${totalFailed} failed to ${subscribers.length} subscribers`);
+  console.log(`Broadcast signal: ${totalSent} sent, ${totalFailed} failed to ${subscribers.length} subscribers`);
   return { sent: totalSent, failed: totalFailed };
 }
