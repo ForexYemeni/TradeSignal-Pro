@@ -79,16 +79,17 @@ export function middleware(request: NextRequest) {
       request.headers.get("x-real-ip") ||
       "unknown";
 
-    // Login endpoint — strict limit: 5 attempts per minute
+    // Login endpoint — high IP-level limit (smart tracking done in API route per-email)
     if (pathname === "/api/admin" && request.method === "POST") {
-      const result = checkRateLimit(`login:${clientIP}`, 5, 60 * 1000);
+      const result = checkRateLimit(`login:${clientIP}`, 30, 60 * 1000);
       response.headers.set("X-RateLimit-Remaining", String(result.remaining));
 
       if (!result.allowed) {
         return NextResponse.json(
           {
             success: false,
-            error: `محاولات كثيرة. حاول مرة أخرى بعد ${result.resetIn} ثانية`,
+            error: "account_locked",
+            locked: true,
             retryAfter: result.resetIn,
           },
           {

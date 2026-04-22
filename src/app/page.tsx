@@ -505,8 +505,8 @@ export default function HomePage() {
         if (data.error === "account_locked") {
           setLoginFeedback({
             type: "account_locked",
-            lockedUntil: data.lockedUntil,
-            retryAfterMinutes: data.retryAfterMinutes,
+            lockedUntil: data.lockedUntil || new Date(Date.now() + (data.retryAfter || 60) * 1000).toISOString(),
+            retryAfterMinutes: data.retryAfterMinutes || Math.ceil((data.retryAfter || 60) / 60),
           });
           return;
         }
