@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAdmin, setAdmin, addSignal, getSignals } from "@/lib/store";
+import { getAdmin, setAdmin, addSignal, getPackages, addPackage, updateAppSettings } from "@/lib/store";
 
 export async function POST() {
   try {
@@ -71,6 +71,152 @@ export async function POST() {
 
     for (const signal of testSignals) {
       await addSignal(signal);
+    }
+
+    // Seed default packages with real features
+    const existing = await getPackages();
+    if (existing.length === 0) {
+      const defaultPackages = [
+        {
+          id: crypto.randomUUID(),
+          name: "تجربة مجانية",
+          durationDays: 7,
+          price: 0,
+          type: "trial" as const,
+          description: "جرّب الخدمة مجاناً لمدة 7 أيام واستمتع بتجربة فريدة",
+          isActive: true,
+          createdAt: now.toISOString(),
+          order: 1,
+          features: [
+            "إشارات ذهب (XAUUSD) فقط",
+            "حد أقصى 3 إشارات يومياً",
+            "أهداف ربح واحدة لكل إشارة",
+            "الوصول للإشارات بعد 5 دقائق من النشر",
+            "تحليل فني أساسي",
+          ],
+          maxSignals: 3,
+          prioritySupport: false,
+          showEntryEarly: false,
+        },
+        {
+          id: crypto.randomUUID(),
+          name: "الباقة الأساسية",
+          durationDays: 30,
+          price: 25,
+          type: "paid" as const,
+          description: "باقة مثالية للمبتدئين مع تغطية الأزواج الرئيسية",
+          isActive: true,
+          createdAt: now.toISOString(),
+          order: 2,
+          features: [
+            "جميع أزواج العملات الرئيسية",
+            "إشارات ذهب (XAUUSD)",
+            "حد أقصى 5 إشارات يومياً",
+            "3 أهداف ربح لكل إشارة",
+            "تحليل فني متوسط",
+            "تحديثات وقف الخسارة",
+            "إشعارات فورية",
+          ],
+          maxSignals: 5,
+          prioritySupport: false,
+          showEntryEarly: false,
+        },
+        {
+          id: crypto.randomUUID(),
+          name: "الباقة الاحترافية",
+          durationDays: 30,
+          price: 50,
+          type: "paid" as const,
+          description: "للمتداولين المحترفين مع مميزات متقدمة وتغطية شاملة",
+          isActive: true,
+          createdAt: now.toISOString(),
+          order: 3,
+          features: [
+            "جميع أزواج العملات الرئيسية والثانوية",
+            "إشارات ذهب (XAUUSD)",
+            "إشارات المؤشرات (Indices)",
+            "حد أقصى 10 إشارات يومياً",
+            "5 أهداف ربح لكل إشارة",
+            "تحليل فني متقدم مع SMC",
+            "تحديثات وقف الخسارة والتراجع",
+            "دعم عبر Telegram",
+            "تقارير أسبوعية للأداء",
+          ],
+          maxSignals: 10,
+          prioritySupport: true,
+          showEntryEarly: false,
+        },
+        {
+          id: crypto.randomUUID(),
+          name: "الباقة الذهبية",
+          durationDays: 90,
+          price: 120,
+          type: "paid" as const,
+          description: "أفضل قيمة للمتداولين الجادين مع وصول كامل لجميع الخدمات",
+          isActive: true,
+          createdAt: now.toISOString(),
+          order: 4,
+          features: [
+            "جميع الأزواج والمؤشرات والمعادن",
+            "إشارات نفط خام (Crude Oil)",
+            "إشارات العملات الرقمية (BTC, ETH)",
+            "إشارات غير محدودة يومياً",
+            "5+ أهداف ربح لكل إشارة",
+            "تحليل فني شامل (SMC + ICT)",
+            "تحديثات مباشرة لوقف الخسارة",
+            "دعم أولوي عبر Telegram",
+            "تقارير أداء يومية",
+            "دخول مبكر للإشارات",
+            "استشارات تداول شخصية",
+          ],
+          maxSignals: 0,
+          prioritySupport: true,
+          showEntryEarly: true,
+        },
+        {
+          id: crypto.randomUUID(),
+          name: "VIP Diamond",
+          durationDays: 365,
+          price: 299,
+          type: "paid" as const,
+          description: "الباقة الحصرية للأعضاء VIP مع جميع المميزات والامتيازات الخاصة",
+          isActive: true,
+          createdAt: now.toISOString(),
+          order: 5,
+          features: [
+            "جميع الأزواج والمؤشرات والمعادن والعملات الرقمية",
+            "إشارات حصرية VIP",
+            "إشارات غير محدودة يومياً",
+            "أهداف ربح متعددة غير محدودة",
+            "تحليل فني متقدم (SMC + ICT + Wyckoff)",
+            "تحديثات مباشرة لحظياً",
+            "دعم أولوي 24/7 عبر Telegram و WhatsApp",
+            "تقارير أداء يومية وأسبوعية",
+            "دخول مبكر للإشارات (قبل النشر العام)",
+            "استشارات تداول شخصية أسبوعية",
+            "دخول لغرفة التحليل الحية",
+            "محتوى تعليمي حصري",
+            "توصيات إدارة المخاطر المخصصة",
+            "أولوية في طلبات التحليل",
+          ],
+          maxSignals: 0,
+          prioritySupport: true,
+          showEntryEarly: true,
+        },
+      ];
+
+      let trialPackageId: string | null = null;
+      for (const pkg of defaultPackages) {
+        await addPackage(pkg);
+        if (pkg.type === "trial") {
+          trialPackageId = pkg.id;
+        }
+      }
+
+      // Set the trial package as default free trial
+      if (trialPackageId) {
+        await updateAppSettings({ freeTrialPackageId: trialPackageId, autoApproveOnRegister: true });
+      }
     }
 
     return NextResponse.json({ success: true, message: `تم إنشاء ${testSignals.length} إشارة تجريبية`, count: testSignals.length });

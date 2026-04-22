@@ -2264,182 +2264,240 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* ── Packages List ── */}
+            {/* ── Packages Header ── */}
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
-                <Package className="w-4 h-4 text-amber-400" />
-                إدارة الباقات
-                <span className="text-[9px] bg-amber-500/15 text-amber-400 px-1.5 py-0.5 rounded-md font-bold">{packages.length}</span>
-              </h2>
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/10 border border-amber-500/15 flex items-center justify-center">
+                  <Package className="w-4 h-4 text-amber-400" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold text-foreground">إدارة الباقات</h2>
+                  <p className="text-[9px] text-muted-foreground">{packages.filter(p => p.isActive).length} باقة مفعلة من {packages.length}</p>
+                </div>
+              </div>
               <button onClick={() => { if (showPkgForm && editingPkgId) resetPkgForm(); else setShowPkgForm(!showPkgForm); }}
-                className="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/20 active:scale-95 transition-transform">
-                {showPkgForm && editingPkgId ? "إلغاء التعديل" : showPkgForm ? "إلغاء" : "+ إضافة باقة"}
+                className="px-3 py-1.5 rounded-xl text-[10px] font-bold bg-gradient-to-r from-amber-500/20 to-orange-500/15 text-amber-400 border border-amber-500/25 active:scale-95 transition-transform flex items-center gap-1">
+                {showPkgForm && editingPkgId ? "✕ إلغاء التعديل" : showPkgForm ? "✕ إلغاء" : <><span className="text-amber-300">+</span> إنشاء باقة</>}
               </button>
             </div>
 
             {/* ── Create/Edit Package Form ── */}
+            <AnimatePresence>
             {showPkgForm && (
-              <div className="rounded-2xl border border-border bg-muted/50 p-4 space-y-3 animate-[fadeIn_0.2s_ease-out]">
-                <div className="text-[10px] font-bold text-amber-400">{editingPkgId ? "تعديل الباقة" : "إنشاء باقة جديدة"}</div>
+              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+              <div className="rounded-2xl border border-amber-500/20 bg-muted/40 p-4 space-y-3" style={{ background: "linear-gradient(135deg, rgba(255,215,0,0.03) 0%, rgba(255,140,0,0.01) 100%)" }}>
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-5 rounded-lg bg-amber-500/20 flex items-center justify-center">
+                    {editingPkgId ? <Settings className="w-3 h-3 text-amber-400" /> : <Sparkles className="w-3 h-3 text-amber-400" />}
+                  </div>
+                  <span className="text-[11px] font-bold text-amber-400">{editingPkgId ? "تعديل الباقة" : "إنشاء باقة جديدة"}</span>
+                </div>
+
+                {/* Basic Info */}
                 <div className="grid grid-cols-2 gap-2.5">
                   <div className="col-span-2">
-                    <label className="text-[9px] text-muted-foreground mb-1 block">اسم الباقة</label>
-                    <Input value={pkgFormName} onChange={e => setPkgFormName(e.target.value)} placeholder="مثال: الشهرية VIP"
-                      className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-9 rounded-lg text-[11px]" dir="rtl" />
+                    <label className="text-[9px] text-muted-foreground mb-1 block font-medium">اسم الباقة *</label>
+                    <Input value={pkgFormName} onChange={e => setPkgFormName(e.target.value)} placeholder="مثال: الباقة الشهرية VIP"
+                      className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-10 rounded-xl text-[11px]" dir="rtl" />
                   </div>
                   <div>
-                    <label className="text-[9px] text-muted-foreground mb-1 block">المدة (أيام)</label>
+                    <label className="text-[9px] text-muted-foreground mb-1 block font-medium">المدة (أيام) *</label>
                     <Input type="number" value={pkgFormDays} onChange={e => setPkgFormDays(e.target.value)} placeholder="30"
-                      className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-9 rounded-lg text-[11px]" dir="ltr" />
+                      className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-10 rounded-xl text-[11px]" dir="ltr" />
                   </div>
                   <div>
-                    <label className="text-[9px] text-muted-foreground mb-1 block">السعر ($)</label>
+                    <label className="text-[9px] text-muted-foreground mb-1 block font-medium">السعر ($)</label>
                     <Input type="number" value={pkgFormPrice} onChange={e => setPkgFormPrice(e.target.value)} placeholder="0"
-                      className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-9 rounded-lg text-[11px]" dir="ltr" />
+                      className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-10 rounded-xl text-[11px]" dir="ltr" />
                   </div>
                   <div>
-                    <label className="text-[9px] text-muted-foreground mb-1 block">النوع</label>
-                    <div className="flex gap-1.5">
-                      {(["free", "trial", "paid"] as const).map(t => (
-                        <button key={t} onClick={() => setPkgFormType(t)}
-                          className={`flex-1 py-2 rounded-lg text-[10px] font-semibold transition-all ${pkgFormType === t ? "bg-amber-500/20 text-amber-400 border border-amber-500/30" : "bg-muted/50 text-muted-foreground border border-border"}`}>
-                          {t === "free" ? "مجانية" : t === "trial" ? "تجربة" : "مدفوعة"}
+                    <label className="text-[9px] text-muted-foreground mb-1 block font-medium">نوع الباقة</label>
+                    <div className="flex gap-1.5 h-[40px]">
+                      {([
+                        { key: "trial" as const, label: "تجربة", color: "sky" },
+                        { key: "free" as const, label: "مجانية", color: "emerald" },
+                        { key: "paid" as const, label: "مدفوعة", color: "purple" },
+                      ]).map(t => (
+                        <button key={t.key} onClick={() => setPkgFormType(t.key)}
+                          className={`flex-1 rounded-xl text-[10px] font-semibold transition-all border ${pkgFormType === t.key ? `bg-${t.color}-500/20 text-${t.color}-400 border-${t.color}-500/30` : "bg-muted/50 text-muted-foreground border-border"}`}>
+                          {t.label}
                         </button>
                       ))}
                     </div>
                   </div>
                   <div>
-                    <label className="text-[9px] text-muted-foreground mb-1 block">الحد الأقصى للإشارات (0 = غير محدود)</label>
+                    <label className="text-[9px] text-muted-foreground mb-1 block font-medium">الحد الأقصى للإشارات (0 = غير محدود)</label>
                     <Input type="number" value={pkgFormMaxSignals} onChange={e => setPkgFormMaxSignals(e.target.value)} placeholder="0"
-                      className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-9 rounded-lg text-[11px]" dir="ltr" />
+                      className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-10 rounded-xl text-[11px]" dir="ltr" />
                   </div>
                 </div>
 
+                {/* Description */}
+                <div>
+                  <label className="text-[9px] text-muted-foreground mb-1 block font-medium">وصف مختصر للباقة</label>
+                  <Input value={pkgFormDesc} onChange={e => setPkgFormDesc(e.target.value)} placeholder="وصف قصير يظهر في بطاقة الباقة..."
+                    className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-10 rounded-xl text-[11px]" dir="rtl" />
+                </div>
+
                 {/* Feature toggles */}
-                <div className="flex gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   <button onClick={() => setPkgFormPriority(!pkgFormPriority)}
-                    className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[10px] font-bold border transition-all active:scale-[0.98] ${pkgFormPriority ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/25" : "bg-muted/40 text-muted-foreground border-border"}`}>
+                    className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[10px] font-bold border transition-all active:scale-[0.98] ${pkgFormPriority ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/25" : "bg-muted/40 text-muted-foreground border-border"}`}>
                     <Zap className="w-3.5 h-3.5" />
                     دعم أولوي
                   </button>
                   <button onClick={() => setPkgFormEarlyEntry(!pkgFormEarlyEntry)}
-                    className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[10px] font-bold border transition-all active:scale-[0.98] ${pkgFormEarlyEntry ? "bg-sky-500/15 text-sky-400 border-sky-500/25" : "bg-muted/40 text-muted-foreground border-border"}`}>
+                    className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[10px] font-bold border transition-all active:scale-[0.98] ${pkgFormEarlyEntry ? "bg-sky-500/15 text-sky-400 border-sky-500/25" : "bg-muted/40 text-muted-foreground border-border"}`}>
                     <Timer className="w-3.5 h-3.5" />
-                    دخول مبكر للإشارات
+                    دخول مبكر
                   </button>
                   <button onClick={() => setPkgFormActive(!pkgFormActive)}
-                    className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[10px] font-bold border transition-all active:scale-[0.98] ${pkgFormActive ? "bg-amber-500/15 text-amber-400 border-amber-500/25" : "bg-muted/40 text-muted-foreground border-border"}`}>
-                    {pkgFormActive ? "مفعلة" : "معطلة"}
+                    className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[10px] font-bold border transition-all active:scale-[0.98] ${pkgFormActive ? "bg-amber-500/15 text-amber-400 border-amber-500/25" : "bg-muted/40 text-muted-foreground border-border"}`}>
+                    {pkgFormActive ? "● مفعلة" : "○ معطلة"}
                   </button>
                 </div>
 
                 {/* Features list */}
                 <div>
-                  <label className="text-[9px] text-muted-foreground mb-1 block">المميزات (كل سطر = مميزة واحدة)</label>
+                  <label className="text-[9px] text-muted-foreground mb-1 block font-medium">المميزات (كل سطر = مميزة واحدة)</label>
                   <Textarea value={pkgFormFeatures} onChange={e => setPkgFormFeatures(e.target.value)}
                     placeholder={"إشارات ذهبية يومية\nتحليل فني متقدم\nدعم مباشر 24/7\nوصول لجميع الأزواج"}
-                    className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground min-h-[80px] rounded-lg text-[11px] resize-none" dir="rtl" rows={3} />
+                    className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground min-h-[100px] rounded-xl text-[11px] resize-none" dir="rtl" rows={4} />
                 </div>
 
-                <Input value={pkgFormDesc} onChange={e => setPkgFormDesc(e.target.value)} placeholder="وصف مختصر للباقة..."
-                  className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-9 rounded-lg text-[11px]" dir="rtl" />
-
-                <div className="flex gap-2">
+                <div className="flex gap-2 pt-1">
                   <button onClick={handleSavePackage} disabled={pkgLoad || !pkgFormName || !pkgFormDays}
-                    className="flex-1 h-9 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-black text-[11px] font-bold disabled:opacity-50 active:scale-[0.98] transition-transform">
-                    {pkgLoad ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : editingPkgId ? "حفظ التعديلات" : "إنشاء الباقة"}
+                    className="flex-1 h-10 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-black text-[11px] font-bold disabled:opacity-40 active:scale-[0.98] transition-transform flex items-center justify-center gap-1.5">
+                    {pkgLoad ? <Loader2 className="w-4 h-4 animate-spin" /> : <>{editingPkgId ? "حفظ التعديلات" : "إنشاء الباقة"}</>}
                   </button>
-                  <button onClick={resetPkgForm} className="px-4 h-9 rounded-xl bg-muted/60 text-muted-foreground text-[11px]">إلغاء</button>
+                  <button onClick={resetPkgForm} className="px-5 h-10 rounded-xl bg-muted/60 text-muted-foreground text-[11px] font-medium active:scale-[0.98] transition-transform">إلغاء</button>
                 </div>
               </div>
+              </motion.div>
             )}
+            </AnimatePresence>
 
             {/* ── Package Cards ── */}
             {packages.length === 0 ? (
-              <EmptyState icon={<Package className="w-7 h-7" />} title="لا توجد باقات. أنشئ باقة جديدة للبدء" />
+              <EmptyState icon={<Package className="w-7 h-7" />} title="لا توجد باقات حالياً" subtitle="أنشئ باقة جديدة أو استخدم زر البيانات التجريبية" />
             ) : (
               <div className="space-y-3">
-                {packages.map(pkg => {
+                {packages.map((pkg, idx) => {
                   const isTrial = appSettings.freeTrialPackageId === pkg.id;
-                  return (
-                    <div key={pkg.id} className={`rounded-2xl border overflow-hidden transition-all ${isTrial ? "border-amber-500/30" : pkg.isActive ? "border-border" : "border-white/[0.03] opacity-50"}`}
-                      style={{ background: isTrial ? "linear-gradient(135deg, rgba(255,215,0,0.08) 0%, rgba(255,140,0,0.03) 100%)" : "rgba(255,255,255,0.02)" }}>
-                      {/* Header */}
+                  const pkgColors = pkg.type === "free"
+                    ? { bg: "from-emerald-500/10 to-green-500/5", border: "border-emerald-500/20", accent: "text-emerald-400", badge: "bg-emerald-500/15 text-emerald-400" }
+                    : pkg.type === "trial"
+                    ? { bg: "from-sky-500/10 to-blue-500/5", border: "border-sky-500/20", accent: "text-sky-400", badge: "bg-sky-500/15 text-sky-400" }
+                    : { bg: "from-purple-500/10 to-violet-500/5", border: "border-purple-500/20", accent: "text-purple-400", badge: "bg-purple-500/15 text-purple-400" };
+
+                  return (() => {
+                    const pkgBg = isTrial
+                      ? "linear-gradient(135deg, rgba(255,215,0,0.08) 0%, rgba(255,140,0,0.03) 100%)"
+                      : pkg.isActive
+                      ? "linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)"
+                      : undefined;
+                    return (
+                    <motion.div key={pkg.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: pkg.isActive ? 1 : 0.5, y: 0 }} transition={{ delay: idx * 0.05 }}
+                      className={`rounded-2xl border overflow-hidden transition-all ${isTrial ? "border-amber-500/30 ring-1 ring-amber-500/10" : pkg.isActive ? pkgColors.border : "border-white/[0.03]"}`}
+                      style={pkgBg ? { background: pkgBg } : undefined}>
+                      {/* Header Row */}
                       <div className="p-4">
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex-1 min-w-0">
+                            {/* Name + Badges */}
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="text-base font-extrabold text-foreground">{pkg.name}</span>
-                              {isTrial && <span className="text-[8px] bg-amber-500/25 text-amber-400 px-1.5 py-0.5 rounded-md font-bold animate-pulse">التجربة التلقائية</span>}
+                              {isTrial && (
+                                <span className="text-[8px] bg-amber-500/25 text-amber-400 px-1.5 py-0.5 rounded-md font-bold animate-pulse flex items-center gap-0.5">
+                                  <Sparkles className="w-2 h-2" /> التجربة التلقائية
+                                </span>
+                              )}
                               {!pkg.isActive && <span className="text-[8px] bg-red-500/15 text-red-400 px-1.5 py-0.5 rounded-md font-bold">معطلة</span>}
-                              <span className={`text-[8px] px-1.5 py-0.5 rounded-md font-bold ${pkg.type === "free" ? "bg-emerald-500/15 text-emerald-400" : pkg.type === "trial" ? "bg-sky-500/15 text-sky-400" : "bg-purple-500/15 text-purple-400"}`}>
+                              <span className={`text-[8px] px-1.5 py-0.5 rounded-md font-bold ${pkgColors.badge}`}>
                                 {pkg.type === "free" ? "مجانية" : pkg.type === "trial" ? "تجربة" : "مدفوعة"}
                               </span>
                             </div>
+                            {/* Description */}
                             {pkg.description && <p className="text-[10px] text-muted-foreground mt-1.5 leading-relaxed">{pkg.description}</p>}
                           </div>
-                          {/* Price badge */}
+                          {/* Price Badge */}
                           <div className="text-left flex-shrink-0">
                             {pkg.price > 0 ? (
-                              <div>
-                                <div className="text-xl font-black text-amber-400 font-mono">${pkg.price}</div>
-                                <div className="text-[9px] text-muted-foreground text-center">{pkg.durationDays} يوم</div>
+                              <div className="text-center">
+                                <div className="text-2xl font-black text-amber-400 font-mono leading-tight">${pkg.price}</div>
+                                <div className="text-[8px] text-muted-foreground mt-0.5">{pkg.durationDays} يوم</div>
+                                <div className="text-[7px] text-muted-foreground/60">{pkg.durationDays >= 365 ? `${(pkg.price / (pkg.durationDays / 30)).toFixed(1)}/شهر` : `${((pkg.price / pkg.durationDays) * 30).toFixed(0)}/شهر`}</div>
                               </div>
                             ) : (
-                              <div className="px-3 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/20">
-                                <span className="text-[11px] font-bold text-emerald-400">مجاني</span>
+                              <div className="px-4 py-2 rounded-xl bg-emerald-500/15 border border-emerald-500/20">
+                                <span className="text-xs font-bold text-emerald-400">مجاني</span>
                               </div>
                             )}
                           </div>
                         </div>
 
-                        {/* Feature badges */}
+                        {/* Feature List */}
                         {(pkg.features && pkg.features.length > 0) && (
-                          <div className="flex flex-wrap gap-1.5 mt-3">
+                          <div className="mt-3 space-y-1">
                             {pkg.features.map((f, i) => (
-                              <div key={i} className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/[0.04] border border-white/[0.06]">
-                                <Sparkles className="w-2.5 h-2.5 text-amber-400/70" />
-                                <span className="text-[9px] text-foreground/80">{f}</span>
+                              <div key={i} className="flex items-center gap-2">
+                                <div className="w-4 h-4 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                                  <svg className="w-2.5 h-2.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                                </div>
+                                <span className="text-[10px] text-foreground/80 leading-relaxed">{f}</span>
                               </div>
                             ))}
                           </div>
                         )}
 
-                        {/* Extra features row */}
-                        <div className="flex items-center gap-3 mt-3 text-[9px]">
+                        {/* Quick Stats Row */}
+                        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-border/30">
                           {pkg.prioritySupport && (
-                            <div className="flex items-center gap-1 text-emerald-400"><Zap className="w-3 h-3" />دعم أولوي</div>
+                            <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-500/10 text-[9px] text-emerald-400 font-medium">
+                              <Zap className="w-3 h-3" /> دعم أولوي
+                            </div>
                           )}
                           {pkg.showEntryEarly && (
-                            <div className="flex items-center gap-1 text-sky-400"><Timer className="w-3 h-3" />دخول مبكر</div>
+                            <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-sky-500/10 text-[9px] text-sky-400 font-medium">
+                              <Timer className="w-3 h-3" /> دخول مبكر
+                            </div>
                           )}
-                          {pkg.maxSignals > 0 && (
-                            <div className="flex items-center gap-1 text-purple-400"><Target className="w-3 h-3" />{pkg.maxSignals} إشارة/يوم</div>
+                          {pkg.maxSignals > 0 ? (
+                            <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-purple-500/10 text-[9px] text-purple-400 font-medium">
+                              <Target className="w-3 h-3" /> {pkg.maxSignals} إشارة/يوم
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-500/10 text-[9px] text-amber-400 font-medium">
+                              <Activity className="w-3 h-3" /> إشارات غير محدودة
+                            </div>
                           )}
                         </div>
                       </div>
 
-                      {/* Actions */}
-                      <div className="flex gap-1.5 px-4 py-2.5 border-t border-border/50 flex-wrap bg-muted/30">
+                      {/* Actions Footer */}
+                      <div className="flex gap-1.5 px-4 py-2.5 border-t border-border/40 flex-wrap bg-muted/20">
                         <button onClick={() => openEditPkg(pkg)}
-                          className="px-2.5 py-1 rounded-lg text-[9px] font-bold bg-sky-500/10 text-sky-400 border border-sky-500/15 active:scale-95 transition-transform">
-                          تعديل
+                          className="px-3 py-1.5 rounded-lg text-[9px] font-bold bg-sky-500/10 text-sky-400 border border-sky-500/15 active:scale-95 transition-transform flex items-center gap-1">
+                          <Settings className="w-3 h-3" /> تعديل
                         </button>
-                        <button onClick={() => handleSetTrialPkg(pkg.id)}
-                          className={`px-2.5 py-1 rounded-lg text-[9px] font-bold transition-all active:scale-95 ${isTrial ? "bg-amber-500/20 text-amber-400 border border-amber-500/30" : "bg-muted/60 text-muted-foreground border border-border"}`}>
-                          {isTrial ? "✓ تجربة تلقائية" : "تعيين كتجربة"}
-                        </button>
+                        {pkg.type === "trial" || pkg.type === "free" ? (
+                          <button onClick={() => handleSetTrialPkg(pkg.id)}
+                            className={`px-3 py-1.5 rounded-lg text-[9px] font-bold transition-all active:scale-95 flex items-center gap-1 ${isTrial ? "bg-amber-500/20 text-amber-400 border border-amber-500/30" : "bg-muted/60 text-muted-foreground border border-border"}`}>
+                            {isTrial ? "✓ تجربة تلقائية" : "تعيين كتجربة"}
+                          </button>
+                        ) : null}
                         <button onClick={() => handleTogglePackage(pkg.id, !pkg.isActive)}
-                          className={`px-2.5 py-1 rounded-lg text-[9px] font-medium border active:scale-95 transition-transform ${pkg.isActive ? "bg-amber-500/10 text-amber-300/70 border-amber-500/15" : "bg-emerald-500/10 text-emerald-400 border-emerald-500/15"}`}>
+                          className={`px-3 py-1.5 rounded-lg text-[9px] font-medium border active:scale-95 transition-transform flex items-center gap-1 ${pkg.isActive ? "bg-amber-500/10 text-amber-300/70 border-amber-500/15" : "bg-emerald-500/10 text-emerald-400 border-emerald-500/15"}`}>
                           {pkg.isActive ? "تعطيل" : "تفعيل"}
                         </button>
                         <button onClick={() => handleDeletePackage(pkg.id)}
-                          className="px-2.5 py-1 rounded-lg text-[9px] font-medium bg-red-500/5 text-red-300/60 border border-red-500/10 active:scale-95 transition-transform mr-auto">
-                          حذف
+                          className="px-3 py-1.5 rounded-lg text-[9px] font-medium bg-red-500/5 text-red-300/60 border border-red-500/10 active:scale-95 transition-transform flex items-center gap-1 mr-auto">
+                          <Trash2 className="w-3 h-3" /> حذف
                         </button>
                       </div>
-                    </div>
-                  );
+                    </motion.div>
+                    );
+                  })();
                 })}
               </div>
             )}
@@ -2450,12 +2508,23 @@ export default function HomePage() {
 
         {tab === "users" && isAdmin && (
           <motion.div key="users" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }} className="space-y-4">
+            {/* Header */}
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-bold text-foreground flex items-center gap-2"><User className="w-4 h-4 text-amber-400" />إدارة المستخدمين</h2>
-              <button onClick={fetchUsers} className="px-3 py-1.5 rounded-lg text-[10px] font-medium bg-muted/60 text-muted-foreground border border-border active:scale-95 transition-transform hover:bg-muted/80">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/10 border border-amber-500/15 flex items-center justify-center">
+                  <Users className="w-4 h-4 text-amber-400" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold text-foreground">إدارة المستخدمين</h2>
+                  <p className="text-[9px] text-muted-foreground">{users.length} مستخدم مسجل</p>
+                </div>
+              </div>
+              <button onClick={fetchUsers} disabled={usersLoad} className="px-3 py-1.5 rounded-xl text-[10px] font-medium bg-muted/60 text-muted-foreground border border-border active:scale-95 transition-transform hover:bg-muted/80 flex items-center gap-1">
+                <RefreshCw className={`w-3 h-3 ${usersLoad ? "animate-spin" : ""}`} />
                 تحديث
               </button>
             </div>
+
             {usersLoad && <SignalsLoadingSkeleton />}
             {!usersLoad && users.length === 0 && (
               <EmptyState
@@ -2465,48 +2534,71 @@ export default function HomePage() {
               />
             )}
             {!usersLoad && users.length > 0 && (
-              <div className="space-y-2">
-                {/* Pending Users */}
+              <div className="space-y-4">
+                {/* ── Stats Bar ── */}
+                <div className="grid grid-cols-4 gap-2">
+                  {[
+                    { label: "الكل", count: users.length, color: "text-foreground", bg: "bg-muted/40" },
+                    { label: "نشط", count: users.filter(u => u.status === "active").length, color: "text-emerald-400", bg: "bg-emerald-500/10" },
+                    { label: "معلق", count: users.filter(u => u.status === "pending").length, color: "text-amber-400", bg: "bg-amber-500/10" },
+                    { label: "محظور", count: users.filter(u => u.status === "blocked").length, color: "text-red-400", bg: "bg-red-500/10" },
+                  ].map(s => (
+                    <div key={s.label} className={`${s.bg} rounded-xl p-2.5 border border-border/50 text-center`}>
+                      <div className={`text-lg font-black ${s.color}`}>{s.count}</div>
+                      <div className="text-[8px] text-muted-foreground font-medium mt-0.5">{s.label}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* ── Pending Users ── */}
                 {users.filter(u => u.status === "pending").length > 0 && (
-                  <div className="mb-3">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-                      <span className="text-[10px] text-amber-400 font-bold">بانتظار الموافقة ({users.filter(u => u.status === "pending").length})</span>
+                  <div>
+                    <div className="flex items-center gap-2 mb-2.5">
+                      <div className="w-1.5 h-5 rounded-full bg-amber-400 animate-pulse" />
+                      <span className="text-[11px] text-amber-400 font-bold">بانتظار الموافقة</span>
+                      <span className="text-[8px] bg-amber-500/15 text-amber-400 px-1.5 py-0.5 rounded-full font-bold">{users.filter(u => u.status === "pending").length}</span>
                     </div>
                     {users.filter(u => u.status === "pending").map(u => (
-                      <Glass key={u.id} className="p-3 mb-2 border-amber-500/15">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-9 h-9 rounded-xl bg-amber-500/15 flex items-center justify-center">
-                              <User className="w-4 h-4 text-amber-400" />
-                            </div>
-                            <div>
-                              <div className="text-xs font-bold text-foreground">{u.name}</div>
-                              <div className="text-[10px] text-muted-foreground font-mono" dir="ltr">{u.email}</div>
-                            </div>
+                      <div key={u.id} className="rounded-xl border border-amber-500/15 bg-muted/30 p-3 mb-2">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/10 border border-amber-500/15 flex items-center justify-center flex-shrink-0">
+                            <span className="text-sm font-black text-amber-400">{u.name?.charAt(0)?.toUpperCase() || "?"}</span>
                           </div>
-                          <div className="flex items-center gap-1.5">
-                            <button onClick={() => handleUserAction(u.id, "approve")} className="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 active:scale-95 transition-transform">قبول</button>
-                            <button onClick={() => handleDeleteUser(u.id)} className="px-2 py-1.5 rounded-lg text-[10px] font-medium bg-red-500/10 text-red-400 border border-red-500/15 active:scale-95 transition-transform">رفض</button>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[11px] font-bold text-foreground truncate">{u.name}</div>
+                            <div className="text-[9px] text-muted-foreground font-mono truncate" dir="ltr">{u.email}</div>
+                            <div className="text-[8px] text-muted-foreground/60 mt-0.5">{new Date(u.createdAt).toLocaleDateString("ar-SA", { year: "numeric", month: "short", day: "numeric" })}</div>
+                          </div>
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            <button onClick={() => handleUserAction(u.id, "approve")} className="px-3 py-1.5 rounded-lg text-[9px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 active:scale-95 transition-transform">قبول</button>
+                            <button onClick={() => handleDeleteUser(u.id)} className="px-2 py-1.5 rounded-lg text-[9px] font-medium bg-red-500/10 text-red-400 border border-red-500/15 active:scale-95 transition-transform">رفض</button>
                           </div>
                         </div>
-                      </Glass>
+                      </div>
                     ))}
                   </div>
                 )}
-                {/* Active Users with Subscription Info */}
+
+                {/* ── Active Users ── */}
                 {users.filter(u => u.status === "active").length > 0 && (() => {
                   const actives = users.filter(u => u.status === "active");
-                  const subscribers = actives.filter(u => u.subscriptionType === "subscriber");
-                  const agency = actives.filter(u => u.subscriptionType === "agency");
-                  const noSub = actives.filter(u => !u.subscriptionType || u.subscriptionType === "none");
+                  const admins = actives.filter(u => u.role === "admin");
+                  const subscribers = actives.filter(u => u.subscriptionType === "subscriber" && u.role !== "admin");
+                  const agency = actives.filter(u => u.subscriptionType === "agency" && u.role !== "admin");
+                  const regular = actives.filter(u => !u.subscriptionType || u.subscriptionType === "none");
+
                   return (
-                  <div className="mb-3">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="w-2 h-2 rounded-full bg-emerald-400" />
-                      <span className="text-[10px] text-emerald-400 font-bold">نشطون ({actives.length})</span>
-                      {subscribers.length > 0 && <span className="text-[8px] bg-sky-500/15 text-sky-400 px-1.5 py-0.5 rounded-md">{subscribers.length} مشترك</span>}
-                      {agency.length > 0 && <span className="text-[8px] bg-purple-500/15 text-purple-400 px-1.5 py-0.5 rounded-md">{agency.length} وكالة</span>}
+                  <div>
+                    <div className="flex items-center gap-2 mb-2.5">
+                      <div className="w-1.5 h-5 rounded-full bg-emerald-400" />
+                      <span className="text-[11px] text-emerald-400 font-bold">المستخدمون النشطون</span>
+                      <span className="text-[8px] bg-emerald-500/15 text-emerald-400 px-1.5 py-0.5 rounded-full font-bold">{actives.length}</span>
+                      <div className="flex gap-1 mr-auto">
+                        {admins.length > 0 && <span className="text-[7px] bg-amber-500/15 text-amber-400 px-1 py-0.5 rounded-full">{admins.length} مدير</span>}
+                        {subscribers.length > 0 && <span className="text-[7px] bg-sky-500/15 text-sky-400 px-1 py-0.5 rounded-full">{subscribers.length} مشترك</span>}
+                        {agency.length > 0 && <span className="text-[7px] bg-purple-500/15 text-purple-400 px-1 py-0.5 rounded-full">{agency.length} وكالة</span>}
+                        {regular.length > 0 && <span className="text-[7px] bg-muted/50 text-muted-foreground px-1 py-0.5 rounded-full">{regular.length} عادي</span>}
+                      </div>
                     </div>
                     {actives.map(u => {
                       const isAgency = u.subscriptionType === "agency";
@@ -2514,141 +2606,145 @@ export default function HomePage() {
                       const expDays = u.subscriptionExpiry ? Math.ceil((new Date(u.subscriptionExpiry).getTime() - Date.now()) / 86400000) : null;
                       const isSuperAdmin = u.email?.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
                       const isPromotedAdmin = u.role === "admin" && !isSuperAdmin;
+                      const avatarColor = isSuperAdmin ? "from-amber-500/30 to-orange-500/20 border-amber-500/25" : isPromotedAdmin ? "from-amber-500/20 to-amber-600/10 border-amber-500/15" : isAgency ? "from-purple-500/20 to-violet-500/10 border-purple-500/15" : isSub ? "from-sky-500/20 to-blue-500/10 border-sky-500/15" : "from-emerald-500/15 to-green-500/5 border-emerald-500/10";
+                      const textColor = isSuperAdmin ? "text-amber-300" : isPromotedAdmin ? "text-amber-400" : isAgency ? "text-purple-400" : isSub ? "text-sky-400" : "text-emerald-400";
+
                       return (
-                        <Glass key={u.id} className={`p-3 mb-2 ${isSuperAdmin ? "border-amber-500/20" : ""}`}>
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2.5">
-                              <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${isSuperAdmin ? "bg-gradient-to-br from-amber-500/25 to-orange-500/15" : u.role === "admin" ? "bg-amber-500/15" : isAgency ? "bg-purple-500/15" : "bg-emerald-500/10"}`}>
-                                <Crown className={`w-4 h-4 ${isSuperAdmin ? "text-amber-300" : u.role === "admin" ? "text-amber-400" : isAgency ? "text-purple-400" : "text-emerald-400"}`} />
-                              </div>
-                              <div>
-                                <div className="flex items-center gap-1.5">
-                                  <span className="text-xs font-bold text-foreground">{u.name}</span>
-                                  {isSuperAdmin && <span className="text-[8px] bg-gradient-to-r from-amber-500/30 to-orange-500/20 text-amber-300 px-1.5 py-0.5 rounded-md font-bold">المدير الأعلى</span>}
-                                  {isPromotedAdmin && <span className="text-[8px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded-md font-bold">مدير</span>}
-                                  {isAgency && <span className="text-[8px] bg-purple-500/15 text-purple-400 px-1.5 py-0.5 rounded-md font-bold">وكالة</span>}
-                                  {isSub && <span className="text-[8px] bg-sky-500/15 text-sky-400 px-1.5 py-0.5 rounded-md font-bold">مشترك</span>}
-                                </div>
-                                <div className="text-[10px] text-muted-foreground font-mono" dir="ltr">{u.email}</div>
-                                {u.packageName && (
-                                  <div className="flex items-center gap-1.5 mt-1 text-[9px]">
-                                    <span className="text-muted-foreground">{u.packageName}</span>
-                                    {u.hadFreeTrial && (
-                                      <span className="text-[7px] bg-amber-500/15 text-amber-400/70 px-1 py-0.5 rounded font-bold">سبق أخذ تجربة</span>
-                                    )}
-                                    {expDays !== null && (
-                                      <span className={`font-bold ${expDays > 7 ? "text-emerald-400" : expDays > 3 ? "text-sky-400" : expDays > 0 ? "text-amber-400" : "text-red-400"}`}>
-                                        {expDays > 0 ? `${expDays} يوم متبقي` : "منتهي!"}
-                                      </span>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
+                        <div key={u.id} className={`rounded-xl border p-3 mb-2 transition-all ${isSuperAdmin ? "border-amber-500/20 bg-gradient-to-l from-amber-500/[0.03]" : "border-border/50 bg-muted/20"}`}>
+                          {/* Main Row */}
+                          <div className="flex items-center gap-3">
+                            {/* Avatar */}
+                            <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${avatarColor} border flex items-center justify-center flex-shrink-0`}>
+                              {isSuperAdmin || isPromotedAdmin ? <Crown className={`w-4 h-4 ${textColor}`} /> : <span className="text-sm font-black">{u.name?.charAt(0)?.toUpperCase() || "?"}</span>}
                             </div>
-                            {/* Registration date */}
-                            <div className="text-[9px] text-muted-foreground/60 text-left">
+                            {/* Info */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-[11px] font-bold text-foreground">{u.name}</span>
+                                {isSuperAdmin && <span className="text-[7px] bg-gradient-to-r from-amber-500/30 to-orange-500/20 text-amber-300 px-1.5 py-0.5 rounded-full font-bold">المدير الأعلى</span>}
+                                {isPromotedAdmin && <span className="text-[7px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded-full font-bold">مدير</span>}
+                                {isAgency && <span className="text-[7px] bg-purple-500/15 text-purple-400 px-1.5 py-0.5 rounded-full font-bold">وكالة</span>}
+                                {isSub && <span className="text-[7px] bg-sky-500/15 text-sky-400 px-1.5 py-0.5 rounded-full font-bold">مشترك</span>}
+                              </div>
+                              <div className="text-[9px] text-muted-foreground font-mono truncate" dir="ltr">{u.email}</div>
+                              {/* Subscription Info */}
+                              {u.packageName && (
+                                <div className="flex items-center gap-1.5 mt-1">
+                                  <Package className="w-2.5 h-2.5 text-muted-foreground" />
+                                  <span className="text-[9px] text-muted-foreground">{u.packageName}</span>
+                                  {u.hadFreeTrial && <span className="text-[7px] bg-amber-500/10 text-amber-400/60 px-1 py-0.5 rounded font-medium">سبق تجربة</span>}
+                                  {expDays !== null && (
+                                    <span className={`text-[8px] font-bold px-1 py-0.5 rounded-md ${
+                                      expDays > 7 ? "bg-emerald-500/10 text-emerald-400" :
+                                      expDays > 3 ? "bg-sky-500/10 text-sky-400" :
+                                      expDays > 0 ? "bg-amber-500/10 text-amber-400" :
+                                      "bg-red-500/10 text-red-400"
+                                    }`}>
+                                      {expDays > 0 ? `${expDays}ي متبقي` : "منتهي!"}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                            {/* Date */}
+                            <div className="text-[8px] text-muted-foreground/50 text-left flex-shrink-0 hidden sm:block">
                               {new Date(u.createdAt).toLocaleDateString("ar-SA", { year: "numeric", month: "short", day: "numeric" })}
                             </div>
                           </div>
-                          {/* Action Buttons - NOT for super admin */}
-                          {!isSuperAdmin && (
-                          <div className="flex gap-1.5 mt-2.5 pt-2.5 border-t border-border flex-wrap">
-                            {isPromotedAdmin ? (
-                              <>
-                                <button onClick={() => handleUserAction(u.id, "remove_admin")}
-                                  className="px-2 py-1.5 rounded-lg text-[9px] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/15 active:scale-95 transition-transform">
-                                  إزالة صلاحية المدير
-                                </button>
-                                <button onClick={() => setShowAssignPkg(u.id)}
-                                  className="px-2 py-1 rounded-lg text-[9px] font-medium bg-sky-500/10 text-sky-400 border border-sky-500/15 active:scale-95 transition-transform">
-                                  تعيين باقة
-                                </button>
-                              </>
-                            ) : (
-                              <>
-                                <button onClick={() => setShowAssignPkg(u.id)}
-                                  className="px-2 py-1 rounded-lg text-[9px] font-medium bg-sky-500/10 text-sky-400 border border-sky-500/15 active:scale-95 transition-transform">
-                                  تعيين باقة
-                                </button>
-                                <button onClick={() => handleSetAgency(u.id)}
-                                  className={`px-2 py-1 rounded-lg text-[9px] font-medium active:scale-95 transition-transform ${isAgency ? "bg-purple-500/20 text-purple-400 border border-purple-500/25" : "bg-purple-500/10 text-purple-400 border border-purple-500/15"}`}>
-                                  {isAgency ? "✓ وكالة" : "تحويل لوكالة"}
-                                </button>
-                                <button onClick={() => handleUserAction(u.id, "make_admin")} className="px-2 py-1.5 rounded-lg text-[9px] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/15 active:scale-95 transition-transform">ترقية</button>
-                                <button onClick={() => handleUserAction(u.id, "block")} className="px-2 py-1.5 rounded-lg text-[9px] font-medium bg-red-500/10 text-red-400 border border-red-500/15 active:scale-95 transition-transform">حظر</button>
-                                <button onClick={() => handleDeleteUser(u.id)} className="px-2 py-1.5 rounded-lg text-[9px] font-medium bg-red-500/5 text-red-300/60 border border-red-500/10 active:scale-95 transition-transform">حذف</button>
-                              </>
-                            )}
+
+                          {/* Action Buttons - NOT for super admin or promoted admins */}
+                          {!isSuperAdmin && !isPromotedAdmin && (
+                          <div className="flex gap-1.5 mt-2.5 pt-2.5 border-t border-border/40 flex-wrap">
+                            <button onClick={() => setShowAssignPkg(u.id)}
+                              className="px-2.5 py-1 rounded-lg text-[9px] font-medium bg-sky-500/10 text-sky-400 border border-sky-500/15 active:scale-95 transition-transform flex items-center gap-1">
+                              <Package className="w-3 h-3" /> باقة
+                            </button>
+                            <button onClick={() => handleSetAgency(u.id)}
+                              className={`px-2.5 py-1 rounded-lg text-[9px] font-medium active:scale-95 transition-transform flex items-center gap-1 ${isAgency ? "bg-purple-500/20 text-purple-400 border border-purple-500/25" : "bg-purple-500/10 text-purple-400 border border-purple-500/15"}`}>
+                              {isAgency ? "✓ وكالة" : "وكالة"}
+                            </button>
+                            <button onClick={() => handleUserAction(u.id, "make_admin")} className="px-2.5 py-1 rounded-lg text-[9px] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/15 active:scale-95 transition-transform flex items-center gap-1">
+                              <Crown className="w-3 h-3" /> ترقية
+                            </button>
+                            <button onClick={() => handleUserAction(u.id, "block")} className="px-2 py-1 rounded-lg text-[9px] font-medium bg-red-500/10 text-red-400 border border-red-500/15 active:scale-95 transition-transform">حظر</button>
+                            <button onClick={() => handleDeleteUser(u.id)} className="px-2 py-1 rounded-lg text-[9px] font-medium bg-red-500/5 text-red-300/50 border border-red-500/10 active:scale-95 transition-transform mr-auto">حذف</button>
                           </div>
                           )}
                           {/* Assign Package Dropdown */}
                           {showAssignPkg === u.id && packages.filter(p => p.isActive).length > 0 && (
-                            <div className="mt-2 p-2.5 rounded-xl bg-muted/50 border border-border space-y-2 animate-[fadeIn_0.2s_ease-out]">
+                            <div className="mt-2.5 p-3 rounded-xl bg-muted/40 border border-sky-500/15 space-y-2.5 animate-[fadeIn_0.2s_ease-out]">
+                              <div className="flex items-center gap-1.5">
+                                <Package className="w-3.5 h-3.5 text-sky-400" />
+                                <span className="text-[10px] font-bold text-sky-400">اختر باقة لتعيينها</span>
+                              </div>
                               {u.hadFreeTrial && (
-                                <div className="flex items-center gap-1.5 bg-amber-500/10 rounded-lg px-2.5 py-2">
+                                <div className="flex items-center gap-1.5 bg-amber-500/10 rounded-lg px-2.5 py-2 border border-amber-500/15">
                                   <AlertTriangle className="w-3 h-3 text-amber-400 flex-shrink-0" />
                                   <span className="text-[9px] text-amber-300/80 leading-relaxed">
                                     هذا المستخدم سبق له أخذ تجربة مجانية. لا يمكن تفعيل الباقة المجانية مرة أخرى.
                                   </span>
                                 </div>
                               )}
-                              <div className="flex gap-1.5 flex-wrap">
+                              <div className="grid grid-cols-2 gap-1.5">
                                 {packages.filter(p => p.isActive).map(pkg => {
                                   const isTrial = appSettings.freeTrialPackageId === pkg.id;
                                   const disabled = isTrial && u.hadFreeTrial;
                                   return (
                                     <button key={pkg.id}
                                       onClick={() => !disabled && handleAssignPackage(u.id, pkg.id)}
-                                      className={`px-2.5 py-1.5 rounded-lg text-[9px] font-semibold border active:scale-95 transition-transform ${
+                                      className={`px-2.5 py-2 rounded-lg text-[9px] font-semibold border text-right transition-transform ${
                                         disabled
                                           ? "bg-white/3 text-muted-foreground/40 border-border cursor-not-allowed line-through opacity-50"
-                                          : "bg-sky-500/10 text-sky-400 border-sky-500/15"
+                                          : "bg-sky-500/10 text-sky-400 border-sky-500/15 active:scale-95"
                                       }`}
                                       disabled={disabled}>
-                                      {pkg.name} ({pkg.durationDays}ي)
-                                      {isTrial && <span className="text-[7px] mr-1 opacity-60">مجاني</span>}
+                                      <div className="flex items-center justify-between">
+                                        <span className="truncate">{pkg.name}</span>
+                                        <span className="text-[7px] text-muted-foreground flex-shrink-0 mr-1">{pkg.durationDays}ي{pkg.price > 0 ? ` · $${pkg.price}` : ""}</span>
+                                      </div>
+                                      {isTrial && !disabled && <div className="text-[7px] text-emerald-400 mt-0.5">مجاني</div>}
                                     </button>
                                   );
                                 })}
                               </div>
                               <div className="flex items-center gap-2">
                                 <Input type="number" value={assignDays} onChange={e => setAssignDays(e.target.value)} placeholder="أيام مخصصة (اختياري)"
-                                  className="flex-1 bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-8 rounded-lg text-[10px]" dir="ltr" />
-                                <button onClick={() => setShowAssignPkg(null)} className="px-2 h-8 rounded-lg bg-muted/60 text-muted-foreground text-[9px]">إلغاء</button>
+                                  className="flex-1 bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-9 rounded-lg text-[10px]" dir="ltr" />
+                                <button onClick={() => setShowAssignPkg(null)} className="px-3 h-9 rounded-lg bg-muted/60 text-muted-foreground text-[9px] font-medium">إلغاء</button>
                               </div>
                             </div>
                           )}
-                        </Glass>
+                        </div>
                       );
                     })}
                   </div>
                   );
                 })()}
-                {/* Blocked Users */}
+
+                {/* ── Blocked Users ── */}
                 {users.filter(u => u.status === "blocked").length > 0 && (
                   <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="w-2 h-2 rounded-full bg-red-400" />
-                      <span className="text-[10px] text-red-400 font-bold">محظورون ({users.filter(u => u.status === "blocked").length})</span>
+                    <div className="flex items-center gap-2 mb-2.5">
+                      <div className="w-1.5 h-5 rounded-full bg-red-400" />
+                      <span className="text-[11px] text-red-400 font-bold">محظورون</span>
+                      <span className="text-[8px] bg-red-500/15 text-red-400 px-1.5 py-0.5 rounded-full font-bold">{users.filter(u => u.status === "blocked").length}</span>
                     </div>
                     {users.filter(u => u.status === "blocked").map(u => (
-                      <Glass key={u.id} className="p-3 mb-2 opacity-60">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-9 h-9 rounded-xl bg-red-500/10 flex items-center justify-center">
-                              <User className="w-4 h-4 text-red-400" />
-                            </div>
-                            <div>
-                              <div className="text-xs font-bold text-foreground">{u.name}</div>
-                              <div className="text-[10px] text-muted-foreground font-mono" dir="ltr">{u.email}</div>
-                            </div>
+                      <div key={u.id} className="rounded-xl border border-red-500/10 bg-red-500/[0.02] p-3 mb-2 opacity-70">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/15 flex items-center justify-center flex-shrink-0">
+                            <span className="text-sm font-black text-red-400">{u.name?.charAt(0)?.toUpperCase() || "?"}</span>
                           </div>
-                          <div className="flex items-center gap-1.5">
-                            <button onClick={() => handleUserAction(u.id, "unblock")} className="px-2 py-1.5 rounded-lg text-[9px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/15 active:scale-95 transition-transform">فتح</button>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[11px] font-bold text-foreground/70">{u.name}</div>
+                            <div className="text-[9px] text-muted-foreground font-mono truncate" dir="ltr">{u.email}</div>
+                          </div>
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            <button onClick={() => handleUserAction(u.id, "unblock")} className="px-2.5 py-1.5 rounded-lg text-[9px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/15 active:scale-95 transition-transform">فتح الحظر</button>
                             <button onClick={() => handleDeleteUser(u.id)} className="px-2 py-1.5 rounded-lg text-[9px] font-medium bg-red-500/10 text-red-400 border border-red-500/15 active:scale-95 transition-transform">حذف</button>
                           </div>
                         </div>
-                      </Glass>
+                      </div>
                     ))}
                   </div>
                 )}
@@ -2656,7 +2752,7 @@ export default function HomePage() {
             )}
             {/* Email Change Requests (Admin) */}
             {isAdmin && (
-              <div className="mt-4">
+              <div className="mt-2">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <Mail className="w-3.5 h-3.5 text-sky-400" />
@@ -2668,9 +2764,9 @@ export default function HomePage() {
                   <div className="text-[10px] text-muted-foreground text-center py-2">لا توجد طلبات معلقة</div>
                 )}
                 {emailRequests.filter(r => r.status === "pending").map(r => (
-                  <Glass key={r.id} className="p-3 mb-2 border-sky-500/15">
+                  <div key={r.id} className="rounded-xl border border-sky-500/15 bg-sky-500/[0.02] p-3 mb-2">
                     <div className="flex items-center gap-2.5 mb-2">
-                      <div className="w-8 h-8 rounded-lg bg-sky-500/15 flex items-center justify-center">
+                      <div className="w-8 h-8 rounded-lg bg-sky-500/15 flex items-center justify-center flex-shrink-0">
                         <Mail className="w-3.5 h-3.5 text-sky-400" />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -2686,7 +2782,7 @@ export default function HomePage() {
                       <button onClick={() => handleEmailRequestAction(r.id, "approve")} className="flex-1 px-2 py-1.5 rounded-lg text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 active:scale-95 transition-transform">قبول</button>
                       <button onClick={() => handleEmailRequestAction(r.id, "reject")} className="flex-1 px-2 py-1.5 rounded-lg text-[10px] font-medium bg-red-500/10 text-red-400 border border-red-500/15 active:scale-95 transition-transform">رفض</button>
                     </div>
-                  </Glass>
+                  </div>
                 ))}
               </div>
             )}
