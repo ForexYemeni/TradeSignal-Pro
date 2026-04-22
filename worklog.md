@@ -68,3 +68,29 @@ Stage Summary:
 - 5 default packages added with real Forex trading features
 - Admin users no longer show package/remove-admin buttons for promoted admins
 - Professional UI redesign for both packages and users management sections
+
+---
+Task ID: 2
+Agent: Main Agent
+Task: Add instrument categories per package - users only see allowed signals
+
+Work Log:
+- Added 6 instrument categories: gold, currencies, indices, oil, crypto, metals
+- Added `instruments: string[]` field to SubscriptionPackage in store.ts
+- Updated SubPackage interface in types.ts to include instruments field
+- Updated packages API (POST/PUT) to handle instruments field with fallback defaults
+- Updated seed data: 5 packages with appropriate instruments per tier
+- Updated signal parser to auto-detect instrument category from pair name (XAUUSD→ذهب, BTCUSDT→عملات رقمية, etc.)
+- Added INST_CATS constant inside component for UI
+- Added pkgFormInstruments state for package form editing
+- Added instrument category toggle buttons in package create/edit form (grid of 6 categories)
+- Added instrument badges display on package cards
+- Added signal filtering in getFiltered() - non-admin users only see signals from their package's allowed instruments
+- Fixed Turbopack prerendering TDZ issue by adding `export const dynamic = 'force-dynamic'` in layout.tsx
+
+Stage Summary:
+- Files modified: layout.tsx, page.tsx, types.ts, store.ts, packages/route.ts, seed/route.ts, signal-parser.ts
+- 6 instrument categories defined with Arabic labels and emoji icons
+- Each package has instruments array defining what users can access
+- Non-admin users are automatically filtered based on their package's allowed instruments
+- Admin sees all signals regardless of package instruments
