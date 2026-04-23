@@ -198,6 +198,17 @@ export default function HomePage() {
   const [regErr, setRegErr] = useState("");
   const [regSuccess, setRegSuccess] = useState("");
 
+  /* ── Device ID (unique per device, stored in localStorage) ── */
+  function getDeviceId(): string {
+    if (typeof window === "undefined") return "";
+    let id = localStorage.getItem("fy_device_id");
+    if (!id) {
+      id = crypto.randomUUID();
+      localStorage.setItem("fy_device_id", id);
+    }
+    return id;
+  }
+
   /* ── OTP (shared by login & register & reset) ── */
   const [otpStep, setOtpStep] = useState<"none" | "sending" | "verifying" | "done">("none");
   const [otpVerifying, setOtpVerifying] = useState(false);
@@ -638,7 +649,7 @@ export default function HomePage() {
       const res = await fetch("/api/admin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "login", email, password: pwd }),
+        body: JSON.stringify({ action: "login", email, password: pwd, deviceId: getDeviceId() }),
       });
       const data = await res.json();
       if (!data.success) {
@@ -647,8 +658,13 @@ export default function HomePage() {
           setView("pending");
           return;
         }
-        if (data.blocked) {
-          setView("blocked");
+        if (data.blocked || data.deviceBlocked) {
+          if (data.deviceBlocked) {
+            setLoginErr(data.error || "تم حظرك بسبب وجود حساب آخر من نفس الجهاز.");
+            toast.error(data.error || "تم الحظر التلقائي.", { duration: 10000 });
+          } else {
+            setView("blocked");
+          }
           return;
         }
         if (data.expired) {
@@ -853,7 +869,7 @@ export default function HomePage() {
           const regRes = await fetch("/api/register", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name: otpName, email: otpEmail, password: otpPwd, verifyToken: data.verifyToken }),
+            body: JSON.stringify({ name: otpName, email: otpEmail, password: otpPwd, verifyToken: data.verifyToken, deviceId: getDeviceId() }),
           });
           const regData = await regRes.json();
           console.log("[Register]", JSON.stringify(regData));
@@ -862,6 +878,10 @@ export default function HomePage() {
             setRegName(""); setRegEmail(""); setRegPwd("");
             toast.success(regData.message);
             setView("login");
+          } else if (regData.deviceBlocked) {
+            setOtpErr(regData.error || "تم الحظر بسبب حسابات مكررة");
+            toast.error(regData.error || "تم حظرك. تواصل مع الإدارة.", { duration: 10000 });
+            setOtpVerifying(false);
           } else {
             setOtpErr(regData.error || "فشل إنشاء الحساب");
             toast.error(regData.error || "فشل إنشاء الحساب");
@@ -878,7 +898,7 @@ export default function HomePage() {
           const loginRes = await fetch("/api/admin", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ action: "login", email: otpEmail, password: otpPwd, verifyToken: data.verifyToken }),
+            body: JSON.stringify({ action: "login", email: otpEmail, password: otpPwd, verifyToken: data.verifyToken, deviceId: getDeviceId() }),
           });
           const loginData = await loginRes.json();
           console.log("[Login after OTP]", JSON.stringify(loginData));
@@ -886,8 +906,14 @@ export default function HomePage() {
             completeLogin(loginData);
           } else if (loginData.pending) {
             setView("pending");
-          } else if (loginData.blocked) {
-            setView("blocked");
+          } else if (loginData.blocked || loginData.deviceBlocked) {
+            if (loginData.deviceBlocked) {
+              setOtpErr(loginData.error || "تم حظرك بسبب حسابات مكررة.");
+              toast.error(loginData.error || "تم الحظر التلقائي.", { duration: 10000 });
+            } else {
+              setView("blocked");
+            }
+            setOtpVerifying(false);
           } else if (loginData.expired) {
             setView("expired");
           } else if (loginData.locked) {

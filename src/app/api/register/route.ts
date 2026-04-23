@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { kv } from "@vercel/kv";
-import { getUserByEmail, addUser, migrateAdminToUsers, getAppSettings, getPackageById } from "@/lib/store";
+import { getUserByEmail, getUserByDeviceId, addUser, updateUser, migrateAdminToUsers, getAppSettings, getPackageById, getUsers } from "@/lib/store";
 import { sendPushToAdmins } from "@/lib/push";
 import { validateText, validateEmail, validatePassword } from "@/lib/validation";
+import { sendDuplicateAccountAlert } from "@/lib/email";
 
 export async function POST(request: NextRequest) {
   try {
     await migrateAdminToUsers();
 
-    const { name, email, password, verifyToken } = await request.json();
+    const { name, email, password, verifyToken, deviceId } = await request.json();
 
     // Validate inputs
     const nameVal = validateText(name, "الاسم", 100);
@@ -33,10 +34,69 @@ export async function POST(request: NextRequest) {
     // Delete the verify token (one-time use)
     await kv.del(verifyKey);
 
-    // Check duplicate
+    // Check duplicate email
     const existing = await getUserByEmail(emailVal.sanitized);
     if (existing) {
       return NextResponse.json({ success: false, error: "هذا البريد مسجل مسبقا" }, { status: 409 });
+    }
+
+    // ── Device ID Check: prevent multiple accounts from same device ──
+    if (deviceId && deviceId.trim()) {
+      const existingDeviceUser = await getUserByDeviceId(deviceId.trim());
+      if (existingDeviceUser) {
+        // Found another account with the same device ID → block both
+        const now = new Date().toISOString();
+
+        // Block the existing account
+        await updateUser(existingDeviceUser.id, {
+          status: "blocked",
+          subscriptionType: "none",
+          subscriptionExpiry: null,
+          packageId: null,
+          packageName: null,
+        });
+
+        // Send email alert to admin
+        const users = await getUsers();
+        const adminUser = users.find(u => u.role === "admin");
+
+        if (adminUser) {
+          sendDuplicateAccountAlert(adminUser.email, {
+            detectedAt: "register",
+            user1: {
+              name: existingDeviceUser.name,
+              email: existingDeviceUser.email,
+              createdAt: existingDeviceUser.createdAt,
+              status: "blocked",
+            },
+            user2: {
+              name: nameVal.sanitized,
+              email: emailVal.sanitized,
+              createdAt: now,
+              status: "blocked",
+            },
+            deviceId: deviceId.trim(),
+          }).catch(err => console.error("[Duplicate Account] Failed to send alert email:", err));
+        }
+
+        // Push notification to admin
+        sendPushToAdmins({
+          title: "🚨 حسابان من نفس الجهاز — تم الحظر",
+          body: `محاولة تسجيل جديد: ${emailVal.sanitized} | الحساب القديم: ${existingDeviceUser.email}`,
+          tag: `duplicate-device-${deviceId.slice(0, 8)}`,
+          sound: 'new_signal',
+          requireInteraction: true,
+          urgency: 'high',
+        }).catch(() => {});
+
+        console.log(`[Duplicate Account] Blocked both accounts. Device: ${deviceId.slice(0, 8)}... | Existing: ${existingDeviceUser.email} | New attempt: ${emailVal.sanitized}`);
+
+        return NextResponse.json({
+          success: false,
+          error: "تم حظرك بسبب محاولة إنشاء حساب ثانٍ من نفس الجهاز. تم حظر جميع الحسابات المرتبطة بهذا الجهاز تلقائياً.",
+          deviceBlocked: true,
+        }, { status: 403 });
+      }
     }
 
     // ── Get app settings for auto-trial ──
@@ -72,6 +132,7 @@ export async function POST(request: NextRequest) {
       subscriptionExpiry: trialExpiry,
       packageId: trialPkgId,
       packageName: trialPkgName,
+      deviceId: deviceId?.trim() || null,
     });
 
     // ── Notify admins about new registration ──

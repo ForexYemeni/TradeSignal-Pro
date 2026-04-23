@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { kv } from "@vercel/kv";
-import { getAdmin, setAdmin, getUserByEmail, migrateAdminToUsers, comparePassword, hashPassword, getUserById, updateUser, trackLoginAttempt, getLoginAttempts, resetLoginAttempts } from "@/lib/store";
+import { getAdmin, setAdmin, getUserByEmail, migrateAdminToUsers, comparePassword, hashPassword, getUserById, updateUser, trackLoginAttempt, getLoginAttempts, resetLoginAttempts, getUserByDeviceId, getUsers } from "@/lib/store";
 import { validateEmail, validatePassword, validateAction, validateUUID } from "@/lib/validation";
+import { sendDuplicateAccountAlert } from "@/lib/email";
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,7 +21,7 @@ export async function POST(request: NextRequest) {
 }
 
 async function handleLogin(body: Record<string, unknown>) {
-  const { email, password, verifyToken } = body as { email: string; password: string; verifyToken?: string };
+  const { email, password, verifyToken, deviceId } = body as { email: string; password: string; verifyToken?: string; deviceId?: string };
 
   // Validate inputs
   const emailVal = validateEmail(email);
@@ -112,6 +113,70 @@ async function handleLogin(body: Record<string, unknown>) {
     // Mark email as verified after first OTP login (so OTP won't be required again)
     if (!user.emailVerified) {
       await updateUser(user.id, { emailVerified: true });
+    }
+
+    // ── Device ID Check: prevent multiple accounts from same device ──
+    if (deviceId && deviceId.trim() && user.role === "user") {
+      const existingDeviceUser = await getUserByDeviceId(deviceId.trim());
+
+      if (existingDeviceUser && existingDeviceUser.id !== user.id) {
+        // Another user already registered with this device → block both
+        const now = new Date().toISOString();
+
+        // Block the existing device user
+        await updateUser(existingDeviceUser.id, {
+          status: "blocked",
+          subscriptionType: "none",
+          subscriptionExpiry: null,
+          packageId: null,
+          packageName: null,
+        });
+
+        // Block the current user too
+        await updateUser(user.id, {
+          status: "blocked",
+          subscriptionType: "none",
+          subscriptionExpiry: null,
+          packageId: null,
+          packageName: null,
+        });
+
+        // Send email alert to admin
+        const users = await getUsers();
+        const adminUser = users.find(u => u.role === "admin");
+
+        if (adminUser) {
+          sendDuplicateAccountAlert(adminUser.email, {
+            detectedAt: "login",
+            user1: {
+              name: existingDeviceUser.name,
+              email: existingDeviceUser.email,
+              createdAt: existingDeviceUser.createdAt,
+              status: "blocked",
+            },
+            user2: {
+              name: user.name,
+              email: user.email,
+              createdAt: user.createdAt,
+              status: "blocked",
+            },
+            deviceId: deviceId.trim(),
+          }).catch(err => console.error("[Duplicate Account Login] Failed to send alert email:", err));
+        }
+
+        console.log(`[Duplicate Account Login] Blocked both accounts. Device: ${deviceId.slice(0, 8)}... | Account 1: ${existingDeviceUser.email} | Account 2: ${user.email}`);
+
+        return NextResponse.json({
+          success: false,
+          error: "تم حظرك بسبب وجود حساب آخر مسجل من نفس الجهاز. تم حظر جميع الحسابات المرتبطة بهذا الجهاز تلقائياً.",
+          deviceBlocked: true,
+        }, { status: 403 });
+      }
+
+      // First time this device logs in — save deviceId to user
+      if (!user.deviceId && deviceId.trim()) {
+        await updateUser(user.id, { deviceId: deviceId.trim() });
+      }
     }
 
     // Check subscription expiry for regular users

@@ -74,6 +74,8 @@ export interface StoredUser {
   packageId: string | null;
   packageName: string | null;
   hadFreeTrial: boolean;
+  /* Device tracking */
+  deviceId: string | null;
 }
 
 // ─── Signals ────────────────────────────────────────────
@@ -254,6 +256,12 @@ export async function getUserById(id: string): Promise<StoredUser | null> {
 export async function getUserByEmail(email: string): Promise<StoredUser | null> {
   const users = await getUsers();
   return users.find(u => u.email.toLowerCase() === email.toLowerCase()) || null;
+}
+
+export async function getUserByDeviceId(deviceId: string): Promise<StoredUser | null> {
+  if (!deviceId) return null;
+  const users = await getUsers();
+  return users.find(u => u.deviceId === deviceId && u.role !== "admin") || null;
 }
 
 export async function addUser(user: StoredUser): Promise<StoredUser> {

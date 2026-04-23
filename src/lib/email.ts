@@ -404,3 +404,159 @@ export async function broadcastSignalToSubscribers(signal: {
   console.log(`Broadcast signal: ${totalSent} sent, ${totalFailed} failed to ${subscribers.length} subscribers`);
   return { sent: totalSent, failed: totalFailed };
 }
+
+// ═══════════════════════════════════════════════════════════════
+//  DUPLICATE ACCOUNT ALERT EMAIL
+// ═══════════════════════════════════════════════════════════════
+
+export function buildDuplicateAccountEmail(data: {
+  detectedAt: 'register' | 'login';
+  user1: { name: string; email: string; createdAt: string; status: string };
+  user2: { name: string; email: string; createdAt: string; status: string };
+  deviceId: string;
+}): {
+  subject: string;
+  html: string;
+} {
+  const { user1, user2, deviceId, detectedAt } = data;
+  const actionText = detectedAt === 'register' ? 'محاولة تسجيل حساب جديد' : 'محاولة تسجيل دخول';
+
+  return {
+    subject: `🚨 تنبيه: حسابان من نفس الجهاز — تم الحظر التلقائي`,
+    html: `<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>تنبيه حسابات مكررة</title>
+</head>
+<body style="margin:0;padding:0;background-color:#070b14;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#070b14;min-height:100vh;">
+    <tr>
+      <td align="center" style="padding:40px 16px;">
+        <table role="presentation" width="520" cellpadding="0" cellspacing="0" style="max-width:520px;width:100%;">
+          <tr>
+            <td align="center" style="padding-bottom:24px;">
+              <div style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#FF5252,#D32F2F);display:inline-flex;align-items:center;justify-content:center;">
+                <span style="font-size:28px;">🚨</span>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding-bottom:8px;">
+              <h1 style="margin:0;font-size:22px;font-weight:800;color:#FF5252;letter-spacing:0.5px;">كشف حسابات مكررة</h1>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding-bottom:32px;">
+              <p style="margin:0;font-size:14px;color:rgba(255,255,255,0.6);line-height:1.8;text-align:center;">
+                تم اكتشاف ${actionText} من جهاز مسجل مسبقاً بحساب آخر. تم حظر الحسابين تلقائياً.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <div style="background:rgba(255,82,82,0.06);border:1px solid rgba(255,82,82,0.2);border-radius:16px;overflow:hidden;">
+                <div style="padding:16px 20px;border-bottom:1px solid rgba(255,82,82,0.15);background:rgba(255,82,82,0.08);">
+                  <p style="margin:0;font-size:13px;font-weight:700;color:#FF5252;">الحساب الأول (الحساب القديم)</p>
+                </div>
+                <div style="padding:16px 20px;">
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                      <td style="padding:6px 0;font-size:12px;color:rgba(255,255,255,0.4);">الاسم</td>
+                      <td style="padding:6px 0;font-size:13px;color:#ffffff;font-weight:600;text-align:left;" dir="ltr">${user1.name}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding:6px 0;font-size:12px;color:rgba(255,255,255,0.4);">البريد</td>
+                      <td style="padding:6px 0;font-size:13px;color:#FFD700;font-weight:600;text-align:left;" dir="ltr">${user1.email}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding:6px 0;font-size:12px;color:rgba(255,255,255,0.4);">الحالة</td>
+                      <td style="padding:6px 0;font-size:13px;color:#FF5252;font-weight:600;text-align:left;">محظور</td>
+                    </tr>
+                    <tr>
+                      <td style="padding:6px 0;font-size:12px;color:rgba(255,255,255,0.4);">تاريخ التسجيل</td>
+                      <td style="padding:6px 0;font-size:12px;color:rgba(255,255,255,0.5);text-align:left;" dir="ltr">${user1.createdAt}</td>
+                    </tr>
+                  </table>
+                </div>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding-top:12px;">
+              <div style="background:rgba(255,82,82,0.06);border:1px solid rgba(255,82,82,0.2);border-radius:16px;overflow:hidden;">
+                <div style="padding:16px 20px;border-bottom:1px solid rgba(255,82,82,0.15);background:rgba(255,82,82,0.08);">
+                  <p style="margin:0;font-size:13px;font-weight:700;color:#FF5252;">الحساب الثاني (الحساب الجديد / المحاولة)</p>
+                </div>
+                <div style="padding:16px 20px;">
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                      <td style="padding:6px 0;font-size:12px;color:rgba(255,255,255,0.4);">الاسم</td>
+                      <td style="padding:6px 0;font-size:13px;color:#ffffff;font-weight:600;text-align:left;" dir="ltr">${user2.name}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding:6px 0;font-size:12px;color:rgba(255,255,255,0.4);">البريد</td>
+                      <td style="padding:6px 0;font-size:13px;color:#FFD700;font-weight:600;text-align:left;" dir="ltr">${user2.email}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding:6px 0;font-size:12px;color:rgba(255,255,255,0.4);">الحالة</td>
+                      <td style="padding:6px 0;font-size:13px;color:#FF5252;font-weight:600;text-align:left;">محظور</td>
+                    </tr>
+                    <tr>
+                      <td style="padding:6px 0;font-size:12px;color:rgba(255,255,255,0.4);">تاريخ التسجيل</td>
+                      <td style="padding:6px 0;font-size:12px;color:rgba(255,255,255,0.5);text-align:left;" dir="ltr">${user2.createdAt}</td>
+                    </tr>
+                  </table>
+                </div>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding-top:12px;">
+              <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:16px 20px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td style="font-size:11px;color:rgba(255,255,255,0.4);">معرف الجهاز (Device ID)</td>
+                    <td style="font-size:11px;color:rgba(255,255,255,0.3);text-align:left;font-family:'Courier New',monospace;" dir="ltr">${deviceId.slice(0, 8)}...${deviceId.slice(-4)}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding-top:8px;font-size:11px;color:rgba(255,255,255,0.4);">نوع الكشف</td>
+                    <td style="padding-top:8px;font-size:11px;color:rgba(255,255,255,0.5);text-align:left;">${detectedAt === 'register' ? 'تسجيل جديد' : 'تسجيل دخول'}</td>
+                  </tr>
+                </table>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding-top:28px;">
+              <p style="margin:0;font-size:12px;color:rgba(255,255,255,0.3);line-height:1.6;text-align:center;">
+                تم الحظر التلقائي. يمكنك فك الحظر يدوياً من لوحة الإدارة إذا لزم الأمر.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding-top:20px;border-top:1px solid rgba(255,255,255,0.06);">
+              <p style="margin:0;font-size:11px;color:rgba(255,255,255,0.15);">
+                ForexYemeni VIP Trading Signals &copy; ${new Date().getFullYear()}
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
+  };
+}
+
+export async function sendDuplicateAccountAlert(adminEmail: string, data: {
+  detectedAt: 'register' | 'login';
+  user1: { name: string; email: string; createdAt: string; status: string };
+  user2: { name: string; email: string; createdAt: string; status: string };
+  deviceId: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  const { subject, html } = buildDuplicateAccountEmail(data);
+  return await sendViaGAS({ to: adminEmail, subject, html });
+}
