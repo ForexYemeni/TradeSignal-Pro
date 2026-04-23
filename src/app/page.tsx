@@ -20,6 +20,7 @@ import {
   Crown, Package, Users, CalendarDays, Settings,
   Home, Flame, Trophy, ArrowUpRight, ArrowDownRight, Hash, Globe, PieChart, Sparkles, Timer, Wallet,
   MoreHorizontal, CreditCard, Upload, CheckCircle2, XCircle, Image, Copy, Plus, Banknote,
+  ShieldCheck, ShieldX, WifiOff,
 } from "lucide-react";
 
 // ═══ EXTRACTED MODULES ═══
@@ -1334,16 +1335,39 @@ export default function HomePage() {
     if (!selectedPkg || !usdtTxid.trim() || !session) return;
     setPaymentLoad(true);
     try {
+      const networkName = selectedUsdtNetwork?.network || appSettings.usdtNetwork || "";
+      const networkId = selectedUsdtNetwork?.id || undefined;
       const res = await fetch("/api/payments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: session.id, packageId: selectedPkg.id, packagePrice: selectedPkg.price, paymentMethod: "usdt", txId: usdtTxid.trim(), network: selectedUsdtNetwork?.network || appSettings.usdtNetwork }),
+        body: JSON.stringify({
+          userId: session.id, packageId: selectedPkg.id, packagePrice: selectedPkg.price,
+          paymentMethod: "usdt",
+          txId: usdtTxid.trim(),
+          paymentMethodId: networkId,
+          usdtNetwork: networkName,
+          paymentMethodName: networkName,
+        }),
       });
       const data = await res.json();
       if (data.success) {
-        setPaymentResult("success");
-        toast.success(data.message || "تم تفعيل الاشتراك بنجاح!");
-        setTimeout(() => { fetchPackages(); handleLogout(); }, 3000);
+        if (data.autoActivated && data.blockchainVerified && data.blockchainValid) {
+          // Auto-activated: blockchain verification passed
+          setPaymentResult("success");
+          toast.success(data.message || "تم تفعيل الاشتراك بنجاح! تم التحقق من الدفع.");
+          setTimeout(() => { fetchPackages(); handleLogout(); }, 3000);
+        } else if (data.requiresAdminReview) {
+          // Verification failed or API error: pending admin review
+          setPaymentResult("pending");
+          if (data.blockchainError) {
+            toast.warning(data.blockchainError, { duration: 8000 });
+          }
+          toast.info(data.message || "تم إرسال طلبك للمراجعة اليدوية.", { duration: 6000 });
+        } else {
+          setPaymentResult("success");
+          toast.success(data.message || "تم تفعيل الاشتراك بنجاح!");
+          setTimeout(() => { fetchPackages(); handleLogout(); }, 3000);
+        }
       } else {
         toast.error(data.error || "فشل تفعيل الاشتراك");
         if (data.samePackage) resetPaymentState();
@@ -3622,13 +3646,30 @@ export default function HomePage() {
                         </div>
                         <div className="flex items-center gap-2 text-[9px] text-muted-foreground">
                           <span className="px-1.5 py-0.5 rounded-md bg-sky-500/10 text-sky-400 font-medium">
-                            {req.paymentMethod === "usdt" ? "USDT" : (req.paymentMethodName || "محلي")}
+                            {req.paymentMethod === "usdt" ? `USDT${req.usdtNetwork ? ` (${req.usdtNetwork})` : ""}` : (req.paymentMethodName || "محلي")}
                           </span>
                           {req.txid && <span className="truncate font-mono" dir="ltr">TX: {req.txid}</span>}
                           {req.txId && <span className="truncate font-mono" dir="ltr">TX: {req.txId}</span>}
                           {req.localAmount && <span className="font-mono" dir="ltr">{req.localAmount.toLocaleString()} {req.localCurrencyCode || ""}</span>}
                           <span className="mr-auto">{new Date(req.createdAt).toLocaleDateString("ar-SA", { month: "short", day: "numeric" })}</span>
                         </div>
+                        {/* Blockchain verification status */}
+                        {req.paymentMethod === "usdt" && req.blockchainVerified !== undefined && (
+                          <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[9px] font-medium ${
+                            req.blockchainValid
+                              ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/15"
+                              : "bg-red-500/10 text-red-400 border border-red-500/15"
+                          }`}>
+                            {req.blockchainValid ? <ShieldCheck className="w-3 h-3" /> : <ShieldX className="w-3 h-3" />}
+                            <span>{req.blockchainValid ? "تم التحقق من البلوكتشين بنجاح" : `فشل التحقق: ${req.blockchainError || "غير معروف"}`}</span>
+                          </div>
+                        )}
+                        {req.paymentMethod === "usdt" && req.blockchainVerified === false && !req.blockchainValid && (
+                          <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-[9px] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/15">
+                            <WifiOff className="w-3 h-3" />
+                            <span>لم يتم التحقق التلقائي (مشكلة اتصال) — راجع يدوياً</span>
+                          </div>
+                        )}
                         {(req.proofUrl || req.paymentProofUrl) && (
                           <div className="mt-1">
                             <button onClick={() => handleViewProofImage(req.proofUrl || req.paymentProofUrl || "")} className="flex items-center gap-1.5 text-[10px] text-sky-400 hover:text-sky-300 transition-colors">

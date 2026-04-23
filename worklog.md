@@ -364,3 +364,58 @@ Stage Summary:
 - Users can cancel their active subscription with confirmation dialog
 - Admin payment methods now use professional tabbed UI instead of cluttered accordion
 - All changes backward-compatible
+---
+Task ID: 1
+Agent: main
+Task: Implement real blockchain verification for USDT payments (TRC20 + BEP20)
+
+Work Log:
+- Created src/lib/blockchain-verify.ts with full verification system:
+  - TRC20 verification via TronGrid API (free, no API key needed)
+    - Validates TXID format (64 hex chars)
+    - Checks transaction exists and is confirmed (contractRet = SUCCESS)
+    - Verifies TRC20 transfer info exists
+    - Compares recipient address against admin's wallet
+    - Validates USDT amount (6 decimals) with 0.5 USDT tolerance
+  - BEP20 verification via BSC public RPC (no API key needed)
+    - Validates TXID format (0x + 64 hex chars)
+    - Gets transaction receipt via eth_getTransactionReceipt
+    - Checks transaction success (status 0x1)
+    - Decodes Transfer event logs (ERC20 ABI)
+    - Verifies USDT contract address (0x55d3...7955)
+    - Compares recipient address, validates amount (18 decimals)
+  - Duplicate TXID check (prevents reuse of approved transactions)
+  - 15-second timeout for all API calls
+- Updated PaymentRequest interface in store.ts:
+  - Added usdtNetwork field (TRC20/BEP20)
+  - Added blockchainVerified, blockchainValid, blockchainError, blockchainDetails fields
+- Rewrote POST /api/payments to integrate blockchain verification:
+  - Determines network from paymentMethodId (selected USDT network) or auto-detects from TXID format
+  - Checks for duplicate TXID before proceeding (returns 409 if duplicate)
+  - Calls verifyUsdtTransaction() to validate on blockchain
+  - If verification passes: auto-activates subscription (same as before)
+  - If verification fails: creates pending request for admin manual review
+  - If API error (timeout/network): creates pending request with "connection error" note
+  - Logs all verification attempts to console
+- Updated frontend handleUsdtPayment():
+  - Sends paymentMethodId and usdtNetwork with request
+  - Handles three response scenarios:
+    1. autoActivated + blockchainValid → success toast + auto-logout
+    2. requiresAdminReview → pending state + warning about verification failure
+    3. Standard success fallback
+- Updated admin payment requests display:
+  - Shows network name (TRC20/BEP20) next to USDT badge
+  - Green shield icon for verified transactions
+  - Red shield icon for failed verification with error message
+  - Amber warning for API connection errors
+- Added ShieldCheck, ShieldX, WifiOff icon imports
+- Build verified: all routes compile successfully
+
+Stage Summary:
+- USDT payments now verified on real blockchain before activation
+- TRC20: TronGrid API verifies transaction existence, confirmation, recipient, amount
+- BEP20: BSC public RPC verifies transaction receipt, Transfer event, recipient, amount
+- Invalid/fake TXIDs are rejected and sent to admin for manual review
+- Duplicate TXID detection prevents reuse
+- If blockchain API is unreachable, request goes to admin pending queue
+- Admin sees verification status (pass/fail/error) on each payment request

@@ -616,11 +616,17 @@ export interface PaymentRequest {
   packageName: string;
   packagePrice: number;           // Price in USDT
   paymentMethod: "usdt" | "local";
-  paymentMethodId?: string;       // ID of LocalPaymentMethod (for local payments)
+  paymentMethodId?: string;       // ID of LocalPaymentMethod or UsdtNetwork (for local/usdt payments)
   paymentMethodName?: string;     // Name of the payment method (display)
   status: "pending" | "approved" | "rejected" | "expired";
   // USDT fields
   txId?: string;                  // Transaction ID
+  usdtNetwork?: string;           // Network used: "TRC20", "BEP20", etc.
+  // Blockchain verification fields
+  blockchainVerified?: boolean;   // Whether blockchain verification was performed
+  blockchainValid?: boolean;      // Whether verification passed
+  blockchainError?: string;       // Verification error message (if any)
+  blockchainDetails?: string;     // JSON string of verification details
   // Local currency fields
   localAmount?: number;           // Amount in local currency
   localCurrencyCode?: string;     // e.g., "YER"

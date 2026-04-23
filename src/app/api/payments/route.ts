@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPaymentRequests, getPaymentRequestsByUser, getPendingPaymentRequests, addPaymentRequest, updatePaymentRequest } from "@/lib/store";
-import { getPackageById, getUserById, updateUser } from "@/lib/store";
+import { getPackageById, getUserById, updateUser, getAppSettings } from "@/lib/store";
+import { verifyUsdtTransaction, checkDuplicateTxId, type BlockchainVerification } from "@/lib/blockchain-verify";
 
 /**
  * GET /api/payments?userId=xxx&pending=true
@@ -34,12 +35,13 @@ export async function GET(request: NextRequest) {
  * POST /api/payments
  * - Create a new payment request (subscription purchase / upgrade)
  *
- * Body: { userId, packageId, paymentMethod, txId?, paymentMethodId?, localAmount?, localCurrencyCode? }
+ * Body: { userId, packageId, paymentMethod, txId?, txid?, paymentMethodId?, usdtNetwork?,
+ *         localAmount?, localCurrencyCode?, proofUrl?, paymentProofUrl? }
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { userId, packageId, paymentMethod, txId, txid, paymentMethodId, localAmount, localCurrencyCode, proofUrl, paymentProofUrl } = body;
+    const { userId, packageId, paymentMethod, txId, txid, paymentMethodId, usdtNetwork: bodyNetwork, localAmount, localCurrencyCode, proofUrl, paymentProofUrl } = body;
 
     // Normalize txId (support both txId and txid from frontend)
     const normalizedTxId = txId || txid;
@@ -139,6 +141,153 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "لديك طلب معلق لنفس الباقة وطريقة الدفع. انتظر المراجعة." }, { status: 409 });
     }
 
+    // ── USDT: Blockchain Verification ──
+    if (paymentMethod === "usdt") {
+      // Determine which network and wallet address to verify against
+      const settings = await getAppSettings();
+      let networkName = bodyNetwork?.trim() || ""; // e.g., "TRC20" or "BEP20"
+      let walletAddress = "";
+
+      // If paymentMethodId is provided, look up the network from usdtNetworks
+      if (paymentMethodId && settings.usdtNetworks) {
+        const selectedNetwork = settings.usdtNetworks.find(n => n.id === paymentMethodId && n.isActive);
+        if (selectedNetwork) {
+          networkName = selectedNetwork.network;
+          walletAddress = selectedNetwork.address;
+        }
+      }
+
+      // Fallback: use legacy single network if available
+      if (!walletAddress && settings.usdtWalletAddress) {
+        walletAddress = settings.usdtWalletAddress;
+        if (!networkName && settings.usdtNetwork) {
+          networkName = settings.usdtNetwork;
+        }
+      }
+
+      // If still no network name, try to detect from TXID format
+      if (!networkName) {
+        const trimmedTxId = normalizedTxId.trim();
+        if (/^[0-9a-fA-F]{64}$/.test(trimmedTxId) && !trimmedTxId.startsWith("0x")) {
+          networkName = "TRC20";
+        } else if (/^0x[0-9a-fA-F]{64}$/.test(trimmedTxId) || /^[0-9a-fA-F]{64}$/.test(trimmedTxId)) {
+          networkName = "BEP20";
+        }
+      }
+
+      // Default to TRC20 if still unknown
+      if (!networkName) {
+        networkName = "TRC20";
+      }
+
+      console.log(`[USDT Verification] TXID: ${normalizedTxId}, Network: ${networkName}, Address: ${walletAddress ? walletAddress.slice(0, 10) + "..." : "NOT SET"}, Expected Amount: ${effectivePrice}`);
+
+      // 1. Check for duplicate TXID (approved transactions only)
+      const duplicateCheck = await checkDuplicateTxId(normalizedTxId!, userId);
+      if (duplicateCheck.isDuplicate && duplicateCheck.existingRequest) {
+        return NextResponse.json({
+          success: false,
+          error: `تم استخدام هذا المعرف (TXID) مسبقاً في طلب آخر لـ "${duplicateCheck.existingRequest.packageName}". لا يمكن استخدام نفس المعاملة مرتين.`,
+          isDuplicateTxId: true,
+        }, { status: 409 });
+      }
+
+      // 2. Verify transaction on blockchain
+      let verification: BlockchainVerification = { success: false, valid: false, error: "لم يتم إجراء التحقق" };
+
+      if (walletAddress) {
+        verification = await verifyUsdtTransaction(normalizedTxId!, networkName, walletAddress, effectivePrice);
+        console.log(`[USDT Verification] Result: success=${verification.success}, valid=${verification.valid}, error=${verification.error}`);
+      } else {
+        console.log("[USDT Verification] Skipped: No wallet address configured");
+        verification = {
+          success: true,
+          valid: false,
+          error: "لم يتم تعيين عنوان محفظة USDT للشبكة المحددة. يرجى إضافة عنوان المحفظة في إعدادات الدفع.",
+        };
+      }
+
+      // 3. Create payment request (with verification data)
+      const paymentRequest = await addPaymentRequest({
+        id: crypto.randomUUID(),
+        userId,
+        userName: user.name,
+        userEmail: user.email,
+        packageId,
+        packageName: pkg.name,
+        packagePrice: effectivePrice,
+        paymentMethod,
+        paymentMethodId: paymentMethodId || undefined,
+        paymentMethodName: body.paymentMethodName || networkName,
+        status: "pending", // Start as pending, will change based on verification
+        txId: normalizedTxId || undefined,
+        usdtNetwork: networkName,
+        blockchainVerified: verification.success,
+        blockchainValid: verification.valid,
+        blockchainError: verification.error,
+        blockchainDetails: verification.details ? JSON.stringify(verification.details) : undefined,
+        createdAt: new Date().toISOString(),
+      });
+
+      // 4. If verification passed → auto-activate subscription
+      if (verification.success && verification.valid) {
+        let expiry: Date;
+
+        if (isUpgrade && user.subscriptionExpiry) {
+          // Extend from current expiry date
+          expiry = new Date(user.subscriptionExpiry);
+          expiry.setDate(expiry.getDate() + pkg.durationDays);
+        } else {
+          // Fresh subscription
+          expiry = new Date();
+          expiry.setDate(expiry.getDate() + pkg.durationDays);
+        }
+
+        await updateUser(userId, {
+          subscriptionType: "subscriber",
+          subscriptionExpiry: expiry.toISOString(),
+          packageId: pkg.id,
+          packageName: pkg.name,
+          status: "active",
+        });
+
+        // Update the payment request status to approved
+        await updatePaymentRequest(paymentRequest.id, { status: "approved" });
+
+        return NextResponse.json({
+          success: true,
+          message: isUpgrade
+            ? `تم ترقية اشتراكك إلى باقة "${pkg.name}" بنجاح! تم التحقق من المعاملة على البلوكتشين وتم تمديد الاشتراك بـ ${pkg.durationDays} يوم إضافي.`
+            : `تم تفعيل الاشتراك بنجاح! تم التحقق من الدفع عبر USDT (${networkName}) على البلوكتشين.`,
+          autoActivated: true,
+          blockchainVerified: true,
+          blockchainValid: true,
+          verificationDetails: verification.details,
+          isUpgrade,
+          request: { ...paymentRequest, status: "approved" },
+        });
+      }
+
+      // 5. Verification failed or API error → keep as pending for admin review
+      const isApiError = !verification.success;
+      const userMessage = isApiError
+        ? `تم إرسال طلب الاشتراك. يتعذر التحقق التلقائي من المعاملة حالياً بسبب مشكلة في الاتصال بالبلوكتشين. سيتم مراجعة طلبك يدوياً من قبل الإدارة.`
+        : `تعذر التحقق من المعاملة: ${verification.error}. تم تحويل طلبك للمراجعة اليدوية.`;
+
+      return NextResponse.json({
+        success: true,
+        message: userMessage,
+        autoActivated: false,
+        blockchainVerified: verification.success,
+        blockchainValid: verification.valid,
+        blockchainError: verification.error,
+        isUpgrade,
+        requiresAdminReview: true,
+        request: paymentRequest,
+      });
+    }
+
+    // ── Local currency: pending review ──
     const paymentRequest = await addPaymentRequest({
       id: crypto.randomUUID(),
       userId,
@@ -150,7 +299,7 @@ export async function POST(request: NextRequest) {
       paymentMethod,
       paymentMethodId: paymentMethodId || undefined,
       paymentMethodName: body.paymentMethodName || undefined,
-      status: paymentMethod === "usdt" ? "approved" : "pending",
+      status: "pending",
       txId: normalizedTxId || undefined,
       localAmount: localAmount || undefined,
       localCurrencyCode: localCurrencyCode || undefined,
@@ -158,40 +307,6 @@ export async function POST(request: NextRequest) {
       createdAt: new Date().toISOString(),
     });
 
-    // For USDT: auto-activate subscription immediately
-    if (paymentMethod === "usdt") {
-      let expiry: Date;
-
-      if (isUpgrade && user.subscriptionExpiry) {
-        // Extend from current expiry date
-        expiry = new Date(user.subscriptionExpiry);
-        expiry.setDate(expiry.getDate() + pkg.durationDays);
-      } else {
-        // Fresh subscription
-        expiry = new Date();
-        expiry.setDate(expiry.getDate() + pkg.durationDays);
-      }
-
-      await updateUser(userId, {
-        subscriptionType: "subscriber",
-        subscriptionExpiry: expiry.toISOString(),
-        packageId: pkg.id,
-        packageName: pkg.name,
-        status: "active",
-      });
-
-      return NextResponse.json({
-        success: true,
-        message: isUpgrade
-          ? `تم ترقية اشتراكك إلى باقة "${pkg.name}" بنجاح! تم تمديد الاشتراك بـ ${pkg.durationDays} يوم إضافي.`
-          : "تم تفعيل الاشتراك بنجاح عبر USDT!",
-        autoActivated: true,
-        isUpgrade,
-        request: paymentRequest,
-      });
-    }
-
-    // For local currency: pending review
     return NextResponse.json({
       success: true,
       message: isUpgrade
