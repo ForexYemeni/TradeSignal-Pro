@@ -181,55 +181,23 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       updateData.hitPrice = stopLoss;
     }
 
-    // ── MANUAL CLOSE: Calculate proper PnL when admin manually closes ──
+    // ── MANUAL CLOSE: Each TP alert from the indicator already contains its own profit.
+    //    So pnlDollars holds the LAST TP's profit (not cumulative). Just fix status & display.
     if (status === "MANUAL_CLOSE") {
       const prevHitTp = Number(existing.hitTpIndex) || 0;
       let tps: { tp: number; rr: number }[] = [];
       try { tps = JSON.parse(String(existing.takeProfits)); } catch { tps = []; }
       const totalTPsCount = tps.length;
 
-      if (prevHitTp > 0 && totalTPsCount > 0 && prevHitTp < totalTPsCount) {
-        // TPs were partially hit before manual close → treat as partial win
-        let tpProfitDollars = 0;
-        let tpProfitPoints = 0;
-        for (let i = 0; i < Math.min(prevHitTp, tps.length); i++) {
-          const tpPrice = tps[i].tp;
-          const pts = Math.abs(tpPrice - entry);
-          tpProfitPoints += pts;
-          if (lotSize > 0) tpProfitDollars += pts * pipValue * lotSize;
-          else if (balance > 0 && slDistance > 0) tpProfitDollars += (pts / slDistance) * (balance * 0.02) * tps[i].rr;
-        }
-
+      if (prevHitTp > 0 && totalTPsCount > 0) {
+        // TPs were hit before manual close → change status so it displays correctly
+        // Keep existing pnlDollars (profit from last TP hit by the indicator)
+        // Keep existing pnlPoints (points from last TP hit)
         updateData.status = "HIT_TP";
-        updateData.partialWin = true;
-        updateData.hitTpIndex = prevHitTp;
-        updateData.pnlPoints = parseFloat(tpProfitPoints.toFixed(1));
-        updateData.pnlDollars = parseFloat(tpProfitDollars.toFixed(2));
+        updateData.partialWin = prevHitTp < totalTPsCount;
         updateData.totalTPs = totalTPsCount;
-      } else if (prevHitTp > 0 && totalTPsCount > 0 && prevHitTp >= totalTPsCount) {
-        // All TPs were hit → full win (shouldn't normally happen, but handle it)
-        let tpProfitDollars = 0;
-        let tpProfitPoints = 0;
-        for (let i = 0; i < tps.length; i++) {
-          const tpPrice = tps[i].tp;
-          const pts = Math.abs(tpPrice - entry);
-          tpProfitPoints += pts;
-          if (lotSize > 0) tpProfitDollars += pts * pipValue * lotSize;
-          else if (balance > 0 && slDistance > 0) tpProfitDollars += (pts / slDistance) * (balance * 0.02) * tps[i].rr;
-        }
-
-        updateData.status = "HIT_TP";
-        updateData.partialWin = false;
-        updateData.hitTpIndex = totalTPsCount;
-        updateData.pnlPoints = parseFloat(tpProfitPoints.toFixed(1));
-        updateData.pnlDollars = parseFloat(tpProfitDollars.toFixed(2));
-        updateData.totalTPs = totalTPsCount;
-      } else {
-        // No TPs were hit — keep as MANUAL_CLOSE with zero PnL
-        updateData.status = "MANUAL_CLOSE";
-        updateData.pnlPoints = 0;
-        updateData.pnlDollars = 0;
       }
+      // else: No TPs were hit — keep status as MANUAL_CLOSE, no PnL change
     }
 
     const signal = await updateSignal(id, updateData);
