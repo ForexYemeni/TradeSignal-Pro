@@ -321,3 +321,46 @@ Stage Summary:
 - Admin can add multiple USDT network addresses (TRC20, BEP20, ERC20 etc.) with toggle/edit/delete
 - Users with active subscriptions cannot re-subscribe; active status shown as banner in packages tab
 - All changes backward-compatible with existing single USDT address configuration
+---
+Task ID: 2
+Agent: main
+Task: Implement upgrade logic, cancel subscription, and professional admin payment UI redesign
+
+Work Log:
+- Created POST /api/subscription/cancel endpoint for users to cancel their own subscription
+- Rewrote POST /api/payments to support upgrade logic:
+  - Free/trial users can subscribe to paid packages (full price, fresh subscription)
+  - Paid users can upgrade to higher-priced packages (pay difference)
+  - Calculates: upgradePrice = newPackagePrice - remainingValue
+  - remainingValue = (remainingDays / currentTotalDays) * currentPackagePrice
+  - Upgrade extends from current expiry date + new package duration
+  - Same package subscription blocked with clear error
+- Updated PUT /api/payments (admin approve) to also support upgrade extension
+- Added handleCancelSubscription() frontend handler with confirmation dialog
+- Updated handleUsdtPayment and handleLocalPayment to handle upgrade/samePackage errors
+- Redesigned user subscription card (packages tab) with:
+  - Professional card with gradient top bar, status badge, expiry countdown
+  - Cancel subscription button with danger confirmation
+- Updated package cards to show:
+  - "باقتك الحالية" badge for same package (disabled state)
+  - "ترقية" badge for upgradeable packages
+  - Upgrade price (difference) with strikethrough original price
+  - Upgrade info bar explaining the upgrade terms
+  - "ترقية الآن" button with sky-blue gradient for upgrades
+- Redesigned admin payment methods UI with:
+  - Professional tabbed design (USDT / محلية) with indicator dots
+  - Count badges on each tab
+  - Cleaner card design with gradient icons, status indicators
+  - Hover-based action buttons (edit/toggle/delete) that only show on hover
+  - Larger, more breathable form layouts
+  - Empty state illustrations with centered icons
+  - Dashed-border add buttons
+  - Better spacing between elements (space-y-3, space-y-4)
+- Build verified: all routes compile successfully including new /api/subscription/cancel
+
+Stage Summary:
+- Users can upgrade from paid package to higher package by paying only the difference
+- Free trial users can subscribe to paid packages anytime
+- Users can cancel their active subscription with confirmation dialog
+- Admin payment methods now use professional tabbed UI instead of cluttered accordion
+- All changes backward-compatible

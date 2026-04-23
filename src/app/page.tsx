@@ -290,6 +290,8 @@ export default function HomePage() {
   const [editingUsdtNetworkId, setEditingUsdtNetworkId] = useState<string | null>(null);
   const [usdtNetFormNetwork, setUsdtNetFormNetwork] = useState("TRC20");
   const [usdtNetFormAddress, setUsdtNetFormAddress] = useState("");
+  /* ── Admin Payment Tab ── */
+  const [adminPaymentTab, setAdminPaymentTab] = useState<"usdt" | "local">("usdt");
 
   /* ── Session Init: restore from localStorage ── */
   const [dbReady, setDbReady] = useState(false);
@@ -1341,11 +1343,11 @@ export default function HomePage() {
       const data = await res.json();
       if (data.success) {
         setPaymentResult("success");
-        toast.success("تم تفعيل الاشتراك بنجاح! استمتع بالباقة.");
+        toast.success(data.message || "تم تفعيل الاشتراك بنجاح!");
         setTimeout(() => { fetchPackages(); handleLogout(); }, 3000);
       } else {
         toast.error(data.error || "فشل تفعيل الاشتراك");
-        if (data.hasActiveSubscription) resetPaymentState();
+        if (data.samePackage) resetPaymentState();
       }
     } catch (e) { console.error("USDT payment:", e); toast.error("خطأ في الاتصال"); }
     finally { setPaymentLoad(false); }
@@ -1355,7 +1357,6 @@ export default function HomePage() {
     if (!selectedPkg || !paymentProofFile || !session || !selectedLocalMethod) return;
     setPaymentLoad(true);
     try {
-      // Upload proof image first
       const reader = new FileReader();
       const fileDataUrl: string = await new Promise((resolve, reject) => {
         reader.onload = () => resolve(reader.result as string);
@@ -1371,7 +1372,6 @@ export default function HomePage() {
       if (!uploadData.success || !uploadData.url) { toast.error("فشل رفع صورة الإثبات"); setPaymentLoad(false); return; }
 
       const localAmount = selectedPkg.price * selectedLocalMethod.exchangeRate;
-      // Submit payment request
       const res = await fetch("/api/payments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1388,13 +1388,39 @@ export default function HomePage() {
       const data = await res.json();
       if (data.success) {
         setPaymentResult("pending");
-        toast.success("تم إرسال طلب الدفع بنجاح! سيتم مراجعته من قبل الإدارة.");
+        toast.success(data.message || "تم إرسال طلب الدفع بنجاح!");
       } else {
         toast.error(data.error || "فشل إرسال طلب الدفع");
-        if (data.hasActiveSubscription) resetPaymentState();
+        if (data.samePackage) resetPaymentState();
       }
     } catch (e) { console.error("Local payment:", e); toast.error("خطأ في الاتصال"); }
     finally { setPaymentLoad(false); }
+  }
+
+  /* ── Cancel Subscription ── */
+  async function handleCancelSubscription() {
+    if (!session) return;
+    askConfirm({
+      title: "إلغاء الاشتراك",
+      description: `هل أنت متأكد من إلغاء اشتراكك في باقة "${session.packageName}"؟ سيتم فقدان الوصول إلى الإشارات فوراً ولا يمكن التراجع عن هذا الإجراء.`,
+      variant: "danger",
+      confirmLabel: "نعم، إلغاء الاشتراك",
+      icon: <XCircle className="w-5 h-5 text-red-400" />,
+      action: async () => {
+        try {
+          const res = await fetch("/api/subscription/cancel", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: session.id }) });
+          const data = await res.json();
+          if (data.success) {
+            toast.success("تم إلغاء الاشتراك بنجاح");
+            fetchPackages();
+            // Update session locally
+            setSession(s => s ? { ...s, subscriptionType: "none", subscriptionExpiry: undefined, packageId: undefined, packageName: undefined, status: "expired" } : s);
+          } else {
+            toast.error(data.error || "فشل إلغاء الاشتراك");
+          }
+        } catch (e) { console.error("Cancel subscription:", e); toast.error("خطأ في الاتصال"); }
+      },
+    });
   }
 
   function resetPaymentState() {
@@ -3340,250 +3366,246 @@ export default function HomePage() {
         {/* ══════ TAB: PACKAGES (Admin) ══════ */}
         {tab === "packages" && isAdmin && (
           <motion.div key="packages" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }} className="space-y-4">
-            {/* ── USDT Multi-Network Settings ── */}
-            <div className="rounded-2xl border border-amber-500/15 overflow-hidden" style={{ background: "linear-gradient(135deg, rgba(255,215,0,0.06) 0%, rgba(255,140,0,0.02) 100%)" }}>
-              <button onClick={() => { setShowPaymentSettings(!showPaymentSettings); if (!showPaymentSettings) { setPaySettingsForm({ usdtWalletAddress: appSettings.usdtWalletAddress || "", usdtNetwork: appSettings.usdtNetwork || "TRC20" }); } }} className="w-full p-4 flex items-center justify-between text-sm text-foreground/80 hover:bg-muted/30 transition-colors">
-                <span className="flex items-center gap-2"><Wallet className="w-4 h-4 text-amber-400" />إعدادات محفظة USDT</span>
-                <div className="flex items-center gap-2">
-                  {(appSettings.usdtNetworks || (appSettings.usdtWalletAddress ? [{ network: appSettings.usdtNetwork }] : [])).length > 0 && (
-                    <span className="text-[9px] bg-amber-500/15 text-amber-400 px-1.5 py-0.5 rounded-md font-bold">
-                      {(appSettings.usdtNetworks || []).filter(n => n.isActive).length} شبكة نشطة
-                    </span>
-                  )}
-                  <span className={`text-[10px] transition-transform duration-200 ${showPaymentSettings ? "rotate-180" : ""}`}>▼</span>
-                </div>
-              </button>
-              {showPaymentSettings && (
-                <div className="px-4 pb-4 space-y-3 animate-[fadeIn_0.2s_ease-out]">
-                  {/* Network Addresses List */}
+            {/* ── Payment Methods (Tabbed) ── */}
+            <div className="rounded-2xl border border-border overflow-hidden">
+              {/* Tab Header */}
+              <div className="flex border-b border-border">
+                <button onClick={() => setAdminPaymentTab("usdt")}
+                  className={`flex-1 py-3.5 text-[11px] font-bold flex items-center justify-center gap-2 transition-colors relative ${adminPaymentTab === "usdt" ? "text-amber-400" : "text-muted-foreground hover:text-foreground"}`}>
+                  <Wallet className="w-3.5 h-3.5" />
+                  <span>USDT</span>
+                  <span className={`text-[8px] px-1.5 py-0.5 rounded-full ${adminPaymentTab === "usdt" ? "bg-amber-500/15" : "bg-muted/50"}`}>
+                    {(usdtNetworks.length > 0 ? usdtNetworks : (appSettings.usdtWalletAddress ? 1 : 0)).filter(Boolean).length || 0}
+                  </span>
+                  {adminPaymentTab === "usdt" && <div className="absolute bottom-0 left-1/4 right-1/4 h-0.5 bg-amber-400 rounded-full" />}
+                </button>
+                <button onClick={() => setAdminPaymentTab("local")}
+                  className={`flex-1 py-3.5 text-[11px] font-bold flex items-center justify-center gap-2 transition-colors relative ${adminPaymentTab === "local" ? "text-sky-400" : "text-muted-foreground hover:text-foreground"}`}>
+                  <Banknote className="w-3.5 h-3.5" />
+                  <span>محلية</span>
+                  <span className={`text-[8px] px-1.5 py-0.5 rounded-full ${adminPaymentTab === "local" ? "bg-sky-500/15" : "bg-muted/50"}`}>
+                    {localPaymentMethods.length}
+                  </span>
+                  {adminPaymentTab === "local" && <div className="absolute bottom-0 left-1/4 right-1/4 h-0.5 bg-sky-400 rounded-full" />}
+                </button>
+              </div>
+
+              {/* USDT Tab Content */}
+              {adminPaymentTab === "usdt" && (
+                <div className="p-4 space-y-4 animate-[fadeIn_0.2s_ease-out]">
                   {(usdtNetworks.length > 0 || (appSettings.usdtWalletAddress && usdtNetworks.length === 0)) ? (
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       {(usdtNetworks.length > 0 ? usdtNetworks : (appSettings.usdtWalletAddress ? [{
                         id: "legacy", network: appSettings.usdtNetwork || "TRC20",
                         address: appSettings.usdtWalletAddress || "", isActive: true, order: 0
                       }] : [])).map(net => (
-                        <div key={net.id} className={`rounded-xl border p-3 space-y-2 ${net.isActive ? "border-amber-500/20 bg-amber-500/[0.04]" : "border-border bg-muted/20 opacity-60"}`}>
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <div className={`w-6 h-6 rounded-lg ${net.isActive ? "bg-amber-500/15" : "bg-muted/40"} flex items-center justify-center flex-shrink-0`}>
-                                <Wallet className={`w-3 h-3 ${net.isActive ? "text-amber-400" : "text-muted-foreground"}`} />
+                        <div key={net.id} className={`rounded-xl border p-3.5 ${net.isActive ? "border-amber-500/15 bg-amber-500/[0.03]" : "border-border/50 bg-muted/10 opacity-50"}`}>
+                          <div className="flex items-center justify-between mb-2.5">
+                            <div className="flex items-center gap-2.5">
+                              <div className={`w-9 h-9 rounded-xl ${net.isActive ? "bg-gradient-to-br from-amber-500/20 to-orange-500/10" : "bg-muted/30"} border ${net.isActive ? "border-amber-500/20" : "border-border/50"} flex items-center justify-center`}>
+                                <Wallet className={`w-4 h-4 ${net.isActive ? "text-amber-400" : "text-muted-foreground"}`} />
                               </div>
-                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg ${net.isActive ? "bg-amber-500/15 text-amber-400" : "bg-muted/50 text-muted-foreground"}`}>{net.network}</span>
-                              {!net.isActive && <span className="text-[8px] bg-muted/60 text-muted-foreground px-1.5 py-0.5 rounded-md">معطلة</span>}
+                              <div>
+                                <span className={`text-[11px] font-bold ${net.isActive ? "text-foreground" : "text-muted-foreground"}`}>{net.network}</span>
+                                <div className="flex items-center gap-1 mt-0.5">
+                                  <span className={`w-1.5 h-1.5 rounded-full ${net.isActive ? "bg-emerald-400" : "bg-muted-foreground"}`} />
+                                  <span className="text-[8px] text-muted-foreground">{net.isActive ? "نشطة" : "معطلة"}</span>
+                                </div>
+                              </div>
                             </div>
-                            <div className="flex gap-1">
+                            <div className="flex gap-1.5">
                               <button onClick={() => { setEditingUsdtNetworkId(net.id); setUsdtNetFormNetwork(net.network); setUsdtNetFormAddress(net.address); setShowUsdtNetworkForm(true); }}
-                                className="px-2 py-1 rounded-lg text-[8px] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/15 active:scale-95 transition-transform">تعديل</button>
+                                className="p-1.5 rounded-lg text-muted-foreground hover:text-amber-400 hover:bg-amber-500/10 border border-transparent hover:border-amber-500/15 transition-all">
+                                <Settings className="w-3.5 h-3.5" />
+                              </button>
                               <button onClick={() => handleToggleUsdtNetwork(net.id, !net.isActive)}
-                                className={`px-2 py-1 rounded-lg text-[8px] font-medium border active:scale-95 transition-transform ${net.isActive ? "bg-amber-500/10 text-amber-300/70 border-amber-500/15" : "bg-emerald-500/10 text-emerald-400 border-emerald-500/15"}`}>
-                                {net.isActive ? "تعطيل" : "تفعيل"}
+                                className={`p-1.5 rounded-lg border transition-all ${net.isActive ? "text-amber-300/60 hover:text-amber-300 hover:bg-amber-500/10 border-transparent hover:border-amber-500/15" : "text-muted-foreground hover:text-emerald-400 hover:bg-emerald-500/10 border-transparent hover:border-emerald-500/15"}`}>
+                                <span className="text-[9px] font-medium">{net.isActive ? "إيقاف" : "تشغيل"}</span>
                               </button>
                               <button onClick={() => handleDeleteUsdtNetwork(net.id)}
-                                className="px-2 py-1 rounded-lg text-[8px] font-medium bg-red-500/5 text-red-300/60 border border-red-500/10 active:scale-95 transition-transform">
-                                <Trash2 className="w-2.5 h-2.5" />
+                                className="p-1.5 rounded-lg text-muted-foreground hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/15 transition-all">
+                                <Trash2 className="w-3.5 h-3.5" />
                               </button>
                             </div>
                           </div>
-                          <div className="bg-black/20 rounded-lg p-2">
-                            <div className="text-[9px] font-mono text-foreground/80 break-all select-all" dir="ltr">{net.address}</div>
+                          <div className="bg-black/15 rounded-lg p-2.5">
+                            <div className="text-[9px] font-mono text-foreground/60 break-all select-all leading-relaxed" dir="ltr">{net.address}</div>
                           </div>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <div className="rounded-xl border border-dashed border-amber-500/20 p-4 text-center">
-                      <Wallet className="w-6 h-6 text-muted-foreground/40 mx-auto mb-2" />
-                      <p className="text-[10px] text-muted-foreground">لم تتم إضافة أي عناوين USDT بعد</p>
-                      <p className="text-[9px] text-muted-foreground/60 mt-1">أضف عناوين المحفظة لكل شبكة</p>
+                    <div className="py-8 text-center">
+                      <div className="w-12 h-12 rounded-2xl bg-muted/20 border border-border/50 flex items-center justify-center mx-auto mb-3">
+                        <Wallet className="w-5 h-5 text-muted-foreground/40" />
+                      </div>
+                      <p className="text-[11px] text-muted-foreground font-medium">لا توجد شبكات USDT</p>
+                      <p className="text-[9px] text-muted-foreground/50 mt-1">أضف عناوين المحفظة لتفعيل الدفع عبر USDT</p>
                     </div>
                   )}
 
-                  {/* Add/Edit Network Form */}
+                  {/* Add/Edit Network */}
                   <AnimatePresence>
                   {showUsdtNetworkForm && (
-                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-                      <div className="rounded-xl border border-amber-500/20 bg-muted/40 p-3 space-y-2.5">
-                        <div className="flex items-center gap-1.5 mb-1">
-                          <div className="w-4 h-4 rounded-lg bg-amber-500/20 flex items-center justify-center">
-                            {editingUsdtNetworkId ? <Settings className="w-2.5 h-2.5 text-amber-400" /> : <Plus className="w-2.5 h-2.5 text-amber-400" />}
-                          </div>
-                          <span className="text-[10px] font-bold text-amber-400">{editingUsdtNetworkId ? "تعديل عنوان الشبكة" : "إضافة شبكة جديدة"}</span>
-                        </div>
-                        <div>
-                          <label className="text-[9px] text-muted-foreground mb-1 block font-medium">الشبكة</label>
-                          <div className="flex gap-1.5 h-[40px]">
-                            {["TRC20", "BEP20", "ERC20"].map(n => (
-                              <button key={n} onClick={() => setUsdtNetFormNetwork(n)}
-                                className={`flex-1 rounded-xl text-[10px] font-semibold transition-all border ${usdtNetFormNetwork === n ? "bg-amber-500/20 text-amber-400 border-amber-500/30" : "bg-muted/50 text-muted-foreground border-border"}`}>
-                                {n}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                        <div>
-                          <label className="text-[9px] text-muted-foreground mb-1 block font-medium">عنوان المحفظة</label>
-                          <Input value={usdtNetFormAddress} onChange={e => setUsdtNetFormAddress(e.target.value)} placeholder="أدخل عنوان المحفظة..."
-                            className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-10 rounded-xl text-[11px] font-mono" dir="ltr" />
-                        </div>
-                        <div className="flex gap-2">
-                          <button onClick={handleSaveUsdtNetwork}
-                            className="flex-1 h-10 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-black text-[11px] font-bold active:scale-[0.98] transition-transform flex items-center justify-center gap-1.5">
-                            <CheckCircle2 className="w-3.5 h-3.5" /> {editingUsdtNetworkId ? "حفظ التعديل" : "إضافة الشبكة"}
+                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="rounded-xl border border-amber-500/15 bg-amber-500/[0.03] p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-amber-400">{editingUsdtNetworkId ? "تعديل الشبكة" : "شبكة جديدة"}</span>
+                        <button onClick={resetUsdtNetForm} className="text-muted-foreground hover:text-foreground transition-colors"><XCircle className="w-4 h-4" /></button>
+                      </div>
+                      <div className="flex gap-1.5 h-[42px]">
+                        {["TRC20", "BEP20", "ERC20"].map(n => (
+                          <button key={n} onClick={() => setUsdtNetFormNetwork(n)}
+                            className={`flex-1 rounded-xl text-[10px] font-semibold transition-all border ${usdtNetFormNetwork === n ? "bg-amber-500/20 text-amber-400 border-amber-500/30 shadow-sm shadow-amber-500/10" : "bg-muted/30 text-muted-foreground border-border hover:bg-muted/50"}`}>
+                            {n}
                           </button>
-                          <button onClick={resetUsdtNetForm} className="h-10 px-4 rounded-xl bg-muted/60 text-muted-foreground border border-border text-[11px] font-medium active:scale-95 transition-transform">
-                            إلغاء
-                          </button>
-                        </div>
+                        ))}
+                      </div>
+                      <Input value={usdtNetFormAddress} onChange={e => setUsdtNetFormAddress(e.target.value)} placeholder="أدخل عنوان المحفظة..."
+                        className="bg-black/10 border-border/50 text-foreground placeholder:text-muted-foreground/50 h-11 rounded-xl text-[11px] font-mono focus:border-amber-500/30" dir="ltr" />
+                      <div className="flex gap-2">
+                        <button onClick={handleSaveUsdtNetwork}
+                          className="flex-1 h-11 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-black text-[11px] font-bold active:scale-[0.98] transition-all shadow-sm shadow-amber-500/20">
+                          <CheckCircle2 className="w-4 h-4 mx-auto" /> {editingUsdtNetworkId ? "حفظ" : "إضافة"}
+                        </button>
                       </div>
                     </motion.div>
                   )}
                   </AnimatePresence>
 
-                  {/* Add Network Button (when form not showing) */}
                   {!showUsdtNetworkForm && (
                     <button onClick={() => { resetUsdtNetForm(); setShowUsdtNetworkForm(true); }}
-                      className="w-full h-10 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[11px] font-bold active:scale-[0.98] transition-transform flex items-center justify-center gap-1.5">
-                      <Plus className="w-3.5 h-3.5" /> إضافة شبكة USDT جديدة
+                      className="w-full py-3 rounded-xl border border-dashed border-amber-500/20 text-amber-400/60 text-[11px] font-semibold hover:bg-amber-500/5 hover:text-amber-400 hover:border-amber-500/30 transition-all flex items-center justify-center gap-2">
+                      <Plus className="w-4 h-4" /> إضافة شبكة جديدة
                     </button>
                   )}
                 </div>
               )}
-            </div>
 
-            {/* ── Local Payment Methods Management ── */}
-            <div className="rounded-2xl border border-sky-500/15 overflow-hidden" style={{ background: "linear-gradient(135deg, rgba(14,165,233,0.06) 0%, rgba(6,182,212,0.02) 100%)" }}>
-              <div className="p-4 pb-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-xl bg-sky-500/15 border border-sky-500/15 flex items-center justify-center">
-                      <Banknote className="w-4 h-4 text-sky-400" />
-                    </div>
-                    <div>
-                      <h3 className="text-xs font-bold text-foreground">طرق الدفع المحلية</h3>
-                      <p className="text-[9px] text-muted-foreground">{localPaymentMethods.length} طريقة دفع</p>
-                    </div>
-                  </div>
-                  <button onClick={() => { if (showMethodForm && editingMethodId) resetMethodForm(); else { resetMethodForm(); setShowMethodForm(true); } }}
-                    className="px-3 py-1.5 rounded-xl text-[10px] font-bold bg-gradient-to-r from-sky-500/20 to-cyan-500/15 text-sky-400 border border-sky-500/25 active:scale-95 transition-transform flex items-center gap-1">
-                    {showMethodForm && editingMethodId ? "✕ إلغاء التعديل" : <><span className="text-sky-300">+</span> إضافة طريقة</>}
-                  </button>
-                </div>
-              </div>
-
-              {/* Method Form */}
-              <AnimatePresence>
-              {showMethodForm && (
-                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-                  <div className="px-4 pb-4 animate-[fadeIn_0.2s_ease-out]">
-                    <div className="rounded-xl border border-sky-500/20 bg-muted/40 p-3 space-y-2.5">
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <div className="w-4 h-4 rounded-lg bg-sky-500/20 flex items-center justify-center">
-                          {editingMethodId ? <Settings className="w-2.5 h-2.5 text-sky-400" /> : <Plus className="w-2.5 h-2.5 text-sky-400" />}
-                        </div>
-                        <span className="text-[10px] font-bold text-sky-400">{editingMethodId ? "تعديل طريقة الدفع" : "إضافة طريقة دفع جديدة"}</span>
+              {/* Local Payment Tab Content */}
+              {adminPaymentTab === "local" && (
+                <div className="p-4 space-y-4 animate-[fadeIn_0.2s_ease-out]">
+                  {/* Method Form */}
+                  <AnimatePresence>
+                  {showMethodForm && (
+                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="rounded-xl border border-sky-500/15 bg-sky-500/[0.03] p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-sky-400">{editingMethodId ? "تعديل طريقة الدفع" : "طريقة دفع جديدة"}</span>
+                        <button onClick={resetMethodForm} className="text-muted-foreground hover:text-foreground transition-colors"><XCircle className="w-4 h-4" /></button>
                       </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="col-span-2">
-                          <label className="text-[9px] text-muted-foreground mb-1 block font-medium">اسم المحفظة (للعرض)</label>
-                          <Input value={methodFormName} onChange={e => setMethodFormName(e.target.value)} placeholder="مثال: محفظة YmntPay"
-                            className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-10 rounded-xl text-[11px]" dir="rtl" />
-                        </div>
-                        <div className="col-span-2">
-                          <label className="text-[9px] text-muted-foreground mb-1 block font-medium">اسم مزود المحفظة</label>
-                          <Input value={methodFormWalletName} onChange={e => setMethodFormWalletName(e.target.value)} placeholder="مثال: YmntPay, Chime, MTN"
-                            className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-10 rounded-xl text-[11px]" dir="ltr" />
-                        </div>
-                        <div className="col-span-2">
-                          <label className="text-[9px] text-muted-foreground mb-1 block font-medium">رقم المحفظة / عنوان المحفظة</label>
-                          <Input value={methodFormWallet} onChange={e => setMethodFormWallet(e.target.value)} placeholder="أدخل رقم أو عنوان المحفظة"
-                            className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-10 rounded-xl text-[11px] font-mono" dir="ltr" />
-                        </div>
-                        <div>
-                          <label className="text-[9px] text-muted-foreground mb-1 block font-medium">اسم العملة المحلية</label>
-                          <Input value={methodFormCurrencyName} onChange={e => setMethodFormCurrencyName(e.target.value)} placeholder="مثال: الريال اليمني"
-                            className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-10 rounded-xl text-[11px]" dir="rtl" />
-                        </div>
-                        <div>
-                          <label className="text-[9px] text-muted-foreground mb-1 block font-medium">رمز العملة</label>
-                          <Input value={methodFormCurrencyCode} onChange={e => setMethodFormCurrencyCode(e.target.value)} placeholder="مثال: YER"
-                            className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-10 rounded-xl text-[11px] font-mono" dir="ltr" />
-                        </div>
-                        <div className="col-span-2">
-                          <label className="text-[9px] text-muted-foreground mb-1 block font-medium">سعر الصرف (1 USDT = ?)</label>
-                          <Input type="number" value={methodFormRate} onChange={e => setMethodFormRate(e.target.value)} placeholder="مثال: 535"
-                            className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-10 rounded-xl text-[11px] font-mono" dir="ltr" />
-                        </div>
-                      </div>
-                      <button onClick={handleSaveMethod} disabled={methodLoad}
-                        className="w-full h-10 rounded-xl bg-gradient-to-r from-sky-500 to-cyan-500 text-white text-[11px] font-bold disabled:opacity-40 active:scale-[0.98] transition-transform flex items-center justify-center gap-1.5">
-                        {methodLoad ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <><CheckCircle2 className="w-3.5 h-3.5" /> {editingMethodId ? "حفظ التعديلات" : "إضافة طريقة الدفع"}</>}
-                      </button>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-              </AnimatePresence>
-
-              {/* Methods List */}
-              {localPaymentMethods.length > 0 && (
-                <div className="px-4 pb-3 space-y-2">
-                  {localPaymentMethods.map((m) => (
-                    <motion.div key={m.id} initial={{ opacity: 0, x: 5 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.03 }}
-                      className={`rounded-xl border p-3 space-y-2 ${m.isActive ? "border-sky-500/20 bg-sky-500/[0.04]" : "border-border bg-muted/20 opacity-60"}`}>
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <div className={`w-6 h-6 rounded-lg ${m.isActive ? "bg-sky-500/15" : "bg-muted/40"} flex items-center justify-center flex-shrink-0`}>
-                              <CreditCard className={`w-3 h-3 ${m.isActive ? "text-sky-400" : "text-muted-foreground"}`} />
-                            </div>
-                            <span className="text-[11px] font-bold text-foreground">{m.name}</span>
-                            {!m.isActive && <span className="text-[8px] bg-muted/60 text-muted-foreground px-1.5 py-0.5 rounded-md">معطلة</span>}
+                      <div className="space-y-2.5">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="col-span-2">
+                            <label className="text-[9px] text-muted-foreground mb-1 block">اسم المحفظة</label>
+                            <Input value={methodFormName} onChange={e => setMethodFormName(e.target.value)} placeholder="محفظة YmntPay" dir="rtl"
+                              className="bg-black/10 border-border/50 text-foreground placeholder:text-muted-foreground/50 h-10 rounded-xl text-[11px]" />
                           </div>
-                          <div className="mt-1.5 space-y-1">
-                            <div className="flex items-center gap-2 text-[9px]">
-                              <span className="text-muted-foreground w-16 flex-shrink-0">المزود:</span>
-                              <span className="text-foreground font-medium font-mono" dir="ltr">{m.walletName}</span>
-                            </div>
-                            <div className="flex items-center gap-2 text-[9px]">
-                              <span className="text-muted-foreground w-16 flex-shrink-0">المحفظة:</span>
-                              <span className="text-foreground font-mono truncate" dir="ltr">{m.walletAddress}</span>
-                            </div>
-                            <div className="flex items-center gap-2 text-[9px]">
-                              <span className="text-muted-foreground w-16 flex-shrink-0">العملة:</span>
-                              <span className="text-foreground">{m.currencyName} ({m.currencyCode})</span>
-                            </div>
-                            <div className="flex items-center gap-2 text-[9px]">
-                              <span className="text-muted-foreground w-16 flex-shrink-0">السعر:</span>
-                              <span className="text-amber-400 font-bold font-mono" dir="ltr">1 USDT = {m.exchangeRate.toLocaleString()} {m.currencyCode}</span>
-                            </div>
+                          <div className="col-span-2">
+                            <label className="text-[9px] text-muted-foreground mb-1 block">اسم المزود</label>
+                            <Input value={methodFormWalletName} onChange={e => setMethodFormWalletName(e.target.value)} placeholder="YmntPay, Chime, MTN" dir="ltr"
+                              className="bg-black/10 border-border/50 text-foreground placeholder:text-muted-foreground/50 h-10 rounded-xl text-[11px] font-mono" />
+                          </div>
+                          <div className="col-span-2">
+                            <label className="text-[9px] text-muted-foreground mb-1 block">رقم المحفظة</label>
+                            <Input value={methodFormWallet} onChange={e => setMethodFormWallet(e.target.value)} placeholder="أدخل رقم المحفظة" dir="ltr"
+                              className="bg-black/10 border-border/50 text-foreground placeholder:text-muted-foreground/50 h-10 rounded-xl text-[11px] font-mono" />
+                          </div>
+                          <div>
+                            <label className="text-[9px] text-muted-foreground mb-1 block">اسم العملة</label>
+                            <Input value={methodFormCurrencyName} onChange={e => setMethodFormCurrencyName(e.target.value)} placeholder="الريال اليمني" dir="rtl"
+                              className="bg-black/10 border-border/50 text-foreground placeholder:text-muted-foreground/50 h-10 rounded-xl text-[11px]" />
+                          </div>
+                          <div>
+                            <label className="text-[9px] text-muted-foreground mb-1 block">رمز العملة</label>
+                            <Input value={methodFormCurrencyCode} onChange={e => setMethodFormCurrencyCode(e.target.value)} placeholder="YER" dir="ltr"
+                              className="bg-black/10 border-border/50 text-foreground placeholder:text-muted-foreground/50 h-10 rounded-xl text-[11px] font-mono" />
+                          </div>
+                          <div className="col-span-2">
+                            <label className="text-[9px] text-muted-foreground mb-1 block">سعر الصرف (1 USDT = ?)</label>
+                            <Input type="number" value={methodFormRate} onChange={e => setMethodFormRate(e.target.value)} placeholder="535" dir="ltr"
+                              className="bg-black/10 border-border/50 text-foreground placeholder:text-muted-foreground/50 h-10 rounded-xl text-[11px] font-mono" />
                           </div>
                         </div>
-                      </div>
-                      <div className="flex gap-1.5 pt-1 border-t border-border/50">
-                        <button onClick={() => { setEditingMethodId(m.id); setMethodFormName(m.name); setMethodFormWallet(m.walletAddress); setMethodFormWalletName(m.walletName); setMethodFormCurrencyName(m.currencyName); setMethodFormCurrencyCode(m.currencyCode); setMethodFormRate(String(m.exchangeRate)); setShowMethodForm(true); }}
-                          className="px-2.5 py-1.5 rounded-lg text-[9px] font-medium bg-sky-500/10 text-sky-400 border border-sky-500/15 active:scale-95 transition-transform flex items-center gap-1">
-                          <Settings className="w-2.5 h-2.5" /> تعديل
-                        </button>
-                        <button onClick={() => handleToggleMethod(m.id, !m.isActive)}
-                          className={`px-2.5 py-1.5 rounded-lg text-[9px] font-medium border active:scale-95 transition-transform flex items-center gap-1 ${m.isActive ? "bg-amber-500/10 text-amber-300/70 border-amber-500/15" : "bg-emerald-500/10 text-emerald-400 border-emerald-500/15"}`}>
-                          {m.isActive ? "تعطيل" : "تفعيل"}
-                        </button>
-                        <button onClick={() => handleDeleteMethod(m.id)}
-                          className="px-2.5 py-1.5 rounded-lg text-[9px] font-medium bg-red-500/5 text-red-300/60 border border-red-500/10 active:scale-95 transition-transform flex items-center gap-1 mr-auto">
-                          <Trash2 className="w-2.5 h-2.5" /> حذف
+                        <button onClick={handleSaveMethod} disabled={methodLoad}
+                          className="w-full h-11 rounded-xl bg-gradient-to-r from-sky-500 to-cyan-500 text-white text-[11px] font-bold disabled:opacity-40 active:scale-[0.98] transition-all shadow-sm shadow-sky-500/20">
+                          {methodLoad ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : <><CheckCircle2 className="w-4 h-4" /> {editingMethodId ? "حفظ التعديلات" : "إضافة"}</>}
                         </button>
                       </div>
                     </motion.div>
-                  ))}
-                </div>
-              )}
-              {localPaymentMethods.length === 0 && !showMethodForm && (
-                <div className="px-4 pb-4">
-                  <div className="rounded-xl border border-dashed border-border/50 p-4 text-center">
-                    <CreditCard className="w-6 h-6 text-muted-foreground/40 mx-auto mb-2" />
-                    <p className="text-[10px] text-muted-foreground">لم تتم إضافة أي طرق دفع محلية بعد</p>
-                    <p className="text-[9px] text-muted-foreground/60 mt-1">أضف طرق دفع ليتمكن المستخدمون من الدفع بالعملات المحلية</p>
-                  </div>
+                  )}
+                  </AnimatePresence>
+
+                  {/* Methods List */}
+                  {localPaymentMethods.length > 0 ? (
+                    <div className="space-y-3">
+                      {localPaymentMethods.map(m => (
+                        <motion.div key={m.id} initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.03 }}
+                          className={`rounded-xl border p-3.5 ${m.isActive ? "border-sky-500/15 bg-sky-500/[0.03]" : "border-border/50 bg-muted/10 opacity-50"}`}>
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2.5">
+                              <div className={`w-9 h-9 rounded-xl ${m.isActive ? "bg-gradient-to-br from-sky-500/20 to-cyan-500/10" : "bg-muted/30"} border ${m.isActive ? "border-sky-500/20" : "border-border/50"} flex items-center justify-center`}>
+                                <CreditCard className={`w-4 h-4 ${m.isActive ? "text-sky-400" : "text-muted-foreground"}`} />
+                              </div>
+                              <div>
+                                <span className={`text-[11px] font-bold ${m.isActive ? "text-foreground" : "text-muted-foreground"}`}>{m.name}</span>
+                                <div className="flex items-center gap-1 mt-0.5">
+                                  <span className={`w-1.5 h-1.5 rounded-full ${m.isActive ? "bg-emerald-400" : "bg-muted-foreground"}`} />
+                                  <span className="text-[8px] text-muted-foreground">{m.isActive ? "نشطة" : "معطلة"}</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex gap-1.5">
+                              <button onClick={() => { setEditingMethodId(m.id); setMethodFormName(m.name); setMethodFormWallet(m.walletAddress); setMethodFormWalletName(m.walletName); setMethodFormCurrencyName(m.currencyName); setMethodFormCurrencyCode(m.currencyCode); setMethodFormRate(String(m.exchangeRate)); setShowMethodForm(true); }}
+                                className="p-1.5 rounded-lg text-muted-foreground hover:text-sky-400 hover:bg-sky-500/10 border border-transparent hover:border-sky-500/15 transition-all">
+                                <Settings className="w-3.5 h-3.5" />
+                              </button>
+                              <button onClick={() => handleToggleMethod(m.id, !m.isActive)}
+                                className={`p-1.5 rounded-lg border transition-all ${m.isActive ? "text-amber-300/60 hover:text-amber-300 hover:bg-amber-500/10 border-transparent hover:border-amber-500/15" : "text-muted-foreground hover:text-emerald-400 hover:bg-emerald-500/10 border-transparent hover:border-emerald-500/15"}`}>
+                                <span className="text-[9px] font-medium">{m.isActive ? "إيقاف" : "تشغيل"}</span>
+                              </button>
+                              <button onClick={() => handleDeleteMethod(m.id)}
+                                className="p-1.5 rounded-lg text-muted-foreground hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/15 transition-all">
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                          {/* Details */}
+                          <div className="space-y-2 text-[9px]">
+                            <div className="flex items-center gap-2">
+                              <span className="text-muted-foreground/60 w-14 flex-shrink-0">المزود</span>
+                              <span className="text-foreground font-medium font-mono" dir="ltr">{m.walletName}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-muted-foreground/60 w-14 flex-shrink-0">المحفظة</span>
+                              <span className="text-foreground font-mono truncate" dir="ltr">{m.walletAddress}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-muted-foreground/60 w-14 flex-shrink-0">العملة</span>
+                              <span className="text-foreground">{m.currencyName} ({m.currencyCode})</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-muted-foreground/60 w-14 flex-shrink-0">السعر</span>
+                              <span className="text-amber-400 font-bold font-mono" dir="ltr">1 USDT = {m.exchangeRate.toLocaleString()} {m.currencyCode}</span>
+                            </div>
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+                  ) : !showMethodForm ? (
+                    <div className="py-8 text-center">
+                      <div className="w-12 h-12 rounded-2xl bg-muted/20 border border-border/50 flex items-center justify-center mx-auto mb-3">
+                        <Banknote className="w-5 h-5 text-muted-foreground/40" />
+                      </div>
+                      <p className="text-[11px] text-muted-foreground font-medium">لا توجد طرق دفع محلية</p>
+                      <p className="text-[9px] text-muted-foreground/50 mt-1">أضف طرق دفع للعملات المحلية</p>
+                    </div>
+                  ) : null}
+
+                  {!showMethodForm && localPaymentMethods.length >= 0 && (
+                    <button onClick={() => { resetMethodForm(); setShowMethodForm(true); }}
+                      className="w-full py-3 rounded-xl border border-dashed border-sky-500/20 text-sky-400/60 text-[11px] font-semibold hover:bg-sky-500/5 hover:text-sky-400 hover:border-sky-500/30 transition-all flex items-center justify-center gap-2">
+                      <Plus className="w-4 h-4" /> إضافة طريقة دفع جديدة
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -3962,28 +3984,61 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* ── Active Subscription Banner ── */}
+            {/* ── Active Subscription Card ── */}
             {session?.subscriptionType === "subscriber" && session?.subscriptionExpiry && new Date(session.subscriptionExpiry).getTime() > Date.now() && (
-              <div className="rounded-2xl border border-emerald-500/25 p-4" style={{ background: "linear-gradient(135deg, rgba(16,185,129,0.08) 0%, rgba(16,185,129,0.02) 100%)" }}>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/20 flex items-center justify-center flex-shrink-0">
-                    <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-emerald-400">لديك اشتراك نشط</span>
-                      <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              (() => {
+                const remainingMs = new Date(session.subscriptionExpiry!).getTime() - Date.now();
+                const remainingDays = Math.max(0, Math.ceil(remainingMs / 86400000));
+                const expiryDate = new Date(session.subscriptionExpiry);
+                const currentPkg = packages.find(p => p.id === session.packageId);
+                const isFreeOrTrial = currentPkg && (currentPkg.type === "free" || currentPkg.type === "trial");
+                const daysColor = remainingDays > 7 ? "text-emerald-400" : remainingDays > 3 ? "text-amber-400" : "text-red-400";
+                const daysBg = remainingDays > 7 ? "bg-emerald-500/15 border-emerald-500/25" : remainingDays > 3 ? "bg-amber-500/15 border-amber-500/25" : "bg-red-500/15 border-red-500/25";
+                const daysTextColor = remainingDays > 7 ? "text-emerald-400" : remainingDays > 3 ? "text-amber-400" : "text-red-400";
+                return (
+                  <div className="rounded-2xl border border-emerald-500/20 overflow-hidden" style={{ background: "linear-gradient(145deg, rgba(16,185,129,0.06) 0%, rgba(16,185,129,0.01) 100%)" }}>
+                    {/* Top gradient bar */}
+                    <div className="h-1 w-full" style={{ background: "linear-gradient(90deg, #10B981, #34D399, #6EE7B7)" }} />
+                    <div className="p-4 space-y-3">
+                      {/* Status row */}
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-11 h-11 rounded-xl bg-emerald-500/15 border border-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                            <Crown className="w-5 h-5 text-emerald-400" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-extrabold text-foreground">{session.packageName}</span>
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[8px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                مفعّل
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-muted-foreground mt-0.5">اشتراكك الحالي نشط ومفعل</p>
+                          </div>
+                        </div>
+                        {/* Days counter */}
+                        <div className={`flex items-center justify-between p-3 rounded-xl border ${daysBg}`}>
+                          <div className="flex items-center gap-2">
+                            <CalendarDays className={`w-4 h-4 ${daysTextColor}`} />
+                            <span className="text-[10px] text-muted-foreground">تاريخ الانتهاء</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] font-semibold text-foreground/80">{expiryDate.toLocaleDateString("ar-SA", { year: "numeric", month: "short", day: "numeric" })}</span>
+                            <span className={`text-xs font-black ${daysTextColor}`}>{remainingDays > 0 ? remainingDays : 0}</span>
+                            <span className="text-[9px] text-muted-foreground">يوم</span>
+                          </div>
+                        </div>
+                        {/* Cancel button */}
+                        <button onClick={handleCancelSubscription}
+                          className="w-full py-2.5 rounded-xl text-[10px] font-medium text-red-400/70 bg-red-500/5 border border-red-500/10 hover:bg-red-500/10 hover:text-red-400 transition-colors flex items-center justify-center gap-1.5">
+                          <XCircle className="w-3.5 h-3.5" /> إلغاء الاشتراك الآن
+                        </button>
+                      </div>
                     </div>
-                    <div className="text-[11px] text-foreground font-semibold mt-0.5">{session.packageName}</div>
-                    <div className="flex items-center gap-3 mt-1">
-                      <span className="text-[9px] text-muted-foreground">ينتهي: {new Date(session.subscriptionExpiry).toLocaleDateString("ar-SA", { month: "short", day: "numeric" })}</span>
-                      <span className="text-[9px] text-muted-foreground">
-                        {(() => { const d = Math.ceil((new Date(session.subscriptionExpiry!).getTime() - Date.now()) / 86400000); return <span className={d > 7 ? "text-emerald-400" : d > 3 ? "text-amber-400" : "text-red-400"}>{d > 0 ? d : 0} يوم متبقي</span>; })()}
-                      </span>
-                    </div>
                   </div>
-                </div>
-              </div>
+                );
+              })()
             )}
 
             {/* ── Payment Result ── */}
@@ -4232,26 +4287,82 @@ export default function HomePage() {
               ) : (
                 <div className="space-y-3">
                   {packages.filter(p => p.isActive && p.type === "paid").map((pkg, idx) => {
-                    const pkgBg = "linear-gradient(135deg, rgba(255,215,0,0.06) 0%, rgba(255,140,0,0.02) 100%)";
+                    // Check upgrade eligibility
+                    const hasActiveSub = session?.subscriptionType === "subscriber" && session?.subscriptionExpiry && new Date(session.subscriptionExpiry).getTime() > Date.now();
+                    const isSamePkg = session?.packageId === pkg.id;
+                    const currentPkg = session?.packageId ? packages.find(p => p.id === session.packageId) : null;
+                    const isCurrentFreeTrial = currentPkg && (currentPkg.type === "free" || currentPkg.type === "trial");
+                    const isCurrentPaid = currentPkg && currentPkg.type === "paid";
+                    const isUpgrade = hasActiveSub && !isSamePkg && isCurrentPaid && pkg.type === "paid";
+                    const canSubscribe = !isSamePkg;
+                    // Calculate upgrade price
+                    let upgradePrice = 0;
+                    let remainingDays = 0;
+                    if (isUpgrade && currentPkg && session?.subscriptionExpiry) {
+                      remainingDays = Math.max(0, Math.ceil((new Date(session.subscriptionExpiry).getTime() - Date.now()) / 86400000));
+                      const remainingValue = (remainingDays / currentPkg.durationDays) * currentPkg.price;
+                      upgradePrice = Math.ceil(Math.max(0, pkg.price - remainingValue));
+                    }
+                    const pkgBg = isSamePkg
+                      ? "linear-gradient(135deg, rgba(16,185,129,0.06) 0%, rgba(16,185,129,0.02) 100%)"
+                      : "linear-gradient(135deg, rgba(255,215,0,0.06) 0%, rgba(255,140,0,0.02) 100%)";
                     return (
                       <motion.div key={pkg.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }}
-                        className="rounded-2xl border border-amber-500/20 overflow-hidden" style={{ background: pkgBg }}>
+                        className={`rounded-2xl border overflow-hidden ${isSamePkg ? "border-emerald-500/20" : "border-amber-500/20"}`} style={{ background: pkgBg }}>
                         <div className="p-4">
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex-1 min-w-0">
-                              <span className="text-base font-extrabold text-foreground">{pkg.name}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-base font-extrabold text-foreground">{pkg.name}</span>
+                                {isSamePkg && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[8px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
+                                    باقتك الحالية
+                                  </span>
+                                )}
+                                {isUpgrade && upgradePrice > 0 && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[8px] font-bold bg-sky-500/15 text-sky-400 border border-sky-500/20">
+                                    <Sparkles className="w-2.5 h-2.5" /> ترقية
+                                  </span>
+                                )}
+                              </div>
                               {pkg.description && <p className="text-[10px] text-muted-foreground mt-1 leading-relaxed">{pkg.description}</p>}
                             </div>
                             <div className="text-left flex-shrink-0">
-                              <div className="text-2xl font-black text-amber-400 font-mono leading-tight">${pkg.price}</div>
-                              <div className="text-[8px] text-muted-foreground mt-0.5">{pkg.durationDays} يوم</div>
-                              {appSettings.usdtWalletAddress && userPaymentMethods.length > 0 && (
-                                <div className="text-[8px] text-muted-foreground mt-0.5">
-                                  {userPaymentMethods.map(m => `${(pkg.price * m.exchangeRate).toLocaleString()} ${m.currencyCode}`).join(" / ")}
+                              {isSamePkg ? (
+                                <div className="text-center">
+                                  <div className="text-2xl font-black text-emerald-400 font-mono leading-tight">${pkg.price}</div>
+                                  <div className="text-[8px] text-emerald-400/70 mt-0.5">مفعّلة</div>
+                                </div>
+                              ) : isUpgrade && upgradePrice > 0 ? (
+                                <div className="text-center">
+                                  <div className="text-[9px] text-muted-foreground line-through">${pkg.price}</div>
+                                  <div className="text-2xl font-black text-sky-400 font-mono leading-tight">${upgradePrice}</div>
+                                  <div className="text-[8px] text-sky-400/70 mt-0.5">سعر الترقية</div>
+                                </div>
+                              ) : (
+                                <div className="text-center">
+                                  <div className="text-2xl font-black text-amber-400 font-mono leading-tight">${pkg.price}</div>
+                                  <div className="text-[8px] text-muted-foreground mt-0.5">{pkg.durationDays} يوم</div>
+                                  {userPaymentMethods.length > 0 && (
+                                    <div className="text-[8px] text-muted-foreground mt-0.5">
+                                      {userPaymentMethods.map(m => `${(pkg.price * m.exchangeRate).toLocaleString()} ${m.currencyCode}`).join(" / ")}
+                                    </div>
+                                  )}
                                 </div>
                               )}
                             </div>
                           </div>
+                          {/* Upgrade info bar */}
+                          {isUpgrade && upgradePrice > 0 && (
+                            <div className="mt-3 p-2.5 rounded-xl bg-sky-500/5 border border-sky-500/15">
+                              <div className="flex items-center gap-2 text-[9px]">
+                                <Sparkles className="w-3 h-3 text-sky-400 flex-shrink-0" />
+                                <span className="text-sky-400/80">
+                                  ترقية من <span className="font-bold text-foreground/80">{currentPkg?.name}</span> — دفع الفرق فقط <span className="font-bold text-sky-400">${upgradePrice}</span> بدلاً من ${pkg.price} — يتم تمديد {pkg.durationDays} يوم من تاريخ الانتهاء الحالي
+                                </span>
+                              </div>
+                            </div>
+                          )}
                           {(pkg.features && pkg.features.length > 0) && (
                             <div className="mt-3 space-y-1">
                               {pkg.features.map((f, i) => (
@@ -4271,10 +4382,16 @@ export default function HomePage() {
                           )}
                         </div>
                         <div className="px-4 py-2.5 border-t border-border/40 bg-muted/20">
-                          <button onClick={() => { setSelectedPkg(pkg); setPaymentMethod(null); setSelectedLocalMethod(null); setSelectedUsdtNetwork(null); setUsdtTxid(""); setPaymentProofFile(null); setPaymentProofPreview(null); setPaymentResult(null); }}
-                            className="w-full h-10 rounded-xl gold-gradient text-black text-[11px] font-bold active:scale-[0.98] transition-transform flex items-center justify-center gap-1.5">
-                            <Crown className="w-3.5 h-3.5" /> اشترك الآن
-                          </button>
+                          {isSamePkg ? (
+                            <div className="w-full h-10 rounded-xl bg-emerald-500/10 text-emerald-400/60 text-[11px] font-bold flex items-center justify-center gap-1.5 cursor-default">
+                              <CheckCircle2 className="w-3.5 h-3.5" /> الباقة الحالية
+                            </div>
+                          ) : (
+                            <button onClick={() => { setSelectedPkg(pkg); setPaymentMethod(null); setSelectedLocalMethod(null); setSelectedUsdtNetwork(null); setUsdtTxid(""); setPaymentProofFile(null); setPaymentProofPreview(null); setPaymentResult(null); }}
+                              className={`w-full h-10 rounded-xl text-[11px] font-bold active:scale-[0.98] transition-transform flex items-center justify-center gap-1.5 ${isUpgrade ? "bg-gradient-to-r from-sky-500 to-cyan-500 text-white" : "gold-gradient text-black"}`}>
+                              {isUpgrade ? <><Sparkles className="w-3.5 h-3.5" /> ترقية الآن</> : <><Crown className="w-3.5 h-3.5" /> اشترك الآن</>}
+                            </button>
+                          )}
                         </div>
                       </motion.div>
                     );

@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST /api/payments
- * - Create a new payment request (subscription purchase)
+ * - Create a new payment request (subscription purchase / upgrade)
  *
  * Body: { userId, packageId, paymentMethod, txId?, paymentMethodId?, localAmount?, localCurrencyCode? }
  */
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "المستخدم غير موجود" }, { status: 404 });
     }
 
-    // Get package
+    // Get target package
     const pkg = await getPackageById(packageId);
     if (!pkg || !pkg.isActive) {
       return NextResponse.json({ success: false, error: "الباقة غير موجودة أو غير مفعلة" }, { status: 404 });
@@ -80,15 +80,54 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Check if user already has an active subscription
+    // ── Check active subscription & determine upgrade mode ──
+    let isUpgrade = false;
+    let effectivePrice = pkg.price;
+    let remainingDays = 0;
+    let remainingValue = 0;
+    let upgradePrice = 0;
+
     if (user.subscriptionType !== "none" && user.subscriptionExpiry && new Date(user.subscriptionExpiry) > new Date()) {
-      return NextResponse.json({
-        success: false,
-        error: `لديك اشتراك نشط بالفعل في باقة "${user.packageName}" ينتهي في ${new Date(user.subscriptionExpiry).toLocaleDateString("ar-SA")}. لا يمكنك الاشتراك في باقة جديدة حتى تنتهي الباقة الحالية.`,
-        hasActiveSubscription: true,
-        currentPackage: user.packageName,
-        currentExpiry: user.subscriptionExpiry,
-      }, { status: 409 });
+      // Same package → block
+      if (user.packageId === packageId) {
+        const remDays = Math.ceil((new Date(user.subscriptionExpiry).getTime() - Date.now()) / 86400000);
+        return NextResponse.json({
+          success: false,
+          error: `أنت مشترك بالفعل في باقة "${user.packageName}". متبقي ${remDays} يوم على الانتهاء.`,
+          hasActiveSubscription: true,
+          samePackage: true,
+        }, { status: 409 });
+      }
+
+      const currentPkg = user.packageId ? await getPackageById(user.packageId) : null;
+      const isCurrentFreeOrTrial = currentPkg && (currentPkg.type === "free" || currentPkg.type === "trial");
+
+      if (isCurrentFreeOrTrial) {
+        // Free/trial → paid: full price, fresh subscription
+        isUpgrade = false;
+        effectivePrice = pkg.price;
+      } else if (currentPkg && currentPkg.type === "paid" && pkg.type === "paid") {
+        // Paid → paid: calculate upgrade price
+        isUpgrade = true;
+        remainingDays = Math.max(0, Math.ceil((new Date(user.subscriptionExpiry).getTime() - Date.now()) / 86400000));
+        remainingValue = (remainingDays / currentPkg.durationDays) * currentPkg.price;
+        upgradePrice = Math.ceil(Math.max(0, pkg.price - remainingValue));
+
+        if (upgradePrice <= 0) {
+          return NextResponse.json({
+            success: false,
+            error: `اشتراكك الحالي في باقة "${user.packageName}" يعادل أو يفوق قيمة باقة "${pkg.name}". لا حاجة للترقية.`,
+            hasActiveSubscription: true,
+            currentPackage: user.packageName,
+          }, { status: 409 });
+        }
+
+        effectivePrice = upgradePrice;
+      } else {
+        // Other cases (e.g., agency → paid): allow with full price
+        isUpgrade = false;
+        effectivePrice = pkg.price;
+      }
     }
 
     // Check for existing pending request for same user + package
@@ -107,7 +146,7 @@ export async function POST(request: NextRequest) {
       userEmail: user.email,
       packageId,
       packageName: pkg.name,
-      packagePrice: pkg.price,
+      packagePrice: effectivePrice,
       paymentMethod,
       paymentMethodId: paymentMethodId || undefined,
       paymentMethodName: body.paymentMethodName || undefined,
@@ -121,8 +160,18 @@ export async function POST(request: NextRequest) {
 
     // For USDT: auto-activate subscription immediately
     if (paymentMethod === "usdt") {
-      const expiry = new Date();
-      expiry.setDate(expiry.getDate() + pkg.durationDays);
+      let expiry: Date;
+
+      if (isUpgrade && user.subscriptionExpiry) {
+        // Extend from current expiry date
+        expiry = new Date(user.subscriptionExpiry);
+        expiry.setDate(expiry.getDate() + pkg.durationDays);
+      } else {
+        // Fresh subscription
+        expiry = new Date();
+        expiry.setDate(expiry.getDate() + pkg.durationDays);
+      }
+
       await updateUser(userId, {
         subscriptionType: "subscriber",
         subscriptionExpiry: expiry.toISOString(),
@@ -133,8 +182,11 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        message: "تم تفعيل الاشتراك بنجاح عبر USDT!",
+        message: isUpgrade
+          ? `تم ترقية اشتراكك إلى باقة "${pkg.name}" بنجاح! تم تمديد الاشتراك بـ ${pkg.durationDays} يوم إضافي.`
+          : "تم تفعيل الاشتراك بنجاح عبر USDT!",
         autoActivated: true,
+        isUpgrade,
         request: paymentRequest,
       });
     }
@@ -142,8 +194,11 @@ export async function POST(request: NextRequest) {
     // For local currency: pending review
     return NextResponse.json({
       success: true,
-      message: "تم إرسال طلب الاشتراك. سيتم المراجعة بعد رفع إثبات الدفع.",
+      message: isUpgrade
+        ? `تم إرسال طلب الترقية لباقة "${pkg.name}". سيتم مراجعة الطلب وتفعيل الترقية بعد القبول.`
+        : "تم إرسال طلب الاشتراك. سيتم المراجعة بعد رفع إثبات الدفع.",
       autoActivated: false,
+      isUpgrade,
       request: paymentRequest,
     });
   } catch (error) {
@@ -193,12 +248,31 @@ export async function PUT(request: NextRequest) {
 
     const updated = await updatePaymentRequest(requestId, updates);
 
-    // If approved: activate subscription
+    // If approved: activate subscription (with upgrade support)
     if (action === "approve" && updated) {
       const pkg = await getPackageById(req.packageId);
+      const user = await getUserById(req.userId);
+
       if (pkg) {
-        const expiry = new Date();
-        expiry.setDate(expiry.getDate() + pkg.durationDays);
+        let expiry: Date;
+
+        // Check if this is an upgrade (user has active paid subscription)
+        const currentPkg = user?.packageId ? await getPackageById(user.packageId) : null;
+        const isActivePaid = user?.subscriptionType !== "none"
+          && user?.subscriptionExpiry
+          && new Date(user.subscriptionExpiry) > new Date()
+          && currentPkg?.type === "paid";
+
+        if (isActivePaid && user?.subscriptionExpiry) {
+          // Upgrade: extend from current expiry
+          expiry = new Date(user.subscriptionExpiry);
+          expiry.setDate(expiry.getDate() + pkg.durationDays);
+        } else {
+          // Fresh subscription
+          expiry = new Date();
+          expiry.setDate(expiry.getDate() + pkg.durationDays);
+        }
+
         await updateUser(req.userId, {
           subscriptionType: "subscriber",
           subscriptionExpiry: expiry.toISOString(),
