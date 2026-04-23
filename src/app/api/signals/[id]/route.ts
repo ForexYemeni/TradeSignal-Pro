@@ -181,6 +181,57 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       updateData.hitPrice = stopLoss;
     }
 
+    // ── MANUAL CLOSE: Calculate proper PnL when admin manually closes ──
+    if (status === "MANUAL_CLOSE") {
+      const prevHitTp = Number(existing.hitTpIndex) || 0;
+      let tps: { tp: number; rr: number }[] = [];
+      try { tps = JSON.parse(String(existing.takeProfits)); } catch { tps = []; }
+      const totalTPsCount = tps.length;
+
+      if (prevHitTp > 0 && totalTPsCount > 0 && prevHitTp < totalTPsCount) {
+        // TPs were partially hit before manual close → treat as partial win
+        let tpProfitDollars = 0;
+        let tpProfitPoints = 0;
+        for (let i = 0; i < Math.min(prevHitTp, tps.length); i++) {
+          const tpPrice = tps[i].tp;
+          const pts = Math.abs(tpPrice - entry);
+          tpProfitPoints += pts;
+          if (lotSize > 0) tpProfitDollars += pts * pipValue * lotSize;
+          else if (balance > 0 && slDistance > 0) tpProfitDollars += (pts / slDistance) * (balance * 0.02) * tps[i].rr;
+        }
+
+        updateData.status = "HIT_TP";
+        updateData.partialWin = true;
+        updateData.hitTpIndex = prevHitTp;
+        updateData.pnlPoints = parseFloat(tpProfitPoints.toFixed(1));
+        updateData.pnlDollars = parseFloat(tpProfitDollars.toFixed(2));
+        updateData.totalTPs = totalTPsCount;
+      } else if (prevHitTp > 0 && totalTPsCount > 0 && prevHitTp >= totalTPsCount) {
+        // All TPs were hit → full win (shouldn't normally happen, but handle it)
+        let tpProfitDollars = 0;
+        let tpProfitPoints = 0;
+        for (let i = 0; i < tps.length; i++) {
+          const tpPrice = tps[i].tp;
+          const pts = Math.abs(tpPrice - entry);
+          tpProfitPoints += pts;
+          if (lotSize > 0) tpProfitDollars += pts * pipValue * lotSize;
+          else if (balance > 0 && slDistance > 0) tpProfitDollars += (pts / slDistance) * (balance * 0.02) * tps[i].rr;
+        }
+
+        updateData.status = "HIT_TP";
+        updateData.partialWin = false;
+        updateData.hitTpIndex = totalTPsCount;
+        updateData.pnlPoints = parseFloat(tpProfitPoints.toFixed(1));
+        updateData.pnlDollars = parseFloat(tpProfitDollars.toFixed(2));
+        updateData.totalTPs = totalTPsCount;
+      } else {
+        // No TPs were hit — keep as MANUAL_CLOSE with zero PnL
+        updateData.status = "MANUAL_CLOSE";
+        updateData.pnlPoints = 0;
+        updateData.pnlDollars = 0;
+      }
+    }
+
     const signal = await updateSignal(id, updateData);
     if (!signal) {
       return NextResponse.json({ success: false, error: "الإشارة غير موجودة" }, { status: 404 });
