@@ -1,7 +1,43 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPaymentRequests, getPaymentRequestsByUser, getPendingPaymentRequests, addPaymentRequest, updatePaymentRequest } from "@/lib/store";
-import { getPackageById, getUserById, updateUser, getAppSettings } from "@/lib/store";
+import { getPackageById, getUserById, updateUser, getAppSettings, getUserByReferralCode } from "@/lib/store";
 import { verifyUsdtTransaction, checkDuplicateTxId, type BlockchainVerification } from "@/lib/blockchain-verify";
+
+// ── Referral reward: grant referrer bonus days when referred user activates paid plan ──
+async function grantReferralReward(
+  userId: string,
+  packageType: "free" | "trial" | "paid"
+): Promise<{ granted: boolean; days: number; referrerName?: string }> {
+  try {
+    const settings = await getAppSettings();
+    if (!settings.referralEnabled || !settings.referralRewardDays) return { granted: false, days: 0 };
+    if (packageType === "free" || packageType === "trial") return { granted: false, days: 0 };
+
+    const user = await getUserById(userId);
+    if (!user || !user.referredBy || user.referralRewardClaimed) return { granted: false, days: 0 };
+
+    const referrer = await getUserByReferralCode(user.referredBy);
+    if (!referrer || referrer.id === userId) return { granted: false, days: 0 };
+
+    // Mark reward as claimed on the referred user
+    await updateUser(userId, { referralRewardClaimed: true });
+
+    const rewardDays = settings.referralRewardDays;
+
+    // If referrer has active subscription, extend it immediately
+    if (referrer.subscriptionType === "subscriber" && referrer.subscriptionExpiry && new Date(referrer.subscriptionExpiry) > new Date()) {
+      const newExpiry = new Date(referrer.subscriptionExpiry);
+      newExpiry.setDate(newExpiry.getDate() + rewardDays);
+      await updateUser(referrer.id, { subscriptionExpiry: newExpiry.toISOString() });
+      console.log(`[Referral Reward] Extended ${referrer.email} by ${rewardDays} days (referred by ${user.email})`);
+    }
+
+    return { granted: true, days: rewardDays, referrerName: referrer.name };
+  } catch (error) {
+    console.error("[Referral Reward] Error:", error);
+    return { granted: false, days: 0 };
+  }
+}
 
 /**
  * GET /api/payments?userId=xxx&pending=true
@@ -254,16 +290,25 @@ export async function POST(request: NextRequest) {
         // Update the payment request status to approved
         await updatePaymentRequest(paymentRequest.id, { status: "approved" });
 
+        // ── Grant referral reward to the referrer (if applicable) ──
+        const referralReward = await grantReferralReward(userId, pkg.type);
+
+        let rewardMsg = "";
+        if (referralReward.granted) {
+          rewardMsg = ` 🎁 حصلت صاحب الدعوة على ${referralReward.days} أيام إضافية!`;
+        }
+
         return NextResponse.json({
           success: true,
           message: isUpgrade
-            ? `تم ترقية اشتراكك إلى باقة "${pkg.name}" بنجاح! تم التحقق من المعاملة على البلوكتشين وتم تمديد الاشتراك بـ ${pkg.durationDays} يوم إضافي.`
-            : `تم تفعيل الاشتراك بنجاح! تم التحقق من الدفع عبر USDT (${networkName}) على البلوكتشين.`,
+            ? `تم ترقية اشتراكك إلى باقة "${pkg.name}" بنجاح! تم التحقق من المعاملة على البلوكتشين وتم تمديد الاشتراك بـ ${pkg.durationDays} يوم إضافي.${rewardMsg}`
+            : `تم تفعيل الاشتراك بنجاح! تم التحقق من الدفع عبر USDT (${networkName}) على البلوكتشين.${rewardMsg}`,
           autoActivated: true,
           blockchainVerified: true,
           blockchainValid: true,
           verificationDetails: verification.details,
           isUpgrade,
+          referralReward,
           request: { ...paymentRequest, status: "approved" },
         });
       }
@@ -395,6 +440,11 @@ export async function PUT(request: NextRequest) {
           packageName: pkg.name,
           status: "active",
         });
+
+        // ── Grant referral reward (admin-approved payment) ──
+        if (pkg.type === "paid") {
+          await grantReferralReward(req.userId, pkg.type);
+        }
       }
     }
 

@@ -20,7 +20,7 @@ import {
   Crown, Package, Users, CalendarDays, Settings,
   Home, Flame, Trophy, ArrowUpRight, ArrowDownRight, Hash, Globe, PieChart, Sparkles, Timer, Wallet,
   MoreHorizontal, CreditCard, Upload, CheckCircle2, XCircle, Image, Copy, Plus, Banknote,
-  ShieldCheck, ShieldX, WifiOff,
+  ShieldCheck, ShieldX, WifiOff, Gift, Ticket,
 } from "lucide-react";
 
 // ═══ EXTRACTED MODULES ═══
@@ -93,6 +93,199 @@ function SignalCard({ s, idx, isAdmin, onUpdate, onDelete, isNew, statusChanged 
   return <EntryCard s={s} idx={idx} isAdmin={isAdmin} onUpdate={onUpdate} onDelete={onDelete} isNew={isNew} statusChanged={statusChanged} />;
 }
 
+
+/* ═══════════════════════════════════════════════════════════════
+   REFERRAL SECTION COMPONENT
+   ═══════════════════════════════════════════════════════════════ */
+
+function ReferralSection({ session, appSettings }: { session: any; appSettings: any }) {
+  const [referralData, setReferralData] = useState<{
+    enabled: boolean;
+    referralCode: string | null;
+    referrals: any[];
+    stats: { total: number; active: number; rewarded: number; rewardDays: number; inviteeRewardDays: number };
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [referralInput, setReferralInput] = useState("");
+  const [applyingCode, setApplyingCode] = useState(false);
+  const [codeApplied, setCodeApplied] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!session?.id) return;
+    fetch(`/api/referral?userId=${session.id}`)
+      .then(r => r.json())
+      .then(data => { if (data.success) setReferralData(data); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [session?.id]);
+
+  // Check if user already has a referral applied
+  useEffect(() => {
+    if (session?.referredBy) setCodeApplied(true);
+  }, [session?.referredBy]);
+
+  async function handleApplyCode() {
+    if (!referralInput.trim() || !session?.id) return;
+    setApplyingCode(true);
+    try {
+      const res = await fetch("/api/referral", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: session.id, referralCode: referralInput.trim() }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(data.message);
+        setCodeApplied(true);
+        setReferralInput("");
+      } else {
+        toast.error(data.error || "فشل تطبيق الكود");
+      }
+    } catch { toast.error("خطأ في الاتصال"); }
+    finally { setApplyingCode(false); }
+  }
+
+  function handleCopy() {
+    if (!referralData?.referralCode) return;
+    const text = `انضم إلى ForexYemeni VIP واستخدم كود الاحالة: ${referralData.referralCode} للحصول على ${referralData.stats.inviteeRewardDays} أيام مجانية!`;
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      toast.success("تم نسخ رابط الدعوة!");
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  if (loading) return null;
+  if (!referralData?.enabled) return null;
+
+  const now = new Date();
+
+  return (
+    <div className="space-y-3">
+      {/* ── Share Your Code ── */}
+      <div className="rounded-2xl border border-violet-500/15 overflow-hidden" style={{ background: "linear-gradient(135deg, rgba(139,92,246,0.06) 0%, rgba(109,40,217,0.02) 100%)" }}>
+        <div className="p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-violet-500/15 border border-violet-500/15 flex items-center justify-center">
+              <Gift className="w-4 h-4 text-violet-400" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-xs font-bold text-foreground">دعوة أصدقائك</h3>
+              <p className="text-[9px] text-muted-foreground">شارك كودك واحصل على {referralData.stats.rewardDays} أيام لكل اشتراك مدفوع</p>
+            </div>
+          </div>
+
+          {/* Referral Code Display */}
+          <div className="flex items-center gap-2">
+            <div className="flex-1 rounded-xl bg-muted/50 border border-border px-3 py-2.5 text-center">
+              <span className="text-lg font-black font-mono tracking-[4px] text-violet-400">{referralData.referralCode || "----"}</span>
+            </div>
+            <button onClick={handleCopy} className="px-4 py-2.5 rounded-xl bg-violet-500/15 border border-violet-500/20 text-violet-400 active:scale-95 transition-transform flex items-center gap-1.5">
+              <Copy className="w-3.5 h-3.5" />
+              <span className="text-[10px] font-bold">{copied ? "تم!" : "نسخ"}</span>
+            </button>
+          </div>
+
+          {/* Stats Row */}
+          <div className="grid grid-cols-3 gap-2">
+            <div className="rounded-lg bg-muted/40 border border-border p-2 text-center">
+              <div className="text-sm font-black text-foreground">{referralData.stats.total}</div>
+              <div className="text-[8px] text-muted-foreground">مدعو</div>
+            </div>
+            <div className="rounded-lg bg-emerald-500/[0.08] border border-emerald-500/15 p-2 text-center">
+              <div className="text-sm font-black text-emerald-400">{referralData.stats.active}</div>
+              <div className="text-[8px] text-emerald-400/60">مشترك نشط</div>
+            </div>
+            <div className="rounded-lg bg-violet-500/[0.08] border border-violet-500/15 p-2 text-center">
+              <div className="text-sm font-black text-violet-400">{referralData.stats.rewarded * referralData.stats.rewardDays}</div>
+              <div className="text-[8px] text-violet-400/60">يوم مكافأة</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Apply Referral Code ── */}
+      {!codeApplied && (
+        <div className="rounded-2xl border border-sky-500/15 overflow-hidden" style={{ background: "linear-gradient(135deg, rgba(14,165,233,0.05) 0%, rgba(2,132,199,0.02) 100%)" }}>
+          <div className="p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-sky-500/15 border border-sky-500/15 flex items-center justify-center">
+                <Ticket className="w-3.5 h-3.5 text-sky-400" />
+              </div>
+              <div>
+                <h3 className="text-xs font-bold text-foreground">لديك كود دعوة؟</h3>
+                <p className="text-[9px] text-muted-foreground">أدخل كود صديقك واحصل على {referralData.stats.inviteeRewardDays} أيام إضافية</p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Input
+                value={referralInput}
+                onChange={e => setReferralInput(e.target.value.toUpperCase())}
+                placeholder="أدخل كود الدعوة..."
+                className="flex-1 bg-muted/50 border-border text-xs font-mono uppercase tracking-wider text-center"
+                maxLength={6}
+              />
+              <button
+                onClick={handleApplyCode}
+                disabled={applyingCode || referralInput.length < 4}
+                className="px-4 py-2 rounded-xl bg-sky-500/15 border border-sky-500/20 text-sky-400 text-[10px] font-bold active:scale-95 transition-transform disabled:opacity-40"
+              >
+                {applyingCode ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "تطبيق"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Code Already Applied ── */}
+      {codeApplied && (
+        <div className="rounded-xl bg-emerald-500/[0.06] border border-emerald-500/15 px-3 py-2 flex items-center gap-2">
+          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+          <span className="text-[10px] text-emerald-400">تم تطبيق كود الدعوة بنجاح</span>
+        </div>
+      )}
+
+      {/* ── Referred Users List ── */}
+      {referralData.referrals.length > 0 && (
+        <div className="rounded-2xl border border-border overflow-hidden bg-muted/20">
+          <div className="px-4 py-3 border-b border-border">
+            <div className="flex items-center gap-2">
+              <Users className="w-3.5 h-3.5 text-muted-foreground" />
+              <span className="text-[11px] font-bold text-foreground">الأشخاص الذين دعوتهم ({referralData.referrals.length})</span>
+            </div>
+          </div>
+          <div className="divide-y divide-border">
+            {referralData.referrals.map((ref: any) => {
+              const isActive = ref.subscriptionType === "subscriber" && ref.subscriptionExpiry && new Date(ref.subscriptionExpiry) > now;
+              return (
+                <div key={ref.id} className="px-4 py-2.5 flex items-center justify-between">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold ${isActive ? "bg-emerald-500/15 text-emerald-400" : "bg-muted/60 text-muted-foreground"}`}>
+                      {ref.name.charAt(0)}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[11px] font-semibold text-foreground truncate">{ref.name}</div>
+                      <div className="text-[8px] text-muted-foreground truncate" dir="ltr">{ref.email}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    {ref.referralRewardClaimed && (
+                      <span className="text-[8px] px-1.5 py-0.5 rounded-md bg-violet-500/10 text-violet-400 font-medium">مكافأة</span>
+                    )}
+                    <span className={`text-[8px] px-1.5 py-0.5 rounded-md font-medium ${isActive ? "bg-emerald-500/10 text-emerald-400" : "bg-muted/40 text-muted-foreground"}`}>
+                      {isActive ? ref.packageName || "مشترك" : ref.status === "blocked" ? "محظور" : ref.status === "pending" ? "معلق" : "غير مشترك"}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 /* ═══════════════════════════════════════════════════════════════
    MAIN APP
@@ -4486,6 +4679,10 @@ export default function HomePage() {
                 </div>
               )
             )}
+
+            {/* ── Referral Section ── */}
+            <ReferralSection session={session} appSettings={appSettings} />
+
           </motion.div>
         )}
 

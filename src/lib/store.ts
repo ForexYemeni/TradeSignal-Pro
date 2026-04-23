@@ -76,6 +76,10 @@ export interface StoredUser {
   hadFreeTrial: boolean;
   /* Device tracking */
   deviceId: string | null;
+  /* Referral fields */
+  referralCode: string | null;
+  referredBy: string | null;       // referral code of the person who invited them
+  referralRewardClaimed: boolean;  // whether referrer already got reward for this user
 }
 
 // ─── Signals ────────────────────────────────────────────
@@ -530,11 +534,15 @@ export interface AppSettings {
   localCurrencyName: string | null;   // e.g. "ريال يمني", "جنيه مصري"
   localCurrencyCode: string | null;   // e.g. "YER", "EGP"
   usdtToLocalRate: number | null;     // e.g. 550 (1 USDT = 550 YER)
+  /* Referral settings */
+  referralEnabled: boolean;
+  referralRewardDays: number;         // extra days given to referrer
+  referralInviteeRewardDays: number;  // extra days given to invitee
 }
 
 export async function getAppSettings(): Promise<AppSettings> {
   const data = await kv.get<AppSettings>('app_settings');
-  return data || { freeTrialPackageId: null, autoApproveOnRegister: true, usdtWalletAddress: null, usdtNetwork: null, localCurrencyName: null, localCurrencyCode: null, usdtToLocalRate: null };
+  return data || { freeTrialPackageId: null, autoApproveOnRegister: true, usdtWalletAddress: null, usdtNetwork: null, localCurrencyName: null, localCurrencyCode: null, usdtToLocalRate: null, referralEnabled: false, referralRewardDays: 7, referralInviteeRewardDays: 3 };
 }
 
 export async function updateAppSettings(updates: Partial<AppSettings>): Promise<AppSettings> {
@@ -679,4 +687,34 @@ export async function updatePaymentRequest(id: string, updates: Partial<PaymentR
     await kv.set('payment_requests', all);
     return all[idx];
   });
+}
+
+// ─── Referral System ─────────────────────────────────
+
+export async function getUserByReferralCode(code: string): Promise<StoredUser | null> {
+  if (!code) return null;
+  const users = await getUsers();
+  return users.find(u => u.referralCode === code.trim() && u.role !== "admin") || null;
+}
+
+export async function getReferrals(userId: string): Promise<{ referrer: StoredUser; referred: StoredUser[] }> {
+  const users = await getUsers();
+  const referrer = users.find(u => u.id === userId);
+  if (!referrer || !referrer.referralCode) return { referrer, referred: [] };
+  const referred = users.filter(u => u.referredBy === referrer.referralCode && u.id !== userId);
+  return { referrer, referred };
+}
+
+export async function countSuccessfulReferrals(userId: string): Promise<number> {
+  const { referred } = await getReferrals(userId);
+  return referred.filter(u => u.subscriptionType === "subscriber" && new Date(u.subscriptionExpiry || "") > new Date()).length;
+}
+
+export function generateReferralCode(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // No I,O,0,1 to avoid confusion
+  let code = "";
+  for (let i = 0; i < 6; i++) {
+    code += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return code;
 }
