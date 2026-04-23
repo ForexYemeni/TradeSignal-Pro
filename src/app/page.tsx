@@ -1670,7 +1670,18 @@ export default function HomePage() {
       const uploadData = await uploadRes.json();
       if (!uploadData.success || !uploadData.url) { toast.error("فشل رفع صورة الإثبات"); setPaymentLoad(false); return; }
 
-      const localAmount = selectedPkg.price * selectedLocalMethod.exchangeRate;
+      // Calculate effective price (upgrade or full) for local currency conversion
+      const hasActiveSub = session?.subscriptionType === "subscriber" && session?.subscriptionExpiry && new Date(session.subscriptionExpiry).getTime() > Date.now();
+      const curPkg = session?.packageId ? packages.find(p => p.id === session.packageId) : null;
+      const isUpg = hasActiveSub && curPkg && curPkg.id !== selectedPkg.id && curPkg.type === "paid" && selectedPkg.type === "paid";
+      let effectivePrice = selectedPkg.price;
+      if (isUpg && curPkg && session?.subscriptionExpiry) {
+        const remDays = Math.max(0, Math.ceil((new Date(session.subscriptionExpiry).getTime() - Date.now()) / 86400000));
+        const remVal = (remDays / curPkg.durationDays) * curPkg.price;
+        effectivePrice = Math.ceil(Math.max(0, selectedPkg.price - remVal));
+      }
+
+      const localAmount = effectivePrice * selectedLocalMethod.exchangeRate;
       const res = await fetch("/api/payments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -4841,13 +4852,54 @@ export default function HomePage() {
 
                 {/* Selected Package Summary */}
                 <div className="glass-card border-amber-500/20 p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-sm font-bold text-foreground">{selectedPkg.name}</h3>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">{selectedPkg.durationDays} يوم</p>
+                  {(() => {
+                    const hasActiveSub = session?.subscriptionType === "subscriber" && session?.subscriptionExpiry && new Date(session.subscriptionExpiry).getTime() > Date.now();
+                    const curPkg = session?.packageId ? packages.find(p => p.id === session.packageId) : null;
+                    const isCurFreeTrial = curPkg && (curPkg.type === "free" || curPkg.type === "trial");
+                    const isUpg = hasActiveSub && curPkg && curPkg.id !== selectedPkg.id && curPkg.type === "paid" && selectedPkg.type === "paid";
+                    let effectivePrice = selectedPkg.price;
+                    let upgradeInfo = null;
+                    if (isUpg && curPkg && session?.subscriptionExpiry) {
+                      const remDays = Math.max(0, Math.ceil((new Date(session.subscriptionExpiry).getTime() - Date.now()) / 86400000));
+                      const remVal = (remDays / curPkg.durationDays) * curPkg.price;
+                      effectivePrice = Math.ceil(Math.max(0, selectedPkg.price - remVal));
+                      upgradeInfo = { remainingDays: remDays, currentName: curPkg.name, saved: selectedPkg.price - effectivePrice };
+                    } else if (hasActiveSub && isCurFreeTrial) {
+                      effectivePrice = selectedPkg.price;
+                    }
+                    return <>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-sm font-bold text-foreground">{selectedPkg.name}</h3>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">{selectedPkg.durationDays} يوم</p>
+                      </div>
+                      <div className="text-right">
+                        {upgradeInfo ? (
+                          <>
+                            <div className="text-[10px] text-muted-foreground line-through">${selectedPkg.price}</div>
+                            <div className="text-2xl font-black text-sky-400 font-mono">${effectivePrice}</div>
+                            <div className="text-[8px] text-sky-400/70">سعر الترقية</div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="text-2xl font-black gold-gradient-text font-mono">${effectivePrice}</div>
+                          </>
+                        )}
+                      </div>
                     </div>
-                    <div className="text-2xl font-black gold-gradient-text font-mono">${selectedPkg.price}</div>
-                  </div>
+                    {upgradeInfo && (
+                      <div className="mt-3 p-2.5 rounded-xl bg-sky-500/5 border border-sky-500/15">
+                        <div className="flex items-center gap-2 text-[9px]">
+                          <Sparkles className="w-3 h-3 text-sky-400 flex-shrink-0" />
+                          <span className="text-sky-400/80">
+                            ترقية من <span className="font-bold text-foreground/80">{upgradeInfo.currentName}</span> — المتبقي {upgradeInfo.remainingDays} يوم — دفع الفرق فقط <span className="font-bold text-sky-400">${effectivePrice}</span> بدلاً من ${selectedPkg.price} — وفر ${upgradeInfo.saved}$
+                          </span>
+                        </div>
+                        <div className="text-[8px] text-muted-foreground mt-1">يتم تمديد {selectedPkg.durationDays} يوم إضافي من تاريخ الانتهاء الحالي</div>
+                      </div>
+                    )}
+                    </>;
+                  })()}
                 </div>
 
                 {/* Payment Method Selection (if not chosen yet) */}
@@ -4878,7 +4930,18 @@ export default function HomePage() {
                           <div className="text-[10px] text-muted-foreground mt-0.5">{m.currencyName} — مراجعة يدوية خلال 24 ساعة</div>
                         </div>
                         <div className="text-left flex-shrink-0">
-                          <div className="text-[10px] font-bold text-sky-400 font-mono">{(selectedPkg.price * m.exchangeRate).toLocaleString()}</div>
+                          <div className="text-[10px] font-bold text-sky-400 font-mono">{(() => {
+                            const hasActiveSub = session?.subscriptionType === "subscriber" && session?.subscriptionExpiry && new Date(session.subscriptionExpiry).getTime() > Date.now();
+                            const curPkg = session?.packageId ? packages.find(p => p.id === session.packageId) : null;
+                            const isUpg = hasActiveSub && curPkg && curPkg.id !== selectedPkg.id && curPkg.type === "paid" && selectedPkg.type === "paid";
+                            let eff = selectedPkg.price;
+                            if (isUpg && curPkg && session?.subscriptionExpiry) {
+                              const remDays = Math.max(0, Math.ceil((new Date(session.subscriptionExpiry).getTime() - Date.now()) / 86400000));
+                              const remVal = (remDays / curPkg.durationDays) * curPkg.price;
+                              eff = Math.ceil(Math.max(0, selectedPkg.price - remVal));
+                            }
+                            return (eff * m.exchangeRate).toLocaleString();
+                          })()}</div>
                           <div className="text-[8px] text-muted-foreground">{m.currencyCode}</div>
                         </div>
                       </button>
@@ -4999,13 +5062,34 @@ export default function HomePage() {
                       </div>
 
                       {/* Amount Info */}
-                      <div className="bg-gradient-to-r from-sky-500/10 to-cyan-500/5 rounded-xl p-3 border border-sky-500/15">
-                        <div className="text-[9px] text-muted-foreground mb-1">المبلغ المطلوب التحويل</div>
-                        <div className="text-xl font-black text-foreground">
-                          {(selectedPkg.price * selectedLocalMethod.exchangeRate).toLocaleString()} <span className="text-xs text-muted-foreground">{selectedLocalMethod.currencyCode}</span>
-                        </div>
-                        <div className="text-[9px] text-muted-foreground mt-1" dir="ltr">{selectedPkg.price} USDT × {selectedLocalMethod.exchangeRate.toLocaleString()} = {(selectedPkg.price * selectedLocalMethod.exchangeRate).toLocaleString()} {selectedLocalMethod.currencyCode}</div>
-                      </div>
+                      {(() => {
+                        const hasActiveSub = session?.subscriptionType === "subscriber" && session?.subscriptionExpiry && new Date(session.subscriptionExpiry).getTime() > Date.now();
+                        const curPkg = session?.packageId ? packages.find(p => p.id === session.packageId) : null;
+                        const isCurFreeTrial = curPkg && (curPkg.type === "free" || curPkg.type === "trial");
+                        const isUpg = hasActiveSub && curPkg && curPkg.id !== selectedPkg.id && curPkg.type === "paid" && selectedPkg.type === "paid";
+                        let eff = selectedPkg.price;
+                        if (isUpg && curPkg && session?.subscriptionExpiry) {
+                          const remDays = Math.max(0, Math.ceil((new Date(session.subscriptionExpiry).getTime() - Date.now()) / 86400000));
+                          const remVal = (remDays / curPkg.durationDays) * curPkg.price;
+                          eff = Math.ceil(Math.max(0, selectedPkg.price - remVal));
+                        }
+                        return (
+                          <div className="bg-gradient-to-r from-sky-500/10 to-cyan-500/5 rounded-xl p-3 border border-sky-500/15">
+                            <div className="text-[9px] text-muted-foreground mb-1">{isUpg ? "المبلغ المطلوب للترقية" : "المبلغ المطلوب التحويل"}</div>
+                            <div className="text-xl font-black text-foreground">
+                              {(eff * selectedLocalMethod.exchangeRate).toLocaleString()} <span className="text-xs text-muted-foreground">{selectedLocalMethod.currencyCode}</span>
+                            </div>
+                            {isUpg ? (
+                              <>
+                                <div className="text-[9px] text-muted-foreground mt-1" dir="ltr"><span className="line-through">{selectedPkg.price} USDT × {selectedLocalMethod.exchangeRate.toLocaleString()} = {(selectedPkg.price * selectedLocalMethod.exchangeRate).toLocaleString()} {selectedLocalMethod.currencyCode}</span></div>
+                                <div className="text-[9px] text-sky-400 mt-0.5" dir="ltr">{eff} USDT × {selectedLocalMethod.exchangeRate.toLocaleString()} = {(eff * selectedLocalMethod.exchangeRate).toLocaleString()} {selectedLocalMethod.currencyCode}</div>
+                              </>
+                            ) : (
+                              <div className="text-[9px] text-muted-foreground mt-1" dir="ltr">{eff} USDT × {selectedLocalMethod.exchangeRate.toLocaleString()} = {(eff * selectedLocalMethod.exchangeRate).toLocaleString()} {selectedLocalMethod.currencyCode}</div>
+                            )}
+                          </div>
+                        );
+                      })()}
 
                       {/* Upload Proof */}
                       <div>
