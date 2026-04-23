@@ -867,7 +867,6 @@ export default function HomePage() {
               action: "login",
               blocked: true,
             });
-            setLoginErr(data.error || "تم حظرك بسبب وجود حساب آخر من نفس الجهاز.");
           } else {
             setView("blocked");
           }
