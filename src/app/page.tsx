@@ -2057,6 +2057,88 @@ export default function HomePage() {
   const filtered = getFiltered();
 
   /* ═══════════════════════════════════════════════════════════════
+     DEVICE WARNING DIALOG (extracted for use in all views)
+     ═══════════════════════════════════════════════════════════════ */
+  const deviceWarningDialog = deviceWarning.show ? (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+        style={{ backgroundColor: "rgba(0,0,0,0.9)", backdropFilter: "blur(16px)" }}
+      >
+        <motion.div
+          initial={{ scale: 0.85, opacity: 0, y: 30 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          exit={{ scale: 0.85, opacity: 0, y: 30 }}
+          transition={{ type: "spring", damping: 25, stiffness: 300 }}
+          className="w-full max-w-sm rounded-3xl overflow-hidden"
+          style={{ background: "linear-gradient(160deg, rgba(20,10,10,0.99), rgba(10,8,15,0.99))", border: deviceWarning.blocked ? "1px solid rgba(239,68,68,0.3)" : "1px solid rgba(245,158,11,0.3)" }}
+        >
+          {/* Red/Amber top accent bar */}
+          <div className="h-1" style={{ background: deviceWarning.blocked ? "linear-gradient(90deg, #dc2626, #ef4444, #f87171, #ef4444, #dc2626)" : "linear-gradient(90deg, #f59e0b, #fbbf24, #f59e0b)" }} />
+
+          {/* Header with ShieldAlert icon */}
+          <div className="relative px-6 pt-8 pb-4 text-center">
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 w-32 h-32 rounded-full opacity-20 blur-2xl" style={{ background: deviceWarning.blocked ? "#ef4444" : "#f59e0b" }} />
+            <div className="relative">
+              <div className="w-20 h-20 rounded-full mx-auto mb-5 flex items-center justify-center" style={{ background: deviceWarning.blocked ? "linear-gradient(145deg, rgba(239,68,68,0.15), rgba(185,28,28,0.08))" : "linear-gradient(145deg, rgba(245,158,11,0.15), rgba(217,119,6,0.08))", border: deviceWarning.blocked ? "2px solid rgba(239,68,68,0.3)" : "2px solid rgba(245,158,11,0.3)", boxShadow: deviceWarning.blocked ? "0 0 40px rgba(239,68,68,0.1)" : "0 0 40px rgba(245,158,11,0.1)" }}>
+                <ShieldAlert className="w-10 h-10" style={{ color: deviceWarning.blocked ? "#f87171" : "#fbbf24" }} />
+              </div>
+              <h3 className="text-lg font-extrabold text-white mb-1.5">{deviceWarning.blocked ? "تم الحظر تلقائياً" : "تنبيه أمني"}</h3>
+              <p className="text-[11px] font-semibold" style={{ color: deviceWarning.blocked ? "#fca5a5" : "#fcd34d" }}>{deviceWarning.blocked ? "حظر بسبب تعدد الحسابات" : "كشف حساب آخر على هذا الجهاز"}</p>
+            </div>
+          </div>
+
+          {/* Content */}
+          <div className="px-5 pb-6 space-y-4">
+            <div className="rounded-2xl p-4 space-y-3" style={{ background: deviceWarning.blocked ? "rgba(239,68,68,0.05)" : "rgba(245,158,11,0.05)", border: deviceWarning.blocked ? "1px solid rgba(239,68,68,0.12)" : "1px solid rgba(245,158,11,0.12)" }}>
+              {deviceWarning.blocked ? (
+                <p className="text-[12px] text-white/70 leading-[1.9] text-center">تم اكتشاف محاولة استخدام <strong className="text-red-400">حسابين مختلفين</strong> من نفس الجهاز. تم حظر كلا الحسابين تلقائياً مع الحفاظ على بيانات الاشتراك. تواصل مع الإدارة لتفعيل حسابك.</p>
+              ) : (
+                <p className="text-[12px] text-white/70 leading-[1.9] text-center">يوجد حساب آخر مسجل على هذا الجهاز. إذا متابعتك سيتم <strong className="text-amber-400">حظر الحسابين تلقائياً</strong> بما في ذلك اشتراكاتك الحالية.</p>
+              )}
+
+              {deviceWarning.blocked && (
+                <div className="rounded-xl p-3.5 space-y-2" style={{ background: "rgba(0,0,0,0.4)", border: "1px solid rgba(239,68,68,0.15)" }}>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                    <span className="text-[11px] text-red-400 font-bold">الحساب محظور حالياً</span>
+                  </div>
+                  <p className="text-[10px] text-white/40 leading-relaxed">تم الحفاظ على بيانات اشتراكك. تواصل مع الإدارة عبر البريد الإلكتروني لطلب إعادة تفعيل الحساب.</p>
+                </div>
+              )}
+
+              {!deviceWarning.blocked && deviceWarning.existingAccount.email && (
+                <div className="rounded-xl p-3 space-y-2" style={{ background: "rgba(0,0,0,0.4)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                  <div className="text-[9px] text-white/30 font-bold uppercase tracking-widest">الحساب المسجل على الجهاز</div>
+                  <div className="text-[12px] text-white font-bold" dir="ltr">{deviceWarning.existingAccount.email}</div>
+                  <div className="text-[10px] text-white/50">{deviceWarning.existingAccount.name}</div>
+                  {deviceWarning.existingAccount.packageName && (
+                    <div className="flex items-center gap-1.5">
+                      <Crown className="w-3 h-3 text-amber-400" />
+                      <span className="text-[10px] text-amber-400/80">{deviceWarning.existingAccount.packageName}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              {deviceWarning.blocked ? (
+                <button onClick={() => setDeviceWarning(w => ({ ...w, show: false }))} className="w-full py-3.5 rounded-2xl text-[13px] font-bold active:scale-[0.97] transition-all duration-200" style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03))", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.7)" }}>فهمت</button>
+              ) : (
+                <button onClick={() => setDeviceWarning(w => ({ ...w, show: false }))} className="w-full py-3.5 rounded-2xl text-[13px] font-bold bg-white/5 text-white/60 border border-white/10 active:scale-[0.97] transition-all duration-200">العودة بأمان</button>
+              )}
+            </div>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  ) : null;
+
+  /* ═══════════════════════════════════════════════════════════════
      RENDER: LOGIN (VIP Premium Design)
      ═══════════════════════════════════════════════════════════════ */
   if (view === "login") {
@@ -2064,6 +2146,7 @@ export default function HomePage() {
       return <SplashScreen />;
     }
     return (
+      <>
       <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-background">
         {/* Background gradient blurs */}
         <div className="absolute top-[-20%] left-[-10%] w-72 h-72 rounded-full opacity-20" style={{ background: "radial-gradient(circle, #FFD700 0%, transparent 70%)", filter: "blur(80px)" }} />
@@ -2342,6 +2425,8 @@ export default function HomePage() {
           </div>
         </div>
       </div>
+      {deviceWarningDialog}
+      </>
     );
   }
 
@@ -2350,6 +2435,8 @@ export default function HomePage() {
      ═══════════════════════════════════════════════════════════════ */
   if (otpStep === "sending" || otpStep === "verifying") {
     return (
+      <>
+
       <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-background">
         <div className="absolute top-[-20%] left-[-10%] w-72 h-72 rounded-full opacity-20" style={{ background: "radial-gradient(circle, #FFD700 0%, transparent 70%)", filter: "blur(80px)" }} />
         <div className="absolute bottom-[-15%] right-[-10%] w-64 h-64 rounded-full opacity-15" style={{ background: "radial-gradient(circle, #00E676 0%, transparent 70%)", filter: "blur(80px)" }} />
@@ -2441,6 +2528,8 @@ export default function HomePage() {
           </div>
         </div>
       </div>
+      {deviceWarningDialog}
+      </>
     );
   }
 
@@ -2573,6 +2662,7 @@ export default function HomePage() {
      ═══════════════════════════════════════════════════════════════ */
   if (view === "register") {
     return (
+      <>
       <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-background">
         {/* Background gradient blurs */}
         <div className="absolute top-[-20%] left-[-10%] w-72 h-72 rounded-full opacity-20" style={{ background: "radial-gradient(circle, #FFD700 0%, transparent 70%)", filter: "blur(80px)" }} />
@@ -2665,6 +2755,8 @@ export default function HomePage() {
           </div>
         </div>
       </div>
+      {deviceWarningDialog}
+      </>
     );
   }
 
@@ -5382,101 +5474,7 @@ export default function HomePage() {
   return (
     <>
       {mainContent}
-      <AnimatePresence>
-        {deviceWarning.show && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
-            style={{ backgroundColor: "rgba(0,0,0,0.9)", backdropFilter: "blur(16px)" }}
-          >
-            <motion.div
-              initial={{ scale: 0.85, opacity: 0, y: 30 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.85, opacity: 0, y: 30 }}
-              transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="w-full max-w-sm rounded-3xl overflow-hidden"
-              style={{ background: "linear-gradient(160deg, rgba(20,10,10,0.99), rgba(10,8,15,0.99))", border: deviceWarning.blocked ? "1px solid rgba(239,68,68,0.3)" : "1px solid rgba(245,158,11,0.3)" }}
-            >
-              {/* Red top accent bar */}
-              <div className="h-1" style={{ background: deviceWarning.blocked ? "linear-gradient(90deg, #dc2626, #ef4444, #f87171, #ef4444, #dc2626)" : "linear-gradient(90deg, #f59e0b, #fbbf24, #f59e0b)" }} />
-
-              {/* Header */}
-              <div className="relative px-6 pt-8 pb-4 text-center">
-                <div className="absolute top-4 left-1/2 -translate-x-1/2 w-32 h-32 rounded-full opacity-20 blur-2xl" style={{ background: deviceWarning.blocked ? "#ef4444" : "#f59e0b" }} />
-                <div className="relative">
-                  <div className="w-20 h-20 rounded-full mx-auto mb-5 flex items-center justify-center" style={{ background: deviceWarning.blocked ? "linear-gradient(145deg, rgba(239,68,68,0.15), rgba(185,28,28,0.08))" : "linear-gradient(145deg, rgba(245,158,11,0.15), rgba(217,119,6,0.08))", border: deviceWarning.blocked ? "2px solid rgba(239,68,68,0.3)" : "2px solid rgba(245,158,11,0.3)", boxShadow: deviceWarning.blocked ? "0 0 40px rgba(239,68,68,0.1)" : "0 0 40px rgba(245,158,11,0.1)" }}>
-                    <ShieldAlert className="w-10 h-10" style={{ color: deviceWarning.blocked ? "#f87171" : "#fbbf24" }} />
-                  </div>
-                  <h3 className="text-lg font-extrabold text-white mb-1.5">{deviceWarning.blocked ? "تم الحظر تلقائياً" : "تنبيه أمني"}</h3>
-                  <p className="text-[11px] font-semibold" style={{ color: deviceWarning.blocked ? "#fca5a5" : "#fcd34d" }}>{deviceWarning.blocked ? "حظر بسبب تعدد الحسابات" : "كشف حساب آخر على هذا الجهاز"}</p>
-                </div>
-              </div>
-
-              {/* Content */}
-              <div className="px-5 pb-6 space-y-4">
-                <div className="rounded-2xl p-4 space-y-3" style={{ background: deviceWarning.blocked ? "rgba(239,68,68,0.05)" : "rgba(245,158,11,0.05)", border: deviceWarning.blocked ? "1px solid rgba(239,68,68,0.12)" : "1px solid rgba(245,158,11,0.12)" }}>
-                  {deviceWarning.blocked ? (
-                    <p className="text-[12px] text-white/70 leading-[1.9] text-center">
-                      تم اكتشاف محاولة استخدام <strong className="text-red-400">حسابين مختلفين</strong> من نفس الجهاز. تم حظر كلا الحسابين تلقائياً مع الحفاظ على بيانات الاشتراك. تواصل مع الإدارة لتفعيل حسابك.
-                    </p>
-                  ) : (
-                    <p className="text-[12px] text-white/70 leading-[1.9] text-center">
-                      يوجد حساب آخر مسجل على هذا الجهاز. إذا متابعتك سيتم <strong className="text-amber-400">حظر الحسابين تلقائياً</strong> بما في ذلك اشتراكاتك الحالية.
-                    </p>
-                  )}
-
-                  {deviceWarning.blocked && (
-                    <div className="rounded-xl p-3.5 space-y-2" style={{ background: "rgba(0,0,0,0.4)", border: "1px solid rgba(239,68,68,0.15)" }}>
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                        <span className="text-[11px] text-red-400 font-bold">الحساب محظور حالياً</span>
-                      </div>
-                      <p className="text-[10px] text-white/40 leading-relaxed">
-                        تم الحفاظ على بيانات اشتراكك. تواصل مع الإدارة عبر البريد الإلكتروني لطلب إعادة تفعيل الحساب.
-                      </p>
-                    </div>
-                  )}
-
-                  {!deviceWarning.blocked && deviceWarning.existingAccount.email && (
-                    <div className="rounded-xl p-3 space-y-2" style={{ background: "rgba(0,0,0,0.4)", border: "1px solid rgba(255,255,255,0.06)" }}>
-                      <div className="text-[9px] text-white/30 font-bold uppercase tracking-widest">الحساب المسجل على الجهاز</div>
-                      <div className="text-[12px] text-white font-bold" dir="ltr">{deviceWarning.existingAccount.email}</div>
-                      <div className="text-[10px] text-white/50">{deviceWarning.existingAccount.name}</div>
-                      {deviceWarning.existingAccount.packageName && (
-                        <div className="flex items-center gap-1.5">
-                          <Crown className="w-3 h-3 text-amber-400" />
-                          <span className="text-[10px] text-amber-400/80">{deviceWarning.existingAccount.packageName}</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  {deviceWarning.blocked ? (
-                    <button
-                      onClick={() => setDeviceWarning(w => ({ ...w, show: false }))}
-                      className="w-full py-3.5 rounded-2xl text-[13px] font-bold active:scale-[0.97] transition-all duration-200"
-                      style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03))", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.7)" }}
-                    >
-                      فهمت
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => setDeviceWarning(w => ({ ...w, show: false }))}
-                      className="w-full py-3.5 rounded-2xl text-[13px] font-bold bg-white/5 text-white/60 border border-white/10 active:scale-[0.97] transition-all duration-200"
-                    >
-                      العودة بأمان
-                    </button>
-                  )}
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {deviceWarningDialog}
     </>
   );
 }
