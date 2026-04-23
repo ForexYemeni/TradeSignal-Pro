@@ -171,8 +171,8 @@ async function handleLogin(body: Record<string, unknown>) {
         }, { status: 403 });
       }
 
-      // First time this device logs in — save deviceId to user
-      if (!user.deviceId && deviceId.trim()) {
+      // Always update deviceId on login (critical for duplicate detection across app reinstalls/cache clears)
+      if (deviceId.trim()) {
         await updateUser(user.id, { deviceId: deviceId.trim() });
       }
     }
