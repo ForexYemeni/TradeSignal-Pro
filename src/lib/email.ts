@@ -420,211 +420,150 @@ export function buildDuplicateAccountEmail(data: {
 } {
   const { user1, user2, deviceId, detectedAt } = data;
   const actionText = detectedAt === 'register' ? 'محاولة تسجيل حساب جديد' : 'محاولة تسجيل دخول';
+  const detectionType = detectedAt === 'register' ? 'تسجيل حساب جديد' : 'تسجيل دخول';
   const timestamp = new Date().toISOString();
+  const timeFormatted = new Date(timestamp).toLocaleString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
   function formatSubscription(u: typeof user1): string {
     if (u.subscriptionType === 'subscriber' && u.packageName) {
       const expiry = u.subscriptionExpiry ? new Date(u.subscriptionExpiry).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' }) : 'غير محدد';
-      return `${u.packageName} — تنتهي: ${expiry}`;
+      return u.packageName + ' &mdash; تنتهي: ' + expiry;
     }
     return 'لا يوجد اشتراك';
   }
 
+  const user1Created = new Date(user1.createdAt).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' });
+  const user2Created = new Date(user2.createdAt).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' });
+
   return {
-    subject: `🚨 تنبيه أمني: حسابان من نفس الجهاز — تم الحظر التلقائي`,
-    html: `<!DOCTYPE html>
-<html dir="rtl" lang="ar">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>تنبيه أمني — حسابات مكررة</title>
-</head>
-<body style="margin:0;padding:0;background-color:#05080f;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#05080f;min-height:100vh;">
-    <tr>
-      <td align="center" style="padding:40px 16px;">
-        <table role="presentation" width="540" cellpadding="0" cellspacing="0" style="max-width:540px;width:100%;">
-          
-          <!-- Header -->
-          <tr>
-            <td align="center" style="padding-bottom:24px;">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                <tr>
-                  <td align="right">
-                    <div style="width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,#FFD700,#FFA500);display:inline-flex;align-items:center;justify-content:center;">
-                      <span style="font-size:18px;font-weight:900;color:#05080f;">FY</span>
-                    </div>
-                  </td>
-                  <td align="left">
-                    <span style="display:inline-block;padding:5px 14px;border-radius:20px;font-size:10px;font-weight:700;color:#FF5252;background:rgba(255,82,82,0.1);border:1px solid rgba(255,82,82,0.25);letter-spacing:1px;">
-                      تنبيه أمني
-                    </span>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
+    subject: '[ForexYemeni] تنبيه: كشف حسابين من نفس الجهاز - تم الحظر',
+    html: `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>تنبيه أمني</title></head>
+<body style="margin:0;padding:0;background:#0b0f1a;font-family:'Segoe UI',Tahoma,Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#0b0f1a;min-height:100vh;"><tr><td align="center" style="padding:32px 12px;">
+<table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;">
 
-          <!-- Alert Icon & Title -->
-          <tr>
-            <td align="center" style="padding-bottom:8px;">
-              <div style="width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,rgba(255,82,82,0.15),rgba(211,47,47,0.08));border:2px solid rgba(255,82,82,0.2);display:inline-flex;align-items:center;justify-content:center;">
-                <span style="font-size:32px;">🛡️</span>
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding-bottom:8px;">
-              <h1 style="margin:0;font-size:22px;font-weight:800;color:#FF5252;letter-spacing:0.3px;">كشف حسابات مكررة</h1>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding-bottom:28px;">
-              <p style="margin:0;font-size:13px;color:rgba(255,255,255,0.55);line-height:1.9;text-align:center;">
-                تم اكتشاف <strong style="color:rgba(255,255,255,0.8);">${actionText}</strong> من جهاز مسجل مسبقاً بحساب آخر.<br>
-                تم حظر الحسابين تلقائياً لحماية النظام.
-              </p>
-            </td>
-          </tr>
+<!-- Top border accent -->
+<tr><td style="height:4px;background:linear-gradient(90deg,#dc2626,#ef4444,#dc2626);border-radius:8px 8px 0 0;"></td></tr>
 
-          <!-- Detection Info Bar -->
-          <tr>
-            <td style="padding-bottom:16px;">
-              <div style="background:rgba(255,82,82,0.04);border:1px solid rgba(255,82,82,0.12);border-radius:12px;padding:12px 16px;">
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                  <tr>
-                    <td style="font-size:10px;color:rgba(255,255,255,0.35);padding:3px 0;">نوع الكشف</td>
-                    <td style="font-size:10px;color:rgba(255,255,255,0.6);text-align:left;font-weight:600;">${detectedAt === 'register' ? 'تسجيل حساب جديد' : 'تسجيل دخول'}</td>
-                  </tr>
-                  <tr>
-                    <td style="font-size:10px;color:rgba(255,255,255,0.35);padding:3px 0;">وقت الكشف</td>
-                    <td style="font-size:10px;color:rgba(255,255,255,0.6);text-align:left;direction:ltr;" dir="ltr">${new Date(timestamp).toLocaleString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
-                  </tr>
-                  <tr>
-                    <td style="font-size:10px;color:rgba(255,255,255,0.35);padding:3px 0;">معرف الجهاز</td>
-                    <td style="font-size:10px;color:rgba(255,255,255,0.4);text-align:left;font-family:'Courier New',monospace;direction:ltr;" dir="ltr">${deviceId}</td>
-                  </tr>
-                </table>
-              </div>
-            </td>
-          </tr>
+<!-- Dark card wrapper -->
+<tr><td style="background:#111827;border:1px solid #1f2937;border-top:none;border-radius:0 0 16px 16px;overflow:hidden;">
 
-          <!-- Account 1 Card -->
-          <tr>
-            <td style="padding-bottom:10px;">
-              <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:16px;overflow:hidden;">
-                <div style="padding:14px 18px;border-bottom:1px solid rgba(255,255,255,0.05);background:linear-gradient(90deg,rgba(255,82,82,0.06),transparent);">
-                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                    <tr>
-                      <td>
-                        <p style="margin:0;font-size:12px;font-weight:700;color:#FF8A80;">الحساب الأول</p>
-                        <p style="margin:2px 0 0;font-size:9px;color:rgba(255,255,255,0.3);">الحساب القديم المسجل على الجهاز</p>
-                      </td>
-                      <td align="left">
-                        <span style="display:inline-block;padding:3px 10px;border-radius:8px;font-size:9px;font-weight:700;color:#FF5252;background:rgba(255,82,82,0.12);border:1px solid rgba(255,82,82,0.2);">محظور</span>
-                      </td>
-                    </tr>
-                  </table>
-                </div>
-                <div style="padding:14px 18px;">
-                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                    <tr>
-                      <td style="padding:5px 0;font-size:11px;color:rgba(255,255,255,0.35);">الاسم</td>
-                      <td style="padding:5px 0;font-size:12px;color:#ffffff;font-weight:600;text-align:left;" dir="ltr">${user1.name}</td>
-                    </tr>
-                    <tr>
-                      <td style="padding:5px 0;font-size:11px;color:rgba(255,255,255,0.35);">البريد الإلكتروني</td>
-                      <td style="padding:5px 0;font-size:11px;color:#FFD700;font-weight:600;text-align:left;font-family:'Courier New',monospace;" dir="ltr">${user1.email}</td>
-                    </tr>
-                    <tr>
-                      <td style="padding:5px 0;font-size:11px;color:rgba(255,255,255,0.35);">الاشتراك</td>
-                      <td style="padding:5px 0;font-size:11px;color:rgba(255,255,255,0.6);text-align:left;">${formatSubscription(user1)}</td>
-                    </tr>
-                    <tr>
-                      <td style="padding:5px 0;font-size:11px;color:rgba(255,255,255,0.35);">تاريخ التسجيل</td>
-                      <td style="padding:5px 0;font-size:10px;color:rgba(255,255,255,0.4);text-align:left;direction:ltr;" dir="ltr">${new Date(user1.createdAt).toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' })}</td>
-                    </tr>
-                  </table>
-                </div>
-              </div>
-            </td>
-          </tr>
+<!-- Branding header -->
+<tr><td style="padding:28px 28px 0;">
+<table width="100%" cellpadding="0" cellspacing="0"><tr>
+<td style="vertical-align:middle;">
+<div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#f59e0b,#d97706);display:inline-block;text-align:center;line-height:44px;">
+<span style="font-size:16px;font-weight:900;color:#111827;">FY</span>
+</div>
+</td>
+<td style="text-align:left;vertical-align:middle;">
+<span style="display:inline-block;padding:4px 12px;border-radius:6px;font-size:10px;font-weight:700;color:#dc2626;background:#dc262618;border:1px solid #dc262640;letter-spacing:0.5px;">SECURITY ALERT</span>
+</td>
+</tr></table>
+</td></tr>
 
-          <!-- Account 2 Card -->
-          <tr>
-            <td style="padding-bottom:16px;">
-              <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:16px;overflow:hidden;">
-                <div style="padding:14px 18px;border-bottom:1px solid rgba(255,255,255,0.05);background:linear-gradient(90deg,rgba(255,82,82,0.06),transparent);">
-                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                    <tr>
-                      <td>
-                        <p style="margin:0;font-size:12px;font-weight:700;color:#FF8A80;">الحساب الثاني</p>
-                        <p style="margin:2px 0 0;font-size:9px;color:rgba(255,255,255,0.3);">${detectedAt === 'register' ? 'محاولة التسجيل الجديدة' : 'محاولة تسجيل الدخول'}</p>
-                      </td>
-                      <td align="left">
-                        <span style="display:inline-block;padding:3px 10px;border-radius:8px;font-size:9px;font-weight:700;color:#FF5252;background:rgba(255,82,82,0.12);border:1px solid rgba(255,82,82,0.2);">محظور</span>
-                      </td>
-                    </tr>
-                  </table>
-                </div>
-                <div style="padding:14px 18px;">
-                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                    <tr>
-                      <td style="padding:5px 0;font-size:11px;color:rgba(255,255,255,0.35);">الاسم</td>
-                      <td style="padding:5px 0;font-size:12px;color:#ffffff;font-weight:600;text-align:left;" dir="ltr">${user2.name}</td>
-                    </tr>
-                    <tr>
-                      <td style="padding:5px 0;font-size:11px;color:rgba(255,255,255,0.35);">البريد الإلكتروني</td>
-                      <td style="padding:5px 0;font-size:11px;color:#FFD700;font-weight:600;text-align:left;font-family:'Courier New',monospace;" dir="ltr">${user2.email}</td>
-                    </tr>
-                    <tr>
-                      <td style="padding:5px 0;font-size:11px;color:rgba(255,255,255,0.35);">الاشتراك</td>
-                      <td style="padding:5px 0;font-size:11px;color:rgba(255,255,255,0.6);text-align:left;">${formatSubscription(user2)}</td>
-                    </tr>
-                    <tr>
-                      <td style="padding:5px 0;font-size:11px;color:rgba(255,255,255,0.35);">تاريخ التسجيل</td>
-                      <td style="padding:5px 0;font-size:10px;color:rgba(255,255,255,0.4);text-align:left;direction:ltr;" dir="ltr">${new Date(user2.createdAt).toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' })}</td>
-                    </tr>
-                  </table>
-                </div>
-              </div>
-            </td>
-          </tr>
+<!-- Alert icon -->
+<tr><td align="center" style="padding:20px 0 12px;">
+<div style="width:64px;height:64px;border-radius:50%;background:#dc262612;border:2px solid #dc262630;display:inline-block;text-align:center;line-height:60px;">
+<span style="font-size:28px;color:#dc2626;font-weight:900;">!</span>
+</div>
+</td></tr>
 
-          <!-- Action Note -->
-          <tr>
-            <td style="padding-bottom:24px;">
-              <div style="background:rgba(255,215,0,0.04);border:1px solid rgba(255,215,0,0.12);border-radius:12px;padding:14px 18px;">
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                  <tr>
-                    <td style="vertical-align:top;padding-left:10px;">
-                      <span style="font-size:16px;">💡</span>
-                    </td>
-                    <td>
-                      <p style="margin:0;font-size:11px;color:rgba(255,255,255,0.6);line-height:1.8;">
-                        <strong style="color:#FFD700;">ملاحظة:</strong> تم حظر كلا الحسابين تلقائياً مع الحفاظ على بيانات الاشتراك. يمكنك فك الحظر أو إدارة الحسابات من <strong style="color:rgba(255,255,255,0.8);">لوحة تحكم الإدارة</strong> إذا لزم الأمر.
-                      </p>
-                    </td>
-                  </tr>
-                </table>
-              </div>
-            </td>
-          </tr>
+<!-- Title -->
+<tr><td align="center" style="padding:0 0 6px;">
+<h1 style="margin:0;font-size:20px;font-weight:800;color:#f87171;letter-spacing:0.3px;">كشف حسابات مكررة</h1>
+</td></tr>
 
-          <!-- Footer -->
-          <tr>
-            <td align="center" style="padding-top:20px;border-top:1px solid rgba(255,255,255,0.05);">
-              <p style="margin:0;font-size:10px;color:rgba(255,255,255,0.15);">
-                ForexYemeni VIP Trading Signals &copy; ${new Date().getFullYear()} — نظام الحماية الأمنية
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`,
+<!-- Subtitle -->
+<tr><td align="center" style="padding:0 28px 24px;">
+<p style="margin:0;font-size:13px;color:#9ca3af;line-height:2;text-align:center;">
+تم اكتشاف <strong style="color:#e5e7eb;">${actionText}</strong> من جهاز مسجل مسبقاً بحساب آخر.<br>
+تم حظر الحسابين تلقائياً لحماية النظام.
+</p>
+</td></tr>
+
+<!-- Detection info strip -->
+<tr><td style="padding:0 28px 20px;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#1f2937;border-radius:10px;border:1px solid #374151;">
+<tr>
+<td style="padding:10px 14px;font-size:10px;color:#6b7280;border-bottom:1px solid #374151;">نوع الكشف</td>
+<td style="padding:10px 14px;font-size:10px;color:#d1d5db;text-align:left;font-weight:600;">${detectionType}</td>
+</tr>
+<tr>
+<td style="padding:10px 14px;font-size:10px;color:#6b7280;border-bottom:1px solid #374151;">وقت الكشف</td>
+<td style="padding:10px 14px;font-size:10px;color:#d1d5db;text-align:left;direction:ltr;" dir="ltr">${timeFormatted}</td>
+</tr>
+<tr>
+<td style="padding:10px 14px;font-size:10px;color:#6b7280;">معرف الجهاز</td>
+<td style="padding:10px 14px;font-size:9px;color:#9ca3af;text-align:left;font-family:'Courier New',monospace;direction:ltr;word-break:break-all;" dir="ltr">${deviceId}</td>
+</tr>
+</table>
+</td></tr>
+
+<!-- Account 1 -->
+<tr><td style="padding:0 28px 10px;">
+<div style="background:#111827;border:1px solid #374151;border-radius:12px;overflow:hidden;">
+<div style="padding:12px 16px;background:#dc26260a;border-bottom:1px solid #374151;">
+<table width="100%" cellpadding="0" cellspacing="0"><tr>
+<td><p style="margin:0;font-size:11px;font-weight:700;color:#fca5a5;">الحساب الاول - الحساب القديم</p></td>
+<td style="text-align:left;"><span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:9px;font-weight:700;color:#dc2626;background:#dc262615;border:1px solid #dc262630;">BLOCKED</span></td>
+</tr></table>
+</div>
+<table width="100%" cellpadding="0" cellspacing="0" style="padding:0 16px;">
+<tr><td style="padding:8px 16px;font-size:10px;color:#6b7280;">الاسم</td><td style="padding:8px 16px;font-size:12px;color:#f3f4f6;font-weight:600;text-align:left;" dir="ltr">${user1.name}</td></tr>
+<tr><td style="padding:8px 16px;font-size:10px;color:#6b7280;">البريد</td><td style="padding:8px 16px;font-size:11px;color:#fbbf24;font-weight:600;text-align:left;font-family:monospace;direction:ltr;" dir="ltr">${user1.email}</td></tr>
+<tr><td style="padding:8px 16px;font-size:10px;color:#6b7280;">الاشتراك</td><td style="padding:8px 16px;font-size:11px;color:#d1d5db;text-align:left;">${formatSubscription(user1)}</td></tr>
+<tr><td style="padding:8px 16px;font-size:10px;color:#6b7280;">تاريخ التسجيل</td><td style="padding:8px 16px;font-size:10px;color:#9ca3af;text-align:left;direction:ltr;" dir="ltr">${user1Created}</td></tr>
+</table>
+</div>
+</td></tr>
+
+<!-- Account 2 -->
+<tr><td style="padding:0 28px 20px;">
+<div style="background:#111827;border:1px solid #374151;border-radius:12px;overflow:hidden;">
+<div style="padding:12px 16px;background:#dc26260a;border-bottom:1px solid #374151;">
+<table width="100%" cellpadding="0" cellspacing="0"><tr>
+<td><p style="margin:0;font-size:11px;font-weight:700;color:#fca5a5;">الحساب الثاني - ${detectedAt === 'register' ? 'محاولة التسجيل' : 'محاولة تسجيل الدخول'}</p></td>
+<td style="text-align:left;"><span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:9px;font-weight:700;color:#dc2626;background:#dc262615;border:1px solid #dc262630;">BLOCKED</span></td>
+</tr></table>
+</div>
+<table width="100%" cellpadding="0" cellspacing="0">
+<tr><td style="padding:8px 16px;font-size:10px;color:#6b7280;">الاسم</td><td style="padding:8px 16px;font-size:12px;color:#f3f4f6;font-weight:600;text-align:left;" dir="ltr">${user2.name}</td></tr>
+<tr><td style="padding:8px 16px;font-size:10px;color:#6b7280;">البريد</td><td style="padding:8px 16px;font-size:11px;color:#fbbf24;font-weight:600;text-align:left;font-family:monospace;direction:ltr;" dir="ltr">${user2.email}</td></tr>
+<tr><td style="padding:8px 16px;font-size:10px;color:#6b7280;">الاشتراك</td><td style="padding:8px 16px;font-size:11px;color:#d1d5db;text-align:left;">${formatSubscription(user2)}</td></tr>
+<tr><td style="padding:8px 16px;font-size:10px;color:#6b7280;">تاريخ التسجيل</td><td style="padding:8px 16px;font-size:10px;color:#9ca3af;text-align:left;direction:ltr;" dir="ltr">${user2Created}</td></tr>
+</table>
+</div>
+</td></tr>
+
+<!-- Admin note -->
+<tr><td style="padding:0 28px 28px;">
+<div style="background:#fbbf240a;border:1px solid #fbbf2430;border-radius:10px;padding:14px 16px;">
+<table width="100%" cellpadding="0" cellspacing="0"><tr>
+<td style="vertical-align:top;padding-left:12px;width:20px;">
+<div style="width:18px;height:18px;border-radius:50%;background:#fbbf2430;display:inline-block;text-align:center;line-height:18px;"><span style="font-size:10px;font-weight:900;color:#fbbf24;">i</span></div>
+</td>
+<td>
+<p style="margin:0;font-size:11px;color:#9ca3af;line-height:1.9;">
+<strong style="color:#fbbf24;">للإدارة:</strong> تم حظر الحسابين تلقائياً مع الحفاظ على بيانات الاشتراك. يمكنك فك الحظر يدوياً من لوحة تحكم الإدارة إذا لزم الأمر.
+</p>
+</td>
+</tr></table>
+</div>
+</td></tr>
+
+</td></tr><!-- end card -->
+
+<!-- Footer -->
+<tr><td align="center" style="padding:24px 12px 0;">
+<p style="margin:0;font-size:10px;color:#374151;">
+ForexYemeni VIP Trading Signals &copy; ${new Date().getFullYear()} &mdash; Security System
+</p>
+</td></tr>
+
+</table>
+</td></tr></table>
+</body></html>`,
   };
 }
 
