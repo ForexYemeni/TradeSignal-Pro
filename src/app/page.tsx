@@ -3044,7 +3044,7 @@ export default function HomePage() {
           const closedSignals = signals.filter(s => s.status !== "ACTIVE");
           const winClosed = closedSignals.filter(s => s.status === "HIT_TP");
           const lossClosed = closedSignals.filter(s => s.status === "HIT_SL");
-          const totalPnl = signals.reduce((acc, s) => acc + (s.pnlDollars ?? 0), 0);
+          const totalPnl = parseFloat(signals.reduce((acc, s) => acc + (s.pnlDollars ?? 0), 0).toFixed(2));
           const totalPoints = signals.reduce((acc, s) => acc + (s.pnlPoints ?? 0), 0);
           const todaySignals = signals.filter(s => {
             const d = new Date(s.createdAt);
@@ -3053,7 +3053,7 @@ export default function HomePage() {
           });
           const todayWins = todaySignals.filter(s => s.status === "HIT_TP").length;
           const todayLosses = todaySignals.filter(s => s.status === "HIT_SL").length;
-          const todayPnl = todaySignals.reduce((acc, s) => acc + (s.pnlDollars ?? 0), 0);
+          const todayPnl = parseFloat(todaySignals.reduce((acc, s) => acc + (s.pnlDollars ?? 0), 0).toFixed(2));
           const subDaysLeft = session?.subscriptionExpiry ? Math.max(0, Math.ceil((new Date(session.subscriptionExpiry).getTime() - Date.now()) / 86400000)) : null;
           const totalActiveUsers = users.filter(u => u.status === "active" && u.role === "user").length;
           const totalSubscribers = users.filter(u => u.subscriptionType === "subscriber").length;
@@ -3114,7 +3114,7 @@ export default function HomePage() {
                   </div>
                   <div className="stat-card-premium rounded-xl p-2.5 text-center">
                     <div className={`text-base font-extrabold ${todayPnl >= 0 ? "text-emerald-400" : "text-red-400"}`} style={{ textShadow: todayPnl !== 0 ? `0 0 12px ${todayPnl >= 0 ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}` : "none" }}>
-                      {todayPnl >= 0 ? "+" : ""}{todayPnl > 0 ? `$${todayPnl}` : todayPnl < 0 ? `-$${Math.abs(todayPnl)}` : "$0"}
+                      {todayPnl >= 0 ? "+" : ""}{todayPnl > 0 ? `$${todayPnl.toFixed(2)}` : todayPnl < 0 ? `-$${Math.abs(todayPnl).toFixed(2)}` : "$0"}
                     </div>
                     <div className="text-[8px] text-muted-foreground/60 font-medium mt-0.5">أرباح اليوم</div>
                   </div>
@@ -3215,7 +3215,7 @@ export default function HomePage() {
                       <span className="text-[10px] text-muted-foreground/70 font-medium">إجمالي الأرباح</span>
                     </div>
                     <div className={`text-xl font-extrabold ${totalPnl >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                      {totalPnl >= 0 ? "+" : ""}{totalPnl > 0 ? `$${totalPnl.toLocaleString()}` : totalPnl < 0 ? `-$${Math.abs(totalPnl).toLocaleString()}` : "$0"}
+                      {totalPnl >= 0 ? "+" : ""}{totalPnl > 0 ? `$${totalPnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : totalPnl < 0 ? `-$${Math.abs(totalPnl).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "$0"}
                     </div>
                     <div className="text-[10px] text-muted-foreground/50 mt-0.5 font-mono">{totalPoints >= 0 ? "+" : ""}{totalPoints} نقطة</div>
                   </div>
@@ -3450,7 +3450,7 @@ export default function HomePage() {
                         </div>
                         <div className="text-right shrink-0">
                           <div className={`text-[11px] font-extrabold font-mono ${isProfit ? "text-emerald-400" : "text-red-400"}`}>
-                            {isProfit ? "+" : "-"}${Math.abs(s.pnlDollars ?? 0)}
+                            {isProfit ? "+" : "-"}${Math.abs(s.pnlDollars ?? 0).toFixed(2)}
                           </div>
                           <div className="text-[8px] text-muted-foreground/40 font-mono">{s.pnlPoints ?? 0} pts</div>
                         </div>

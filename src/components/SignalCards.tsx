@@ -215,13 +215,13 @@ export function TradeStatusBanner({ s }: { s: Signal }) {
             {/* PnL */}
             {isProfit && (s.pnlDollars ?? 0) !== 0 && (
               <div className={`text-[11px] font-mono font-bold ${theme.text} mt-0.5 tabular-nums`} dir="ltr">
-                {s.pnlDollars! >= 0 ? "+" : ""}{s.pnlDollars}{" "}
+                {s.pnlDollars! >= 0 ? "+" : ""}{(s.pnlDollars!).toFixed(2)}{" "}
                 <span className={`text-[9px] font-normal ${theme.sub}`}>({s.pnlPoints! >= 0 ? "+" : ""}{s.pnlPoints ?? 0} نقطة)</span>
               </div>
             )}
             {isLoss && (s.pnlDollars ?? 0) !== 0 && (
               <div className="text-[11px] font-mono font-bold text-red-400 mt-0.5 tabular-nums" dir="ltr">
-                -${Math.abs(s.pnlDollars ?? 0)}{" "}
+                -${Math.abs(s.pnlDollars ?? 0).toFixed(2)}{" "}
                 <span className="text-[9px] font-normal text-red-400/50">({s.pnlPoints ?? 0} نقطة)</span>
               </div>
             )}
@@ -353,7 +353,7 @@ export function EntryCard({ s, idx, isAdmin, onUpdate, onDelete, isNew, statusCh
               {(hitCount > 0) && (s.pnlDollars != null && s.pnlDollars !== 0) && (
                 <div className="text-right">
                   <div className={`text-[14px] font-extrabold font-mono tabular-nums ${s.pnlDollars >= 0 ? "text-emerald-400" : "text-red-400"}`} dir="ltr">
-                    {s.pnlDollars >= 0 ? "+" : ""}{s.pnlDollars}$
+                    {s.pnlDollars >= 0 ? "+" : ""}{s.pnlDollars.toFixed(2)}$
                   </div>
                   {s.pnlPoints != null && s.pnlPoints !== 0 && (
                     <div className={`text-[9px] font-mono tabular-nums ${s.pnlDollars >= 0 ? "text-emerald-400/40" : "text-red-400/40"}`} dir="ltr">
@@ -716,7 +716,7 @@ export function ClosedSignalCard({ s, idx, isAdmin, onDelete, statusChanged }: {
               {/* PnL */}
               <div className="text-left">
                 <div className={`text-[13px] font-extrabold font-mono tabular-nums ${isProfit ? theme.text : "text-red-400"}`} dir="ltr">
-                  {pnl >= 0 ? "+" : "-"}${Math.abs(pnl)}
+                  {pnl >= 0 ? "+" : "-"}${Math.abs(pnl).toFixed(2)}
                 </div>
                 <div className={`text-[8px] font-mono tabular-nums ${isProfit ? theme.text + "/40" : "text-red-400/40"}`} dir="ltr">
                   {points >= 0 ? "+" : ""}{points} نقطة
