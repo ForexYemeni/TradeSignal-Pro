@@ -215,7 +215,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           : existing.signalCategory === "PYRAMID" ? "PYRAMID_TP"
           : "TP_HIT"
       ).catch(() => {});
-    } else if (status === "HIT_SL" || (status === "HIT_SL" && updateData.partialWin)) {
+    } else if (status === "HIT_SL") {
       // Partial win (SL after TPs) → send TP notification instead
       if (updateData.partialWin && updateData.status === "HIT_TP") {
         notifyTpHit(

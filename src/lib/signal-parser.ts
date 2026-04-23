@@ -501,7 +501,7 @@ function extractPair(text: string): string | null {
 
   // الأولوية 2: أنماط محددة (نبحث في النص ما عدا الروابط)
   // نزيل الروابط أولاً لمنع تطابق كلمة GOLD من رابط تليجرام
-  var cleanText = text.replace(/t\.me\/[^\s]*/gi, "").replace(/http[^\s]*/gi, "");
+  let cleanText = text.replace(/t\.me\/[^\s]*/gi, "").replace(/http[^\s]*/gi, "");
 
   const patterns = [
     /(?:XAU|GOLD)(?:USD)?/i,

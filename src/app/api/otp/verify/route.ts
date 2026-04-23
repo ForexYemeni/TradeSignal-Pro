@@ -43,7 +43,9 @@ export async function POST(request: NextRequest) {
     const storedStr = String(storedOtp || "").trim();
     const inputStr = sanitizedOtp.trim();
 
-    console.log(`[OTP Verify] email=${sanitizedEmail}, type=${type}, key=${otpKey}, stored="${storedStr}" (raw type: ${typeof storedOtp}), input="${inputStr}", match=${storedStr === inputStr}`);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[OTP Verify] email=${sanitizedEmail}, type=${type}, key=${otpKey}, stored="${storedStr}" (raw type: ${typeof storedOtp}), input="${inputStr}", match=${storedStr === inputStr}`);
+    }
 
     if (!storedStr) {
       return NextResponse.json({ success: false, error: "انتهت صلاحية الكود. أعد إرسال كود جديد." }, { status: 410 });

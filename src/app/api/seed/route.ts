@@ -3,6 +3,11 @@ import { getAdmin, setAdmin, addSignal, getPackages, addPackage, updateAppSettin
 
 export async function POST(request?: Request) {
   try {
+    // Protect against production data wipe
+    if (process.env.NODE_ENV === 'production') {
+      return NextResponse.json({ success: false, error: "Seed endpoint is disabled in production" }, { status: 403 });
+    }
+
     // Check for force reset
     let forceReset = false;
     try {
@@ -18,7 +23,7 @@ export async function POST(request?: Request) {
       admin = {
         id: crypto.randomUUID(),
         email: "admin@forexyemeni.com",
-        passwordHash: "admin123",
+        passwordHash: "$2b$12$6uk84yxl7XWMW5XDNpUfseP5RyihrD3hV1qut6MgPWHHnJdhS6aqC",
         name: "مدير النظام",
         mustChangePwd: true,
         createdAt: new Date().toISOString(),

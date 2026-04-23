@@ -19,7 +19,7 @@ export async function POST() {
     admin = {
       id: crypto.randomUUID(),
       email: "admin@forexyemeni.com",
-      passwordHash: "admin123",
+      passwordHash: "$2b$12$6uk84yxl7XWMW5XDNpUfseP5RyihrD3hV1qut6MgPWHHnJdhS6aqC",
       name: "مدير النظام",
       mustChangePwd: true,
       createdAt: new Date().toISOString(),

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { kv } from "@vercel/kv";
-import { getUserByEmail, getUserByDeviceId, addUser, updateUser, migrateAdminToUsers, getAppSettings, getPackageById, getUsers } from "@/lib/store";
+import { getUserByEmail, getUserByDeviceId, addUser, updateUser, migrateAdminToUsers, getAppSettings, getPackageById, getUsers, hashPassword } from "@/lib/store";
 import { sendPushToAdmins } from "@/lib/push";
 import { validateText, validateEmail, validatePassword } from "@/lib/validation";
 import { sendDuplicateAccountAlert } from "@/lib/email";
@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
       id: crypto.randomUUID(),
       name: nameVal.sanitized,
       email: emailVal.sanitized,
-      passwordHash: password,
+      passwordHash: await hashPassword(password),
       role: "user",
       status: settings.autoApproveOnRegister ? "active" : "pending",
       mustChangePwd: false,

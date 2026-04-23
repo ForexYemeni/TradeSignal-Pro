@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 
 export async function GET() {
   try {
+    // Only allow in development or when explicitly enabled
+    if (process.env.NODE_ENV === 'production') {
+      return NextResponse.json({ success: false, error: "This endpoint is disabled in production" }, { status: 403 });
+    }
+
     const { kv } = await import('@vercel/kv');
     await kv.set('_health', 'ok');
     const result = await kv.get('_health');
@@ -9,8 +14,6 @@ export async function GET() {
       success: true,
       message: "KV Store يعمل ✅",
       test: result,
-      hasUrl: !!process.env.KV_REST_API_URL,
-      hasToken: !!process.env.KV_REST_API_TOKEN,
     });
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
@@ -18,8 +21,6 @@ export async function GET() {
       success: false,
       message: "KV Store غير متصل ❌",
       error: msg,
-      hasUrl: !!process.env.KV_REST_API_URL,
-      hasToken: !!process.env.KV_REST_API_TOKEN,
       fix: "Vercel Dashboard → Storage → Create Database → KV → Create",
     });
   }

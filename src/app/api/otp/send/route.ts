@@ -61,7 +61,9 @@ export async function POST(request: NextRequest) {
       ex: RATE_LIMIT_WINDOW,
     });
 
-    console.log(`[OTP] Generated for ${sanitizedEmail} type=${type} code=${otp}`);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[OTP] Generated for ${sanitizedEmail} type=${type} code=${otp}`);
+    }
 
     // Send email in background — don't block the response
     // The OTP is already stored in KV, so user can verify even if email is slow

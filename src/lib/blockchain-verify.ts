@@ -77,7 +77,7 @@ async function verifyTRC20(
     const USDT_TRON = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t";
     const transfer = trc20Info.find(
       (t: { from_address: string; to_address: string; amount: string; type?: string }) =>
-        t.type === "USDT" || true // Accept any TRC20 for now, we verify the contract later
+        t.type === "USDT"
     ) || trc20Info[0]; // Fallback to first transfer
 
     if (!transfer) {
@@ -100,8 +100,8 @@ async function verifyTRC20(
     // USDT on Tron has 6 decimals (1 USDT = 1,000,000 units)
     const receivedAmount = Number(transfer.amount) / 1_000_000;
 
-    // Allow tolerance of 0.5 USDT (for exchange fees / small differences)
-    if (receivedAmount < expectedAmount - 0.5) {
+    // Allow tolerance of 0.01 USDT (for exchange fees / small differences)
+    if (receivedAmount < expectedAmount - 0.01) {
       return {
         success: true,
         valid: false,
@@ -210,8 +210,8 @@ async function verifyBEP20(
       // Check recipient
       if (transferTo.toLowerCase() !== expectedAddress.toLowerCase()) continue;
 
-      // Check amount (with 0.5 USDT tolerance)
-      if (transferAmount < expectedAmount - 0.5) continue;
+      // Check amount (with 0.01 USDT tolerance)
+      if (transferAmount < expectedAmount - 0.01) continue;
 
       foundValid = true;
       break;

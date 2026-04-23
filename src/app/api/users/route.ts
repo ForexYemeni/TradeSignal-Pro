@@ -181,12 +181,14 @@ export async function DELETE(request: NextRequest) {
     if (await isSuperAdmin(id)) {
       return NextResponse.json({ success: false, error: "لا يمكن حذف المدير الأعلى" }, { status: 403 });
     }
+    // Fetch user info before deletion for notification
+    const userToDelete = await getUserById(id);
     const deleted = await deleteUser(id);
     if (!deleted) {
       return NextResponse.json({ success: false, error: "المستخدم غير موجود" }, { status: 404 });
     }
-    if (user) {
-      sendPushToAdmins({ title: "تم حذف مستخدم", body: `${user.name} — ${user.email}`, tag: `user-${id}`, sound: 'sl_hit' }).catch(() => {});
+    if (userToDelete) {
+      sendPushToAdmins({ title: "تم حذف مستخدم", body: `${userToDelete.name} — ${userToDelete.email}`, tag: `user-${id}`, sound: 'sl_hit' }).catch(() => {});
     }
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -6,6 +6,16 @@
  * Set GOOGLE_APPS_SCRIPT_EMAIL_URL in Vercel env
  */
 
+/** Escape HTML special characters to prevent XSS in email templates */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 const EMAIL_URL = process.env.GOOGLE_APPS_SCRIPT_EMAIL_URL || '';
 const EMAIL_KEY = process.env.GOOGLE_APPS_SCRIPT_EMAIL_KEY || '';
 
@@ -132,8 +142,8 @@ export function buildOtpEmail(otp: string, type: 'register' | 'login' | 'reset',
   const titleMap = { register: 'تأكيد إنشاء الحساب', login: 'تسجيل الدخول', reset: 'إعادة تعيين كلمة المرور' };
   const subtitleMap = {
     register: 'شكراً لك على التسجيل في ForexYemeni VIP. أدخل الكود التالي لإكمال إنشاء حسابك.',
-    login: `مرحباً ${name || ''}، أدخل الكود التالي لتسجيل الدخول إلى حسابك.`,
-    reset: `مرحباً ${name || ''}، أدخل الكود التالي لإعادة تعيين كلمة مرور حسابك.`,
+    login: `مرحباً ${escapeHtml(name || '')}، أدخل الكود التالي لتسجيل الدخول إلى حسابك.`,
+    reset: `مرحباً ${escapeHtml(name || '')}، أدخل الكود التالي لإعادة تعيين كلمة مرور حسابك.`,
   };
   const title = titleMap[type];
   const subtitle = subtitleMap[type];
@@ -495,7 +505,7 @@ export function buildDuplicateAccountEmail(data: {
 </tr>
 <tr>
 <td style="padding:10px 14px;font-size:10px;color:#6b7280;">معرف الجهاز</td>
-<td style="padding:10px 14px;font-size:9px;color:#9ca3af;text-align:left;font-family:'Courier New',monospace;direction:ltr;word-break:break-all;" dir="ltr">${deviceId}</td>
+<td style="padding:10px 14px;font-size:9px;color:#9ca3af;text-align:left;font-family:'Courier New',monospace;direction:ltr;word-break:break-all;" dir="ltr">${escapeHtml(deviceId)}</td>
 </tr>
 </table>
 </td></tr>
@@ -510,8 +520,8 @@ export function buildDuplicateAccountEmail(data: {
 </tr></table>
 </div>
 <table width="100%" cellpadding="0" cellspacing="0" style="padding:0 16px;">
-<tr><td style="padding:8px 16px;font-size:10px;color:#6b7280;">الاسم</td><td style="padding:8px 16px;font-size:12px;color:#f3f4f6;font-weight:600;text-align:left;" dir="ltr">${user1.name}</td></tr>
-<tr><td style="padding:8px 16px;font-size:10px;color:#6b7280;">البريد</td><td style="padding:8px 16px;font-size:11px;color:#fbbf24;font-weight:600;text-align:left;font-family:monospace;direction:ltr;" dir="ltr">${user1.email}</td></tr>
+<tr><td style="padding:8px 16px;font-size:10px;color:#6b7280;">الاسم</td><td style="padding:8px 16px;font-size:12px;color:#f3f4f6;font-weight:600;text-align:left;" dir="ltr">${escapeHtml(user1.name)}</td></tr>
+<tr><td style="padding:8px 16px;font-size:10px;color:#6b7280;">البريد</td><td style="padding:8px 16px;font-size:11px;color:#fbbf24;font-weight:600;text-align:left;font-family:monospace;direction:ltr;" dir="ltr">${escapeHtml(user1.email)}</td></tr>
 <tr><td style="padding:8px 16px;font-size:10px;color:#6b7280;">الاشتراك</td><td style="padding:8px 16px;font-size:11px;color:#d1d5db;text-align:left;">${formatSubscription(user1)}</td></tr>
 <tr><td style="padding:8px 16px;font-size:10px;color:#6b7280;">تاريخ التسجيل</td><td style="padding:8px 16px;font-size:10px;color:#9ca3af;text-align:left;direction:ltr;" dir="ltr">${user1Created}</td></tr>
 </table>
@@ -528,8 +538,8 @@ export function buildDuplicateAccountEmail(data: {
 </tr></table>
 </div>
 <table width="100%" cellpadding="0" cellspacing="0">
-<tr><td style="padding:8px 16px;font-size:10px;color:#6b7280;">الاسم</td><td style="padding:8px 16px;font-size:12px;color:#f3f4f6;font-weight:600;text-align:left;" dir="ltr">${user2.name}</td></tr>
-<tr><td style="padding:8px 16px;font-size:10px;color:#6b7280;">البريد</td><td style="padding:8px 16px;font-size:11px;color:#fbbf24;font-weight:600;text-align:left;font-family:monospace;direction:ltr;" dir="ltr">${user2.email}</td></tr>
+<tr><td style="padding:8px 16px;font-size:10px;color:#6b7280;">الاسم</td><td style="padding:8px 16px;font-size:12px;color:#f3f4f6;font-weight:600;text-align:left;" dir="ltr">${escapeHtml(user2.name)}</td></tr>
+<tr><td style="padding:8px 16px;font-size:10px;color:#6b7280;">البريد</td><td style="padding:8px 16px;font-size:11px;color:#fbbf24;font-weight:600;text-align:left;font-family:monospace;direction:ltr;" dir="ltr">${escapeHtml(user2.email)}</td></tr>
 <tr><td style="padding:8px 16px;font-size:10px;color:#6b7280;">الاشتراك</td><td style="padding:8px 16px;font-size:11px;color:#d1d5db;text-align:left;">${formatSubscription(user2)}</td></tr>
 <tr><td style="padding:8px 16px;font-size:10px;color:#6b7280;">تاريخ التسجيل</td><td style="padding:8px 16px;font-size:10px;color:#9ca3af;text-align:left;direction:ltr;" dir="ltr">${user2Created}</td></tr>
 </table>
