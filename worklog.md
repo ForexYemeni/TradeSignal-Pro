@@ -419,3 +419,25 @@ Stage Summary:
 - Duplicate TXID detection prevents reuse
 - If blockchain API is unreachable, request goes to admin pending queue
 - Admin sees verification status (pass/fail/error) on each payment request
+---
+Task ID: 1
+Agent: Main Agent
+Task: Fix device warning dialog not appearing when duplicate account blocking triggers
+
+Work Log:
+- Analyzed the user's report: first click on login after switching accounts shows nothing, second click shows "account blocked"
+- Traced the full deviceBlocked flow: server returns `deviceBlocked: true` → frontend calls `setDeviceWarning({show: true, ...})`
+- Discovered root cause: the deviceWarning dialog JSX was only in the FINAL return statement (line 5382), but the login/register/OTP views use EARLY returns that never reach the final return
+- The login view early returns at line 2066, OTP view at line 2352, register view at line 2574 — none include the dialog
+- Previously the plain text error worked because it was rendered WITHIN the login form via `setLoginErr()`, but the dialog was in a completely different render path
+- Fix: extracted the deviceWarning dialog into a `deviceWarningDialog` variable before all early returns
+- Added `{deviceWarningDialog}` to login, OTP, and register view returns (wrapped in Fragment)
+- Removed duplicate dialog code from the final return, replaced with `{deviceWarningDialog}`
+- Build passed successfully
+- Deployed via git push
+
+Stage Summary:
+- Bug: deviceWarning dialog was unreachable from login/register/OTP views due to early returns
+- Fix: extracted dialog to shared variable, included in all relevant early returns
+- Files modified: src/app/page.tsx
+- Build and deploy successful
