@@ -402,32 +402,6 @@ export default function HomePage() {
     return id;
   }
 
-  /* ── Device Check Before Login/Register ── */
-  async function checkDeviceBeforeAction(email: string, action: "login" | "register"): Promise<boolean> {
-    const deviceId = getDeviceId();
-    if (!deviceId) return true; // No device ID, skip check
-    try {
-      const res = await fetch("/api/device-check", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ deviceId, email }),
-      });
-      const data = await res.json();
-      if (data.success && data.detected && !data.safe) {
-        // Device has another account - show warning
-        setDeviceWarning({
-          show: true,
-          existingAccount: data.existingAccount,
-          action,
-        });
-        return false; // Don't proceed
-      }
-      return true; // Safe to proceed
-    } catch {
-      return true; // Error checking, allow proceeding
-    }
-  }
-
   /* ── OTP (shared by login & register & reset) ── */
   const [otpStep, setOtpStep] = useState<"none" | "sending" | "verifying" | "done">("none");
   const [otpVerifying, setOtpVerifying] = useState(false);
@@ -447,7 +421,8 @@ export default function HomePage() {
     show: boolean;
     existingAccount: { name: string; email: string; subscriptionType?: string; packageName?: string };
     action: "login" | "register";
-  }>({ show: false, existingAccount: { name: "", email: "" }, action: "login" });
+    blocked: boolean;
+  }>({ show: false, existingAccount: { name: "", email: "" }, action: "login", blocked: false });
 
   /* ── Forgot Password ── */
   const [fpEmail, setFpEmail] = useState("");
@@ -872,10 +847,6 @@ export default function HomePage() {
     setLoginFeedback(null);
     setLoginLoad(true);
     try {
-      // Check device before login
-      const deviceSafe = await checkDeviceBeforeAction(email, "login");
-      if (!deviceSafe) { setLoginLoad(false); return; }
-
       const res = await fetch("/api/admin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -890,8 +861,13 @@ export default function HomePage() {
         }
         if (data.blocked || data.deviceBlocked) {
           if (data.deviceBlocked) {
+            setDeviceWarning({
+              show: true,
+              existingAccount: { name: "", email: "" },
+              action: "login",
+              blocked: true,
+            });
             setLoginErr(data.error || "تم حظرك بسبب وجود حساب آخر من نفس الجهاز.");
-            toast.error(data.error || "تم الحظر التلقائي.", { duration: 10000 });
           } else {
             setView("blocked");
           }
@@ -1096,10 +1072,6 @@ export default function HomePage() {
       } else if (otpPurpose === "register") {
         setRegLoad(true);
         try {
-          // Check device before register
-          const deviceSafe = await checkDeviceBeforeAction(otpEmail, "register");
-          if (!deviceSafe) { setRegLoad(false); return; }
-
           const regRes = await fetch("/api/register", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -1113,8 +1085,12 @@ export default function HomePage() {
             toast.success(regData.message);
             setView("login");
           } else if (regData.deviceBlocked) {
-            setOtpErr(regData.error || "تم الحظر بسبب حسابات مكررة");
-            toast.error(regData.error || "تم حظرك. تواصل مع الإدارة.", { duration: 10000 });
+            setDeviceWarning({
+              show: true,
+              existingAccount: { name: "", email: "" },
+              action: "register",
+              blocked: true,
+            });
             setOtpVerifying(false);
           } else {
             setOtpErr(regData.error || "فشل إنشاء الحساب");
@@ -1142,8 +1118,12 @@ export default function HomePage() {
             setView("pending");
           } else if (loginData.blocked || loginData.deviceBlocked) {
             if (loginData.deviceBlocked) {
-              setOtpErr(loginData.error || "تم حظرك بسبب حسابات مكررة.");
-              toast.error(loginData.error || "تم الحظر التلقائي.", { duration: 10000 });
+              setDeviceWarning({
+                show: true,
+                existingAccount: { name: "", email: "" },
+                action: "login",
+                blocked: true,
+              });
             } else {
               setView("blocked");
             }
@@ -5397,7 +5377,7 @@ export default function HomePage() {
         </div>
       )}
 
-            {/* ── Device Duplicate Warning Dialog ── */}
+            {/* ── Device Duplicate Warning / Blocked Dialog ── */}
             <AnimatePresence>
               {deviceWarning.show && (
                 <motion.div
@@ -5413,69 +5393,86 @@ export default function HomePage() {
                     exit={{ scale: 0.9, opacity: 0, y: 20 }}
                     transition={{ type: "spring", damping: 25, stiffness: 300 }}
                     className="w-full max-w-sm rounded-3xl overflow-hidden"
-                    style={{ background: "linear-gradient(145deg, rgba(15,20,30,0.98), rgba(10,14,22,0.98))", border: "1px solid rgba(255,82,82,0.2)" }}
+                    style={{ background: "linear-gradient(145deg, rgba(15,20,30,0.98), rgba(10,14,22,0.98))", border: deviceWarning.blocked ? "1px solid rgba(255,82,82,0.25)" : "1px solid rgba(255,170,0,0.25)" }}
                   >
-                    {/* Warning Header */}
+                    {/* Header */}
                     <div className="relative p-6 pb-4 text-center">
-                      <div className="absolute inset-x-0 top-0 h-32 opacity-20" style={{ background: "radial-gradient(ellipse at center top, rgba(255,82,82,0.4), transparent 70%)" }} />
+                      <div className="absolute inset-x-0 top-0 h-32 opacity-20" style={{ background: deviceWarning.blocked ? "radial-gradient(ellipse at center top, rgba(255,82,82,0.4), transparent 70%)" : "radial-gradient(ellipse at center top, rgba(255,170,0,0.4), transparent 70%)" }} />
                       <div className="relative">
-                        <div className="w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center" style={{ background: "linear-gradient(135deg, rgba(255,82,82,0.15), rgba(211,47,47,0.08))", border: "2px solid rgba(255,82,82,0.25)" }}>
-                          <ShieldAlert className="w-10 h-10 text-red-400" />
+                        <div className="w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center" style={{ background: deviceWarning.blocked ? "linear-gradient(135deg, rgba(255,82,82,0.15), rgba(211,47,47,0.08))" : "linear-gradient(135deg, rgba(255,170,0,0.15), rgba(255,140,0,0.08))", border: deviceWarning.blocked ? "2px solid rgba(255,82,82,0.25)" : "2px solid rgba(255,170,0,0.25)" }}>
+                          {deviceWarning.blocked ? <ShieldAlert className="w-10 h-10 text-red-400" /> : <ShieldAlert className="w-10 h-10 text-amber-400" />}
                         </div>
-                        <h3 className="text-lg font-extrabold text-white mb-1">تنبيه أمني</h3>
-                        <p className="text-[11px] text-red-300/80 font-semibold">كشف حساب آخر على هذا الجهاز</p>
+                        <h3 className="text-lg font-extrabold text-white mb-1">{deviceWarning.blocked ? "تم الحظر تلقائياً" : "تنبيه أمني"}</h3>
+                        <p className="text-[11px] font-semibold" style={{ color: deviceWarning.blocked ? "rgba(255,82,82,0.8)" : "rgba(255,170,0,0.8)" }}>{deviceWarning.blocked ? "حظر بسبب تعدد الحسابات" : "كشف حساب آخر على هذا الجهاز"}</p>
                       </div>
                     </div>
 
                     {/* Content */}
                     <div className="px-5 pb-5 space-y-4">
-                      <div className="rounded-2xl p-4 space-y-3" style={{ background: "rgba(255,82,82,0.04)", border: "1px solid rgba(255,82,82,0.1)" }}>
-                        <p className="text-[11px] text-white/70 leading-relaxed text-center">
-                          يوجد حساب آخر مسجل على هذا الجهاز. إذا متابعتك سيتم <strong className="text-red-400">حظر الحسابين تلقائياً</strong> بما في ذلك اشتراكاتك الحالية.
-                        </p>
+                      <div className="rounded-2xl p-4 space-y-3" style={{ background: deviceWarning.blocked ? "rgba(255,82,82,0.04)" : "rgba(255,170,0,0.04)", border: deviceWarning.blocked ? "1px solid rgba(255,82,82,0.1)" : "1px solid rgba(255,170,0,0.1)" }}>
+                        {deviceWarning.blocked ? (
+                          <p className="text-[11px] text-white/70 leading-relaxed text-center">
+                            تم اكتشاف محاولة استخدام <strong className="text-red-400">حسابين مختلفين</strong> من نفس الجهاز. تم حظر كلا الحسابين تلقائياً مع الحفاظ على بيانات الاشتراك. تواصل مع الإدارة لتفعيل حسابك.
+                          </p>
+                        ) : (
+                          <p className="text-[11px] text-white/70 leading-relaxed text-center">
+                            يوجد حساب آخر مسجل على هذا الجهاز. إذا متابعتك سيتم <strong className="text-amber-400">حظر الحسابين تلقائياً</strong> بما في ذلك اشتراكاتك الحالية.
+                          </p>
+                        )}
 
-                        {/* Existing Account Info */}
-                        <div className="rounded-xl p-3 space-y-2" style={{ background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.05)" }}>
-                          <div className="text-[9px] text-white/30 font-semibold uppercase tracking-wider">الحساب المسجل على الجهاز</div>
-                          <div className="text-[12px] text-white font-bold" dir="ltr">{deviceWarning.existingAccount.email}</div>
-                          <div className="text-[10px] text-white/50">{deviceWarning.existingAccount.name}</div>
-                          {deviceWarning.existingAccount.packageName && (
-                            <div className="flex items-center gap-1.5">
-                              <Crown className="w-3 h-3 text-amber-400" />
-                              <span className="text-[10px] text-amber-400/80">{deviceWarning.existingAccount.packageName}</span>
+                        {/* Existing Account Info (warning mode only) */}
+                        {!deviceWarning.blocked && deviceWarning.existingAccount.email && (
+                          <div className="rounded-xl p-3 space-y-2" style={{ background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.05)" }}>
+                            <div className="text-[9px] text-white/30 font-semibold uppercase tracking-wider">الحساب المسجل على الجهاز</div>
+                            <div className="text-[12px] text-white font-bold" dir="ltr">{deviceWarning.existingAccount.email}</div>
+                            <div className="text-[10px] text-white/50">{deviceWarning.existingAccount.name}</div>
+                            {deviceWarning.existingAccount.packageName && (
+                              <div className="flex items-center gap-1.5">
+                                <Crown className="w-3 h-3 text-amber-400" />
+                                <span className="text-[10px] text-amber-400/80">{deviceWarning.existingAccount.packageName}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Blocked Info */}
+                        {deviceWarning.blocked && (
+                          <div className="rounded-xl p-3 space-y-2" style={{ background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,82,82,0.1)" }}>
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                              <span className="text-[10px] text-red-400 font-bold">الحساب محظور حالياً</span>
                             </div>
-                          )}
-                        </div>
+                            <p className="text-[10px] text-white/40 leading-relaxed">
+                              تم الحفاظ على بيانات اشتراكك. تواصل مع الإدارة عبر البريد الإلكتروني لطلب إعادة تفعيل الحساب.
+                            </p>
+                          </div>
+                        )}
                       </div>
 
                       {/* Action Buttons */}
                       <div className="space-y-2.5">
-                        <button
-                          onClick={() => setDeviceWarning(w => ({ ...w, show: false }))}
-                          className="w-full py-3 rounded-2xl text-[12px] font-bold bg-white/5 text-white/60 border border-white/10 active:scale-[0.98] transition-transform"
-                        >
-                          إلغاء — العودة بأمان
-                        </button>
-                        <button
-                          onClick={() => {
-                            setDeviceWarning(w => ({ ...w, show: false }));
-                            // Clear device ID to avoid future detection
-                            if (typeof window !== "undefined") {
-                              localStorage.removeItem("fy_device_id");
-                            }
-                            // Navigate to login
-                            setView("login");
-                          }}
-                          className="w-full py-3 rounded-2xl text-[12px] font-bold active:scale-[0.98] transition-transform"
-                          style={{ background: "linear-gradient(135deg, rgba(255,82,82,0.15), rgba(211,47,47,0.1))", border: "1px solid rgba(255,82,82,0.3)", color: "#FF8A80" }}
-                        >
-                          حذف بيانات الجهاز والمتابعة
-                        </button>
+                        {deviceWarning.blocked ? (
+                          <button
+                            onClick={() => setDeviceWarning(w => ({ ...w, show: false }))}
+                            className="w-full py-3.5 rounded-2xl text-[12px] font-bold active:scale-[0.98] transition-transform"
+                            style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.04))", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.7)" }}
+                          >
+                            فهمت
+                          </button>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => setDeviceWarning(w => ({ ...w, show: false }))}
+                              className="w-full py-3.5 rounded-2xl text-[12px] font-bold bg-white/5 text-white/60 border border-white/10 active:scale-[0.98] transition-transform"
+                            >
+                              العودة بأمان
+                            </button>
+                            <p className="text-[9px] text-white/20 text-center leading-relaxed">
+                              سجل الدخول بحسابك الأصلي المسجل على هذا الجهاز.
+                            </p>
+                          </>
+                        )}
                       </div>
-
-                      <p className="text-[9px] text-white/20 text-center leading-relaxed">
-                        يمكنك المتابعة بحسابك الأصلي بأمان. هذا التحذير يظهر فقط عند وجود حساب مختلف على نفس الجهاز.
-                      </p>
                     </div>
                   </motion.div>
                 </motion.div>
