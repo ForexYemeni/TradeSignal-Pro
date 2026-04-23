@@ -41,7 +41,7 @@ export function Stars({
   };
 
   return (
-    <div className={`flex items-center gap-[3px] ${className}`} dir="ltr">
+    <div className={`flex items-center gap-0.5 ${className}`} dir="ltr">
       {Array.from({ length: max }).map((_, i) => (
         <motion.div
           key={i}
@@ -50,9 +50,9 @@ export function Stars({
           transition={{ delay: i * 0.05, type: "spring", stiffness: 400, damping: 20 }}
         >
           <Star
-            className={`${sizeClasses[size]} transition-all duration-300 ${
+            className={`${sizeClasses[size]} transition-colors duration-200 ${
               i < _rating
-                ? "fill-amber-400 text-amber-400 drop-shadow-[0_0_3px_rgba(251,191,36,0.5)]"
+                ? "fill-amber-400 text-amber-400"
                 : "fill-transparent text-muted-foreground/30"
             }`}
           />
@@ -75,18 +75,18 @@ export function Div({
   if (label) {
     return (
       <div className={`flex items-center gap-3 my-4 ${className}`}>
-        <div className="flex-1 h-px bg-gradient-to-l from-white/[0.08] via-white/[0.08] to-transparent" />
-        <span className="text-[11px] text-muted-foreground/50 font-medium whitespace-nowrap px-1">
+        <div className="flex-1 h-px bg-gradient-to-l from-white/10 via-white/10 to-transparent" />
+        <span className="text-[11px] text-muted-foreground/60 font-medium whitespace-nowrap px-1">
           {label}
         </span>
-        <div className="flex-1 h-px bg-gradient-to-r from-white/[0.08] via-white/[0.08] to-transparent" />
+        <div className="flex-1 h-px bg-gradient-to-r from-white/10 via-white/10 to-transparent" />
       </div>
     );
   }
 
   return (
     <div className={`my-3 ${className}`}>
-      <div className="h-px bg-gradient-to-r from-transparent via-white/[0.08] to-transparent" />
+      <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
     </div>
   );
 }
@@ -117,10 +117,10 @@ export function Glass({
     <motion.div
       className={`rounded-2xl border border-white/[0.06] bg-white/[0.03] backdrop-blur-xl ${
         paddingClasses[padding] ?? "p-4"
-      } ${hover ? "hover:bg-white/[0.05] hover:border-white/[0.1] cursor-pointer hover-lift-premium" : ""} card-transition-premium ${className}`}
+      } ${hover ? "hover:bg-white/[0.05] hover:border-white/[0.1] cursor-pointer" : ""} transition-all duration-300 ${className}`}
       whileHover={
         hover
-          ? { y: -3, boxShadow: "0 12px 40px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.06)" }
+          ? { y: -2, boxShadow: "0 8px 32px rgba(0,0,0,0.3)" }
           : undefined
       }
       transition={{ type: "spring", stiffness: 300, damping: 25 }}
@@ -275,18 +275,18 @@ export function EmptyState({
       className="flex flex-col items-center justify-center py-16 px-6"
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+      transition={{ duration: 0.5, ease: "easeOut" }}
     >
       {/* Gradient circle behind icon */}
       <div className="relative mb-5">
         <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-amber-400/10 via-yellow-500/5 to-transparent blur-xl scale-125" />
-        <div className="relative w-16 h-16 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center text-muted-foreground/50 shadow-layered">
+        <div className="relative w-16 h-16 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center text-muted-foreground/50">
           {icon}
         </div>
       </div>
 
       <motion.p
-        className="text-sm font-bold text-muted-foreground/80"
+        className="text-sm font-semibold text-muted-foreground/80"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.15 }}
@@ -296,7 +296,7 @@ export function EmptyState({
 
       {subtitle && (
         <motion.p
-          className="text-[11px] text-muted-foreground/45 mt-1.5 text-center max-w-[260px] leading-relaxed"
+          className="text-[11px] text-muted-foreground/50 mt-1.5 text-center max-w-[260px] leading-relaxed"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.25 }}
@@ -308,7 +308,7 @@ export function EmptyState({
       {actionLabel && onAction && (
         <motion.button
           onClick={onAction}
-          className="mt-5 px-5 py-2.5 rounded-xl btn-premium-gold text-xs active:scale-95"
+          className="mt-5 px-5 py-2 rounded-xl bg-gradient-to-l from-amber-400 to-yellow-500 text-black text-xs font-bold hover:shadow-[0_0_20px_rgba(255,215,0,0.25)] transition-all duration-300 active:scale-95"
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.35 }}
@@ -691,30 +691,24 @@ export function ProgressRing({
           strokeWidth={strokeWidth}
         />
         {/* Progress */}
-        <defs>
-          <linearGradient id={`progressGrad-${color}-${size}`} x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor={stroke} stopOpacity="1" />
-            <stop offset="100%" stopColor={stroke} stopOpacity="0.5" />
-          </linearGradient>
-        </defs>
         <motion.circle
           cx={size / 2}
           cy={size / 2}
           r={radius}
           fill="none"
-          stroke={`url(#progressGrad-${color}-${size})`}
+          stroke={stroke}
           strokeWidth={strokeWidth}
           strokeLinecap="round"
           strokeDasharray={circumference}
           initial={{ strokeDashoffset: circumference }}
           animate={{ strokeDashoffset: offset }}
-          transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
+          transition={{ duration: 1, ease: "easeOut", delay: 0.2 }}
           style={{
-            filter: `drop-shadow(0 0 6px ${stroke}60)`,
+            filter: `drop-shadow(0 0 4px ${stroke}40)`,
           }}
         />
       </svg>
-      <span className="absolute text-[11px] font-extrabold text-foreground tabular-nums">
+      <span className="absolute text-[11px] font-bold text-foreground tabular-nums">
         {value}%
       </span>
     </div>
@@ -775,7 +769,7 @@ export function MiniChart({
             <stop
               offset="0%"
               stopColor={lineColor}
-              stopOpacity="0.25"
+              stopOpacity="0.2"
             />
             <stop
               offset="100%"
@@ -802,8 +796,7 @@ export function MiniChart({
           strokeLinejoin="round"
           initial={{ pathLength: 0 }}
           animate={{ pathLength: 1 }}
-          transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
-          style={{ filter: `drop-shadow(0 0 2px ${lineColor}40)` }}
+          transition={{ duration: 1, ease: "easeOut" }}
         />
         {/* End dot */}
         <motion.circle
@@ -813,8 +806,8 @@ export function MiniChart({
           fill={lineColor}
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
-          transition={{ delay: 1, type: "spring", stiffness: 300, damping: 20 }}
-          style={{ filter: `drop-shadow(0 0 4px ${lineColor}90)` }}
+          transition={{ delay: 0.8, type: "spring" }}
+          style={{ filter: `drop-shadow(0 0 3px ${lineColor}80)` }}
         />
       </svg>
     </div>

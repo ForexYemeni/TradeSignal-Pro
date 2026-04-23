@@ -284,7 +284,7 @@ export function EntryCard({ s, idx, isAdmin, onUpdate, onDelete, isNew, statusCh
       transition={{ duration: 0.4, delay: isNew ? 0 : idx * 0.04 }}
       className={statusChanged ? "animate-status-pulse" : ""}
     >
-      <Glass className={`overflow-hidden ${ac.border} ${isClosed ? "opacity-80" : ""} shadow-layered hover-lift-premium`} padding="none">
+      <Glass className={`overflow-hidden ${ac.border} ${isClosed ? "opacity-80" : ""} shadow-layered`} padding="none">
         {/* 1. Top accent bar */}
         <div className={`h-[3px] bg-gradient-to-l ${ac.accent}`} style={{ boxShadow: `0 0 12px ${isBuy ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}` }} />
 
@@ -667,7 +667,7 @@ export function ClosedSignalCard({ s, idx, isAdmin, onDelete, statusChanged }: {
       transition={{ duration: 0.3, delay: idx * 0.03 }}
       className={statusChanged ? "animate-status-pulse" : ""}
     >
-      <div className={`rounded-2xl border overflow-hidden ${theme.bg} ${theme.border} card-transition-premium hover-lift-premium`}>
+      <div className={`rounded-2xl border overflow-hidden ${theme.bg} ${theme.border} card-transition-premium`}>
         {/* Top accent line */}
         <div className={`h-[2px] bg-gradient-to-l ${theme.accent}`} style={{ boxShadow: `0 1px 8px ${isProfit ? 'rgba(16, 185, 129, 0.2)' : isLoss ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255,255,255,0.05)'}` }} />
 

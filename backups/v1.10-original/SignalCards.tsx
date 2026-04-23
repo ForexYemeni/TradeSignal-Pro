@@ -46,9 +46,9 @@ export function TpMiniCard({ tp, index, isHit, isLastHit, entry, type }: {
       <motion.button
         whileTap={{ scale: 0.98 }}
         onClick={() => setExpanded(!expanded)}
-        className={`w-full text-right rounded-xl border transition-all duration-300 overflow-hidden card-transition-premium ${
+        className={`w-full text-right rounded-xl border transition-all duration-300 overflow-hidden ${
           isHit
-            ? "bg-emerald-500/[0.06] border-emerald-500/20 hover-glow-emerald"
+            ? "bg-emerald-500/[0.06] border-emerald-500/20"
             : "bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.04] hover:border-white/[0.1]"
         }`}
       >
@@ -61,14 +61,14 @@ export function TpMiniCard({ tp, index, isHit, isLastHit, entry, type }: {
               transition={{ type: "spring", stiffness: 500, damping: 25 }}
               className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${
                 isLastHit
-                  ? "bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-lg shadow-emerald-500/30"
+                  ? "bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-lg shadow-emerald-500/25"
                   : "bg-emerald-500/15"
               }`}
             >
               <Check className="w-3.5 h-3.5 text-emerald-300" strokeWidth={3} />
             </motion.div>
           ) : (
-            <div className="w-7 h-7 rounded-full bg-white/[0.04] border border-white/[0.08] flex items-center justify-center flex-shrink-0 shadow-sm">
+            <div className="w-7 h-7 rounded-full bg-white/[0.04] border border-white/[0.08] flex items-center justify-center flex-shrink-0">
               <span className="text-[10px] text-muted-foreground font-bold tabular-nums">{index + 1}</span>
             </div>
           )}
@@ -119,7 +119,7 @@ export function TpMiniCard({ tp, index, isHit, isLastHit, entry, type }: {
             transition={{ duration: 0.25, ease: "easeOut" }}
             className="overflow-hidden"
           >
-            <div className="mt-1.5 mx-1 mb-1 p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] space-y-2.5 shadow-sm">
+            <div className="mt-1.5 mx-1 mb-1 p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] space-y-2.5">
               <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[11px]">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground/70">سعر الهدف</span>
@@ -188,13 +188,13 @@ export function TradeStatusBanner({ s }: { s: Signal }) {
     <motion.div
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+      transition={{ duration: 0.35 }}
       className={`mt-3 rounded-xl border overflow-hidden ${theme.border}`}
     >
       <div className={`bg-gradient-to-l ${theme.gradient} p-3`}>
         <div className="flex items-center gap-3">
           {/* Icon */}
-          <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${theme.iconBg} shadow-sm`}>
+          <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${theme.iconBg}`}>
             {isProfit && <CheckCircle2 className={`w-4 h-4 ${theme.text}`} />}
             {isLoss && <XCircle className="w-4 h-4 text-red-400" />}
             {isManual && <Info className="w-4 h-4 text-muted-foreground" />}
@@ -284,16 +284,16 @@ export function EntryCard({ s, idx, isAdmin, onUpdate, onDelete, isNew, statusCh
       transition={{ duration: 0.4, delay: isNew ? 0 : idx * 0.04 }}
       className={statusChanged ? "animate-status-pulse" : ""}
     >
-      <Glass className={`overflow-hidden ${ac.border} ${isClosed ? "opacity-80" : ""} shadow-layered hover-lift-premium`} padding="none">
+      <Glass className={`overflow-hidden ${ac.border} ${isClosed ? "opacity-80" : ""}`} padding="none">
         {/* 1. Top accent bar */}
-        <div className={`h-[3px] bg-gradient-to-l ${ac.accent}`} style={{ boxShadow: `0 0 12px ${isBuy ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}` }} />
+        <div className={`h-[3px] bg-gradient-to-l ${ac.accent}`} />
 
         <div className="p-4 space-y-3.5">
           {/* 2. Header row */}
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-center gap-3">
               {/* Pair icon */}
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${ac.bg} shadow-lg shadow-layered`}>
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${ac.bg} shadow-lg`}>
                 {isBuy
                   ? <TrendingUp className={`w-5 h-5 ${ac.text}`} />
                   : <TrendingDown className={`w-5 h-5 ${ac.text}`} />
@@ -667,20 +667,20 @@ export function ClosedSignalCard({ s, idx, isAdmin, onDelete, statusChanged }: {
       transition={{ duration: 0.3, delay: idx * 0.03 }}
       className={statusChanged ? "animate-status-pulse" : ""}
     >
-      <div className={`rounded-2xl border overflow-hidden ${theme.bg} ${theme.border} card-transition-premium hover-lift-premium`}>
+      <div className={`rounded-2xl border overflow-hidden ${theme.bg} ${theme.border} transition-all duration-300`}>
         {/* Top accent line */}
-        <div className={`h-[2px] bg-gradient-to-l ${theme.accent}`} style={{ boxShadow: `0 1px 8px ${isProfit ? 'rgba(16, 185, 129, 0.2)' : isLoss ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255,255,255,0.05)'}` }} />
+        <div className={`h-[2px] bg-gradient-to-l ${theme.accent}`} />
 
         {/* Compact Header — Always Visible */}
         <motion.button
           whileTap={{ scale: 0.995 }}
           onClick={() => setExpanded(!expanded)}
-          className="w-full text-right hover-lift-premium"
+          className="w-full text-right"
         >
           <div className="flex items-center justify-between px-3.5 py-3">
             <div className="flex items-center gap-2.5">
               {/* Result icon */}
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${theme.iconBg} shadow-sm`}>
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${theme.iconBg}`}>
                 {isProfit ? (
                   <CheckCircle2 className={`w-4 h-4 ${theme.text}`} />
                 ) : isLoss ? (
@@ -737,7 +737,7 @@ export function ClosedSignalCard({ s, idx, isAdmin, onDelete, statusChanged }: {
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: "auto", opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
               className="overflow-hidden"
             >
               <div className="border-t border-white/[0.06] mx-3.5" />

@@ -3104,15 +3104,15 @@ export default function HomePage() {
                 </div>
                 {/* Quick Stats Row */}
                 <div className="grid grid-cols-3 gap-2">
-                  <div className="stat-card-premium rounded-xl p-2.5 text-center">
+                  <div className="bg-white/[0.04] backdrop-blur-sm rounded-xl p-2.5 text-center border border-white/[0.06] shadow-sm">
                     <div className="text-base font-extrabold text-emerald-400" style={{ textShadow: "0 0 12px rgba(16, 185, 129, 0.3)" }}>{todayWins}</div>
                     <div className="text-[8px] text-emerald-400/60 font-medium mt-0.5">ربح اليوم</div>
                   </div>
-                  <div className="stat-card-premium rounded-xl p-2.5 text-center">
+                  <div className="bg-white/[0.04] backdrop-blur-sm rounded-xl p-2.5 text-center border border-white/[0.06] shadow-sm">
                     <div className="text-base font-extrabold text-red-400" style={{ textShadow: "0 0 12px rgba(239, 68, 68, 0.3)" }}>{todayLosses}</div>
                     <div className="text-[8px] text-red-400/60 font-medium mt-0.5">خسارة اليوم</div>
                   </div>
-                  <div className="stat-card-premium rounded-xl p-2.5 text-center">
+                  <div className="bg-white/[0.04] backdrop-blur-sm rounded-xl p-2.5 text-center border border-white/[0.06] shadow-sm">
                     <div className={`text-base font-extrabold ${todayPnl >= 0 ? "text-emerald-400" : "text-red-400"}`} style={{ textShadow: todayPnl !== 0 ? `0 0 12px ${todayPnl >= 0 ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}` : "none" }}>
                       {todayPnl >= 0 ? "+" : ""}{todayPnl > 0 ? `$${todayPnl}` : todayPnl < 0 ? `-$${Math.abs(todayPnl)}` : "$0"}
                     </div>

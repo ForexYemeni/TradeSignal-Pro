@@ -117,7 +117,7 @@ export function Glass({
     <motion.div
       className={`rounded-2xl border border-white/[0.06] bg-white/[0.03] backdrop-blur-xl ${
         paddingClasses[padding] ?? "p-4"
-      } ${hover ? "hover:bg-white/[0.05] hover:border-white/[0.1] cursor-pointer hover-lift-premium" : ""} card-transition-premium ${className}`}
+      } ${hover ? "hover:bg-white/[0.05] hover:border-white/[0.1] cursor-pointer" : ""} card-transition-premium ${className}`}
       whileHover={
         hover
           ? { y: -3, boxShadow: "0 12px 40px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.06)" }

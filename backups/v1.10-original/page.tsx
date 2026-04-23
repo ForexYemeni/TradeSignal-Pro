@@ -2149,20 +2149,19 @@ export default function HomePage() {
     return (
       <>
       <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-background">
-        {/* Background: animated mesh gradient + grid */}
-        <div className="absolute inset-0 bg-mesh-animated" />
-        <div className="absolute inset-0 bg-grid-subtle opacity-60" />
-        <div className="absolute top-[-20%] left-[-10%] w-80 h-80 rounded-full opacity-20" style={{ background: "radial-gradient(circle, #FFD700 0%, transparent 70%)", filter: "blur(100px)", animation: "meshFloat3 18s ease-in-out infinite" }} />
-        <div className="absolute bottom-[-15%] right-[-10%] w-72 h-72 rounded-full opacity-15" style={{ background: "radial-gradient(circle, #00E676 0%, transparent 70%)", filter: "blur(100px)", animation: "meshFloat2 20s ease-in-out infinite" }} />
-        <div className="absolute top-[40%] left-[50%] w-60 h-60 rounded-full opacity-10" style={{ background: "radial-gradient(circle, #FF8F00 0%, transparent 70%)", filter: "blur(80px)", transform: "translate(-50%, -50%)", animation: "meshFloat1 16s ease-in-out infinite" }} />
+        {/* Background gradient blurs */}
+        <div className="absolute top-[-20%] left-[-10%] w-80 h-80 rounded-full opacity-20" style={{ background: "radial-gradient(circle, #FFD700 0%, transparent 70%)", filter: "blur(100px)" }} />
+        <div className="absolute bottom-[-15%] right-[-10%] w-72 h-72 rounded-full opacity-15" style={{ background: "radial-gradient(circle, #00E676 0%, transparent 70%)", filter: "blur(100px)" }} />
+        <div className="absolute top-[40%] left-[50%] w-60 h-60 rounded-full opacity-10" style={{ background: "radial-gradient(circle, #FF8F00 0%, transparent 70%)", filter: "blur(80px)", transform: "translate(-50%, -50%)" }} />
 
         <div className="w-full max-w-[480px] animate-[fadeInUp_0.5s_ease-out] relative z-10">
-          <div className="card-diamond rounded-3xl p-8 space-y-6 noise-overlay">
+          <div className="glass-card rounded-3xl p-8 space-y-6">
             {/* Logo & Title */}
             <div className="flex flex-col items-center gap-4">
-              {/* Logo with animated ring */}
+              {/* Subtle gold glow behind logo */}
               <div className="relative">
-                <div className="logo-ring-animated w-20 h-20 rounded-2xl gold-gradient flex items-center justify-center shadow-lg shadow-amber-500/30" style={{ boxShadow: "0 0 30px rgba(255, 215, 0, 0.25), 0 0 60px rgba(255, 215, 0, 0.08), 0 4px 16px rgba(255, 215, 0, 0.2)" }}>
+                <div className="absolute inset-0 rounded-2xl animate-pulse" style={{ boxShadow: "0 0 40px rgba(255, 215, 0, 0.25), 0 0 80px rgba(255, 215, 0, 0.08)" }} />
+                <div className="relative w-20 h-20 rounded-2xl gold-gradient flex items-center justify-center shadow-lg shadow-amber-500/30">
                   <svg className="w-10 h-10 text-black" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5zm14 3c0 .6-.4 1-1 1H6c-.6 0-1-.4-1-1v-1h14v1z" />
                   </svg>
@@ -2170,14 +2169,14 @@ export default function HomePage() {
               </div>
               <div className="text-center">
                 <h1 className="text-2xl font-extrabold text-foreground tracking-wide">ForexYemeni</h1>
-                <p className="text-sm font-bold mt-1.5 gold-gradient-text-animated">VIP TRADING SIGNALS</p>
+                <p className="text-sm font-bold mt-1.5 gold-gradient-text">VIP TRADING SIGNALS</p>
               </div>
             </div>
 
             {/* Form */}
             <div className="space-y-4">
               {/* Email */}
-              <div className="glass-input-premium px-4 h-[60px] flex items-center gap-3">
+              <div className="glass-input rounded-2xl px-4 h-[60px] flex items-center gap-3">
                 <Mail className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                 <input
                   type="email"
@@ -2191,7 +2190,7 @@ export default function HomePage() {
               </div>
 
               {/* Password */}
-              <div className="glass-input-premium px-4 h-[60px] flex items-center gap-3">
+              <div className="glass-input rounded-2xl px-4 h-[60px] flex items-center gap-3">
                 <Lock className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                 <input
                   type={showPwd ? "text" : "password"}
@@ -2395,7 +2394,7 @@ export default function HomePage() {
               <button
                 onClick={handleLogin}
                 disabled={loginLoad || !email || !pwd || loginFeedback?.type === "account_locked"}
-                className="w-full h-14 rounded-2xl btn-premium-gold text-base disabled:opacity-50"
+                className="w-full h-14 rounded-2xl gold-gradient text-black font-bold text-base hover:brightness-110 hover:shadow-amber-500/30 hover:shadow-xl transition-all active:scale-[0.97] disabled:opacity-50 shadow-lg shadow-amber-500/20"
               >
                 {loginLoad ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : "تسجيل الدخول"}
               </button>
@@ -2601,7 +2600,7 @@ export default function HomePage() {
 
             {!showNewPwdForm ? (
               <div className="space-y-4">
-                <div className="glass-input-premium px-4 h-[60px] flex items-center gap-3">
+                <div className="glass-input rounded-2xl px-4 h-[60px] flex items-center gap-3">
                   <Mail className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                   <input
                     type="email"
@@ -2623,7 +2622,7 @@ export default function HomePage() {
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="glass-input-premium px-4 h-[60px] flex items-center gap-3">
+                <div className="glass-input rounded-2xl px-4 h-[60px] flex items-center gap-3">
                   <Lock className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                   <input
                     type={fpShowPwd ? "text" : "password"}
@@ -2637,7 +2636,7 @@ export default function HomePage() {
                     {fpShowPwd ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
                 </div>
-                <div className="glass-input-premium px-4 h-[60px] flex items-center gap-3">
+                <div className="glass-input rounded-2xl px-4 h-[60px] flex items-center gap-3">
                   <Lock className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                   <input
                     type={fpShowPwd ? "text" : "password"}
@@ -2704,7 +2703,7 @@ export default function HomePage() {
             {/* Form */}
             <div className="space-y-4">
               {/* Full Name */}
-              <div className="glass-input-premium px-4 h-[60px] flex items-center gap-3">
+              <div className="glass-input rounded-2xl px-4 h-[60px] flex items-center gap-3">
                 <User className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                 <input
                   value={regName}
@@ -2716,7 +2715,7 @@ export default function HomePage() {
               </div>
 
               {/* Email */}
-              <div className="glass-input-premium px-4 h-[60px] flex items-center gap-3">
+              <div className="glass-input rounded-2xl px-4 h-[60px] flex items-center gap-3">
                 <Mail className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                 <input
                   type="email"
@@ -2729,7 +2728,7 @@ export default function HomePage() {
               </div>
 
               {/* Password */}
-              <div className="glass-input-premium px-4 h-[60px] flex items-center gap-3">
+              <div className="glass-input rounded-2xl px-4 h-[60px] flex items-center gap-3">
                 <Lock className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                 <input
                   type="password"
@@ -2929,22 +2928,22 @@ export default function HomePage() {
               </div>
             </div>
             <div className="space-y-4">
-              <div className="glass-input-premium px-4 h-[60px] flex items-center gap-3">
+              <div className="glass-input rounded-2xl px-4 h-[60px] flex items-center gap-3">
                 <Lock className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                 <input type="password" value={cpCur} onChange={e => setCpCur(e.target.value)} placeholder="كلمة المرور الحالية"
                   className="flex-1 bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground text-sm" dir="ltr" />
               </div>
-              <div className="glass-input-premium px-4 h-[60px] flex items-center gap-3">
+              <div className="glass-input rounded-2xl px-4 h-[60px] flex items-center gap-3">
                 <Mail className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                 <input type="email" value={cpEmail} onChange={e => setCpEmail(e.target.value)} placeholder="البريد الإلكتروني الجديد"
                   className="flex-1 bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground text-sm" dir="ltr" />
               </div>
-              <div className="glass-input-premium px-4 h-[60px] flex items-center gap-3">
+              <div className="glass-input rounded-2xl px-4 h-[60px] flex items-center gap-3">
                 <Lock className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                 <input type="password" value={cpNew} onChange={e => setCpNew(e.target.value)} placeholder="كلمة المرور الجديدة"
                   className="flex-1 bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground text-sm" dir="ltr" />
               </div>
-              <div className="glass-input-premium px-4 h-[60px] flex items-center gap-3">
+              <div className="glass-input rounded-2xl px-4 h-[60px] flex items-center gap-3">
                 <Lock className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                 <input type="password" value={cpConf} onChange={e => setCpConf(e.target.value)} placeholder="تأكيد كلمة المرور"
                   className="flex-1 bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground text-sm" dir="ltr" />
@@ -2992,11 +2991,11 @@ export default function HomePage() {
       )}
 
       {/* ── Header ── */}
-      <header className="sticky top-0 z-40 glass-nav-premium glass-nav-border-animated border-b border-white/[0.04]">
+      <header className="sticky top-0 z-40 glass-nav border-b border-white/[0.04]">
         <div className="flex items-center justify-between px-4 h-14">
           {/* Logo + Online Status */}
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-500/25" style={{ boxShadow: "0 2px 8px rgba(255, 215, 0, 0.2), 0 0 16px rgba(255, 215, 0, 0.08)" }}>
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-500/20">
               <Crown className="w-3.5 h-3.5 text-black" />
             </div>
             <div className="flex flex-col">
@@ -3013,22 +3012,22 @@ export default function HomePage() {
           {/* Controls */}
           <div className="flex items-center gap-1">
             {/* Audio Controls */}
-            <button onClick={() => setAudioMuted(!audioMuted)} className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-all duration-300 hover:shadow-sm active:scale-90">
+            <button onClick={() => setAudioMuted(!audioMuted)} className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-white/[0.04] transition-all duration-200 active:scale-90">
               {audioMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
             </button>
             {/* Volume slider (inline, shows when not muted) */}
             {!audioMuted && (
               <div className="flex items-center gap-1.5 px-1">
                 <input type="range" min="0" max="100" value={audioVol * 100} onChange={e => setAudioVol(Number(e.target.value) / 100)}
-                  className="w-14 h-1 accent-amber-500 bg-white/[0.08] rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-2.5 [&::-webkit-slider-thumb]:h-2.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-amber-500 [&::-webkit-slider-thumb]:shadow-[0_0_6px_rgba(251,191,36,0.4)]" />
+                  className="w-14 h-1 accent-amber-500 bg-white/[0.08] rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-2.5 [&::-webkit-slider-thumb]:h-2.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-amber-500" />
               </div>
             )}
             {/* Refresh */}
-            <button onClick={() => setRefreshKey(k => k + 1)} className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-amber-400 hover:bg-white/[0.06] transition-all duration-300 hover:shadow-sm active:scale-90">
+            <button onClick={() => setRefreshKey(k => k + 1)} className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-amber-400 hover:bg-white/[0.04] transition-all duration-200 active:scale-90">
               <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
             </button>
             {/* Logout */}
-            <button onClick={handleLogout} className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-red-400 hover:bg-red-400/[0.08] transition-all duration-300 hover:shadow-sm active:scale-90">
+            <button onClick={handleLogout} className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-red-400 hover:bg-red-400/[0.08] transition-all duration-200 active:scale-90">
               <LogOut className="w-4 h-4" />
             </button>
           </div>
@@ -3080,7 +3079,7 @@ export default function HomePage() {
           <div className="space-y-4">
 
             {/* ── Welcome Hero Card ── */}
-            <div className="card-animated-border rounded-2xl overflow-hidden relative p-5 shadow-layered">
+            <div className="glass-card premium-glow rounded-2xl overflow-hidden relative p-5">
               {/* Decorative blobs */}
               <div className="absolute -top-12 -right-12 w-36 h-36 rounded-full bg-amber-500/[0.07] blur-3xl" />
               <div className="absolute -bottom-10 -left-10 w-28 h-28 rounded-full bg-purple-500/[0.05] blur-3xl" />
@@ -3098,22 +3097,22 @@ export default function HomePage() {
                       }
                     </p>
                   </div>
-                  <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-500/25 shrink-0" style={{ boxShadow: "0 4px 12px rgba(255, 215, 0, 0.2), 0 0 20px rgba(255, 215, 0, 0.08)" }}>
+                  <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-500/20 shrink-0">
                     {isAdmin ? <ShieldAlert className="w-5 h-5 text-black" /> : <Sparkles className="w-5 h-5 text-black" />}
                   </div>
                 </div>
                 {/* Quick Stats Row */}
                 <div className="grid grid-cols-3 gap-2">
-                  <div className="stat-card-premium rounded-xl p-2.5 text-center">
-                    <div className="text-base font-extrabold text-emerald-400" style={{ textShadow: "0 0 12px rgba(16, 185, 129, 0.3)" }}>{todayWins}</div>
+                  <div className="bg-white/[0.04] backdrop-blur-sm rounded-xl p-2.5 text-center border border-white/[0.06]">
+                    <div className="text-base font-extrabold text-emerald-400">{todayWins}</div>
                     <div className="text-[8px] text-emerald-400/60 font-medium mt-0.5">ربح اليوم</div>
                   </div>
-                  <div className="stat-card-premium rounded-xl p-2.5 text-center">
-                    <div className="text-base font-extrabold text-red-400" style={{ textShadow: "0 0 12px rgba(239, 68, 68, 0.3)" }}>{todayLosses}</div>
+                  <div className="bg-white/[0.04] backdrop-blur-sm rounded-xl p-2.5 text-center border border-white/[0.06]">
+                    <div className="text-base font-extrabold text-red-400">{todayLosses}</div>
                     <div className="text-[8px] text-red-400/60 font-medium mt-0.5">خسارة اليوم</div>
                   </div>
-                  <div className="stat-card-premium rounded-xl p-2.5 text-center">
-                    <div className={`text-base font-extrabold ${todayPnl >= 0 ? "text-emerald-400" : "text-red-400"}`} style={{ textShadow: todayPnl !== 0 ? `0 0 12px ${todayPnl >= 0 ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}` : "none" }}>
+                  <div className="bg-white/[0.04] backdrop-blur-sm rounded-xl p-2.5 text-center border border-white/[0.06]">
+                    <div className={`text-base font-extrabold ${todayPnl >= 0 ? "text-emerald-400" : "text-red-400"}`}>
                       {todayPnl >= 0 ? "+" : ""}{todayPnl > 0 ? `$${todayPnl}` : todayPnl < 0 ? `-$${Math.abs(todayPnl)}` : "$0"}
                     </div>
                     <div className="text-[8px] text-muted-foreground/60 font-medium mt-0.5">أرباح اليوم</div>
@@ -3124,7 +3123,7 @@ export default function HomePage() {
 
             {/* ── Live Pulse Indicator ── */}
             <div className="flex items-center gap-2 px-0.5">
-              <div className="flex items-center gap-1.5 bg-emerald-500/[0.06] border border-emerald-500/10 rounded-full px-3 py-1 shadow-sm" style={{ boxShadow: "0 0 12px rgba(16, 185, 129, 0.06)" }}>
+              <div className="flex items-center gap-1.5 bg-emerald-500/[0.06] border border-emerald-500/10 rounded-full px-3 py-1">
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-50" />
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
@@ -5637,16 +5636,16 @@ export default function HomePage() {
         )}
       </main>
 
+      {/* ── Mobile Bottom Navigation (glass effect, visible on mobile only) ── */}
       {/* ── Mobile Bottom Navigation ── */}
-      {/* ── Mobile Bottom Navigation ── */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 md:hidden glass-nav-premium glass-nav-border-animated safe-area-bottom h-16">
+      <nav className="fixed bottom-0 left-0 right-0 z-40 md:hidden glass-nav safe-area-bottom h-16">
         <div className="max-w-lg mx-auto flex items-stretch h-full">
           {tabs.map(t => (
             <button key={t.key} onClick={() => setTab(t.key)}
-              className={`flex-1 flex flex-col items-center justify-center gap-0.5 relative transition-all duration-300 ${tab === t.key ? "" : "text-muted-foreground/60"}`}>
-              {tab === t.key && <div className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-[2px] rounded-full bg-gradient-to-l from-amber-400 to-orange-500 transition-all duration-300 shadow-sm" style={{ boxShadow: "0 0 8px rgba(255, 215, 0, 0.4)" }} />}
-              <div className={`flex items-center justify-center w-8 h-8 rounded-xl transition-all duration-300 ${tab === t.key ? "bg-amber-400/[0.12]" : ""}`}>
-                <span className={`transition-all duration-300 ${tab === t.key ? "text-amber-400 drop-shadow-[0_0_8px_rgba(255,215,0,0.5)]" : ""}`}>{t.icon}</span>
+              className={`flex-1 flex flex-col items-center justify-center gap-0.5 relative transition-all duration-200 ${tab === t.key ? "" : "text-muted-foreground/60"}`}>
+              {tab === t.key && <div className="absolute top-0 left-1/2 -translate-x-1/2 w-6 h-[2px] rounded-full bg-gradient-to-l from-amber-400 to-orange-500 transition-all duration-300" />}
+              <div className={`flex items-center justify-center w-8 h-8 rounded-xl transition-all duration-200 ${tab === t.key ? "bg-amber-400/[0.12]" : ""}`}>
+                <span className={`transition-all duration-200 ${tab === t.key ? "text-amber-400 drop-shadow-[0_0_6px_rgba(255,215,0,0.4)]" : ""}`}>{t.icon}</span>
               </div>
               <span className={`text-[9px] font-semibold transition-colors duration-200 ${tab === t.key ? "text-amber-400" : ""}`}>{t.label}</span>
               {t.badge !== undefined && t.badge > 0 && (
@@ -5660,7 +5659,7 @@ export default function HomePage() {
       </nav>
 
       {/* ── Desktop Bottom Navigation ── */}
-      <nav className="hidden md:block fixed bottom-0 left-0 right-0 z-40 glass-nav-premium glass-nav-border-animated border-t border-white/[0.04] safe-area-bottom h-14">
+      <nav className="hidden md:block fixed bottom-0 left-0 right-0 z-40 glass-nav border-t border-white/[0.04] safe-area-bottom h-14">
         <div className="max-w-lg mx-auto flex h-full">
           {tabs.map(t => (
             <button key={t.key} onClick={() => setTab(t.key)}
