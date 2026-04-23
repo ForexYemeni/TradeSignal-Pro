@@ -1,8 +1,16 @@
+/* ═══════════════════════════════════════════════════════════════════
+   ForexYemeni VIP — Professional Dark Trading Design System
+   Dark Navy-Black Theme · Gold Accent · RTL Arabic Layout
+   ═══════════════════════════════════════════════════════════════════ */
+
 @import "tailwindcss";
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
 
+/* ───────────────────────────────────────────────────────────────
+   §1 — Tailwind Theme Configuration (shadcn/ui compatible)
+   ─────────────────────────────────────────────────────────────── */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -41,8 +49,30 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+
+  /* Extended design-system tokens */
+  --color-navy-900: #050a15;
+  --color-navy-800: #0a1128;
+  --color-navy-700: #0f172a;
+  --color-navy-600: #1e293b;
+  --color-gold-400: #FFD700;
+  --color-gold-500: #FFC107;
+  --color-gold-600: #FF8F00;
+  --color-success: #10b981;
+  --color-success-light: #34d399;
+  --color-danger: #ef4444;
+  --color-danger-light: #f87171;
+  --color-info: #06b6d4;
+  --color-vip: #a855f7;
+  --color-vip-light: #c084fc;
+  --color-muted-primary: #94a3b8;
+  --color-muted-secondary: #64748b;
 }
 
+/* ───────────────────────────────────────────────────────────────
+   §2 — shadcn/ui CSS Custom Properties (DO NOT MODIFY CORE)
+   Mapped to our dark navy-black + gold theme
+   ─────────────────────────────────────────────────────────────── */
 :root {
   --radius: 0.625rem;
   --background: oklch(0.145 0 0);
@@ -76,22 +106,86 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+
+  /* ═══ Design System Extended Tokens ═══ */
+  --ds-navy-900: #050a15;
+  --ds-navy-800: #0a1128;
+  --ds-navy-700: #0f172a;
+  --ds-navy-600: #1e293b;
+  --ds-gold-start: #FFD700;
+  --ds-gold-end: #FF8F00;
+  --ds-success: #10b981;
+  --ds-success-light: #34d399;
+  --ds-danger: #ef4444;
+  --ds-danger-light: #f87171;
+  --ds-info: #06b6d4;
+  --ds-vip: #a855f7;
+  --ds-vip-light: #c084fc;
+  --ds-muted-primary: #94a3b8;
+  --ds-muted-secondary: #64748b;
+  --ds-border-subtle: rgba(255, 255, 255, 0.06);
+  --ds-border-default: rgba(255, 255, 255, 0.1);
+  --ds-border-strong: rgba(255, 255, 255, 0.15);
+  --ds-glass-bg: rgba(10, 17, 40, 0.6);
+  --ds-glass-border: rgba(255, 255, 255, 0.08);
+  --ds-glass-blur: 20px;
 }
 
+/* ───────────────────────────────────────────────────────────────
+   §3 — Base Layer (Reset & Foundations)
+   ─────────────────────────────────────────────────────────────── */
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
   body {
     @apply bg-background text-foreground;
+    font-family: 'Geist', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Prevent overscroll bounce on iOS */
+  html,
+  body {
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* RTL direction for Arabic layout */
+  [dir="rtl"] {
+    text-align: right;
   }
 }
 
-/* Mobile Safe Area & Custom Styles */
+/* ───────────────────────────────────────────────────────────────
+   §4 — Mobile Safe Area & Touch Targets
+   ─────────────────────────────────────────────────────────────── */
 .safe-area-bottom {
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
+.safe-area-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+@media (pointer: coarse) {
+  button,
+  a,
+  [role="button"],
+  select,
+  input[type="checkbox"],
+  input[type="radio"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* ───────────────────────────────────────────────────────────────
+   §5 — Scrollbar System
+   ─────────────────────────────────────────────────────────────── */
+
+/* Hide scrollbar completely */
 .scrollbar-none {
   -ms-overflow-style: none;
   scrollbar-width: none;
@@ -100,41 +194,87 @@
   display: none;
 }
 
-/* Smooth transitions for auth forms */
+/* Thin custom scrollbar */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 215, 0, 0.2) transparent;
+}
+.scrollbar-thin::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(255, 215, 0, 0.2);
+  border-radius: 9999px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 215, 0, 0.4);
+}
+
+/* Gold-accented scrollbar for premium containers */
+.scrollbar-gold {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 215, 0, 0.3) rgba(255, 255, 255, 0.03);
+}
+.scrollbar-gold::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+.scrollbar-gold::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 9999px;
+}
+.scrollbar-gold::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #FFD700, #FF8F00);
+  border-radius: 9999px;
+}
+
+/* ───────────────────────────────────────────────────────────────
+   §6 — Input & Autofill Overrides
+   ─────────────────────────────────────────────────────────────── */
 input:-webkit-autofill {
   -webkit-box-shadow: 0 0 0 30px var(--background) inset !important;
   -webkit-text-fill-color: var(--foreground) !important;
   border-color: var(--border) !important;
+  transition: background-color 5000s ease-in-out 0s;
 }
 
-/* Prevent overscroll on iOS */
-html, body {
-  overscroll-behavior: none;
-  -webkit-tap-highlight-color: transparent;
-}
+/* ───────────────────────────────────────────────────────────────
+   §7 — Animation Keyframes
+   ─────────────────────────────────────────────────────────────── */
 
-/* Touch-friendly sizing */
-@media (pointer: coarse) {
-  button, a, [role="button"] {
-    min-height: 44px;
-  }
-}
-
-/* CSS Animations (replacing framer-motion) */
+/* ── Core Transitions ── */
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
 }
 
 @keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(16px); }
+  from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* Professional Card Animations */
-@keyframes glowPulse {
-  0%, 100% { box-shadow: 0 0 8px rgba(16, 185, 129, 0.15), 0 0 20px rgba(16, 185, 129, 0.05); }
-  50% { box-shadow: 0 0 12px rgba(16, 185, 129, 0.25), 0 0 30px rgba(16, 185, 129, 0.1); }
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(50px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(100%); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes slideDown {
@@ -142,122 +282,147 @@ html, body {
   to { opacity: 1; max-height: 200px; }
 }
 
+/* ── Pulse & Glow Effects ── */
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 8px rgba(16, 185, 129, 0.2), 0 0 24px rgba(16, 185, 129, 0.05); }
+  50% { box-shadow: 0 0 16px rgba(16, 185, 129, 0.35), 0 0 40px rgba(16, 185, 129, 0.1); }
+}
+
+@keyframes pulseRing {
+  0% { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+
+@keyframes onlinePulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+@keyframes gentlePulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.06); opacity: 0.8; }
+}
+
+@keyframes statusPulse {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.04); }
+  100% { transform: scale(1); }
+}
+
+/* ── Profit & Loss Glows ── */
+@keyframes profitGlow {
+  0%, 100% {
+    box-shadow: 0 0 12px rgba(16, 185, 129, 0.15), inset 0 0 12px rgba(16, 185, 129, 0.04);
+  }
+  50% {
+    box-shadow: 0 0 24px rgba(16, 185, 129, 0.3), inset 0 0 20px rgba(16, 185, 129, 0.07);
+  }
+}
+
+@keyframes lossGlow {
+  0%, 100% {
+    box-shadow: 0 0 12px rgba(239, 68, 68, 0.15), inset 0 0 12px rgba(239, 68, 68, 0.04);
+  }
+  50% {
+    box-shadow: 0 0 24px rgba(239, 68, 68, 0.3), inset 0 0 20px rgba(239, 68, 68, 0.07);
+  }
+}
+
+/* ── Checkmark & TP/SL Hit ── */
 @keyframes checkPop {
   0% { transform: scale(0); opacity: 0; }
-  50% { transform: scale(1.3); }
+  50% { transform: scale(1.35); }
   100% { transform: scale(1); opacity: 1; }
 }
 
+@keyframes tpHitPulse {
+  0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
+  50% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+@keyframes slHitPulse {
+  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5); }
+  50% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+/* ── New Signal Notification ── */
+@keyframes newSignalGlow {
+  0% { box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.4); }
+  70% { box-shadow: 0 0 0 12px rgba(255, 215, 0, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 215, 0, 0); }
+}
+
+/* ── Shimmer & Loading ── */
 @keyframes shimmer {
   0% { background-position: -200% center; }
   100% { background-position: 200% center; }
 }
 
-@keyframes pulseRing {
-  0% { transform: scale(1); opacity: 0.6; }
-  100% { transform: scale(2.2); opacity: 0; }
+/* ── Confetti ── */
+@keyframes confettiFall {
+  0% { transform: translateY(-100vh) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
 }
 
-@keyframes profitGlow {
-  0%, 100% { box-shadow: 0 0 15px rgba(16, 185, 129, 0.2), inset 0 0 15px rgba(16, 185, 129, 0.05); }
-  50% { box-shadow: 0 0 25px rgba(16, 185, 129, 0.35), inset 0 0 20px rgba(16, 185, 129, 0.08); }
+/* ── Misc UI ── */
+@keyframes pullSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
-@keyframes lossGlow {
-  0%, 100% { box-shadow: 0 0 15px rgba(239, 68, 68, 0.2), inset 0 0 15px rgba(239, 68, 68, 0.05); }
-  50% { box-shadow: 0 0 25px rgba(239, 68, 68, 0.35), inset 0 0 20px rgba(239, 68, 68, 0.08); }
+@keyframes tipFade {
+  0%, 100% { opacity: 0; transform: translateY(8px); }
+  10%, 90% { opacity: 1; transform: translateY(0); }
 }
 
-.animate-glow-pulse { animation: glowPulse 2.5s ease-in-out infinite; }
-.animate-profit-glow { animation: profitGlow 2s ease-in-out infinite; }
-.animate-loss-glow { animation: lossGlow 2s ease-in-out infinite; }
-.animate-check-pop { animation: checkPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
-
-.tp-expand-enter {
-  animation: slideDown 0.3s ease-out forwards;
-  overflow: hidden;
+@keyframes sparkle {
+  0%, 100% { opacity: 0; transform: scale(0); }
+  50% { opacity: 1; transform: scale(1); }
 }
 
-.shimmer-bg {
-  background-size: 200% auto;
-  animation: shimmer 3s linear infinite;
+@keyframes floatParticles {
+  0%, 100% { transform: translateY(0) translateX(0); opacity: 0; }
+  10% { opacity: 0.6; }
+  90% { opacity: 0.6; }
+  100% { transform: translateY(-100px) translateX(20px); opacity: 0; }
 }
 
-/* Active status pulse ring */
-.active-pulse-ring {
-  position: relative;
-}
-.active-pulse-ring::after {
-  content: '';
-  position: absolute;
-  inset: -3px;
-  border-radius: 9999px;
-  border: 1.5px solid rgba(16, 185, 129, 0.4);
-  animation: pulseRing 2s ease-out infinite;
+@keyframes gridLineMove {
+  0% { opacity: 0.03; }
+  50% { opacity: 0.08; }
+  100% { opacity: 0.03; }
 }
 
-/* ═══ VIP Premium Styles ═══ */
-
-/* Glass Panel */
-.glass-panel {
-  background: rgba(15, 23, 42, 0.65);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+@keyframes progressGrow {
+  0% { width: 0%; }
+  100% { width: 100%; }
 }
 
-.glass-nav {
-  background: rgba(7, 11, 20, 0.9);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-/* Gold Gradient Background */
-.gold-gradient {
-  background: linear-gradient(135deg, #FFD700 0%, #FF8F00 100%);
-}
-
-.vip-gradient {
-  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-}
-
-/* Legacy chart bars removed - replaced by candlestick splash */
-
-/* Input Glass Focus Effect */
-.input-glass {
-  background: rgba(7, 11, 20, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  transition: all 0.3s ease;
-}
-
-.input-glass:focus-within {
-  border-color: #00E676;
-  box-shadow: 0 0 15px rgba(0, 230, 118, 0.15);
-}
-
-/* Status views */
-.status-pending-icon {
-  animation: gentlePulse 2s ease-in-out infinite;
-}
-
-@keyframes gentlePulse {
-  0%, 100% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(1.05); opacity: 0.8; }
-}
-
-/* Splash screen fade-in */
+/* ───────────────────────────────────────────────────────────────
+   §8 — Splash Screen Keyframes
+   ─────────────────────────────────────────────────────────────── */
 @keyframes splashFadeIn {
   from { opacity: 0; transform: translateY(15px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-.splash-fade-in {
-  animation: splashFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+@keyframes splashLogoPulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 30px rgba(255, 215, 0, 0.2), 0 0 60px rgba(255, 215, 0, 0.05);
+  }
+  50% {
+    transform: scale(1.04);
+    box-shadow: 0 0 50px rgba(255, 215, 0, 0.35), 0 0 100px rgba(255, 215, 0, 0.1);
+  }
 }
 
-/* ═══ Professional Candlestick Splash Screen ═══ */
+@keyframes fadeSlideDown {
+  0% { opacity: 0; transform: translateY(-12px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
 
 @keyframes candleGrow {
   0% { transform: scaleY(0); opacity: 0; }
@@ -273,12 +438,12 @@ html, body {
 
 @keyframes candleGlow {
   0%, 100% { filter: drop-shadow(0 0 4px rgba(16, 185, 129, 0.2)); }
-  50% { filter: drop-shadow(0 0 12px rgba(16, 185, 129, 0.5)); }
+  50% { filter: drop-shadow(0 0 14px rgba(16, 185, 129, 0.5)); }
 }
 
 @keyframes candleGlowRed {
   0%, 100% { filter: drop-shadow(0 0 4px rgba(239, 68, 68, 0.2)); }
-  50% { filter: drop-shadow(0 0 12px rgba(239, 68, 68, 0.5)); }
+  50% { filter: drop-shadow(0 0 14px rgba(239, 68, 68, 0.5)); }
 }
 
 @keyframes progressShimmer {
@@ -286,67 +451,54 @@ html, body {
   100% { background-position: 200% center; }
 }
 
-@keyframes splashLogoPulse {
-  0%, 100% { transform: scale(1); box-shadow: 0 0 30px rgba(255, 215, 0, 0.2), 0 0 60px rgba(255, 215, 0, 0.05); }
-  50% { transform: scale(1.04); box-shadow: 0 0 40px rgba(255, 215, 0, 0.35), 0 0 80px rgba(255, 215, 0, 0.1); }
+/* ───────────────────────────────────────────────────────────────
+   §9 — Animation Utility Classes
+   ─────────────────────────────────────────────────────────────── */
+
+/* ── Core Transitions ── */
+.animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
+.animate-fade-in-up { animation: fadeInUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.animate-fade-in-down { animation: fadeInDown 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.animate-slide-in-right { animation: slideInRight 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.animate-scale-in { animation: scaleIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.animate-slide-up { animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.animate-slide-down-exp { animation: slideDown 0.3s ease-out forwards; overflow: hidden; }
+
+/* ── Pulse & Glow ── */
+.animate-pulse-glow { animation: pulseGlow 2.5s ease-in-out infinite; }
+.animate-profit-glow { animation: profitGlow 2s ease-in-out infinite; }
+.animate-loss-glow { animation: lossGlow 2s ease-in-out infinite; }
+.animate-online-pulse { animation: onlinePulse 2s ease-in-out infinite; }
+.animate-gentle-pulse { animation: gentlePulse 2s ease-in-out infinite; }
+.animate-status-pulse { animation: statusPulse 0.6s ease-out; }
+.animate-new-signal-glow { animation: newSignalGlow 1s ease-out; }
+
+/* ── Checkmark & TP/SL ── */
+.animate-check-pop { animation: checkPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+.animate-tp-hit-pulse { animation: tpHitPulse 0.6s ease-out; }
+.animate-sl-hit-pulse { animation: slHitPulse 0.6s ease-out; }
+
+/* ── Shimmer & Loading ── */
+.shimmer-bg {
+  background-size: 200% auto;
+  animation: shimmer 3s linear infinite;
 }
 
-@keyframes fadeSlideDown {
-  0% { opacity: 0; transform: translateY(-12px); }
-  100% { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes sparkle {
-  0%, 100% { opacity: 0; transform: scale(0); }
-  50% { opacity: 1; transform: scale(1); }
-}
-
-@keyframes gridLineMove {
-  0% { opacity: 0.03; }
-  50% { opacity: 0.08; }
-  100% { opacity: 0.03; }
-}
-
-@keyframes progressGrow {
-  0% { width: 0%; }
-  100% { width: 100%; }
-}
-
-@keyframes floatParticles {
-  0%, 100% { transform: translateY(0) translateX(0); opacity: 0; }
-  10% { opacity: 0.6; }
-  90% { opacity: 0.6; }
-  100% { transform: translateY(-100px) translateX(20px); opacity: 0; }
-}
+/* ── Splash Screen ── */
+.splash-fade-in { animation: splashFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.splash-text-anim { animation: fadeSlideDown 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; opacity: 0; }
+.splash-tip-fade { animation: tipFade 2s ease-in-out; }
 
 .splash-candle {
   animation: candleGrow 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
   transform-origin: bottom;
   opacity: 0;
 }
-
-.splash-candle-green {
-  animation: candleGlow 2.5s ease-in-out infinite;
-}
-
-.splash-candle-red {
-  animation: candleGlowRed 2.5s ease-in-out infinite;
-}
-
-.splash-wick {
-  animation: wickGrow 0.5s ease-out forwards;
-  height: 0;
-  opacity: 0;
-}
-
-.splash-logo {
-  animation: splashLogoPulse 3s ease-in-out infinite;
-}
-
-.splash-text-anim {
-  animation: fadeSlideDown 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  opacity: 0;
-}
+.splash-candle-green { animation: candleGlow 2.5s ease-in-out infinite; }
+.splash-candle-red { animation: candleGlowRed 2.5s ease-in-out infinite; }
+.splash-wick { animation: wickGrow 0.5s ease-out forwards; height: 0; opacity: 0; }
+.splash-logo { animation: splashLogoPulse 3s ease-in-out infinite; }
+.splash-sparkle { animation: sparkle 2s ease-in-out infinite; }
 
 .splash-progress-bar {
   background: linear-gradient(90deg, #FFD700, #FF8F00, #FFD700);
@@ -354,87 +506,527 @@ html, body {
   animation: progressShimmer 1.5s linear infinite, progressGrow 3s ease-out forwards;
 }
 
-.splash-sparkle {
-  animation: sparkle 2s ease-in-out infinite;
+/* ── Active Status Pulse Ring ── */
+.active-pulse-ring {
+  position: relative;
+}
+.active-pulse-ring::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 9999px;
+  border: 1.5px solid rgba(16, 185, 129, 0.4);
+  animation: pulseRing 2s ease-out infinite;
 }
 
-/* Nav active effect */
+/* ───────────────────────────────────────────────────────────────
+   §10 — Glass Effect System (3 Levels)
+   ─────────────────────────────────────────────────────────────── */
+
+/* Level 1: Main card glass — subtle frosted panel */
+.glass-card {
+  background: rgba(10, 17, 40, 0.55);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.4),
+    0 1px 2px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  border-radius: 0.75rem;
+}
+
+/* Level 2: Input glass — fields with focus glow */
+.glass-input {
+  background: rgba(5, 10, 21, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 0.5rem;
+}
+.glass-input:focus-within {
+  border-color: rgba(255, 215, 0, 0.5);
+  box-shadow: 0 0 0 3px rgba(255, 215, 0, 0.08), 0 0 20px rgba(255, 215, 0, 0.06);
+}
+.glass-input:focus {
+  border-color: rgba(255, 215, 0, 0.5);
+  box-shadow: 0 0 0 3px rgba(255, 215, 0, 0.08), 0 0 20px rgba(255, 215, 0, 0.06);
+  outline: none;
+}
+
+/* Legacy alias — keep for backwards compatibility */
+.input-glass {
+  background: rgba(5, 10, 21, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.25s ease;
+}
+.input-glass:focus-within {
+  border-color: #FFD700;
+  box-shadow: 0 0 16px rgba(255, 215, 0, 0.12);
+}
+
+/* Level 3: Navigation glass — top/bottom bars */
+.glass-nav {
+  background: rgba(5, 10, 21, 0.92);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border-color: rgba(255, 255, 255, 0.05);
+  box-shadow: 0 -1px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* Extended: Heavier glass for modals / overlays */
+.glass-overlay {
+  background: rgba(5, 10, 21, 0.75);
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+}
+
+/* Extended: Light glass for subtle containers */
+.glass-subtle {
+  background: rgba(15, 23, 42, 0.35);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* ───────────────────────────────────────────────────────────────
+   §11 — Card System
+   ─────────────────────────────────────────────────────────────── */
+
+/* Standard glass card */
+.card-glass {
+  background: rgba(10, 17, 40, 0.5);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 0.75rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Premium card — gold gradient border for VIP elements */
+.card-premium {
+  position: relative;
+  background: rgba(10, 17, 40, 0.6);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 0.75rem;
+  overflow: hidden;
+}
+.card-premium::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: linear-gradient(135deg, #FFD700 0%, #FF8F00 50%, #FFD700 100%);
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* Success card — green-tinted for winning trades */
+.card-success {
+  background: rgba(16, 185, 129, 0.06);
+  border: 1px solid rgba(16, 185, 129, 0.15);
+  border-radius: 0.75rem;
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.06);
+}
+
+/* Danger card — red-tinted for losing trades */
+.card-danger {
+  background: rgba(239, 68, 68, 0.06);
+  border: 1px solid rgba(239, 68, 68, 0.15);
+  border-radius: 0.75rem;
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.06);
+}
+
+/* VIP gradient background */
+.vip-gradient {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+}
+
+/* ───────────────────────────────────────────────────────────────
+   §12 — Gold Gradient System
+   ─────────────────────────────────────────────────────────────── */
+
+/* Gold gradient background — buttons, accents, badges */
+.gold-gradient {
+  background: linear-gradient(135deg, #FFD700 0%, #FF8F00 100%);
+  color: #050a15;
+  font-weight: 600;
+}
+
+/* Gold gradient text */
+.gold-gradient-text {
+  background: linear-gradient(135deg, #FFD700 0%, #FF8F00 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Alias */
+.text-gradient-gold {
+  background: linear-gradient(135deg, #FFD700 0%, #FF8F00 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Gold gradient border (pseudo-element technique) */
+.border-gradient-gold {
+  position: relative;
+  border: none;
+  border-radius: 0.5rem;
+}
+.border-gradient-gold::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: linear-gradient(135deg, #FFD700 0%, #FF8F00 100%);
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* Gold subtle border — for non-premium elements */
+.border-gold-subtle {
+  border: 1px solid rgba(255, 215, 0, 0.15);
+}
+
+/* ───────────────────────────────────────────────────────────────
+   §13 — Status Badge System
+   ─────────────────────────────────────────────────────────────── */
+
+/* BUY badge — green */
+.badge-buy {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #34d399;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  border-radius: 0.375rem;
+  text-transform: uppercase;
+}
+
+/* SELL badge — red */
+.badge-sell {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: 0.375rem;
+  text-transform: uppercase;
+}
+
+/* Active badge — pulsing green */
+.badge-active {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: #34d399;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 9999px;
+}
+.badge-active::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #10b981;
+  animation: onlinePulse 1.5s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+/* Pending badge — amber */
+.badge-pending {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.1);
+  border: 1px solid rgba(251, 191, 36, 0.2);
+  border-radius: 9999px;
+}
+
+/* Blocked badge — red */
+.badge-blocked {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 9999px;
+}
+
+/* VIP badge — purple */
+.badge-vip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #c084fc;
+  background: rgba(168, 85, 247, 0.12);
+  border: 1px solid rgba(168, 85, 247, 0.25);
+  border-radius: 0.375rem;
+  text-transform: uppercase;
+}
+
+/* Info badge — cyan */
+.badge-info {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #22d3ee;
+  background: rgba(6, 182, 212, 0.1);
+  border: 1px solid rgba(6, 182, 212, 0.2);
+  border-radius: 9999px;
+}
+
+/* ───────────────────────────────────────────────────────────────
+   §14 — Interactive Utility Classes
+   ─────────────────────────────────────────────────────────────── */
+
+/* Subtle lift on hover */
+.hover-lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+}
+
+/* Scale down on press (active) */
+.press-scale {
+  transition: transform 0.15s ease;
+  cursor: pointer;
+}
+.press-scale:active {
+  transform: scale(0.97);
+}
+
+/* Gold hover glow */
+.hover-glow-gold {
+  transition: box-shadow 0.3s ease;
+}
+.hover-glow-gold:hover {
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.15), 0 0 40px rgba(255, 215, 0, 0.05);
+}
+
+/* Premium persistent glow */
+.premium-glow {
+  box-shadow: 0 0 40px rgba(255, 215, 0, 0.12), 0 0 80px rgba(255, 215, 0, 0.04);
+}
+
+/* Status pending icon animation */
+.status-pending-icon {
+  animation: gentlePulse 2s ease-in-out infinite;
+}
+
+/* ───────────────────────────────────────────────────────────────
+   §15 — Navigation Styles
+   ─────────────────────────────────────────────────────────────── */
+
+/* Active nav item — gold highlight */
 .nav-active-vip {
   color: #FFD700;
-  text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+  text-shadow: 0 0 12px rgba(255, 215, 0, 0.5);
   transform: translateY(-4px);
+  transition: all 0.25s ease;
 }
 
-/* Premium glow */
-.premium-glow {
-  box-shadow: 0 0 40px rgba(255, 215, 0, 0.15);
+/* Nav item base state */
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.65rem;
+  color: #64748b;
+  transition: color 0.2s ease, transform 0.2s ease;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.nav-item:hover {
+  color: #94a3b8;
 }
 
+/* ───────────────────────────────────────────────────────────────
+   §16 — Typography Utilities
+   ─────────────────────────────────────────────────────────────── */
 
-
-/* ═══ New Animation Keyframes ═══ */
-
-/* Slide in from right (RTL) */
-@keyframes slideInRight {
-  from { opacity: 0; transform: translateX(60px); }
-  to { opacity: 1; transform: translateX(0); }
-}
-.animate-slide-in-right { animation: slideInRight 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-
-/* Status change pulse */
-@keyframes statusPulse {
-  0% { transform: scale(1); }
-  30% { transform: scale(1.03); }
-  100% { transform: scale(1); }
-}
-.animate-status-pulse { animation: statusPulse 0.6s ease-out; }
-
-/* New signal glow */
-@keyframes newSignalGlow {
-  0% { box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.4); }
-  70% { box-shadow: 0 0 0 10px rgba(255, 215, 0, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(255, 215, 0, 0); }
-}
-.animate-new-signal-glow { animation: newSignalGlow 1s ease-out; }
-
-/* Confetti falling */
-@keyframes confettiFall {
-  0% { transform: translateY(-100vh) rotate(0deg); opacity: 1; }
-  100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+/* Micro text — for labels, timestamps */
+.text-micro {
+  font-size: 0.625rem;
+  line-height: 1rem;
+  letter-spacing: 0.02em;
 }
 
-/* Pull to refresh indicator */
-@keyframes pullSpin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+/* Caption — secondary info */
+.text-caption {
+  font-size: 0.75rem;
+  line-height: 1.25rem;
+  color: #94a3b8;
 }
 
-/* Splash tip fade */
-@keyframes tipFade {
-  0%, 100% { opacity: 0; transform: translateY(8px); }
-  10%, 90% { opacity: 1; transform: translateY(0); }
+/* Tabular numbers — for data alignment */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
 }
-.animate-tip-fade { animation: tipFade 2s ease-in-out; }
 
-/* TP hit pulse (emerald) */
-@keyframes tpHitPulse {
-  0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
-  50% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+/* Monospace for prices / data */
+.font-data {
+  font-family: 'Geist Mono', 'SF Mono', 'Fira Code', monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
 }
-.animate-tp-hit-pulse { animation: tpHitPulse 0.6s ease-out; }
 
-/* SL hit pulse (red) */
-@keyframes slHitPulse {
-  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5); }
-  50% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
-}
-.animate-sl-hit-pulse { animation: slHitPulse 0.6s ease-out; }
+/* ───────────────────────────────────────────────────────────────
+   §17 — Divider & Separator Utilities
+   ─────────────────────────────────────────────────────────────── */
 
-/* Online status pulse */
-@keyframes onlinePulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
+/* Subtle horizontal divider */
+.divider-subtle {
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    transparent 0%,
+    rgba(255, 255, 255, 0.08) 20%,
+    rgba(255, 255, 255, 0.08) 80%,
+    transparent 100%
+  );
 }
-.animate-online-pulse { animation: onlinePulse 2s ease-in-out infinite; }
+
+/* Gold divider */
+.divider-gold {
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    transparent 0%,
+    rgba(255, 215, 0, 0.3) 50%,
+    transparent 100%
+  );
+}
+
+/* ───────────────────────────────────────────────────────────────
+   §18 — Background Patterns & Decorations
+   ─────────────────────────────────────────────────────────────── */
+
+/* Dot grid pattern overlay */
+.bg-dots {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* Subtle radial gradient — for hero sections */
+.bg-radial-gold {
+  background: radial-gradient(
+    ellipse 50% 50% at 50% 0%,
+    rgba(255, 215, 0, 0.06) 0%,
+    transparent 70%
+  );
+}
+
+.bg-radial-navy {
+  background: radial-gradient(
+    ellipse 80% 50% at 50% 100%,
+    rgba(15, 23, 42, 0.8) 0%,
+    transparent 70%
+  );
+}
+
+/* ───────────────────────────────────────────────────────────────
+   §19 — Staggered Animation Delays
+   ─────────────────────────────────────────────────────────────── */
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.1s; }
+.stagger-3 { animation-delay: 0.15s; }
+.stagger-4 { animation-delay: 0.2s; }
+.stagger-5 { animation-delay: 0.25s; }
+.stagger-6 { animation-delay: 0.3s; }
+.stagger-7 { animation-delay: 0.35s; }
+.stagger-8 { animation-delay: 0.4s; }
+
+/* ───────────────────────────────────────────────────────────────
+   §20 — RTL-Specific Adjustments
+   ─────────────────────────────────────────────────────────────── */
+[dir="rtl"] .animate-slide-in-right {
+  animation-name: fadeInUp;
+}
+
+[dir="rtl"] .badge-buy,
+[dir="rtl"] .badge-sell,
+[dir="rtl"] .badge-active,
+[dir="rtl"] .badge-pending,
+[dir="rtl"] .badge-blocked,
+[dir="rtl"] .badge-vip,
+[dir="rtl"] .badge-info {
+  direction: rtl;
+}
+
+[dir="rtl"] .gold-gradient,
+[dir="rtl"] .glass-card,
+[dir="rtl"] .glass-input,
+[dir="rtl"] .glass-nav {
+  direction: rtl;
+}
+
+/* ───────────────────────────────────────────────────────────────
+   §21 — Reduced Motion Preferences
+   ─────────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
