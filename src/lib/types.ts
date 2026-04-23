@@ -37,7 +37,17 @@ export interface AppSettingsData {
   autoApproveOnRegister: boolean;
   usdtWalletAddress: string | null;
   usdtNetwork: string | null;
-  localCurrencyName: string | null;
-  localCurrencyCode: string | null;
-  usdtToLocalRate: number | null;
+}
+
+export interface LocalPaymentMethodData {
+  id: string;
+  name: string;
+  walletAddress: string;
+  walletName: string;
+  currencyName: string;
+  currencyCode: string;
+  exchangeRate: number;
+  isActive: boolean;
+  order: number;
+  createdAt: string;
 }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPaymentRequests, getPaymentRequestsByUser, getPendingPaymentRequests, addPaymentRequest, updatePaymentRequest } from "@/lib/store";
-import { getPackageById, getUserById, updateUser, getAppSettings } from "@/lib/store";
+import { getPackageById, getUserById, updateUser } from "@/lib/store";
 
 /**
  * GET /api/payments?userId=xxx&pending=true
@@ -34,11 +34,17 @@ export async function GET(request: NextRequest) {
  * POST /api/payments
  * - Create a new payment request (subscription purchase)
  *
- * Body: { userId, packageId, paymentMethod, txId?, localAmount? }
+ * Body: { userId, packageId, paymentMethod, txId?, paymentMethodId?, localAmount?, localCurrencyCode? }
  */
 export async function POST(request: NextRequest) {
   try {
-    const { userId, packageId, paymentMethod, txId, localAmount } = await request.json();
+    const body = await request.json();
+    const { userId, packageId, paymentMethod, txId, txid, paymentMethodId, localAmount, localCurrencyCode, proofUrl, paymentProofUrl } = body;
+
+    // Normalize txId (support both txId and txid from frontend)
+    const normalizedTxId = txId || txid;
+    // Normalize proofUrl (support both proofUrl and paymentProofUrl from frontend)
+    const normalizedProofUrl = proofUrl || paymentProofUrl;
 
     if (!userId || !packageId || !paymentMethod) {
       return NextResponse.json({ success: false, error: "جميع الحقول مطلوبة" }, { status: 400 });
@@ -61,13 +67,16 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate method-specific fields
-    if (paymentMethod === "usdt" && !txId) {
+    if (paymentMethod === "usdt" && !normalizedTxId) {
       return NextResponse.json({ success: false, error: "معرف المعاملة (TXID) مطلوب للدفع عبر USDT" }, { status: 400 });
     }
 
     if (paymentMethod === "local") {
       if (!localAmount || localAmount <= 0) {
         return NextResponse.json({ success: false, error: "المبلغ مطلوب للدفع بالعملة المحلية" }, { status: 400 });
+      }
+      if (!normalizedProofUrl) {
+        return NextResponse.json({ success: false, error: "صورة إثبات التحويل مطلوبة" }, { status: 400 });
       }
     }
 
@@ -89,9 +98,13 @@ export async function POST(request: NextRequest) {
       packageName: pkg.name,
       packagePrice: pkg.price,
       paymentMethod,
+      paymentMethodId: paymentMethodId || undefined,
+      paymentMethodName: body.paymentMethodName || undefined,
       status: paymentMethod === "usdt" ? "approved" : "pending",
-      txId: txId || undefined,
+      txId: normalizedTxId || undefined,
       localAmount: localAmount || undefined,
+      localCurrencyCode: localCurrencyCode || undefined,
+      paymentProofUrl: normalizedProofUrl || undefined,
       createdAt: new Date().toISOString(),
     });
 
@@ -132,7 +145,7 @@ export async function POST(request: NextRequest) {
  * PUT /api/payments
  * - Admin: approve/reject a payment request
  *
- * Body: { requestId, action: "approve" | "reject", rejectReason? }
+ * Body: { requestId, action: "approve" | "reject", rejectReason?, adminId }
  */
 export async function PUT(request: NextRequest) {
   try {
@@ -146,8 +159,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ success: false, error: "إجراء غير صالح" }, { status: 400 });
     }
 
-    const { updatePaymentRequest: updateReq, getPaymentRequests: getReqs } = await import("@/lib/store");
-    const allReqs = await getReqs();
+    const allReqs = await getPaymentRequests();
     const req = allReqs.find(r => r.id === requestId);
 
     if (!req) {
@@ -168,7 +180,7 @@ export async function PUT(request: NextRequest) {
       updates.rejectReason = rejectReason || "تم رفض الطلب";
     }
 
-    const updated = await updateReq(requestId, updates);
+    const updated = await updatePaymentRequest(requestId, updates);
 
     // If approved: activate subscription
     if (action === "approve" && updated) {

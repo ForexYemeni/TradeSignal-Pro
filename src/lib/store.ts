@@ -549,6 +549,54 @@ export async function enforceSubscriptions(): Promise<string[]> {
   return expiredIds;
 }
 
+// ─── Local Payment Methods ──────────────────────────────
+export interface LocalPaymentMethod {
+  id: string;
+  name: string;                   // اسم المحفظة - e.g., "محفظة YmntPay"
+  walletAddress: string;          // رقم المحفظة - the actual wallet number/address
+  walletName: string;             // اسم مزود المحفظة - e.g., "YmntPay", "Chime", "MTN"
+  currencyName: string;           // اسم العملة المحلية - e.g., "ريال يمني"
+  currencyCode: string;           // رمز العملة - e.g., "YER"
+  exchangeRate: number;           // 1 USDT = X local currency
+  isActive: boolean;
+  order: number;
+  createdAt: string;
+}
+
+export async function getLocalPaymentMethods(): Promise<LocalPaymentMethod[]> {
+  const data = await kv.get<LocalPaymentMethod[]>('local_payment_methods');
+  return (data || []).sort((a, b) => a.order - b.order);
+}
+
+export async function getActiveLocalPaymentMethods(): Promise<LocalPaymentMethod[]> {
+  const methods = await getLocalPaymentMethods();
+  return methods.filter(m => m.isActive);
+}
+
+export async function addLocalPaymentMethod(method: LocalPaymentMethod): Promise<LocalPaymentMethod> {
+  const methods = await getLocalPaymentMethods();
+  methods.push(method);
+  await kv.set('local_payment_methods', methods);
+  return method;
+}
+
+export async function updateLocalPaymentMethod(id: string, updates: Partial<LocalPaymentMethod>): Promise<LocalPaymentMethod | null> {
+  const methods = await getLocalPaymentMethods();
+  const idx = methods.findIndex(m => m.id === id);
+  if (idx === -1) return null;
+  methods[idx] = { ...methods[idx], ...updates };
+  await kv.set('local_payment_methods', methods);
+  return methods[idx];
+}
+
+export async function deleteLocalPaymentMethod(id: string): Promise<boolean> {
+  const methods = await getLocalPaymentMethods();
+  const filtered = methods.filter(m => m.id !== id);
+  if (filtered.length === methods.length) return false;
+  await kv.set('local_payment_methods', filtered);
+  return true;
+}
+
 // ─── Payment Requests (Subscription Purchases) ─────────
 export interface PaymentRequest {
   id: string;
@@ -559,11 +607,14 @@ export interface PaymentRequest {
   packageName: string;
   packagePrice: number;           // Price in USDT
   paymentMethod: "usdt" | "local";
+  paymentMethodId?: string;       // ID of LocalPaymentMethod (for local payments)
+  paymentMethodName?: string;     // Name of the payment method (display)
   status: "pending" | "approved" | "rejected" | "expired";
   // USDT fields
   txId?: string;                  // Transaction ID
   // Local currency fields
   localAmount?: number;           // Amount in local currency
+  localCurrencyCode?: string;     // e.g., "YER"
   paymentProofUrl?: string;       // Uploaded image URL
   // Metadata
   createdAt: string;

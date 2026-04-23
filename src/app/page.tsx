@@ -19,11 +19,11 @@ import {
   BarChart3, User, Volume2, VolumeX, Bell,
   Crown, Package, Users, CalendarDays, Settings,
   Home, Flame, Trophy, ArrowUpRight, ArrowDownRight, Hash, Globe, PieChart, Sparkles, Timer, Wallet,
-  MoreHorizontal, CreditCard, Upload, CheckCircle2, XCircle, Image,
+  MoreHorizontal, CreditCard, Upload, CheckCircle2, XCircle, Image, Copy, Plus, Banknote,
 } from "lucide-react";
 
 // ═══ EXTRACTED MODULES ═══
-import type { Signal, AdminSession, Stats, View, Tab, Filter, SubPackage, AppSettingsData } from "@/lib/types";
+import type { Signal, AdminSession, Stats, View, Tab, Filter, SubPackage, AppSettingsData, LocalPaymentMethodData } from "@/lib/types";
 import { timeAgo, isEntry, entryAccent, isTpLike, isSlLike, nativeNotify, playSound, registerPushNotification, unregisterPushNotification, formatCountdown, warmAudio, ensureNotificationPermission, showBrowserNotification, notifySignal, shareSessionToken } from "@/lib/utils";
 import { Stars, Div, Glass, SkeletonCard, SignalsLoadingSkeleton, StatsLoadingSkeleton, EmptyState, Confetti, useOnlineStatus, usePullToRefresh } from "@/components/shared";
 import { TpMiniCard, TradeStatusBanner, EntryCard, ClosedSignalCard, SplashScreen } from "@/components/SignalCards";
@@ -234,7 +234,7 @@ export default function HomePage() {
 
   /* ── Packages & Settings ── */
   const [packages, setPackages] = useState<SubPackage[]>([]);
-  const [appSettings, setAppSettings] = useState<AppSettingsData>({ freeTrialPackageId: null, autoApproveOnRegister: true, usdtWalletAddress: null, usdtNetwork: null, localCurrencyName: null, localCurrencyCode: null, usdtToLocalRate: null });
+  const [appSettings, setAppSettings] = useState<AppSettingsData>({ freeTrialPackageId: null, autoApproveOnRegister: true, usdtWalletAddress: null, usdtNetwork: null });
   const [showPkgForm, setShowPkgForm] = useState(false);
   const [editingPkgId, setEditingPkgId] = useState<string | null>(null);
   const [pkgFormName, setPkgFormName] = useState("");
@@ -256,6 +256,8 @@ export default function HomePage() {
   /* ── Payment & Subscription ── */
   const [selectedPkg, setSelectedPkg] = useState<SubPackage | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<"usdt" | "local" | null>(null);
+  const [selectedLocalMethod, setSelectedLocalMethod] = useState<LocalPaymentMethodData | null>(null);
+  const [userPaymentMethods, setUserPaymentMethods] = useState<LocalPaymentMethodData[]>([]);
   const [usdtTxid, setUsdtTxid] = useState("");
   const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
   const [paymentProofPreview, setPaymentProofPreview] = useState<string | null>(null);
@@ -264,7 +266,17 @@ export default function HomePage() {
   const [paymentRequests, setPaymentRequests] = useState<{ id: string; userId: string; userName: string; userEmail: string; packageId: string; packageName: string; amount: number; paymentMethod: string; txid?: string; proofUrl?: string; status: string; createdAt: string }[]>([]);
   const [payReqLoad, setPayReqLoad] = useState(false);
   const [showPaymentSettings, setShowPaymentSettings] = useState(false);
-  const [paySettingsForm, setPaySettingsForm] = useState({ usdtWalletAddress: "", usdtNetwork: "TRC20", localCurrencyName: "", localCurrencyCode: "", usdtToLocalRate: "" });
+  const [paySettingsForm, setPaySettingsForm] = useState({ usdtWalletAddress: "", usdtNetwork: "TRC20" });
+  const [localPaymentMethods, setLocalPaymentMethods] = useState<LocalPaymentMethodData[]>([]);
+  const [showMethodForm, setShowMethodForm] = useState(false);
+  const [editingMethodId, setEditingMethodId] = useState<string | null>(null);
+  const [methodFormName, setMethodFormName] = useState("");
+  const [methodFormWallet, setMethodFormWallet] = useState("");
+  const [methodFormWalletName, setMethodFormWalletName] = useState("");
+  const [methodFormCurrencyName, setMethodFormCurrencyName] = useState("");
+  const [methodFormCurrencyCode, setMethodFormCurrencyCode] = useState("");
+  const [methodFormRate, setMethodFormRate] = useState("");
+  const [methodLoad, setMethodLoad] = useState(false);
 
   /* ── Session Init: restore from localStorage ── */
   const [dbReady, setDbReady] = useState(false);
@@ -597,7 +609,8 @@ export default function HomePage() {
     }
     if (view === "main" && tab === "packages") {
       fetchPackages();
-      if (isAdmin) fetchPaymentRequests();
+      if (isAdmin) { fetchPaymentRequests(); fetchLocalPaymentMethods(); }
+      if (!isAdmin) fetchUserPaymentMethods();
     }
   }, [tab, view]);
 
@@ -1045,19 +1058,97 @@ export default function HomePage() {
     const payload: Record<string, string | number | null> = {};
     if (paySettingsForm.usdtWalletAddress) payload.usdtWalletAddress = paySettingsForm.usdtWalletAddress;
     if (paySettingsForm.usdtNetwork) payload.usdtNetwork = paySettingsForm.usdtNetwork;
-    if (paySettingsForm.localCurrencyName) payload.localCurrencyName = paySettingsForm.localCurrencyName;
-    if (paySettingsForm.localCurrencyCode) payload.localCurrencyCode = paySettingsForm.localCurrencyCode;
-    if (paySettingsForm.usdtToLocalRate) payload.usdtToLocalRate = Number(paySettingsForm.usdtToLocalRate) || null;
     try {
       const res = await fetch("/api/settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const data = await res.json();
       if (data.success) {
         setAppSettings(data.settings);
-        toast.success("تم حفظ إعدادات الدفع");
+        toast.success("تم حفظ إعدادات USDT");
       } else {
         toast.error(data.error || "فشل حفظ الإعدادات");
       }
     } catch (e) { console.error("Save payment settings:", e); toast.error("خطأ في الاتصال"); }
+  }
+
+  /* ── Local Payment Methods Handlers ── */
+  async function fetchLocalPaymentMethods() {
+    try {
+      const res = await fetch("/api/payment-methods");
+      const data = await res.json();
+      if (data.success) setLocalPaymentMethods(data.methods || []);
+    } catch (e) { console.error("Fetch local payment methods:", e); }
+  }
+
+  async function fetchUserPaymentMethods() {
+    try {
+      const res = await fetch("/api/payment-methods?active=true");
+      const data = await res.json();
+      if (data.success) setUserPaymentMethods(data.methods || []);
+    } catch (e) { console.error("Fetch user payment methods:", e); }
+  }
+
+  function resetMethodForm() {
+    setMethodFormName(""); setMethodFormWallet(""); setMethodFormWalletName("");
+    setMethodFormCurrencyName(""); setMethodFormCurrencyCode(""); setMethodFormRate("");
+    setEditingMethodId(null); setShowMethodForm(false);
+  }
+
+  async function handleSaveMethod() {
+    if (!methodFormName.trim() || !methodFormWallet.trim() || !methodFormWalletName.trim() || !methodFormCurrencyName.trim() || !methodFormCurrencyCode.trim() || !methodFormRate) {
+      toast.error("جميع الحقول مطلوبة");
+      return;
+    }
+    setMethodLoad(true);
+    try {
+      const body = {
+        name: methodFormName.trim(),
+        walletAddress: methodFormWallet.trim(),
+        walletName: methodFormWalletName.trim(),
+        currencyName: methodFormCurrencyName.trim(),
+        currencyCode: methodFormCurrencyCode.trim(),
+        exchangeRate: Number(methodFormRate),
+      };
+      if (editingMethodId) {
+        const res = await fetch("/api/payment-methods", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editingMethodId, ...body }) });
+        const data = await res.json();
+        if (data.success) { resetMethodForm(); fetchLocalPaymentMethods(); toast.success("تم تحديث طريقة الدفع"); }
+        else { toast.error(data.error || "فشل التحديث"); }
+      } else {
+        const res = await fetch("/api/payment-methods", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        const data = await res.json();
+        if (data.success) { resetMethodForm(); fetchLocalPaymentMethods(); toast.success("تم إضافة طريقة الدفع"); }
+        else { toast.error(data.error || "فشل الإضافة"); }
+      }
+    } catch (e) { console.error("Save method:", e); toast.error("خطأ في الاتصال"); }
+    finally { setMethodLoad(false); }
+  }
+
+  async function handleDeleteMethod(id: string) {
+    const method = localPaymentMethods.find(m => m.id === id);
+    askConfirm({
+      title: "حذف طريقة الدفع",
+      description: `هل تريد حذف طريقة الدفع "${method?.name}"؟`,
+      variant: "danger",
+      confirmLabel: "نعم، حذف",
+      icon: <Trash2 className="w-5 h-5 text-red-400" />,
+      action: async () => {
+        try {
+          const res = await fetch(`/api/payment-methods?id=${id}`, { method: "DELETE" });
+          const data = await res.json();
+          if (data.success) { fetchLocalPaymentMethods(); toast.success("تم حذف طريقة الدفع"); }
+          else { toast.error(data.error || "فشل الحذف"); }
+        } catch (e) { console.error("Delete method:", e); toast.error("خطأ في الاتصال"); }
+      },
+    });
+  }
+
+  async function handleToggleMethod(id: string, active: boolean) {
+    try {
+      const res = await fetch("/api/payment-methods", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, isActive: active }) });
+      const data = await res.json();
+      if (data.success) { fetchLocalPaymentMethods(); toast.success(active ? "تم تفعيل طريقة الدفع" : "تم تعطيل طريقة الدفع"); }
+      else { toast.error(data.error || "فشل التحديث"); }
+    } catch (e) { console.error("Toggle method:", e); toast.error("خطأ في الاتصال"); }
   }
 
   /* ── Payment Request Handlers ── */
@@ -1083,9 +1174,9 @@ export default function HomePage() {
       icon: action === "approve" ? <CheckCircle2 className="w-5 h-5 text-emerald-400" /> : <XCircle className="w-5 h-5 text-red-400" />,
       action: async () => {
         try {
-          const res = await fetch("/api/payments", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, action }) });
+          const res = await fetch("/api/payments", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ requestId: id, action, adminId: session?.id }) });
           const data = await res.json();
-          if (data.success) { fetchPaymentRequests(); toast.success(action === "approve" ? "تم قبول طلب الدفع وتفعيل الاشتراك" : "تم رفض طلب الدفع"); }
+          if (data.success) { fetchPaymentRequests(); fetchUsers(); toast.success(action === "approve" ? "تم قبول طلب الدفع وتفعيل الاشتراك" : "تم رفض طلب الدفع"); }
           else { toast.error(data.error || "فشل تحديث الطلب"); }
         } catch (e) { console.error("Payment action:", e); toast.error("خطأ في الاتصال"); }
       },
@@ -1100,7 +1191,7 @@ export default function HomePage() {
       const res = await fetch("/api/payments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: session.id, packageId: selectedPkg.id, amount: selectedPkg.price, paymentMethod: "usdt", txid: usdtTxid.trim() }),
+        body: JSON.stringify({ userId: session.id, packageId: selectedPkg.id, packagePrice: selectedPkg.price, paymentMethod: "usdt", txId: usdtTxid.trim() }),
       });
       const data = await res.json();
       if (data.success) {
@@ -1115,7 +1206,7 @@ export default function HomePage() {
   }
 
   async function handleLocalPayment() {
-    if (!selectedPkg || !paymentProofFile || !session) return;
+    if (!selectedPkg || !paymentProofFile || !session || !selectedLocalMethod) return;
     setPaymentLoad(true);
     try {
       // Upload proof image first
@@ -1128,16 +1219,25 @@ export default function HomePage() {
       const uploadRes = await fetch("/api/upload", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ file: fileDataUrl, fileName: paymentProofFile.name }),
+        body: JSON.stringify({ image: fileDataUrl }),
       });
       const uploadData = await uploadRes.json();
       if (!uploadData.success || !uploadData.url) { toast.error("فشل رفع صورة الإثبات"); setPaymentLoad(false); return; }
 
+      const localAmount = selectedPkg.price * selectedLocalMethod.exchangeRate;
       // Submit payment request
       const res = await fetch("/api/payments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: session.id, packageId: selectedPkg.id, amount: selectedPkg.price, paymentMethod: "local", proofUrl: uploadData.url }),
+        body: JSON.stringify({
+          userId: session.id, packageId: selectedPkg.id, packagePrice: selectedPkg.price,
+          paymentMethod: "local",
+          paymentMethodId: selectedLocalMethod.id,
+          paymentMethodName: selectedLocalMethod.name,
+          localAmount,
+          localCurrencyCode: selectedLocalMethod.currencyCode,
+          proofUrl: uploadData.url,
+        }),
       });
       const data = await res.json();
       if (data.success) {
@@ -1151,8 +1251,8 @@ export default function HomePage() {
   }
 
   function resetPaymentState() {
-    setSelectedPkg(null); setPaymentMethod(null); setUsdtTxid("");
-    setPaymentProofFile(null); setPaymentProofPreview(null);
+    setSelectedPkg(null); setPaymentMethod(null); setSelectedLocalMethod(null);
+    setUsdtTxid(""); setPaymentProofFile(null); setPaymentProofPreview(null);
     setPaymentLoad(false); setPaymentResult(null);
   }
 
@@ -3092,10 +3192,10 @@ export default function HomePage() {
         {/* ══════ TAB: PACKAGES (Admin) ══════ */}
         {tab === "packages" && isAdmin && (
           <motion.div key="packages" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }} className="space-y-4">
-            {/* ── Payment Settings (Collapsible) ── */}
+            {/* ── USDT Settings (Collapsible) ── */}
             <div className="rounded-2xl border border-amber-500/15 overflow-hidden" style={{ background: "linear-gradient(135deg, rgba(255,215,0,0.06) 0%, rgba(255,140,0,0.02) 100%)" }}>
-              <button onClick={() => { setShowPaymentSettings(!showPaymentSettings); if (!showPaymentSettings) { setPaySettingsForm({ usdtWalletAddress: appSettings.usdtWalletAddress || "", usdtNetwork: appSettings.usdtNetwork || "TRC20", localCurrencyName: appSettings.localCurrencyName || "", localCurrencyCode: appSettings.localCurrencyCode || "", usdtToLocalRate: appSettings.usdtToLocalRate ? String(appSettings.usdtToLocalRate) : "" }); } }} className="w-full p-4 flex items-center justify-between text-sm text-foreground/80 hover:bg-muted/30 transition-colors">
-                <span className="flex items-center gap-2"><Wallet className="w-4 h-4 text-amber-400" />إعدادات الدفع</span>
+              <button onClick={() => { setShowPaymentSettings(!showPaymentSettings); if (!showPaymentSettings) { setPaySettingsForm({ usdtWalletAddress: appSettings.usdtWalletAddress || "", usdtNetwork: appSettings.usdtNetwork || "TRC20" }); } }} className="w-full p-4 flex items-center justify-between text-sm text-foreground/80 hover:bg-muted/30 transition-colors">
+                <span className="flex items-center gap-2"><Wallet className="w-4 h-4 text-amber-400" />إعدادات محفظة USDT</span>
                 <span className={`text-[10px] transition-transform duration-200 ${showPaymentSettings ? "rotate-180" : ""}`}>▼</span>
               </button>
               {showPaymentSettings && (
@@ -3106,7 +3206,7 @@ export default function HomePage() {
                       <Input value={paySettingsForm.usdtWalletAddress} onChange={e => setPaySettingsForm(p => ({ ...p, usdtWalletAddress: e.target.value }))} placeholder="T..."
                         className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-10 rounded-xl text-[11px] font-mono" dir="ltr" />
                     </div>
-                    <div>
+                    <div className="col-span-2">
                       <label className="text-[9px] text-muted-foreground mb-1 block font-medium">الشبكة</label>
                       <div className="flex gap-1.5 h-[40px]">
                         {(["TRC20", "BEP20", "ERC20"] as const).map(n => (
@@ -3117,25 +3217,148 @@ export default function HomePage() {
                         ))}
                       </div>
                     </div>
-                    <div>
-                      <label className="text-[9px] text-muted-foreground mb-1 block font-medium">اسم العملة المحلية</label>
-                      <Input value={paySettingsForm.localCurrencyName} onChange={e => setPaySettingsForm(p => ({ ...p, localCurrencyName: e.target.value }))} placeholder="مثال: الريال اليمني"
-                        className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-10 rounded-xl text-[11px]" dir="rtl" />
-                    </div>
-                    <div>
-                      <label className="text-[9px] text-muted-foreground mb-1 block font-medium">رمز العملة المحلية</label>
-                      <Input value={paySettingsForm.localCurrencyCode} onChange={e => setPaySettingsForm(p => ({ ...p, localCurrencyCode: e.target.value }))} placeholder="مثال: YER"
-                        className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-10 rounded-xl text-[11px] font-mono" dir="ltr" />
-                    </div>
-                    <div>
-                      <label className="text-[9px] text-muted-foreground mb-1 block font-medium">سعر USDT → عملة محلية</label>
-                      <Input type="number" value={paySettingsForm.usdtToLocalRate} onChange={e => setPaySettingsForm(p => ({ ...p, usdtToLocalRate: e.target.value }))} placeholder="مثال: 535"
-                        className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-10 rounded-xl text-[11px] font-mono" dir="ltr" />
-                    </div>
                   </div>
                   <button onClick={handleSavePaymentSettings} className="w-full h-10 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-black text-[11px] font-bold active:scale-[0.98] transition-transform flex items-center justify-center gap-1.5">
-                    <Settings className="w-3.5 h-3.5" /> حفظ إعدادات الدفع
+                    <Settings className="w-3.5 h-3.5" /> حفظ إعدادات USDT
                   </button>
+                </div>
+              )}
+            </div>
+
+            {/* ── Local Payment Methods Management ── */}
+            <div className="rounded-2xl border border-sky-500/15 overflow-hidden" style={{ background: "linear-gradient(135deg, rgba(14,165,233,0.06) 0%, rgba(6,182,212,0.02) 100%)" }}>
+              <div className="p-4 pb-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-xl bg-sky-500/15 border border-sky-500/15 flex items-center justify-center">
+                      <Banknote className="w-4 h-4 text-sky-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-bold text-foreground">طرق الدفع المحلية</h3>
+                      <p className="text-[9px] text-muted-foreground">{localPaymentMethods.length} طريقة دفع</p>
+                    </div>
+                  </div>
+                  <button onClick={() => { if (showMethodForm && editingMethodId) resetMethodForm(); else { resetMethodForm(); setShowMethodForm(true); } }}
+                    className="px-3 py-1.5 rounded-xl text-[10px] font-bold bg-gradient-to-r from-sky-500/20 to-cyan-500/15 text-sky-400 border border-sky-500/25 active:scale-95 transition-transform flex items-center gap-1">
+                    {showMethodForm && editingMethodId ? "✕ إلغاء التعديل" : <><span className="text-sky-300">+</span> إضافة طريقة</>}
+                  </button>
+                </div>
+              </div>
+
+              {/* Method Form */}
+              <AnimatePresence>
+              {showMethodForm && (
+                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                  <div className="px-4 pb-4 animate-[fadeIn_0.2s_ease-out]">
+                    <div className="rounded-xl border border-sky-500/20 bg-muted/40 p-3 space-y-2.5">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <div className="w-4 h-4 rounded-lg bg-sky-500/20 flex items-center justify-center">
+                          {editingMethodId ? <Settings className="w-2.5 h-2.5 text-sky-400" /> : <Plus className="w-2.5 h-2.5 text-sky-400" />}
+                        </div>
+                        <span className="text-[10px] font-bold text-sky-400">{editingMethodId ? "تعديل طريقة الدفع" : "إضافة طريقة دفع جديدة"}</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="col-span-2">
+                          <label className="text-[9px] text-muted-foreground mb-1 block font-medium">اسم المحفظة (للعرض)</label>
+                          <Input value={methodFormName} onChange={e => setMethodFormName(e.target.value)} placeholder="مثال: محفظة YmntPay"
+                            className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-10 rounded-xl text-[11px]" dir="rtl" />
+                        </div>
+                        <div className="col-span-2">
+                          <label className="text-[9px] text-muted-foreground mb-1 block font-medium">اسم مزود المحفظة</label>
+                          <Input value={methodFormWalletName} onChange={e => setMethodFormWalletName(e.target.value)} placeholder="مثال: YmntPay, Chime, MTN"
+                            className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-10 rounded-xl text-[11px]" dir="ltr" />
+                        </div>
+                        <div className="col-span-2">
+                          <label className="text-[9px] text-muted-foreground mb-1 block font-medium">رقم المحفظة / عنوان المحفظة</label>
+                          <Input value={methodFormWallet} onChange={e => setMethodFormWallet(e.target.value)} placeholder="أدخل رقم أو عنوان المحفظة"
+                            className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-10 rounded-xl text-[11px] font-mono" dir="ltr" />
+                        </div>
+                        <div>
+                          <label className="text-[9px] text-muted-foreground mb-1 block font-medium">اسم العملة المحلية</label>
+                          <Input value={methodFormCurrencyName} onChange={e => setMethodFormCurrencyName(e.target.value)} placeholder="مثال: الريال اليمني"
+                            className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-10 rounded-xl text-[11px]" dir="rtl" />
+                        </div>
+                        <div>
+                          <label className="text-[9px] text-muted-foreground mb-1 block font-medium">رمز العملة</label>
+                          <Input value={methodFormCurrencyCode} onChange={e => setMethodFormCurrencyCode(e.target.value)} placeholder="مثال: YER"
+                            className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-10 rounded-xl text-[11px] font-mono" dir="ltr" />
+                        </div>
+                        <div className="col-span-2">
+                          <label className="text-[9px] text-muted-foreground mb-1 block font-medium">سعر الصرف (1 USDT = ?)</label>
+                          <Input type="number" value={methodFormRate} onChange={e => setMethodFormRate(e.target.value)} placeholder="مثال: 535"
+                            className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-10 rounded-xl text-[11px] font-mono" dir="ltr" />
+                        </div>
+                      </div>
+                      <button onClick={handleSaveMethod} disabled={methodLoad}
+                        className="w-full h-10 rounded-xl bg-gradient-to-r from-sky-500 to-cyan-500 text-white text-[11px] font-bold disabled:opacity-40 active:scale-[0.98] transition-transform flex items-center justify-center gap-1.5">
+                        {methodLoad ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <><CheckCircle2 className="w-3.5 h-3.5" /> {editingMethodId ? "حفظ التعديلات" : "إضافة طريقة الدفع"}</>}
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+              </AnimatePresence>
+
+              {/* Methods List */}
+              {localPaymentMethods.length > 0 && (
+                <div className="px-4 pb-3 space-y-2">
+                  {localPaymentMethods.map((m) => (
+                    <motion.div key={m.id} initial={{ opacity: 0, x: 5 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.03 }}
+                      className={`rounded-xl border p-3 space-y-2 ${m.isActive ? "border-sky-500/20 bg-sky-500/[0.04]" : "border-border bg-muted/20 opacity-60"}`}>
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <div className={`w-6 h-6 rounded-lg ${m.isActive ? "bg-sky-500/15" : "bg-muted/40"} flex items-center justify-center flex-shrink-0`}>
+                              <CreditCard className={`w-3 h-3 ${m.isActive ? "text-sky-400" : "text-muted-foreground"}`} />
+                            </div>
+                            <span className="text-[11px] font-bold text-foreground">{m.name}</span>
+                            {!m.isActive && <span className="text-[8px] bg-muted/60 text-muted-foreground px-1.5 py-0.5 rounded-md">معطلة</span>}
+                          </div>
+                          <div className="mt-1.5 space-y-1">
+                            <div className="flex items-center gap-2 text-[9px]">
+                              <span className="text-muted-foreground w-16 flex-shrink-0">المزود:</span>
+                              <span className="text-foreground font-medium font-mono" dir="ltr">{m.walletName}</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-[9px]">
+                              <span className="text-muted-foreground w-16 flex-shrink-0">المحفظة:</span>
+                              <span className="text-foreground font-mono truncate" dir="ltr">{m.walletAddress}</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-[9px]">
+                              <span className="text-muted-foreground w-16 flex-shrink-0">العملة:</span>
+                              <span className="text-foreground">{m.currencyName} ({m.currencyCode})</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-[9px]">
+                              <span className="text-muted-foreground w-16 flex-shrink-0">السعر:</span>
+                              <span className="text-amber-400 font-bold font-mono" dir="ltr">1 USDT = {m.exchangeRate.toLocaleString()} {m.currencyCode}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex gap-1.5 pt-1 border-t border-border/50">
+                        <button onClick={() => { setEditingMethodId(m.id); setMethodFormName(m.name); setMethodFormWallet(m.walletAddress); setMethodFormWalletName(m.walletName); setMethodFormCurrencyName(m.currencyName); setMethodFormCurrencyCode(m.currencyCode); setMethodFormRate(String(m.exchangeRate)); setShowMethodForm(true); }}
+                          className="px-2.5 py-1.5 rounded-lg text-[9px] font-medium bg-sky-500/10 text-sky-400 border border-sky-500/15 active:scale-95 transition-transform flex items-center gap-1">
+                          <Settings className="w-2.5 h-2.5" /> تعديل
+                        </button>
+                        <button onClick={() => handleToggleMethod(m.id, !m.isActive)}
+                          className={`px-2.5 py-1.5 rounded-lg text-[9px] font-medium border active:scale-95 transition-transform flex items-center gap-1 ${m.isActive ? "bg-amber-500/10 text-amber-300/70 border-amber-500/15" : "bg-emerald-500/10 text-emerald-400 border-emerald-500/15"}`}>
+                          {m.isActive ? "تعطيل" : "تفعيل"}
+                        </button>
+                        <button onClick={() => handleDeleteMethod(m.id)}
+                          className="px-2.5 py-1.5 rounded-lg text-[9px] font-medium bg-red-500/5 text-red-300/60 border border-red-500/10 active:scale-95 transition-transform flex items-center gap-1 mr-auto">
+                          <Trash2 className="w-2.5 h-2.5" /> حذف
+                        </button>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+              {localPaymentMethods.length === 0 && !showMethodForm && (
+                <div className="px-4 pb-4">
+                  <div className="rounded-xl border border-dashed border-border/50 p-4 text-center">
+                    <CreditCard className="w-6 h-6 text-muted-foreground/40 mx-auto mb-2" />
+                    <p className="text-[10px] text-muted-foreground">لم تتم إضافة أي طرق دفع محلية بعد</p>
+                    <p className="text-[9px] text-muted-foreground/60 mt-1">أضف طرق دفع ليتمكن المستخدمون من الدفع بالعملات المحلية</p>
+                  </div>
                 </div>
               )}
             </div>
@@ -3168,20 +3391,22 @@ export default function HomePage() {
                             <div className="text-[9px] text-muted-foreground font-mono truncate" dir="ltr">{req.userEmail}</div>
                           </div>
                           <div className="text-left flex-shrink-0">
-                            <div className="text-sm font-black text-amber-400 font-mono">${req.amount}</div>
+                            <div className="text-sm font-black text-amber-400 font-mono">${req.packagePrice || req.amount}</div>
                             <div className="text-[8px] text-muted-foreground">{req.packageName}</div>
                           </div>
                         </div>
                         <div className="flex items-center gap-2 text-[9px] text-muted-foreground">
                           <span className="px-1.5 py-0.5 rounded-md bg-sky-500/10 text-sky-400 font-medium">
-                            {req.paymentMethod === "usdt" ? "USDT" : "محلي"}
+                            {req.paymentMethod === "usdt" ? "USDT" : (req.paymentMethodName || "محلي")}
                           </span>
                           {req.txid && <span className="truncate font-mono" dir="ltr">TX: {req.txid}</span>}
+                          {req.txId && <span className="truncate font-mono" dir="ltr">TX: {req.txId}</span>}
+                          {req.localAmount && <span className="font-mono" dir="ltr">{req.localAmount.toLocaleString()} {req.localCurrencyCode || ""}</span>}
                           <span className="mr-auto">{new Date(req.createdAt).toLocaleDateString("ar-SA", { month: "short", day: "numeric" })}</span>
                         </div>
-                        {req.proofUrl && (
+                        {(req.proofUrl || req.paymentProofUrl) && (
                           <div className="mt-1">
-                            <button onClick={() => window.open(req.proofUrl, "_blank")} className="flex items-center gap-1.5 text-[10px] text-sky-400 hover:text-sky-300 transition-colors">
+                            <button onClick={() => window.open(req.proofUrl || req.paymentProofUrl, "_blank")} className="flex items-center gap-1.5 text-[10px] text-sky-400 hover:text-sky-300 transition-colors">
                               <Image className="w-3.5 h-3.5" aria-hidden="true" /> عرض صورة الإثبات
                             </button>
                           </div>
@@ -3557,11 +3782,6 @@ export default function HomePage() {
                     </div>
                     <div className="text-2xl font-black text-amber-400 font-mono">${selectedPkg.price}</div>
                   </div>
-                  {appSettings.usdtToLocalRate && appSettings.localCurrencyCode && (
-                    <div className="mt-2 pt-2 border-t border-border/50 text-xs text-muted-foreground">
-                      ≈ {(selectedPkg.price * appSettings.usdtToLocalRate).toLocaleString()} {appSettings.localCurrencyCode}
-                    </div>
-                  )}
                 </div>
 
                 {/* Payment Method Selection (if not chosen yet) */}
@@ -3569,26 +3789,39 @@ export default function HomePage() {
                   <div className="space-y-2">
                     <p className="text-xs font-bold text-foreground">اختر طريقة الدفع</p>
                     {/* USDT Payment Card */}
-                    <button onClick={() => setPaymentMethod("usdt")} className="w-full rounded-2xl border border-border bg-muted/30 p-4 flex items-center gap-3 active:scale-[0.98] transition-transform hover:border-amber-500/25">
-                      <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/20 flex items-center justify-center flex-shrink-0">
-                        <Wallet className="w-5 h-5 text-amber-400" />
-                      </div>
-                      <div className="flex-1 text-right">
-                        <div className="text-xs font-bold text-foreground">USDT (تITHER)</div>
-                        <div className="text-[10px] text-muted-foreground mt-0.5">تحويل مباشر — تفعيل فوري تلقائي</div>
-                      </div>
-                    </button>
-                    {/* Local Currency Payment Card */}
-                    {(appSettings.localCurrencyName || appSettings.localCurrencyCode) && (
-                      <button onClick={() => setPaymentMethod("local")} className="w-full rounded-2xl border border-border bg-muted/30 p-4 flex items-center gap-3 active:scale-[0.98] transition-transform hover:border-sky-500/25">
+                    {appSettings.usdtWalletAddress && (
+                      <button onClick={() => setPaymentMethod("usdt")} className="w-full rounded-2xl border border-border bg-muted/30 p-4 flex items-center gap-3 active:scale-[0.98] transition-transform hover:border-amber-500/25">
+                        <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/20 flex items-center justify-center flex-shrink-0">
+                          <Wallet className="w-5 h-5 text-amber-400" />
+                        </div>
+                        <div className="flex-1 text-right">
+                          <div className="text-xs font-bold text-foreground">USDT (TETHER)</div>
+                          <div className="text-[10px] text-muted-foreground mt-0.5">تحويل مباشر — تفعيل فوري تلقائي</div>
+                        </div>
+                        <span className="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded-lg font-bold">فوري</span>
+                      </button>
+                    )}
+                    {/* Local Currency Payment Methods */}
+                    {userPaymentMethods.map(m => (
+                      <button key={m.id} onClick={() => { setPaymentMethod("local"); setSelectedLocalMethod(m); }} className="w-full rounded-2xl border border-border bg-muted/30 p-4 flex items-center gap-3 active:scale-[0.98] transition-transform hover:border-sky-500/25">
                         <div className="w-10 h-10 rounded-xl bg-sky-500/15 border border-sky-500/20 flex items-center justify-center flex-shrink-0">
                           <CreditCard className="w-5 h-5 text-sky-400" />
                         </div>
                         <div className="flex-1 text-right">
-                          <div className="text-xs font-bold text-foreground">{appSettings.localCurrencyName || appSettings.localCurrencyCode || "عملة محلية"}</div>
-                          <div className="text-[10px] text-muted-foreground mt-0.5">تحويل محلي — مراجعة يدوية خلال 24 ساعة</div>
+                          <div className="text-xs font-bold text-foreground">{m.name}</div>
+                          <div className="text-[10px] text-muted-foreground mt-0.5">{m.currencyName} — مراجعة يدوية خلال 24 ساعة</div>
+                        </div>
+                        <div className="text-left flex-shrink-0">
+                          <div className="text-[10px] font-bold text-sky-400 font-mono">{(selectedPkg.price * m.exchangeRate).toLocaleString()}</div>
+                          <div className="text-[8px] text-muted-foreground">{m.currencyCode}</div>
                         </div>
                       </button>
+                    ))}
+                    {!appSettings.usdtWalletAddress && userPaymentMethods.length === 0 && (
+                      <div className="text-center py-4">
+                        <p className="text-xs text-muted-foreground">لا توجد طرق دفع متاحة حالياً</p>
+                        <p className="text-[10px] text-muted-foreground mt-1">تواصل مع الإدارة للاشتراك</p>
+                      </div>
                     )}
                   </div>
                 )}
@@ -3603,19 +3836,30 @@ export default function HomePage() {
                       </div>
                       {appSettings.usdtWalletAddress ? (
                         <>
+                          {/* Step 1: Copy wallet address */}
                           <div className="bg-muted/60 rounded-xl p-3 border border-border">
-                            <div className="text-[9px] text-muted-foreground mb-1">عنوان المحفظة ({appSettings.usdtNetwork || "TRC20"})</div>
-                            <div className="text-[11px] font-mono text-foreground break-all" dir="ltr">{appSettings.usdtWalletAddress}</div>
-                            <button onClick={() => { navigator.clipboard.writeText(appSettings.usdtWalletAddress || ""); toast.success("تم نسخ العنوان"); }} className="mt-2 text-[10px] text-amber-400 font-medium hover:text-amber-300 transition-colors">نسخ العنوان</button>
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-[9px] text-muted-foreground font-medium">الخطوة 1: انسخ عنوان المحفظة</span>
+                              <span className="text-[8px] bg-amber-500/10 text-amber-400 px-1.5 py-0.5 rounded-md font-mono">{appSettings.usdtNetwork || "TRC20"}</span>
+                            </div>
+                            <div className="bg-black/20 rounded-lg p-2.5">
+                              <div className="text-[10px] font-mono text-foreground break-all select-all" dir="ltr">{appSettings.usdtWalletAddress}</div>
+                            </div>
+                            <button onClick={() => { navigator.clipboard.writeText(appSettings.usdtWalletAddress || ""); toast.success("تم نسخ العنوان"); }}
+                              className="mt-2 w-full py-2 rounded-lg text-[10px] text-amber-400 font-medium bg-amber-500/10 border border-amber-500/15 hover:bg-amber-500/15 transition-colors flex items-center justify-center gap-1.5">
+                              <Copy className="w-3 h-3" /> نسخ عنوان المحفظة
+                            </button>
                           </div>
+                          {/* Step 2: Enter TXID */}
                           <div>
-                            <label className="text-[9px] text-muted-foreground mb-1 block font-medium">رقم العملية (TXID) *</label>
+                            <label className="text-[9px] text-muted-foreground mb-1 block font-medium">الخطوة 2: أدخل رقم العملية (TXID) بعد التحويل</label>
                             <Input value={usdtTxid} onChange={e => setUsdtTxid(e.target.value)} placeholder="أدخل رقم العملية..."
-                              className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-10 rounded-xl text-[11px] font-mono" dir="ltr" />
+                              className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-11 rounded-xl text-[11px] font-mono" dir="ltr" />
                           </div>
+                          {/* Activate */}
                           <button onClick={handleUsdtPayment} disabled={paymentLoad || !usdtTxid.trim()}
                             className="w-full h-11 rounded-xl gold-gradient text-black text-xs font-bold disabled:opacity-40 active:scale-[0.98] transition-transform flex items-center justify-center gap-2">
-                            {paymentLoad ? <Loader2 className="w-4 h-4 animate-spin" /> : <><CheckCircle2 className="w-4 h-4" /> تفعيل الآن</>}
+                            {paymentLoad ? <Loader2 className="w-4 h-4 animate-spin" /> : <><CheckCircle2 className="w-4 h-4" /> تفعيل الاشتراك الآن</>}
                           </button>
                         </>
                       ) : (
@@ -3629,24 +3873,43 @@ export default function HomePage() {
                 )}
 
                 {/* Local Payment Form */}
-                {paymentMethod === "local" && (
+                {paymentMethod === "local" && selectedLocalMethod && (
                   <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
                     <div className="rounded-2xl border border-sky-500/20 bg-muted/40 p-4 space-y-3">
-                      <div className="flex items-center gap-2">
-                        <CreditCard className="w-4 h-4 text-sky-400" />
-                        <span className="text-xs font-bold text-sky-400">دفع بالعملة المحلية</span>
-                      </div>
-                      {appSettings.usdtToLocalRate && appSettings.localCurrencyCode ? (
-                        <div className="bg-muted/60 rounded-xl p-3 border border-border">
-                          <div className="text-[9px] text-muted-foreground mb-1">المبلغ المطلوب</div>
-                          <div className="text-lg font-black text-foreground">
-                            {(selectedPkg.price * appSettings.usdtToLocalRate).toLocaleString()} <span className="text-sm text-muted-foreground">{appSettings.localCurrencyCode}</span>
-                          </div>
-                          <div className="text-[9px] text-muted-foreground mt-1">{selectedPkg.price} USDT × {appSettings.usdtToLocalRate}</div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <CreditCard className="w-4 h-4 text-sky-400" />
+                          <span className="text-xs font-bold text-sky-400">{selectedLocalMethod.name}</span>
                         </div>
-                      ) : null}
+                        <span className="text-[9px] bg-sky-500/10 text-sky-400 px-2 py-0.5 rounded-lg font-bold">{selectedLocalMethod.walletName}</span>
+                      </div>
+
+                      {/* Wallet Info */}
+                      <div className="bg-muted/60 rounded-xl p-3 border border-border space-y-2">
+                        <div>
+                          <div className="text-[9px] text-muted-foreground mb-1">رقم المحفظة</div>
+                          <div className="bg-black/20 rounded-lg p-2.5">
+                            <div className="text-[10px] font-mono text-foreground break-all select-all" dir="ltr">{selectedLocalMethod.walletAddress}</div>
+                          </div>
+                          <button onClick={() => { navigator.clipboard.writeText(selectedLocalMethod.walletAddress || ""); toast.success("تم نسخ رقم المحفظة"); }}
+                            className="mt-1.5 text-[10px] text-sky-400 font-medium hover:text-sky-300 transition-colors flex items-center gap-1">
+                            <Copy className="w-3 h-3" /> نسخ رقم المحفظة
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Amount Info */}
+                      <div className="bg-gradient-to-r from-sky-500/10 to-cyan-500/5 rounded-xl p-3 border border-sky-500/15">
+                        <div className="text-[9px] text-muted-foreground mb-1">المبلغ المطلوب التحويل</div>
+                        <div className="text-xl font-black text-foreground">
+                          {(selectedPkg.price * selectedLocalMethod.exchangeRate).toLocaleString()} <span className="text-xs text-muted-foreground">{selectedLocalMethod.currencyCode}</span>
+                        </div>
+                        <div className="text-[9px] text-muted-foreground mt-1" dir="ltr">{selectedPkg.price} USDT × {selectedLocalMethod.exchangeRate.toLocaleString()} = {(selectedPkg.price * selectedLocalMethod.exchangeRate).toLocaleString()} {selectedLocalMethod.currencyCode}</div>
+                      </div>
+
+                      {/* Upload Proof */}
                       <div>
-                        <label className="text-[9px] text-muted-foreground mb-1.5 block font-medium">صورة إثبات التحويل *</label>
+                        <label className="text-[9px] text-muted-foreground mb-1.5 block font-medium">صورة إثبات التحويل <span className="text-red-400">*إجباري</span></label>
                         <div className="relative">
                           <input type="file" accept="image/*" className="hidden" id="payment-proof" onChange={e => {
                             const f = e.target.files?.[0]; if (!f) return;
@@ -3663,7 +3926,7 @@ export default function HomePage() {
                           ) : (
                             <label htmlFor="payment-proof" className="flex flex-col items-center justify-center gap-2 h-32 rounded-xl border-2 border-dashed border-border bg-muted/30 cursor-pointer hover:border-sky-500/30 transition-colors">
                               <Upload className="w-6 h-6 text-muted-foreground" />
-                              <span className="text-[10px] text-muted-foreground">اضغط لرفع صورة الإثبات</span>
+                              <span className="text-[10px] text-muted-foreground">اضغط لرفع صورة إثبات التحويل</span>
                             </label>
                           )}
                         </div>
@@ -3699,8 +3962,10 @@ export default function HomePage() {
                             <div className="text-left flex-shrink-0">
                               <div className="text-2xl font-black text-amber-400 font-mono leading-tight">${pkg.price}</div>
                               <div className="text-[8px] text-muted-foreground mt-0.5">{pkg.durationDays} يوم</div>
-                              {appSettings.usdtToLocalRate && appSettings.localCurrencyCode && (
-                                <div className="text-[8px] text-muted-foreground mt-0.5">≈ {(pkg.price * appSettings.usdtToLocalRate).toLocaleString()} {appSettings.localCurrencyCode}</div>
+                              {appSettings.usdtWalletAddress && userPaymentMethods.length > 0 && (
+                                <div className="text-[8px] text-muted-foreground mt-0.5">
+                                  {userPaymentMethods.map(m => `${(pkg.price * m.exchangeRate).toLocaleString()} ${m.currencyCode}`).join(" / ")}
+                                </div>
                               )}
                             </div>
                           </div>
@@ -3723,7 +3988,7 @@ export default function HomePage() {
                           )}
                         </div>
                         <div className="px-4 py-2.5 border-t border-border/40 bg-muted/20">
-                          <button onClick={() => { setSelectedPkg(pkg); setPaymentMethod(null); setUsdtTxid(""); setPaymentProofFile(null); setPaymentProofPreview(null); setPaymentResult(null); }}
+                          <button onClick={() => { setSelectedPkg(pkg); setPaymentMethod(null); setSelectedLocalMethod(null); setUsdtTxid(""); setPaymentProofFile(null); setPaymentProofPreview(null); setPaymentResult(null); }}
                             className="w-full h-10 rounded-xl gold-gradient text-black text-[11px] font-bold active:scale-[0.98] transition-transform flex items-center justify-center gap-1.5">
                             <Crown className="w-3.5 h-3.5" /> اشترك الآن
                           </button>

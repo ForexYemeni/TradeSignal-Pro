@@ -6,12 +6,14 @@ import { kv } from "@vercel/kv";
  * Upload payment proof image (base64) and store in KV.
  * Returns a URL-like reference ID.
  *
- * Body: { image: string (base64 data URL) }
+ * Body: { image?: string, file?: string, fileName?: string }
  * Returns: { success: true, url: "proof:<id>" }
  */
 export async function POST(request: NextRequest) {
   try {
-    const { image } = await request.json();
+    const body = await request.json();
+    // Support both "image" and "file" keys from frontend
+    const image = body.image || body.file;
 
     if (!image || typeof image !== "string") {
       return NextResponse.json({ success: false, error: "الصورة مطلوبة" }, { status: 400 });
