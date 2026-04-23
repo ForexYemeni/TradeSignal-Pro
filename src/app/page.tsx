@@ -402,6 +402,32 @@ export default function HomePage() {
     return id;
   }
 
+  /* ── Device Check Before Login/Register ── */
+  async function checkDeviceBeforeAction(email: string, action: "login" | "register"): Promise<boolean> {
+    const deviceId = getDeviceId();
+    if (!deviceId) return true; // No device ID, skip check
+    try {
+      const res = await fetch("/api/device-check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deviceId, email }),
+      });
+      const data = await res.json();
+      if (data.success && data.detected && !data.safe) {
+        // Device has another account - show warning
+        setDeviceWarning({
+          show: true,
+          existingAccount: data.existingAccount,
+          action,
+        });
+        return false; // Don't proceed
+      }
+      return true; // Safe to proceed
+    } catch {
+      return true; // Error checking, allow proceeding
+    }
+  }
+
   /* ── OTP (shared by login & register & reset) ── */
   const [otpStep, setOtpStep] = useState<"none" | "sending" | "verifying" | "done">("none");
   const [otpVerifying, setOtpVerifying] = useState(false);
@@ -415,6 +441,13 @@ export default function HomePage() {
   const [otpTimer, setOtpTimer] = useState(0);
   const [otpIntervalId, setOtpIntervalId] = useState<ReturnType<typeof setInterval> | null>(null);
   const otpInputRef = useRef<HTMLInputElement | null>(null);
+
+  /* ── Device Warning Dialog ── */
+  const [deviceWarning, setDeviceWarning] = useState<{
+    show: boolean;
+    existingAccount: { name: string; email: string; subscriptionType?: string; packageName?: string };
+    action: "login" | "register";
+  }>({ show: false, existingAccount: { name: "", email: "" }, action: "login" });
 
   /* ── Forgot Password ── */
   const [fpEmail, setFpEmail] = useState("");
@@ -439,7 +472,7 @@ export default function HomePage() {
 
   /* ── Packages & Settings ── */
   const [packages, setPackages] = useState<SubPackage[]>([]);
-  const [appSettings, setAppSettings] = useState<AppSettingsData>({ freeTrialPackageId: null, autoApproveOnRegister: true, usdtWalletAddress: null, usdtNetwork: null });
+  const [appSettings, setAppSettings] = useState<AppSettingsData>({ freeTrialPackageId: null, autoApproveOnRegister: true, usdtWalletAddress: null, usdtNetwork: null, referralEnabled: false, referralRewardDays: 7, referralInviteeRewardDays: 3 });
   const [showPkgForm, setShowPkgForm] = useState(false);
   const [editingPkgId, setEditingPkgId] = useState<string | null>(null);
   const [pkgFormName, setPkgFormName] = useState("");
@@ -839,6 +872,10 @@ export default function HomePage() {
     setLoginFeedback(null);
     setLoginLoad(true);
     try {
+      // Check device before login
+      const deviceSafe = await checkDeviceBeforeAction(email, "login");
+      if (!deviceSafe) { setLoginLoad(false); return; }
+
       const res = await fetch("/api/admin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1059,6 +1096,10 @@ export default function HomePage() {
       } else if (otpPurpose === "register") {
         setRegLoad(true);
         try {
+          // Check device before register
+          const deviceSafe = await checkDeviceBeforeAction(otpEmail, "register");
+          if (!deviceSafe) { setRegLoad(false); return; }
+
           const regRes = await fetch("/api/register", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -1288,6 +1329,30 @@ export default function HomePage() {
       await fetch("/api/settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ autoApproveOnRegister: val }) });
       setAppSettings(s => ({ ...s, autoApproveOnRegister: val }));
     } catch (e) { console.error("Set auto approve:", e); }
+  }
+
+  /* ── Referral Settings Handlers ── */
+  async function handleSetReferralEnabled(val: boolean) {
+    try {
+      await fetch("/api/settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ referralEnabled: val }) });
+      setAppSettings(s => ({ ...s, referralEnabled: val }));
+    } catch (e) { console.error("Set referral enabled:", e); }
+  }
+
+  async function handleSetReferralRewardDays(val: number) {
+    const days = Math.max(1, Math.min(365, val));
+    try {
+      await fetch("/api/settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ referralRewardDays: days }) });
+      setAppSettings(s => ({ ...s, referralRewardDays: days }));
+    } catch (e) { console.error("Set referral reward days:", e); }
+  }
+
+  async function handleSetReferralInviteeDays(val: number) {
+    const days = Math.max(1, Math.min(365, val));
+    try {
+      await fetch("/api/settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ referralInviteeRewardDays: days }) });
+      setAppSettings(s => ({ ...s, referralInviteeRewardDays: days }));
+    } catch (e) { console.error("Set referral invitee days:", e); }
   }
 
   /* ── Payment Settings Handlers ── */
@@ -3931,6 +3996,66 @@ export default function HomePage() {
               </div>
             </div>
 
+            {/* ── Referral Settings Card ── */}
+            <div className="rounded-2xl border border-violet-500/15 overflow-hidden" style={{ background: "linear-gradient(135deg, rgba(139,92,246,0.06) 0%, rgba(109,40,217,0.02) 100%)" }}>
+              <div className="p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-lg bg-violet-500/15 flex items-center justify-center">
+                    <Gift className="w-3.5 h-3.5 text-violet-400" />
+                  </div>
+                  <span className="text-xs font-bold text-violet-400">نظام الاحالة</span>
+                </div>
+
+                {/* Toggle */}
+                <div className="flex items-center justify-between bg-muted/50 rounded-xl p-3 border border-border">
+                  <div>
+                    <div className="text-[11px] font-semibold text-foreground">تفعيل نظام الاحالة</div>
+                    <div className="text-[9px] text-muted-foreground mt-0.5">يحصل المستخدمون على مكافأة عند دعوة أصدقائهم</div>
+                  </div>
+                  <button onClick={() => handleSetReferralEnabled(!appSettings.referralEnabled)}
+                    className={`w-11 h-6 rounded-full transition-all duration-300 relative ${appSettings.referralEnabled ? "bg-violet-500" : "bg-white/10"}`}>
+                    <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-md transition-all duration-300 ${appSettings.referralEnabled ? "left-[22px]" : "left-0.5"}`} />
+                  </button>
+                </div>
+
+                {/* Reward Days */}
+                {appSettings.referralEnabled && (
+                  <div className="space-y-2.5 pt-1">
+                    <div className="bg-muted/50 rounded-xl p-3 border border-border">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-[11px] font-semibold text-foreground">مكافأة المدعو (لصاحب الكود)</div>
+                          <div className="text-[9px] text-muted-foreground mt-0.5">عدد الأيام المجانية عند تفعيل اشتراك المدعو</div>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <button onClick={() => handleSetReferralRewardDays((appSettings.referralRewardDays || 7) - 1)}
+                            className="w-7 h-7 rounded-lg bg-white/5 border border-border flex items-center justify-center text-foreground active:scale-90 transition-transform text-sm font-bold">−</button>
+                          <span className="w-8 text-center text-sm font-bold text-violet-400">{appSettings.referralRewardDays || 7}</span>
+                          <button onClick={() => handleSetReferralRewardDays((appSettings.referralRewardDays || 7) + 1)}
+                            className="w-7 h-7 rounded-lg bg-white/5 border border-border flex items-center justify-center text-foreground active:scale-90 transition-transform text-sm font-bold">+</button>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="bg-muted/50 rounded-xl p-3 border border-border">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-[11px] font-semibold text-foreground">مكافأة الداعي (للمدعو الجديد)</div>
+                          <div className="text-[9px] text-muted-foreground mt-0.5">عدد الأيام المجانية للمدعو عند استخدام الكود</div>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <button onClick={() => handleSetReferralInviteeDays((appSettings.referralInviteeRewardDays || 3) - 1)}
+                            className="w-7 h-7 rounded-lg bg-white/5 border border-border flex items-center justify-center text-foreground active:scale-90 transition-transform text-sm font-bold">−</button>
+                          <span className="w-8 text-center text-sm font-bold text-violet-400">{appSettings.referralInviteeRewardDays || 3}</span>
+                          <button onClick={() => handleSetReferralInviteeDays((appSettings.referralInviteeRewardDays || 3) + 1)}
+                            className="w-7 h-7 rounded-lg bg-white/5 border border-border flex items-center justify-center text-foreground active:scale-90 transition-transform text-sm font-bold">+</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* ── Packages Header ── */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -5271,6 +5396,91 @@ export default function HomePage() {
           </div>
         </div>
       )}
+
+            {/* ── Device Duplicate Warning Dialog ── */}
+            <AnimatePresence>
+              {deviceWarning.show && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+                  style={{ backgroundColor: "rgba(0,0,0,0.85)", backdropFilter: "blur(12px)" }}
+                >
+                  <motion.div
+                    initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                    animate={{ scale: 1, opacity: 1, y: 0 }}
+                    exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                    transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                    className="w-full max-w-sm rounded-3xl overflow-hidden"
+                    style={{ background: "linear-gradient(145deg, rgba(15,20,30,0.98), rgba(10,14,22,0.98))", border: "1px solid rgba(255,82,82,0.2)" }}
+                  >
+                    {/* Warning Header */}
+                    <div className="relative p-6 pb-4 text-center">
+                      <div className="absolute inset-x-0 top-0 h-32 opacity-20" style={{ background: "radial-gradient(ellipse at center top, rgba(255,82,82,0.4), transparent 70%)" }} />
+                      <div className="relative">
+                        <div className="w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center" style={{ background: "linear-gradient(135deg, rgba(255,82,82,0.15), rgba(211,47,47,0.08))", border: "2px solid rgba(255,82,82,0.25)" }}>
+                          <ShieldAlert className="w-10 h-10 text-red-400" />
+                        </div>
+                        <h3 className="text-lg font-extrabold text-white mb-1">تنبيه أمني</h3>
+                        <p className="text-[11px] text-red-300/80 font-semibold">كشف حساب آخر على هذا الجهاز</p>
+                      </div>
+                    </div>
+
+                    {/* Content */}
+                    <div className="px-5 pb-5 space-y-4">
+                      <div className="rounded-2xl p-4 space-y-3" style={{ background: "rgba(255,82,82,0.04)", border: "1px solid rgba(255,82,82,0.1)" }}>
+                        <p className="text-[11px] text-white/70 leading-relaxed text-center">
+                          يوجد حساب آخر مسجل على هذا الجهاز. إذا متابعتك سيتم <strong className="text-red-400">حظر الحسابين تلقائياً</strong> بما في ذلك اشتراكاتك الحالية.
+                        </p>
+
+                        {/* Existing Account Info */}
+                        <div className="rounded-xl p-3 space-y-2" style={{ background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.05)" }}>
+                          <div className="text-[9px] text-white/30 font-semibold uppercase tracking-wider">الحساب المسجل على الجهاز</div>
+                          <div className="text-[12px] text-white font-bold" dir="ltr">{deviceWarning.existingAccount.email}</div>
+                          <div className="text-[10px] text-white/50">{deviceWarning.existingAccount.name}</div>
+                          {deviceWarning.existingAccount.packageName && (
+                            <div className="flex items-center gap-1.5">
+                              <Crown className="w-3 h-3 text-amber-400" />
+                              <span className="text-[10px] text-amber-400/80">{deviceWarning.existingAccount.packageName}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="space-y-2.5">
+                        <button
+                          onClick={() => setDeviceWarning(w => ({ ...w, show: false }))}
+                          className="w-full py-3 rounded-2xl text-[12px] font-bold bg-white/5 text-white/60 border border-white/10 active:scale-[0.98] transition-transform"
+                        >
+                          إلغاء — العودة بأمان
+                        </button>
+                        <button
+                          onClick={() => {
+                            setDeviceWarning(w => ({ ...w, show: false }));
+                            // Clear device ID to avoid future detection
+                            if (typeof window !== "undefined") {
+                              localStorage.removeItem("fy_device_id");
+                            }
+                            // Navigate to login
+                            setView("login");
+                          }}
+                          className="w-full py-3 rounded-2xl text-[12px] font-bold active:scale-[0.98] transition-transform"
+                          style={{ background: "linear-gradient(135deg, rgba(255,82,82,0.15), rgba(211,47,47,0.1))", border: "1px solid rgba(255,82,82,0.3)", color: "#FF8A80" }}
+                        >
+                          حذف بيانات الجهاز والمتابعة
+                        </button>
+                      </div>
+
+                      <p className="text-[9px] text-white/20 text-center leading-relaxed">
+                        يمكنك المتابعة بحسابك الأصلي بأمان. هذا التحذير يظهر فقط عند وجود حساب مختلف على نفس الجهاز.
+                      </p>
+                    </div>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
     </div>
   );
 }

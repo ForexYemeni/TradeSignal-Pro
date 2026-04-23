@@ -411,8 +411,8 @@ export async function broadcastSignalToSubscribers(signal: {
 
 export function buildDuplicateAccountEmail(data: {
   detectedAt: 'register' | 'login';
-  user1: { name: string; email: string; createdAt: string; status: string };
-  user2: { name: string; email: string; createdAt: string; status: string };
+  user1: { name: string; email: string; createdAt: string; status: string; subscriptionType?: string; subscriptionExpiry?: string | null; packageName?: string | null };
+  user2: { name: string; email: string; createdAt: string; status: string; subscriptionType?: string; subscriptionExpiry?: string | null; packageName?: string | null };
   deviceId: string;
 }): {
   subject: string;
@@ -420,125 +420,202 @@ export function buildDuplicateAccountEmail(data: {
 } {
   const { user1, user2, deviceId, detectedAt } = data;
   const actionText = detectedAt === 'register' ? 'محاولة تسجيل حساب جديد' : 'محاولة تسجيل دخول';
+  const timestamp = new Date().toISOString();
+
+  function formatSubscription(u: typeof user1): string {
+    if (u.subscriptionType === 'subscriber' && u.packageName) {
+      const expiry = u.subscriptionExpiry ? new Date(u.subscriptionExpiry).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' }) : 'غير محدد';
+      return `${u.packageName} — تنتهي: ${expiry}`;
+    }
+    return 'لا يوجد اشتراك';
+  }
 
   return {
-    subject: `🚨 تنبيه: حسابان من نفس الجهاز — تم الحظر التلقائي`,
+    subject: `🚨 تنبيه أمني: حسابان من نفس الجهاز — تم الحظر التلقائي`,
     html: `<!DOCTYPE html>
 <html dir="rtl" lang="ar">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>تنبيه حسابات مكررة</title>
+  <title>تنبيه أمني — حسابات مكررة</title>
 </head>
-<body style="margin:0;padding:0;background-color:#070b14;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#070b14;min-height:100vh;">
+<body style="margin:0;padding:0;background-color:#05080f;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#05080f;min-height:100vh;">
     <tr>
       <td align="center" style="padding:40px 16px;">
-        <table role="presentation" width="520" cellpadding="0" cellspacing="0" style="max-width:520px;width:100%;">
+        <table role="presentation" width="540" cellpadding="0" cellspacing="0" style="max-width:540px;width:100%;">
+          
+          <!-- Header -->
           <tr>
             <td align="center" style="padding-bottom:24px;">
-              <div style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#FF5252,#D32F2F);display:inline-flex;align-items:center;justify-content:center;">
-                <span style="font-size:28px;">🚨</span>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="right">
+                    <div style="width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,#FFD700,#FFA500);display:inline-flex;align-items:center;justify-content:center;">
+                      <span style="font-size:18px;font-weight:900;color:#05080f;">FY</span>
+                    </div>
+                  </td>
+                  <td align="left">
+                    <span style="display:inline-block;padding:5px 14px;border-radius:20px;font-size:10px;font-weight:700;color:#FF5252;background:rgba(255,82,82,0.1);border:1px solid rgba(255,82,82,0.25);letter-spacing:1px;">
+                      تنبيه أمني
+                    </span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Alert Icon & Title -->
+          <tr>
+            <td align="center" style="padding-bottom:8px;">
+              <div style="width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,rgba(255,82,82,0.15),rgba(211,47,47,0.08));border:2px solid rgba(255,82,82,0.2);display:inline-flex;align-items:center;justify-content:center;">
+                <span style="font-size:32px;">🛡️</span>
               </div>
             </td>
           </tr>
           <tr>
             <td align="center" style="padding-bottom:8px;">
-              <h1 style="margin:0;font-size:22px;font-weight:800;color:#FF5252;letter-spacing:0.5px;">كشف حسابات مكررة</h1>
+              <h1 style="margin:0;font-size:22px;font-weight:800;color:#FF5252;letter-spacing:0.3px;">كشف حسابات مكررة</h1>
             </td>
           </tr>
           <tr>
-            <td align="center" style="padding-bottom:32px;">
-              <p style="margin:0;font-size:14px;color:rgba(255,255,255,0.6);line-height:1.8;text-align:center;">
-                تم اكتشاف ${actionText} من جهاز مسجل مسبقاً بحساب آخر. تم حظر الحسابين تلقائياً.
+            <td align="center" style="padding-bottom:28px;">
+              <p style="margin:0;font-size:13px;color:rgba(255,255,255,0.55);line-height:1.9;text-align:center;">
+                تم اكتشاف <strong style="color:rgba(255,255,255,0.8);">${actionText}</strong> من جهاز مسجل مسبقاً بحساب آخر.<br>
+                تم حظر الحسابين تلقائياً لحماية النظام.
               </p>
             </td>
           </tr>
+
+          <!-- Detection Info Bar -->
           <tr>
-            <td>
-              <div style="background:rgba(255,82,82,0.06);border:1px solid rgba(255,82,82,0.2);border-radius:16px;overflow:hidden;">
-                <div style="padding:16px 20px;border-bottom:1px solid rgba(255,82,82,0.15);background:rgba(255,82,82,0.08);">
-                  <p style="margin:0;font-size:13px;font-weight:700;color:#FF5252;">الحساب الأول (الحساب القديم)</p>
-                </div>
-                <div style="padding:16px 20px;">
-                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                    <tr>
-                      <td style="padding:6px 0;font-size:12px;color:rgba(255,255,255,0.4);">الاسم</td>
-                      <td style="padding:6px 0;font-size:13px;color:#ffffff;font-weight:600;text-align:left;" dir="ltr">${user1.name}</td>
-                    </tr>
-                    <tr>
-                      <td style="padding:6px 0;font-size:12px;color:rgba(255,255,255,0.4);">البريد</td>
-                      <td style="padding:6px 0;font-size:13px;color:#FFD700;font-weight:600;text-align:left;" dir="ltr">${user1.email}</td>
-                    </tr>
-                    <tr>
-                      <td style="padding:6px 0;font-size:12px;color:rgba(255,255,255,0.4);">الحالة</td>
-                      <td style="padding:6px 0;font-size:13px;color:#FF5252;font-weight:600;text-align:left;">محظور</td>
-                    </tr>
-                    <tr>
-                      <td style="padding:6px 0;font-size:12px;color:rgba(255,255,255,0.4);">تاريخ التسجيل</td>
-                      <td style="padding:6px 0;font-size:12px;color:rgba(255,255,255,0.5);text-align:left;" dir="ltr">${user1.createdAt}</td>
-                    </tr>
-                  </table>
-                </div>
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding-top:12px;">
-              <div style="background:rgba(255,82,82,0.06);border:1px solid rgba(255,82,82,0.2);border-radius:16px;overflow:hidden;">
-                <div style="padding:16px 20px;border-bottom:1px solid rgba(255,82,82,0.15);background:rgba(255,82,82,0.08);">
-                  <p style="margin:0;font-size:13px;font-weight:700;color:#FF5252;">الحساب الثاني (الحساب الجديد / المحاولة)</p>
-                </div>
-                <div style="padding:16px 20px;">
-                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                    <tr>
-                      <td style="padding:6px 0;font-size:12px;color:rgba(255,255,255,0.4);">الاسم</td>
-                      <td style="padding:6px 0;font-size:13px;color:#ffffff;font-weight:600;text-align:left;" dir="ltr">${user2.name}</td>
-                    </tr>
-                    <tr>
-                      <td style="padding:6px 0;font-size:12px;color:rgba(255,255,255,0.4);">البريد</td>
-                      <td style="padding:6px 0;font-size:13px;color:#FFD700;font-weight:600;text-align:left;" dir="ltr">${user2.email}</td>
-                    </tr>
-                    <tr>
-                      <td style="padding:6px 0;font-size:12px;color:rgba(255,255,255,0.4);">الحالة</td>
-                      <td style="padding:6px 0;font-size:13px;color:#FF5252;font-weight:600;text-align:left;">محظور</td>
-                    </tr>
-                    <tr>
-                      <td style="padding:6px 0;font-size:12px;color:rgba(255,255,255,0.4);">تاريخ التسجيل</td>
-                      <td style="padding:6px 0;font-size:12px;color:rgba(255,255,255,0.5);text-align:left;" dir="ltr">${user2.createdAt}</td>
-                    </tr>
-                  </table>
-                </div>
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding-top:12px;">
-              <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:16px 20px;">
+            <td style="padding-bottom:16px;">
+              <div style="background:rgba(255,82,82,0.04);border:1px solid rgba(255,82,82,0.12);border-radius:12px;padding:12px 16px;">
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                   <tr>
-                    <td style="font-size:11px;color:rgba(255,255,255,0.4);">معرف الجهاز (Device ID)</td>
-                    <td style="font-size:11px;color:rgba(255,255,255,0.3);text-align:left;font-family:'Courier New',monospace;" dir="ltr">${deviceId.slice(0, 8)}...${deviceId.slice(-4)}</td>
+                    <td style="font-size:10px;color:rgba(255,255,255,0.35);padding:3px 0;">نوع الكشف</td>
+                    <td style="font-size:10px;color:rgba(255,255,255,0.6);text-align:left;font-weight:600;">${detectedAt === 'register' ? 'تسجيل حساب جديد' : 'تسجيل دخول'}</td>
                   </tr>
                   <tr>
-                    <td style="padding-top:8px;font-size:11px;color:rgba(255,255,255,0.4);">نوع الكشف</td>
-                    <td style="padding-top:8px;font-size:11px;color:rgba(255,255,255,0.5);text-align:left;">${detectedAt === 'register' ? 'تسجيل جديد' : 'تسجيل دخول'}</td>
+                    <td style="font-size:10px;color:rgba(255,255,255,0.35);padding:3px 0;">وقت الكشف</td>
+                    <td style="font-size:10px;color:rgba(255,255,255,0.6);text-align:left;direction:ltr;" dir="ltr">${new Date(timestamp).toLocaleString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
+                  </tr>
+                  <tr>
+                    <td style="font-size:10px;color:rgba(255,255,255,0.35);padding:3px 0;">معرف الجهاز</td>
+                    <td style="font-size:10px;color:rgba(255,255,255,0.4);text-align:left;font-family:'Courier New',monospace;direction:ltr;" dir="ltr">${deviceId}</td>
                   </tr>
                 </table>
               </div>
             </td>
           </tr>
+
+          <!-- Account 1 Card -->
           <tr>
-            <td align="center" style="padding-top:28px;">
-              <p style="margin:0;font-size:12px;color:rgba(255,255,255,0.3);line-height:1.6;text-align:center;">
-                تم الحظر التلقائي. يمكنك فك الحظر يدوياً من لوحة الإدارة إذا لزم الأمر.
-              </p>
+            <td style="padding-bottom:10px;">
+              <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:16px;overflow:hidden;">
+                <div style="padding:14px 18px;border-bottom:1px solid rgba(255,255,255,0.05);background:linear-gradient(90deg,rgba(255,82,82,0.06),transparent);">
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                      <td>
+                        <p style="margin:0;font-size:12px;font-weight:700;color:#FF8A80;">الحساب الأول</p>
+                        <p style="margin:2px 0 0;font-size:9px;color:rgba(255,255,255,0.3);">الحساب القديم المسجل على الجهاز</p>
+                      </td>
+                      <td align="left">
+                        <span style="display:inline-block;padding:3px 10px;border-radius:8px;font-size:9px;font-weight:700;color:#FF5252;background:rgba(255,82,82,0.12);border:1px solid rgba(255,82,82,0.2);">محظور</span>
+                      </td>
+                    </tr>
+                  </table>
+                </div>
+                <div style="padding:14px 18px;">
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                      <td style="padding:5px 0;font-size:11px;color:rgba(255,255,255,0.35);">الاسم</td>
+                      <td style="padding:5px 0;font-size:12px;color:#ffffff;font-weight:600;text-align:left;" dir="ltr">${user1.name}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding:5px 0;font-size:11px;color:rgba(255,255,255,0.35);">البريد الإلكتروني</td>
+                      <td style="padding:5px 0;font-size:11px;color:#FFD700;font-weight:600;text-align:left;font-family:'Courier New',monospace;" dir="ltr">${user1.email}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding:5px 0;font-size:11px;color:rgba(255,255,255,0.35);">الاشتراك</td>
+                      <td style="padding:5px 0;font-size:11px;color:rgba(255,255,255,0.6);text-align:left;">${formatSubscription(user1)}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding:5px 0;font-size:11px;color:rgba(255,255,255,0.35);">تاريخ التسجيل</td>
+                      <td style="padding:5px 0;font-size:10px;color:rgba(255,255,255,0.4);text-align:left;direction:ltr;" dir="ltr">${new Date(user1.createdAt).toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' })}</td>
+                    </tr>
+                  </table>
+                </div>
+              </div>
             </td>
           </tr>
+
+          <!-- Account 2 Card -->
           <tr>
-            <td align="center" style="padding-top:20px;border-top:1px solid rgba(255,255,255,0.06);">
-              <p style="margin:0;font-size:11px;color:rgba(255,255,255,0.15);">
-                ForexYemeni VIP Trading Signals &copy; ${new Date().getFullYear()}
+            <td style="padding-bottom:16px;">
+              <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:16px;overflow:hidden;">
+                <div style="padding:14px 18px;border-bottom:1px solid rgba(255,255,255,0.05);background:linear-gradient(90deg,rgba(255,82,82,0.06),transparent);">
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                      <td>
+                        <p style="margin:0;font-size:12px;font-weight:700;color:#FF8A80;">الحساب الثاني</p>
+                        <p style="margin:2px 0 0;font-size:9px;color:rgba(255,255,255,0.3);">${detectedAt === 'register' ? 'محاولة التسجيل الجديدة' : 'محاولة تسجيل الدخول'}</p>
+                      </td>
+                      <td align="left">
+                        <span style="display:inline-block;padding:3px 10px;border-radius:8px;font-size:9px;font-weight:700;color:#FF5252;background:rgba(255,82,82,0.12);border:1px solid rgba(255,82,82,0.2);">محظور</span>
+                      </td>
+                    </tr>
+                  </table>
+                </div>
+                <div style="padding:14px 18px;">
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                      <td style="padding:5px 0;font-size:11px;color:rgba(255,255,255,0.35);">الاسم</td>
+                      <td style="padding:5px 0;font-size:12px;color:#ffffff;font-weight:600;text-align:left;" dir="ltr">${user2.name}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding:5px 0;font-size:11px;color:rgba(255,255,255,0.35);">البريد الإلكتروني</td>
+                      <td style="padding:5px 0;font-size:11px;color:#FFD700;font-weight:600;text-align:left;font-family:'Courier New',monospace;" dir="ltr">${user2.email}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding:5px 0;font-size:11px;color:rgba(255,255,255,0.35);">الاشتراك</td>
+                      <td style="padding:5px 0;font-size:11px;color:rgba(255,255,255,0.6);text-align:left;">${formatSubscription(user2)}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding:5px 0;font-size:11px;color:rgba(255,255,255,0.35);">تاريخ التسجيل</td>
+                      <td style="padding:5px 0;font-size:10px;color:rgba(255,255,255,0.4);text-align:left;direction:ltr;" dir="ltr">${new Date(user2.createdAt).toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' })}</td>
+                    </tr>
+                  </table>
+                </div>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Action Note -->
+          <tr>
+            <td style="padding-bottom:24px;">
+              <div style="background:rgba(255,215,0,0.04);border:1px solid rgba(255,215,0,0.12);border-radius:12px;padding:14px 18px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td style="vertical-align:top;padding-left:10px;">
+                      <span style="font-size:16px;">💡</span>
+                    </td>
+                    <td>
+                      <p style="margin:0;font-size:11px;color:rgba(255,255,255,0.6);line-height:1.8;">
+                        <strong style="color:#FFD700;">ملاحظة:</strong> تم حظر كلا الحسابين تلقائياً مع الحفاظ على بيانات الاشتراك. يمكنك فك الحظر أو إدارة الحسابات من <strong style="color:rgba(255,255,255,0.8);">لوحة تحكم الإدارة</strong> إذا لزم الأمر.
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td align="center" style="padding-top:20px;border-top:1px solid rgba(255,255,255,0.05);">
+              <p style="margin:0;font-size:10px;color:rgba(255,255,255,0.15);">
+                ForexYemeni VIP Trading Signals &copy; ${new Date().getFullYear()} — نظام الحماية الأمنية
               </p>
             </td>
           </tr>
@@ -553,8 +630,8 @@ export function buildDuplicateAccountEmail(data: {
 
 export async function sendDuplicateAccountAlert(adminEmail: string, data: {
   detectedAt: 'register' | 'login';
-  user1: { name: string; email: string; createdAt: string; status: string };
-  user2: { name: string; email: string; createdAt: string; status: string };
+  user1: { name: string; email: string; createdAt: string; status: string; subscriptionType?: string; subscriptionExpiry?: string | null; packageName?: string | null };
+  user2: { name: string; email: string; createdAt: string; status: string; subscriptionType?: string; subscriptionExpiry?: string | null; packageName?: string | null };
   deviceId: string;
 }): Promise<{ ok: boolean; error?: string }> {
   const { subject, html } = buildDuplicateAccountEmail(data);

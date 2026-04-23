@@ -123,22 +123,14 @@ async function handleLogin(body: Record<string, unknown>) {
         // Another user already registered with this device → block both
         const now = new Date().toISOString();
 
-        // Block the existing device user
+        // Block the existing device user (preserve subscription)
         await updateUser(existingDeviceUser.id, {
           status: "blocked",
-          subscriptionType: "none",
-          subscriptionExpiry: null,
-          packageId: null,
-          packageName: null,
         });
 
-        // Block the current user too
+        // Block the current user too (preserve subscription)
         await updateUser(user.id, {
           status: "blocked",
-          subscriptionType: "none",
-          subscriptionExpiry: null,
-          packageId: null,
-          packageName: null,
         });
 
         // Send email alert to admin
@@ -153,12 +145,18 @@ async function handleLogin(body: Record<string, unknown>) {
               email: existingDeviceUser.email,
               createdAt: existingDeviceUser.createdAt,
               status: "blocked",
+              subscriptionType: existingDeviceUser.subscriptionType,
+              subscriptionExpiry: existingDeviceUser.subscriptionExpiry,
+              packageName: existingDeviceUser.packageName,
             },
             user2: {
               name: user.name,
               email: user.email,
               createdAt: user.createdAt,
               status: "blocked",
+              subscriptionType: user.subscriptionType,
+              subscriptionExpiry: user.subscriptionExpiry,
+              packageName: user.packageName,
             },
             deviceId: deviceId.trim(),
           }).catch(err => console.error("[Duplicate Account Login] Failed to send alert email:", err));

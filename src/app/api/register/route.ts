@@ -47,13 +47,9 @@ export async function POST(request: NextRequest) {
         // Found another account with the same device ID → block both
         const now = new Date().toISOString();
 
-        // Block the existing account
+        // Block the existing account (preserve subscription)
         await updateUser(existingDeviceUser.id, {
           status: "blocked",
-          subscriptionType: "none",
-          subscriptionExpiry: null,
-          packageId: null,
-          packageName: null,
         });
 
         // Send email alert to admin
@@ -68,12 +64,18 @@ export async function POST(request: NextRequest) {
               email: existingDeviceUser.email,
               createdAt: existingDeviceUser.createdAt,
               status: "blocked",
+              subscriptionType: existingDeviceUser.subscriptionType,
+              subscriptionExpiry: existingDeviceUser.subscriptionExpiry,
+              packageName: existingDeviceUser.packageName,
             },
             user2: {
               name: nameVal.sanitized,
               email: emailVal.sanitized,
               createdAt: now,
               status: "blocked",
+              subscriptionType: "none",
+              subscriptionExpiry: null,
+              packageName: null,
             },
             deviceId: deviceId.trim(),
           }).catch(err => console.error("[Duplicate Account] Failed to send alert email:", err));

@@ -46,6 +46,10 @@ export interface AppSettingsData {
   usdtWalletAddress: string | null;
   usdtNetwork: string | null;
   usdtNetworks?: UsdtNetworkAddress[];  // multiple network addresses
+  /* Referral settings */
+  referralEnabled: boolean;
+  referralRewardDays: number;
+  referralInviteeRewardDays: number;
 }
 
 export interface LocalPaymentMethodData {
