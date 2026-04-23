@@ -298,3 +298,26 @@ Stage Summary:
   - `/home/z/my-project/src/app/api/otp/verify/route.ts` - main OTP comparison fix
   - `/home/z/my-project/src/app/api/admin/route.ts` - verifyToken comparison fix
   - `/home/z/my-project/src/app/api/register/route.ts` - verifyToken comparison fix
+---
+Task ID: 1
+Agent: main
+Task: Fix three subscription system issues - proof image white screen, multiple USDT networks, re-subscription prevention
+
+Work Log:
+- Analyzed full codebase: types.ts, store.ts, page.tsx (4799 lines), payment APIs, upload API
+- Fixed payment proof image: replaced window.open("proof:uuid") with handleViewProofImage() that fetches image via GET /api/upload?id=<uuid> and displays in a full-screen modal overlay with loading state
+- Added UsdtNetworkAddress type to types.ts and UsdtNetwork to store.ts 
+- Replaced single USDT wallet/network settings with multi-network support (usdtNetworks array in AppSettings)
+- Rebuilt admin USDT settings UI: now shows list of network addresses with edit/toggle/delete, add form with network selector
+- Updated user USDT payment flow: if multiple networks, shows network selection step before wallet address
+- Added active subscription check in POST /api/payments (returns 409 if user has active subscription)
+- Added active subscription banner in user packages tab showing current plan, expiry, days remaining
+- Updated handleUsdtPayment and handleLocalPayment to handle hasActiveSubscription error response
+- Updated resetPaymentState to also clear selectedUsdtNetwork
+- Build verified: all routes compile successfully
+
+Stage Summary:
+- Payment proof images now display in modal instead of white screen
+- Admin can add multiple USDT network addresses (TRC20, BEP20, ERC20 etc.) with toggle/edit/delete
+- Users with active subscriptions cannot re-subscribe; active status shown as banner in packages tab
+- All changes backward-compatible with existing single USDT address configuration

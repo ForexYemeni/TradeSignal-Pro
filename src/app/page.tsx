@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 
 // ═══ EXTRACTED MODULES ═══
-import type { Signal, AdminSession, Stats, View, Tab, Filter, SubPackage, AppSettingsData, LocalPaymentMethodData } from "@/lib/types";
+import type { Signal, AdminSession, Stats, View, Tab, Filter, SubPackage, AppSettingsData, LocalPaymentMethodData, UsdtNetworkAddress } from "@/lib/types";
 import { timeAgo, isEntry, entryAccent, isTpLike, isSlLike, nativeNotify, playSound, registerPushNotification, unregisterPushNotification, formatCountdown, warmAudio, ensureNotificationPermission, showBrowserNotification, notifySignal, shareSessionToken } from "@/lib/utils";
 import { Stars, Div, Glass, SkeletonCard, SignalsLoadingSkeleton, StatsLoadingSkeleton, EmptyState, Confetti, useOnlineStatus, usePullToRefresh } from "@/components/shared";
 import { TpMiniCard, TradeStatusBanner, EntryCard, ClosedSignalCard, SplashScreen } from "@/components/SignalCards";
@@ -259,6 +259,7 @@ export default function HomePage() {
   const [selectedLocalMethod, setSelectedLocalMethod] = useState<LocalPaymentMethodData | null>(null);
   const [userPaymentMethods, setUserPaymentMethods] = useState<LocalPaymentMethodData[]>([]);
   const [usdtTxid, setUsdtTxid] = useState("");
+  const [selectedUsdtNetwork, setSelectedUsdtNetwork] = useState<UsdtNetworkAddress | null>(null);
   const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
   const [paymentProofPreview, setPaymentProofPreview] = useState<string | null>(null);
   const [paymentLoad, setPaymentLoad] = useState(false);
@@ -277,6 +278,18 @@ export default function HomePage() {
   const [methodFormCurrencyCode, setMethodFormCurrencyCode] = useState("");
   const [methodFormRate, setMethodFormRate] = useState("");
   const [methodLoad, setMethodLoad] = useState(false);
+
+  /* ── Proof Image Modal ── */
+  const [proofModalOpen, setProofModalOpen] = useState(false);
+  const [proofModalImage, setProofModalImage] = useState<string | null>(null);
+  const [proofModalLoading, setProofModalLoading] = useState(false);
+
+  /* ── USDT Multiple Networks ── */
+  const [usdtNetworks, setUsdtNetworks] = useState<UsdtNetworkAddress[]>([]);
+  const [showUsdtNetworkForm, setShowUsdtNetworkForm] = useState(false);
+  const [editingUsdtNetworkId, setEditingUsdtNetworkId] = useState<string | null>(null);
+  const [usdtNetFormNetwork, setUsdtNetFormNetwork] = useState("TRC20");
+  const [usdtNetFormAddress, setUsdtNetFormAddress] = useState("");
 
   /* ── Session Init: restore from localStorage ── */
   const [dbReady, setDbReady] = useState(false);
@@ -970,7 +983,10 @@ export default function HomePage() {
       const pkgData = await pkgRes.json();
       const setData = await setRes.json();
       if (pkgData.success) setPackages(pkgData.packages);
-      if (setData.success) setAppSettings(setData.settings);
+      if (setData.success) {
+        setAppSettings(setData.settings);
+        setUsdtNetworks(setData.settings.usdtNetworks || []);
+      }
     } catch (e) { console.error("Fetch packages:", e); }
   }
 
@@ -1063,11 +1079,140 @@ export default function HomePage() {
       const data = await res.json();
       if (data.success) {
         setAppSettings(data.settings);
+        // Sync USDT networks from settings
+        setUsdtNetworks(data.settings.usdtNetworks || []);
         toast.success("تم حفظ إعدادات USDT");
       } else {
         toast.error(data.error || "فشل حفظ الإعدادات");
       }
     } catch (e) { console.error("Save payment settings:", e); toast.error("خطأ في الاتصال"); }
+  }
+
+  /* ── Proof Image Viewer ── */
+  async function handleViewProofImage(proofUrl: string) {
+    // Extract proof ID from "proof:<uuid>" format
+    const proofId = proofUrl.replace("proof:", "");
+    if (!proofId) { toast.error("رابط الصورة غير صالح"); return; }
+    setProofModalOpen(true);
+    setProofModalLoading(true);
+    setProofModalImage(null);
+    try {
+      const res = await fetch(`/api/upload?id=${proofId}`);
+      const data = await res.json();
+      if (data.success && data.image) {
+        setProofModalImage(data.image);
+      } else {
+        toast.error(data.error || "الصورة غير موجودة أو انتهت صلاحيتها");
+        setProofModalOpen(false);
+      }
+    } catch (e) {
+      console.error("View proof:", e);
+      toast.error("خطأ في تحميل الصورة");
+      setProofModalOpen(false);
+    } finally {
+      setProofModalLoading(false);
+    }
+  }
+
+  /* ── USDT Network Addresses Handlers ── */
+  function resetUsdtNetForm() {
+    setUsdtNetFormNetwork("TRC20");
+    setUsdtNetFormAddress("");
+    setEditingUsdtNetworkId(null);
+    setShowUsdtNetworkForm(false);
+  }
+
+  async function handleSaveUsdtNetwork() {
+    if (!usdtNetFormAddress.trim()) { toast.error("عنوان المحفظة مطلوب"); return; }
+    const currentNetworks = [...(appSettings.usdtNetworks || appSettings.usdtNetwork ? [{
+      id: appSettings.usdtWalletAddress || "legacy",
+      network: appSettings.usdtNetwork || "TRC20",
+      address: appSettings.usdtWalletAddress || "",
+      isActive: true,
+      order: 0,
+    }] : [])];
+    // Remove old one being edited
+    const filtered = editingUsdtNetworkId ? currentNetworks.filter(n => n.id !== editingUsdtNetworkId) : currentNetworks;
+    const newNetwork = {
+      id: editingUsdtNetworkId || crypto.randomUUID(),
+      network: usdtNetFormNetwork,
+      address: usdtNetFormAddress.trim(),
+      isActive: true,
+      order: filtered.length,
+    };
+    filtered.push(newNetwork);
+    // Set first active address as default for backward compatibility
+    const firstActive = filtered.find(n => n.isActive);
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          usdtNetworks: filtered,
+          usdtWalletAddress: firstActive?.address || null,
+          usdtNetwork: firstActive?.network || null,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAppSettings(data.settings);
+        setUsdtNetworks(data.settings.usdtNetworks || []);
+        resetUsdtNetForm();
+        toast.success(editingUsdtNetworkId ? "تم تحديث عنوان الشبكة" : "تم إضافة عنوان الشبكة");
+      } else {
+        toast.error(data.error || "فشل الحفظ");
+      }
+    } catch (e) { console.error("Save USDT network:", e); toast.error("خطأ في الاتصال"); }
+  }
+
+  async function handleDeleteUsdtNetwork(id: string) {
+    const currentNetworks = appSettings.usdtNetworks || [];
+    const filtered = currentNetworks.filter(n => n.id !== id);
+    const firstActive = filtered.find(n => n.isActive);
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          usdtNetworks: filtered,
+          usdtWalletAddress: firstActive?.address || null,
+          usdtNetwork: firstActive?.network || null,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAppSettings(data.settings);
+        setUsdtNetworks(data.settings.usdtNetworks || []);
+        toast.success("تم حذف عنوان الشبكة");
+      } else {
+        toast.error(data.error || "فشل الحذف");
+      }
+    } catch (e) { console.error("Delete USDT network:", e); toast.error("خطأ في الاتصال"); }
+  }
+
+  async function handleToggleUsdtNetwork(id: string, active: boolean) {
+    const currentNetworks = appSettings.usdtNetworks || [];
+    const updated = currentNetworks.map(n => n.id === id ? { ...n, isActive: active } : n);
+    const firstActive = updated.find(n => n.isActive);
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          usdtNetworks: updated,
+          usdtWalletAddress: firstActive?.address || null,
+          usdtNetwork: firstActive?.network || null,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAppSettings(data.settings);
+        setUsdtNetworks(data.settings.usdtNetworks || []);
+        toast.success(active ? "تم تفعيل الشبكة" : "تم تعطيل الشبكة");
+      } else {
+        toast.error(data.error || "فشل التحديث");
+      }
+    } catch (e) { console.error("Toggle USDT network:", e); toast.error("خطأ في الاتصال"); }
   }
 
   /* ── Local Payment Methods Handlers ── */
@@ -1191,7 +1336,7 @@ export default function HomePage() {
       const res = await fetch("/api/payments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: session.id, packageId: selectedPkg.id, packagePrice: selectedPkg.price, paymentMethod: "usdt", txId: usdtTxid.trim() }),
+        body: JSON.stringify({ userId: session.id, packageId: selectedPkg.id, packagePrice: selectedPkg.price, paymentMethod: "usdt", txId: usdtTxid.trim(), network: selectedUsdtNetwork?.network || appSettings.usdtNetwork }),
       });
       const data = await res.json();
       if (data.success) {
@@ -1200,6 +1345,7 @@ export default function HomePage() {
         setTimeout(() => { fetchPackages(); handleLogout(); }, 3000);
       } else {
         toast.error(data.error || "فشل تفعيل الاشتراك");
+        if (data.hasActiveSubscription) resetPaymentState();
       }
     } catch (e) { console.error("USDT payment:", e); toast.error("خطأ في الاتصال"); }
     finally { setPaymentLoad(false); }
@@ -1245,6 +1391,7 @@ export default function HomePage() {
         toast.success("تم إرسال طلب الدفع بنجاح! سيتم مراجعته من قبل الإدارة.");
       } else {
         toast.error(data.error || "فشل إرسال طلب الدفع");
+        if (data.hasActiveSubscription) resetPaymentState();
       }
     } catch (e) { console.error("Local payment:", e); toast.error("خطأ في الاتصال"); }
     finally { setPaymentLoad(false); }
@@ -1252,7 +1399,8 @@ export default function HomePage() {
 
   function resetPaymentState() {
     setSelectedPkg(null); setPaymentMethod(null); setSelectedLocalMethod(null);
-    setUsdtTxid(""); setPaymentProofFile(null); setPaymentProofPreview(null);
+    setSelectedUsdtNetwork(null); setUsdtTxid("");
+    setPaymentProofFile(null); setPaymentProofPreview(null);
     setPaymentLoad(false); setPaymentResult(null);
   }
 
@@ -3192,35 +3340,112 @@ export default function HomePage() {
         {/* ══════ TAB: PACKAGES (Admin) ══════ */}
         {tab === "packages" && isAdmin && (
           <motion.div key="packages" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }} className="space-y-4">
-            {/* ── USDT Settings (Collapsible) ── */}
+            {/* ── USDT Multi-Network Settings ── */}
             <div className="rounded-2xl border border-amber-500/15 overflow-hidden" style={{ background: "linear-gradient(135deg, rgba(255,215,0,0.06) 0%, rgba(255,140,0,0.02) 100%)" }}>
               <button onClick={() => { setShowPaymentSettings(!showPaymentSettings); if (!showPaymentSettings) { setPaySettingsForm({ usdtWalletAddress: appSettings.usdtWalletAddress || "", usdtNetwork: appSettings.usdtNetwork || "TRC20" }); } }} className="w-full p-4 flex items-center justify-between text-sm text-foreground/80 hover:bg-muted/30 transition-colors">
                 <span className="flex items-center gap-2"><Wallet className="w-4 h-4 text-amber-400" />إعدادات محفظة USDT</span>
-                <span className={`text-[10px] transition-transform duration-200 ${showPaymentSettings ? "rotate-180" : ""}`}>▼</span>
+                <div className="flex items-center gap-2">
+                  {(appSettings.usdtNetworks || (appSettings.usdtWalletAddress ? [{ network: appSettings.usdtNetwork }] : [])).length > 0 && (
+                    <span className="text-[9px] bg-amber-500/15 text-amber-400 px-1.5 py-0.5 rounded-md font-bold">
+                      {(appSettings.usdtNetworks || []).filter(n => n.isActive).length} شبكة نشطة
+                    </span>
+                  )}
+                  <span className={`text-[10px] transition-transform duration-200 ${showPaymentSettings ? "rotate-180" : ""}`}>▼</span>
+                </div>
               </button>
               {showPaymentSettings && (
                 <div className="px-4 pb-4 space-y-3 animate-[fadeIn_0.2s_ease-out]">
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="col-span-2">
-                      <label className="text-[9px] text-muted-foreground mb-1 block font-medium">عنوان محفظة USDT</label>
-                      <Input value={paySettingsForm.usdtWalletAddress} onChange={e => setPaySettingsForm(p => ({ ...p, usdtWalletAddress: e.target.value }))} placeholder="T..."
-                        className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-10 rounded-xl text-[11px] font-mono" dir="ltr" />
+                  {/* Network Addresses List */}
+                  {(usdtNetworks.length > 0 || (appSettings.usdtWalletAddress && usdtNetworks.length === 0)) ? (
+                    <div className="space-y-2">
+                      {(usdtNetworks.length > 0 ? usdtNetworks : (appSettings.usdtWalletAddress ? [{
+                        id: "legacy", network: appSettings.usdtNetwork || "TRC20",
+                        address: appSettings.usdtWalletAddress || "", isActive: true, order: 0
+                      }] : [])).map(net => (
+                        <div key={net.id} className={`rounded-xl border p-3 space-y-2 ${net.isActive ? "border-amber-500/20 bg-amber-500/[0.04]" : "border-border bg-muted/20 opacity-60"}`}>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <div className={`w-6 h-6 rounded-lg ${net.isActive ? "bg-amber-500/15" : "bg-muted/40"} flex items-center justify-center flex-shrink-0`}>
+                                <Wallet className={`w-3 h-3 ${net.isActive ? "text-amber-400" : "text-muted-foreground"}`} />
+                              </div>
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg ${net.isActive ? "bg-amber-500/15 text-amber-400" : "bg-muted/50 text-muted-foreground"}`}>{net.network}</span>
+                              {!net.isActive && <span className="text-[8px] bg-muted/60 text-muted-foreground px-1.5 py-0.5 rounded-md">معطلة</span>}
+                            </div>
+                            <div className="flex gap-1">
+                              <button onClick={() => { setEditingUsdtNetworkId(net.id); setUsdtNetFormNetwork(net.network); setUsdtNetFormAddress(net.address); setShowUsdtNetworkForm(true); }}
+                                className="px-2 py-1 rounded-lg text-[8px] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/15 active:scale-95 transition-transform">تعديل</button>
+                              <button onClick={() => handleToggleUsdtNetwork(net.id, !net.isActive)}
+                                className={`px-2 py-1 rounded-lg text-[8px] font-medium border active:scale-95 transition-transform ${net.isActive ? "bg-amber-500/10 text-amber-300/70 border-amber-500/15" : "bg-emerald-500/10 text-emerald-400 border-emerald-500/15"}`}>
+                                {net.isActive ? "تعطيل" : "تفعيل"}
+                              </button>
+                              <button onClick={() => handleDeleteUsdtNetwork(net.id)}
+                                className="px-2 py-1 rounded-lg text-[8px] font-medium bg-red-500/5 text-red-300/60 border border-red-500/10 active:scale-95 transition-transform">
+                                <Trash2 className="w-2.5 h-2.5" />
+                              </button>
+                            </div>
+                          </div>
+                          <div className="bg-black/20 rounded-lg p-2">
+                            <div className="text-[9px] font-mono text-foreground/80 break-all select-all" dir="ltr">{net.address}</div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                    <div className="col-span-2">
-                      <label className="text-[9px] text-muted-foreground mb-1 block font-medium">الشبكة</label>
-                      <div className="flex gap-1.5 h-[40px]">
-                        {(["TRC20", "BEP20", "ERC20"] as const).map(n => (
-                          <button key={n} onClick={() => setPaySettingsForm(p => ({ ...p, usdtNetwork: n }))}
-                            className={`flex-1 rounded-xl text-[10px] font-semibold transition-all border ${paySettingsForm.usdtNetwork === n ? "bg-amber-500/20 text-amber-400 border-amber-500/30" : "bg-muted/50 text-muted-foreground border-border"}`}>
-                            {n}
+                  ) : (
+                    <div className="rounded-xl border border-dashed border-amber-500/20 p-4 text-center">
+                      <Wallet className="w-6 h-6 text-muted-foreground/40 mx-auto mb-2" />
+                      <p className="text-[10px] text-muted-foreground">لم تتم إضافة أي عناوين USDT بعد</p>
+                      <p className="text-[9px] text-muted-foreground/60 mt-1">أضف عناوين المحفظة لكل شبكة</p>
+                    </div>
+                  )}
+
+                  {/* Add/Edit Network Form */}
+                  <AnimatePresence>
+                  {showUsdtNetworkForm && (
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                      <div className="rounded-xl border border-amber-500/20 bg-muted/40 p-3 space-y-2.5">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <div className="w-4 h-4 rounded-lg bg-amber-500/20 flex items-center justify-center">
+                            {editingUsdtNetworkId ? <Settings className="w-2.5 h-2.5 text-amber-400" /> : <Plus className="w-2.5 h-2.5 text-amber-400" />}
+                          </div>
+                          <span className="text-[10px] font-bold text-amber-400">{editingUsdtNetworkId ? "تعديل عنوان الشبكة" : "إضافة شبكة جديدة"}</span>
+                        </div>
+                        <div>
+                          <label className="text-[9px] text-muted-foreground mb-1 block font-medium">الشبكة</label>
+                          <div className="flex gap-1.5 h-[40px]">
+                            {["TRC20", "BEP20", "ERC20"].map(n => (
+                              <button key={n} onClick={() => setUsdtNetFormNetwork(n)}
+                                className={`flex-1 rounded-xl text-[10px] font-semibold transition-all border ${usdtNetFormNetwork === n ? "bg-amber-500/20 text-amber-400 border-amber-500/30" : "bg-muted/50 text-muted-foreground border-border"}`}>
+                                {n}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-[9px] text-muted-foreground mb-1 block font-medium">عنوان المحفظة</label>
+                          <Input value={usdtNetFormAddress} onChange={e => setUsdtNetFormAddress(e.target.value)} placeholder="أدخل عنوان المحفظة..."
+                            className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-10 rounded-xl text-[11px] font-mono" dir="ltr" />
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={handleSaveUsdtNetwork}
+                            className="flex-1 h-10 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-black text-[11px] font-bold active:scale-[0.98] transition-transform flex items-center justify-center gap-1.5">
+                            <CheckCircle2 className="w-3.5 h-3.5" /> {editingUsdtNetworkId ? "حفظ التعديل" : "إضافة الشبكة"}
                           </button>
-                        ))}
+                          <button onClick={resetUsdtNetForm} className="h-10 px-4 rounded-xl bg-muted/60 text-muted-foreground border border-border text-[11px] font-medium active:scale-95 transition-transform">
+                            إلغاء
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                  <button onClick={handleSavePaymentSettings} className="w-full h-10 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-black text-[11px] font-bold active:scale-[0.98] transition-transform flex items-center justify-center gap-1.5">
-                    <Settings className="w-3.5 h-3.5" /> حفظ إعدادات USDT
-                  </button>
+                    </motion.div>
+                  )}
+                  </AnimatePresence>
+
+                  {/* Add Network Button (when form not showing) */}
+                  {!showUsdtNetworkForm && (
+                    <button onClick={() => { resetUsdtNetForm(); setShowUsdtNetworkForm(true); }}
+                      className="w-full h-10 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[11px] font-bold active:scale-[0.98] transition-transform flex items-center justify-center gap-1.5">
+                      <Plus className="w-3.5 h-3.5" /> إضافة شبكة USDT جديدة
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -3406,7 +3631,7 @@ export default function HomePage() {
                         </div>
                         {(req.proofUrl || req.paymentProofUrl) && (
                           <div className="mt-1">
-                            <button onClick={() => window.open(req.proofUrl || req.paymentProofUrl, "_blank")} className="flex items-center gap-1.5 text-[10px] text-sky-400 hover:text-sky-300 transition-colors">
+                            <button onClick={() => handleViewProofImage(req.proofUrl || req.paymentProofUrl || "")} className="flex items-center gap-1.5 text-[10px] text-sky-400 hover:text-sky-300 transition-colors">
                               <Image className="w-3.5 h-3.5" aria-hidden="true" /> عرض صورة الإثبات
                             </button>
                           </div>
@@ -3737,6 +3962,30 @@ export default function HomePage() {
               </div>
             </div>
 
+            {/* ── Active Subscription Banner ── */}
+            {session?.subscriptionType === "subscriber" && session?.subscriptionExpiry && new Date(session.subscriptionExpiry).getTime() > Date.now() && (
+              <div className="rounded-2xl border border-emerald-500/25 p-4" style={{ background: "linear-gradient(135deg, rgba(16,185,129,0.08) 0%, rgba(16,185,129,0.02) 100%)" }}>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-emerald-400">لديك اشتراك نشط</span>
+                      <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    </div>
+                    <div className="text-[11px] text-foreground font-semibold mt-0.5">{session.packageName}</div>
+                    <div className="flex items-center gap-3 mt-1">
+                      <span className="text-[9px] text-muted-foreground">ينتهي: {new Date(session.subscriptionExpiry).toLocaleDateString("ar-SA", { month: "short", day: "numeric" })}</span>
+                      <span className="text-[9px] text-muted-foreground">
+                        {(() => { const d = Math.ceil((new Date(session.subscriptionExpiry!).getTime() - Date.now()) / 86400000); return <span className={d > 7 ? "text-emerald-400" : d > 3 ? "text-amber-400" : "text-red-400"}>{d > 0 ? d : 0} يوم متبقي</span>; })()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* ── Payment Result ── */}
             <AnimatePresence>
             {paymentResult === "success" && (
@@ -3788,8 +4037,8 @@ export default function HomePage() {
                 {!paymentMethod && (
                   <div className="space-y-2">
                     <p className="text-xs font-bold text-foreground">اختر طريقة الدفع</p>
-                    {/* USDT Payment Card */}
-                    {appSettings.usdtWalletAddress && (
+                    {/* USDT Payment Card - show if any networks configured */}
+                    {(appSettings.usdtNetworks || []).filter(n => n.isActive).length > 0 && (
                       <button onClick={() => setPaymentMethod("usdt")} className="w-full rounded-2xl border border-border bg-muted/30 p-4 flex items-center gap-3 active:scale-[0.98] transition-transform hover:border-amber-500/25">
                         <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/20 flex items-center justify-center flex-shrink-0">
                           <Wallet className="w-5 h-5 text-amber-400" />
@@ -3817,7 +4066,7 @@ export default function HomePage() {
                         </div>
                       </button>
                     ))}
-                    {!appSettings.usdtWalletAddress && userPaymentMethods.length === 0 && (
+                    {(appSettings.usdtNetworks || []).filter(n => n.isActive).length === 0 && userPaymentMethods.length === 0 && (
                       <div className="text-center py-4">
                         <p className="text-xs text-muted-foreground">لا توجد طرق دفع متاحة حالياً</p>
                         <p className="text-[10px] text-muted-foreground mt-1">تواصل مع الإدارة للاشتراك</p>
@@ -3834,40 +4083,74 @@ export default function HomePage() {
                         <Wallet className="w-4 h-4 text-amber-400" />
                         <span className="text-xs font-bold text-amber-400">دفع USDT</span>
                       </div>
-                      {appSettings.usdtWalletAddress ? (
-                        <>
-                          {/* Step 1: Copy wallet address */}
-                          <div className="bg-muted/60 rounded-xl p-3 border border-border">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="text-[9px] text-muted-foreground font-medium">الخطوة 1: انسخ عنوان المحفظة</span>
-                              <span className="text-[8px] bg-amber-500/10 text-amber-400 px-1.5 py-0.5 rounded-md font-mono">{appSettings.usdtNetwork || "TRC20"}</span>
+                      {(() => {
+                        const activeNetworks = (appSettings.usdtNetworks || []).filter(n => n.isActive);
+                        // If only one network, auto-select it
+                        const displayNetwork = selectedUsdtNetwork || (activeNetworks.length === 1 ? activeNetworks[0] : null);
+                        const displayAddress = displayNetwork?.address || appSettings.usdtWalletAddress || "";
+                        const displayNetName = displayNetwork?.network || appSettings.usdtNetwork || "TRC20";
+                        if (!displayAddress) return (
+                          <div className="text-center py-2">
+                            <p className="text-xs text-muted-foreground">عنوان المحفظة غير متاح حالياً</p>
+                            <p className="text-[10px] text-muted-foreground mt-1">تواصل مع الإدارة للاشتراك</p>
+                          </div>
+                        );
+                        return (
+                          <>
+                            {/* Network Selection (if multiple) */}
+                            {activeNetworks.length > 1 && !selectedUsdtNetwork && (
+                              <div className="space-y-2">
+                                <label className="text-[9px] text-muted-foreground font-medium block">اختر الشبكة:</label>
+                                <div className="space-y-1.5">
+                                  {activeNetworks.map(net => (
+                                    <button key={net.id} onClick={() => setSelectedUsdtNetwork(net)}
+                                      className="w-full rounded-xl border border-border bg-muted/30 p-3 flex items-center justify-between active:scale-[0.98] transition-transform hover:border-amber-500/25">
+                                      <div className="flex items-center gap-2">
+                                        <div className="w-8 h-8 rounded-lg bg-amber-500/15 border border-amber-500/20 flex items-center justify-center">
+                                          <Wallet className="w-4 h-4 text-amber-400" />
+                                        </div>
+                                        <span className="text-[11px] font-bold text-foreground">{net.network}</span>
+                                      </div>
+                                      <span className="text-[8px] bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded-md font-mono">{net.network}</span>
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {/* Show selected network with option to change */}
+                            {selectedUsdtNetwork && activeNetworks.length > 1 && (
+                              <button onClick={() => setSelectedUsdtNetwork(null)} className="text-[9px] text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
+                                ← تغيير الشبكة
+                              </button>
+                            )}
+                            {/* Step 1: Copy wallet address */}
+                            <div className="bg-muted/60 rounded-xl p-3 border border-border">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-[9px] text-muted-foreground font-medium">الخطوة 1: انسخ عنوان المحفظة</span>
+                                <span className="text-[8px] bg-amber-500/10 text-amber-400 px-1.5 py-0.5 rounded-md font-mono">{displayNetName}</span>
+                              </div>
+                              <div className="bg-black/20 rounded-lg p-2.5">
+                                <div className="text-[10px] font-mono text-foreground break-all select-all" dir="ltr">{displayAddress}</div>
+                              </div>
+                              <button onClick={() => { navigator.clipboard.writeText(displayAddress); toast.success("تم نسخ العنوان"); }}
+                                className="mt-2 w-full py-2 rounded-lg text-[10px] text-amber-400 font-medium bg-amber-500/10 border border-amber-500/15 hover:bg-amber-500/15 transition-colors flex items-center justify-center gap-1.5">
+                                <Copy className="w-3 h-3" /> نسخ عنوان المحفظة
+                              </button>
                             </div>
-                            <div className="bg-black/20 rounded-lg p-2.5">
-                              <div className="text-[10px] font-mono text-foreground break-all select-all" dir="ltr">{appSettings.usdtWalletAddress}</div>
+                            {/* Step 2: Enter TXID */}
+                            <div>
+                              <label className="text-[9px] text-muted-foreground mb-1 block font-medium">الخطوة 2: أدخل رقم العملية (TXID) بعد التحويل</label>
+                              <Input value={usdtTxid} onChange={e => setUsdtTxid(e.target.value)} placeholder="أدخل رقم العملية..."
+                                className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-11 rounded-xl text-[11px] font-mono" dir="ltr" />
                             </div>
-                            <button onClick={() => { navigator.clipboard.writeText(appSettings.usdtWalletAddress || ""); toast.success("تم نسخ العنوان"); }}
-                              className="mt-2 w-full py-2 rounded-lg text-[10px] text-amber-400 font-medium bg-amber-500/10 border border-amber-500/15 hover:bg-amber-500/15 transition-colors flex items-center justify-center gap-1.5">
-                              <Copy className="w-3 h-3" /> نسخ عنوان المحفظة
+                            {/* Activate */}
+                            <button onClick={handleUsdtPayment} disabled={paymentLoad || !usdtTxid.trim()}
+                              className="w-full h-11 rounded-xl gold-gradient text-black text-xs font-bold disabled:opacity-40 active:scale-[0.98] transition-transform flex items-center justify-center gap-2">
+                              {paymentLoad ? <Loader2 className="w-4 h-4 animate-spin" /> : <><CheckCircle2 className="w-4 h-4" /> تفعيل الاشتراك الآن</>}
                             </button>
-                          </div>
-                          {/* Step 2: Enter TXID */}
-                          <div>
-                            <label className="text-[9px] text-muted-foreground mb-1 block font-medium">الخطوة 2: أدخل رقم العملية (TXID) بعد التحويل</label>
-                            <Input value={usdtTxid} onChange={e => setUsdtTxid(e.target.value)} placeholder="أدخل رقم العملية..."
-                              className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground h-11 rounded-xl text-[11px] font-mono" dir="ltr" />
-                          </div>
-                          {/* Activate */}
-                          <button onClick={handleUsdtPayment} disabled={paymentLoad || !usdtTxid.trim()}
-                            className="w-full h-11 rounded-xl gold-gradient text-black text-xs font-bold disabled:opacity-40 active:scale-[0.98] transition-transform flex items-center justify-center gap-2">
-                            {paymentLoad ? <Loader2 className="w-4 h-4 animate-spin" /> : <><CheckCircle2 className="w-4 h-4" /> تفعيل الاشتراك الآن</>}
-                          </button>
-                        </>
-                      ) : (
-                        <div className="text-center py-2">
-                          <p className="text-xs text-muted-foreground">عنوان المحفظة غير متاح حالياً</p>
-                          <p className="text-[10px] text-muted-foreground mt-1">تواصل مع الإدارة للاشتراك</p>
-                        </div>
-                      )}
+                          </>
+                        );
+                      })()}
                     </div>
                   </motion.div>
                 )}
@@ -3988,7 +4271,7 @@ export default function HomePage() {
                           )}
                         </div>
                         <div className="px-4 py-2.5 border-t border-border/40 bg-muted/20">
-                          <button onClick={() => { setSelectedPkg(pkg); setPaymentMethod(null); setSelectedLocalMethod(null); setUsdtTxid(""); setPaymentProofFile(null); setPaymentProofPreview(null); setPaymentResult(null); }}
+                          <button onClick={() => { setSelectedPkg(pkg); setPaymentMethod(null); setSelectedLocalMethod(null); setSelectedUsdtNetwork(null); setUsdtTxid(""); setPaymentProofFile(null); setPaymentProofPreview(null); setPaymentResult(null); }}
                             className="w-full h-10 rounded-xl gold-gradient text-black text-[11px] font-bold active:scale-[0.98] transition-transform flex items-center justify-center gap-1.5">
                             <Crown className="w-3.5 h-3.5" /> اشترك الآن
                           </button>
@@ -4563,6 +4846,30 @@ export default function HomePage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* ══════ Proof Image Modal ══════ */}
+      {proofModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={() => setProofModalOpen(false)}>
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+          <div className="relative z-10 w-full max-w-lg" onClick={e => e.stopPropagation()}>
+            {/* Close button */}
+            <button onClick={() => setProofModalOpen(false)} className="absolute -top-12 left-0 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors z-20">
+              <XCircle className="w-5 h-5" />
+            </button>
+            {/* Image container */}
+            <div className="rounded-2xl overflow-hidden border border-white/10 bg-black/50">
+              {proofModalLoading ? (
+                <div className="flex flex-col items-center justify-center py-20 gap-3">
+                  <Loader2 className="w-8 h-8 text-amber-400 animate-spin" />
+                  <span className="text-xs text-muted-foreground">جارٍ تحميل الصورة...</span>
+                </div>
+              ) : proofModalImage ? (
+                <img src={proofModalImage} alt="صورة إثبات التحويل" className="w-full max-h-[80vh] object-contain" />
+              ) : null}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

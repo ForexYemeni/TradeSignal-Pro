@@ -80,6 +80,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Check if user already has an active subscription
+    if (user.subscriptionType !== "none" && user.subscriptionExpiry && new Date(user.subscriptionExpiry) > new Date()) {
+      return NextResponse.json({
+        success: false,
+        error: `لديك اشتراك نشط بالفعل في باقة "${user.packageName}" ينتهي في ${new Date(user.subscriptionExpiry).toLocaleDateString("ar-SA")}. لا يمكنك الاشتراك في باقة جديدة حتى تنتهي الباقة الحالية.`,
+        hasActiveSubscription: true,
+        currentPackage: user.packageName,
+        currentExpiry: user.subscriptionExpiry,
+      }, { status: 409 });
+    }
+
     // Check for existing pending request for same user + package
     const existingRequests = await getPaymentRequestsByUser(userId);
     const existingPending = existingRequests.find(

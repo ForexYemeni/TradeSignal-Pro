@@ -504,12 +504,21 @@ export async function resetLoginAttempts(email: string): Promise<void> {
 }
 
 // ─── App Settings ──────────────────────────────────────
+export interface UsdtNetwork {
+  id: string;
+  network: string;       // e.g. "TRC20", "BEP20", "ERC20"
+  address: string;       // wallet address
+  isActive: boolean;
+  order: number;
+}
+
 export interface AppSettings {
   freeTrialPackageId: string | null;
   autoApproveOnRegister: boolean;
   /* Payment settings */
   usdtWalletAddress: string | null;
-  usdtNetwork: string | null;         // e.g. "TRC20", "BEP20", "ERC20"
+  usdtNetwork: string | null;         // e.g. "TRC20", "BEP20", "ERC20" (legacy single)
+  usdtNetworks?: UsdtNetwork[];       // multiple network addresses
   localCurrencyName: string | null;   // e.g. "ريال يمني", "جنيه مصري"
   localCurrencyCode: string | null;   // e.g. "YER", "EGP"
   usdtToLocalRate: number | null;     // e.g. 550 (1 USDT = 550 YER)
