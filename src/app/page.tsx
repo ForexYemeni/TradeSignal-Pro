@@ -306,6 +306,18 @@ export default function HomePage() {
     { id: "metals", label: "معادن", icon: "🥈" },
   ];
 
+  /* ── Helper: Map signal pair to instrument category ── */
+  const getPairCategory = (pair: string) => {
+    const p = (pair || "").toUpperCase();
+    if (/XAU|GOLD/.test(p)) return "gold";
+    if (/XAG|SILVER/.test(p)) return "metals";
+    if (/USOIL|CRUDE|OIL/.test(p)) return "oil";
+    if (/BTC|ETH|SOL|BNB|XRP|ADA|DOGE/.test(p)) return "crypto";
+    if (/NAS|US30|DAX|US500|SPX|NDX/.test(p)) return "indices";
+    if (/[A-Z]{3,6}(USD|EUR|GBP|JPY|AUD|NZD|CAD|CHF)/.test(p)) return "currencies";
+    return "other";
+  };
+
   /* ── View: login shows first ── */
   const [view, setView] = useState<View>("login");
   const [session, setSession] = useState<AdminSession | null>(null);
@@ -3580,6 +3592,49 @@ export default function HomePage() {
               </div>
             )}
 
+            {/* ── Daily Signal Limit Indicator (for non-admin users) ── */}
+            {!isAdmin && session?.packageId && (() => {
+              const userPkg = packages.find(p => p.id === session?.packageId);
+              if (!userPkg || userPkg.maxSignals <= 0) return null;
+              const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+              const todayISO = todayStart.toISOString();
+              const allowedCats = new Set(userPkg.instruments || []);
+              const todayEntryCount = signals.filter(s => {
+                if (!isEntry(s.signalCategory)) return false;
+                if (s.createdAt < todayISO) return false;
+                if (allowedCats.size > 0 && !allowedCats.has(getPairCategory(s.pair))) return false;
+                return true;
+              }).length;
+              const remaining = Math.max(0, userPkg.maxSignals - todayEntryCount);
+              const isLimited = remaining <= 0;
+
+              return (
+                <div className={`rounded-xl border p-3 ${isLimited ? "bg-red-500/[0.06] border-red-500/15" : remaining <= 1 ? "bg-amber-500/[0.06] border-amber-500/15" : "bg-white/[0.02] border-white/[0.05]"}`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${isLimited ? "bg-red-500/15" : remaining <= 1 ? "bg-amber-500/15" : "bg-purple-500/15"}`}>
+                        <Target className={`w-3.5 h-3.5 ${isLimited ? "text-red-400" : remaining <= 1 ? "text-amber-400" : "text-purple-400"}`} />
+                      </div>
+                      <div>
+                        <div className="text-[10px] font-bold text-foreground">
+                          {isLimited ? "تم استنفاد إشارات اليوم" : remaining <= 1 ? `متبقي ${remaining} إشارة فقط` : "حد الإشارات اليومية"}
+                        </div>
+                        <div className="text-[8px] text-muted-foreground">
+                          {isLimited ? "ستتلقى إشارات جديدة غداً" : `${todayEntryCount} من ${userPkg.maxSignals} إشارة مستخدمة`}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="text-right">
+                        <div className={`text-lg font-black font-mono ${isLimited ? "text-red-400" : remaining <= 1 ? "text-amber-400" : "text-purple-400"}`}>{remaining}</div>
+                        <div className="text-[7px] text-muted-foreground">متبقي</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* ── Filter Chips — Premium Style ── */}
             <div className="flex gap-2 overflow-x-auto scrollbar-none pb-0.5">
               {filterChips.map(f => (
@@ -4287,6 +4342,75 @@ export default function HomePage() {
                 )}
               </div>
             </div>
+
+            {/* ── Per-Package Subscriber Stats ── */}
+            {packages.length > 0 && (() => {
+              const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+              const todayISO = todayStart.toISOString();
+
+              return (
+                <div className="glass-card overflow-hidden">
+                  <div className="px-4 py-3 border-b border-white/[0.05] flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500/20 to-blue-500/10 border border-cyan-500/15 flex items-center justify-center">
+                      <BarChart3 className="w-4 h-4 text-cyan-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-bold text-foreground">إحصائيات المشتركين حسب الباقة</h3>
+                      <p className="text-[8px] text-muted-foreground">{users.filter(u => u.status === "active" && u.role === "user" && u.packageId).length} مشترك نشط</p>
+                    </div>
+                  </div>
+                  <div className="p-3 space-y-2">
+                    {packages.filter(p => p.isActive).map(pkg => {
+                      const subs = users.filter(u => u.packageId === pkg.id && u.status === "active" && u.role === "user");
+                      const allowedCats = new Set(pkg.instruments || []);
+                      const pkgEntrySignals = signals.filter(s => {
+                        if (!isEntry(s.signalCategory)) return false;
+                        if (allowedCats.size > 0 && !allowedCats.has(getPairCategory(s.pair))) return false;
+                        return true;
+                      });
+                      const todayEntries = pkgEntrySignals.filter(s => s.createdAt >= todayISO);
+                      const closedPkg = pkgEntrySignals.filter(s => s.status !== "ACTIVE");
+                      const wins = closedPkg.filter(s => s.status === "HIT_TP");
+                      const losses = closedPkg.filter(s => s.status === "HIT_SL");
+                      const totalPnl = parseFloat(closedPkg.reduce((a, s) => a + (s.pnlDollars ?? 0), 0).toFixed(2));
+                      const winRate = closedPkg.length > 0 ? Math.round((wins.length / closedPkg.length) * 100) : 0;
+
+                      return (
+                        <div key={pkg.id} className="bg-white/[0.02] rounded-xl border border-white/[0.05] p-3">
+                          <div className="flex items-center justify-between mb-2.5">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[11px] font-bold text-foreground">{pkg.name}</span>
+                              {pkg.maxSignals > 0 && (
+                                <span className="text-[7px] bg-purple-500/15 text-purple-400 px-1.5 py-0.5 rounded-md font-bold">{pkg.maxSignals} إشارة/يوم</span>
+                              )}
+                            </div>
+                            <span className="text-[11px] font-extrabold text-amber-400">{subs.length} مشترك</span>
+                          </div>
+                          <div className="grid grid-cols-4 gap-2">
+                            <div className="bg-white/[0.03] rounded-lg p-2 text-center">
+                              <div className="text-sm font-extrabold text-foreground">{todayEntries.length}</div>
+                              <div className="text-[7px] text-muted-foreground mt-0.5">إشارة اليوم</div>
+                            </div>
+                            <div className="bg-white/[0.03] rounded-lg p-2 text-center">
+                              <div className="text-sm font-extrabold text-emerald-400">{wins.length}</div>
+                              <div className="text-[7px] text-muted-foreground mt-0.5">رابحة</div>
+                            </div>
+                            <div className="bg-white/[0.03] rounded-lg p-2 text-center">
+                              <div className="text-sm font-extrabold text-red-400">{losses.length}</div>
+                              <div className="text-[7px] text-muted-foreground mt-0.5">خاسرة</div>
+                            </div>
+                            <div className="bg-white/[0.03] rounded-lg p-2 text-center">
+                              <div className={`text-sm font-extrabold ${totalPnl >= 0 ? "text-emerald-400" : "text-red-400"}`}>{totalPnl >= 0 ? "+" : ""}{totalPnl.toFixed(2)}$</div>
+                              <div className="text-[7px] text-muted-foreground mt-0.5">صافي الأرباح</div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* ── Packages Header ── */}
             <div className="flex items-center justify-between">
