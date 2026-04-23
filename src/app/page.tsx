@@ -290,8 +290,7 @@ export default function HomePage() {
   const [editingUsdtNetworkId, setEditingUsdtNetworkId] = useState<string | null>(null);
   const [usdtNetFormNetwork, setUsdtNetFormNetwork] = useState("TRC20");
   const [usdtNetFormAddress, setUsdtNetFormAddress] = useState("");
-  /* ── Admin Payment Tab ── */
-  const [adminPaymentTab, setAdminPaymentTab] = useState<"usdt" | "local">("usdt");
+  /* ── Admin Payment Tab (removed: using separate sections instead) ── */
 
   /* ── Session Init: restore from localStorage ── */
   const [dbReady, setDbReady] = useState(false);
@@ -3365,249 +3364,228 @@ export default function HomePage() {
 
         {/* ══════ TAB: PACKAGES (Admin) ══════ */}
         {tab === "packages" && isAdmin && (
-          <motion.div key="packages" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }} className="space-y-4">
-            {/* ── Payment Methods (Tabbed) ── */}
+          <motion.div key="packages" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }} className="space-y-5">
+
+            {/* ══════════════════════════════════════════════════
+                USDT PAYMENT NETWORKS — Professional Card
+               ══════════════════════════════════════════════════ */}
             <div className="rounded-2xl border border-border overflow-hidden">
-              {/* Tab Header */}
-              <div className="flex border-b border-border">
-                <button onClick={() => setAdminPaymentTab("usdt")}
-                  className={`flex-1 py-3.5 text-[11px] font-bold flex items-center justify-center gap-2 transition-colors relative ${adminPaymentTab === "usdt" ? "text-amber-400" : "text-muted-foreground hover:text-foreground"}`}>
-                  <Wallet className="w-3.5 h-3.5" />
-                  <span>USDT</span>
-                  <span className={`text-[8px] px-1.5 py-0.5 rounded-full ${adminPaymentTab === "usdt" ? "bg-amber-500/15" : "bg-muted/50"}`}>
-                    {(usdtNetworks.length > 0 ? usdtNetworks : (appSettings.usdtWalletAddress ? 1 : 0)).filter(Boolean).length || 0}
-                  </span>
-                  {adminPaymentTab === "usdt" && <div className="absolute bottom-0 left-1/4 right-1/4 h-0.5 bg-amber-400 rounded-full" />}
-                </button>
-                <button onClick={() => setAdminPaymentTab("local")}
-                  className={`flex-1 py-3.5 text-[11px] font-bold flex items-center justify-center gap-2 transition-colors relative ${adminPaymentTab === "local" ? "text-sky-400" : "text-muted-foreground hover:text-foreground"}`}>
-                  <Banknote className="w-3.5 h-3.5" />
-                  <span>محلية</span>
-                  <span className={`text-[8px] px-1.5 py-0.5 rounded-full ${adminPaymentTab === "local" ? "bg-sky-500/15" : "bg-muted/50"}`}>
-                    {localPaymentMethods.length}
-                  </span>
-                  {adminPaymentTab === "local" && <div className="absolute bottom-0 left-1/4 right-1/4 h-0.5 bg-sky-400 rounded-full" />}
-                </button>
+              {/* Section Header */}
+              <div className="px-4 py-3.5 border-b border-border/60 flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500/20 to-orange-500/10 border border-amber-500/15 flex items-center justify-center">
+                    <Wallet className="w-4 h-4 text-amber-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold text-foreground">شبكات USDT</h3>
+                    <p className="text-[8px] text-muted-foreground">{(usdtNetworks.filter(n => n.isActive).length || (appSettings.usdtWalletAddress && usdtNetworks.length === 0 ? 1 : 0))} شبكة نشطة</p>
+                  </div>
+                </div>
+                {!showUsdtNetworkForm && (
+                  <button onClick={() => { resetUsdtNetForm(); setShowUsdtNetworkForm(true); }}
+                    className="px-3 py-1.5 rounded-lg text-[9px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/15 hover:bg-amber-500/15 transition-all flex items-center gap-1 active:scale-95">
+                    <Plus className="w-3 h-3" /> إضافة شبكة
+                  </button>
+                )}
               </div>
 
-              {/* USDT Tab Content */}
-              {adminPaymentTab === "usdt" && (
-                <div className="p-4 space-y-4 animate-[fadeIn_0.2s_ease-out]">
-                  {(usdtNetworks.length > 0 || (appSettings.usdtWalletAddress && usdtNetworks.length === 0)) ? (
-                    <div className="space-y-3">
-                      {(usdtNetworks.length > 0 ? usdtNetworks : (appSettings.usdtWalletAddress ? [{
-                        id: "legacy", network: appSettings.usdtNetwork || "TRC20",
-                        address: appSettings.usdtWalletAddress || "", isActive: true, order: 0
-                      }] : [])).map(net => (
-                        <div key={net.id} className={`rounded-xl border p-3.5 ${net.isActive ? "border-amber-500/15 bg-amber-500/[0.03]" : "border-border/50 bg-muted/10 opacity-50"}`}>
-                          <div className="flex items-center justify-between mb-2.5">
-                            <div className="flex items-center gap-2.5">
-                              <div className={`w-9 h-9 rounded-xl ${net.isActive ? "bg-gradient-to-br from-amber-500/20 to-orange-500/10" : "bg-muted/30"} border ${net.isActive ? "border-amber-500/20" : "border-border/50"} flex items-center justify-center`}>
-                                <Wallet className={`w-4 h-4 ${net.isActive ? "text-amber-400" : "text-muted-foreground"}`} />
-                              </div>
-                              <div>
-                                <span className={`text-[11px] font-bold ${net.isActive ? "text-foreground" : "text-muted-foreground"}`}>{net.network}</span>
-                                <div className="flex items-center gap-1 mt-0.5">
-                                  <span className={`w-1.5 h-1.5 rounded-full ${net.isActive ? "bg-emerald-400" : "bg-muted-foreground"}`} />
-                                  <span className="text-[8px] text-muted-foreground">{net.isActive ? "نشطة" : "معطلة"}</span>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="flex gap-1.5">
-                              <button onClick={() => { setEditingUsdtNetworkId(net.id); setUsdtNetFormNetwork(net.network); setUsdtNetFormAddress(net.address); setShowUsdtNetworkForm(true); }}
-                                className="p-1.5 rounded-lg text-muted-foreground hover:text-amber-400 hover:bg-amber-500/10 border border-transparent hover:border-amber-500/15 transition-all">
-                                <Settings className="w-3.5 h-3.5" />
-                              </button>
-                              <button onClick={() => handleToggleUsdtNetwork(net.id, !net.isActive)}
-                                className={`p-1.5 rounded-lg border transition-all ${net.isActive ? "text-amber-300/60 hover:text-amber-300 hover:bg-amber-500/10 border-transparent hover:border-amber-500/15" : "text-muted-foreground hover:text-emerald-400 hover:bg-emerald-500/10 border-transparent hover:border-emerald-500/15"}`}>
-                                <span className="text-[9px] font-medium">{net.isActive ? "إيقاف" : "تشغيل"}</span>
-                              </button>
-                              <button onClick={() => handleDeleteUsdtNetwork(net.id)}
-                                className="p-1.5 rounded-lg text-muted-foreground hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/15 transition-all">
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
+              {/* Networks List */}
+              <div className="p-3 space-y-2">
+                {(usdtNetworks.length > 0 || (appSettings.usdtWalletAddress && usdtNetworks.length === 0)) ? (
+                  (usdtNetworks.length > 0 ? usdtNetworks : (appSettings.usdtWalletAddress ? [{
+                    id: "legacy", network: appSettings.usdtNetwork || "TRC20",
+                    address: appSettings.usdtWalletAddress || "", isActive: true, order: 0
+                  }] : [])).map(net => (
+                    <div key={net.id} className={`rounded-xl border p-3 transition-all ${net.isActive ? "border-amber-500/15 bg-amber-500/[0.03]" : "border-border/40 bg-muted/5 opacity-40"}`}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                          <div className={`w-8 h-8 rounded-lg ${net.isActive ? "bg-gradient-to-br from-amber-500/20 to-orange-500/10" : "bg-muted/20"} border ${net.isActive ? "border-amber-500/15" : "border-border/40"} flex items-center justify-center flex-shrink-0`}>
+                            <Wallet className={`w-3.5 h-3.5 ${net.isActive ? "text-amber-400" : "text-muted-foreground"}`} />
                           </div>
-                          <div className="bg-black/15 rounded-lg p-2.5">
-                            <div className="text-[9px] font-mono text-foreground/60 break-all select-all leading-relaxed" dir="ltr">{net.address}</div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className={`text-[10px] font-bold ${net.isActive ? "text-foreground" : "text-muted-foreground"}`}>{net.network}</span>
+                              <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[7px] font-bold ${net.isActive ? "bg-emerald-500/10 text-emerald-400" : "bg-muted/20 text-muted-foreground"}`}>
+                                <span className={`w-1 h-1 rounded-full ${net.isActive ? "bg-emerald-400" : "bg-muted-foreground"}`} />
+                                {net.isActive ? "نشطة" : "معطلة"}
+                              </span>
+                            </div>
+                            <div className="text-[8px] font-mono text-foreground/40 truncate mt-0.5" dir="ltr">{net.address}</div>
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="py-8 text-center">
-                      <div className="w-12 h-12 rounded-2xl bg-muted/20 border border-border/50 flex items-center justify-center mx-auto mb-3">
-                        <Wallet className="w-5 h-5 text-muted-foreground/40" />
-                      </div>
-                      <p className="text-[11px] text-muted-foreground font-medium">لا توجد شبكات USDT</p>
-                      <p className="text-[9px] text-muted-foreground/50 mt-1">أضف عناوين المحفظة لتفعيل الدفع عبر USDT</p>
-                    </div>
-                  )}
-
-                  {/* Add/Edit Network */}
-                  <AnimatePresence>
-                  {showUsdtNetworkForm && (
-                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="rounded-xl border border-amber-500/15 bg-amber-500/[0.03] p-4 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold text-amber-400">{editingUsdtNetworkId ? "تعديل الشبكة" : "شبكة جديدة"}</span>
-                        <button onClick={resetUsdtNetForm} className="text-muted-foreground hover:text-foreground transition-colors"><XCircle className="w-4 h-4" /></button>
-                      </div>
-                      <div className="flex gap-1.5 h-[42px]">
-                        {["TRC20", "BEP20", "ERC20"].map(n => (
-                          <button key={n} onClick={() => setUsdtNetFormNetwork(n)}
-                            className={`flex-1 rounded-xl text-[10px] font-semibold transition-all border ${usdtNetFormNetwork === n ? "bg-amber-500/20 text-amber-400 border-amber-500/30 shadow-sm shadow-amber-500/10" : "bg-muted/30 text-muted-foreground border-border hover:bg-muted/50"}`}>
-                            {n}
+                        <div className="flex gap-1 flex-shrink-0">
+                          <button onClick={() => { setEditingUsdtNetworkId(net.id); setUsdtNetFormNetwork(net.network); setUsdtNetFormAddress(net.address); setShowUsdtNetworkForm(true); }}
+                            className="p-1.5 rounded-md text-muted-foreground hover:text-amber-400 hover:bg-amber-500/10 transition-all">
+                            <Settings className="w-3 h-3" />
                           </button>
-                        ))}
-                      </div>
-                      <Input value={usdtNetFormAddress} onChange={e => setUsdtNetFormAddress(e.target.value)} placeholder="أدخل عنوان المحفظة..."
-                        className="bg-black/10 border-border/50 text-foreground placeholder:text-muted-foreground/50 h-11 rounded-xl text-[11px] font-mono focus:border-amber-500/30" dir="ltr" />
-                      <div className="flex gap-2">
-                        <button onClick={handleSaveUsdtNetwork}
-                          className="flex-1 h-11 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-black text-[11px] font-bold active:scale-[0.98] transition-all shadow-sm shadow-amber-500/20">
-                          <CheckCircle2 className="w-4 h-4 mx-auto" /> {editingUsdtNetworkId ? "حفظ" : "إضافة"}
-                        </button>
-                      </div>
-                    </motion.div>
-                  )}
-                  </AnimatePresence>
-
-                  {!showUsdtNetworkForm && (
-                    <button onClick={() => { resetUsdtNetForm(); setShowUsdtNetworkForm(true); }}
-                      className="w-full py-3 rounded-xl border border-dashed border-amber-500/20 text-amber-400/60 text-[11px] font-semibold hover:bg-amber-500/5 hover:text-amber-400 hover:border-amber-500/30 transition-all flex items-center justify-center gap-2">
-                      <Plus className="w-4 h-4" /> إضافة شبكة جديدة
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {/* Local Payment Tab Content */}
-              {adminPaymentTab === "local" && (
-                <div className="p-4 space-y-4 animate-[fadeIn_0.2s_ease-out]">
-                  {/* Method Form */}
-                  <AnimatePresence>
-                  {showMethodForm && (
-                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="rounded-xl border border-sky-500/15 bg-sky-500/[0.03] p-4 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold text-sky-400">{editingMethodId ? "تعديل طريقة الدفع" : "طريقة دفع جديدة"}</span>
-                        <button onClick={resetMethodForm} className="text-muted-foreground hover:text-foreground transition-colors"><XCircle className="w-4 h-4" /></button>
-                      </div>
-                      <div className="space-y-2.5">
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="col-span-2">
-                            <label className="text-[9px] text-muted-foreground mb-1 block">اسم المحفظة</label>
-                            <Input value={methodFormName} onChange={e => setMethodFormName(e.target.value)} placeholder="محفظة YmntPay" dir="rtl"
-                              className="bg-black/10 border-border/50 text-foreground placeholder:text-muted-foreground/50 h-10 rounded-xl text-[11px]" />
-                          </div>
-                          <div className="col-span-2">
-                            <label className="text-[9px] text-muted-foreground mb-1 block">اسم المزود</label>
-                            <Input value={methodFormWalletName} onChange={e => setMethodFormWalletName(e.target.value)} placeholder="YmntPay, Chime, MTN" dir="ltr"
-                              className="bg-black/10 border-border/50 text-foreground placeholder:text-muted-foreground/50 h-10 rounded-xl text-[11px] font-mono" />
-                          </div>
-                          <div className="col-span-2">
-                            <label className="text-[9px] text-muted-foreground mb-1 block">رقم المحفظة</label>
-                            <Input value={methodFormWallet} onChange={e => setMethodFormWallet(e.target.value)} placeholder="أدخل رقم المحفظة" dir="ltr"
-                              className="bg-black/10 border-border/50 text-foreground placeholder:text-muted-foreground/50 h-10 rounded-xl text-[11px] font-mono" />
-                          </div>
-                          <div>
-                            <label className="text-[9px] text-muted-foreground mb-1 block">اسم العملة</label>
-                            <Input value={methodFormCurrencyName} onChange={e => setMethodFormCurrencyName(e.target.value)} placeholder="الريال اليمني" dir="rtl"
-                              className="bg-black/10 border-border/50 text-foreground placeholder:text-muted-foreground/50 h-10 rounded-xl text-[11px]" />
-                          </div>
-                          <div>
-                            <label className="text-[9px] text-muted-foreground mb-1 block">رمز العملة</label>
-                            <Input value={methodFormCurrencyCode} onChange={e => setMethodFormCurrencyCode(e.target.value)} placeholder="YER" dir="ltr"
-                              className="bg-black/10 border-border/50 text-foreground placeholder:text-muted-foreground/50 h-10 rounded-xl text-[11px] font-mono" />
-                          </div>
-                          <div className="col-span-2">
-                            <label className="text-[9px] text-muted-foreground mb-1 block">سعر الصرف (1 USDT = ?)</label>
-                            <Input type="number" value={methodFormRate} onChange={e => setMethodFormRate(e.target.value)} placeholder="535" dir="ltr"
-                              className="bg-black/10 border-border/50 text-foreground placeholder:text-muted-foreground/50 h-10 rounded-xl text-[11px] font-mono" />
-                          </div>
+                          <button onClick={() => handleToggleUsdtNetwork(net.id, !net.isActive)}
+                            className={`p-1.5 rounded-md transition-all ${net.isActive ? "text-muted-foreground/50 hover:text-red-400 hover:bg-red-500/10" : "text-muted-foreground hover:text-emerald-400 hover:bg-emerald-500/10"}`}>
+                            {net.isActive ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
+                          </button>
+                          <button onClick={() => handleDeleteUsdtNetwork(net.id)}
+                            className="p-1.5 rounded-md text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-all">
+                            <Trash2 className="w-3 h-3" />
+                          </button>
                         </div>
-                        <button onClick={handleSaveMethod} disabled={methodLoad}
-                          className="w-full h-11 rounded-xl bg-gradient-to-r from-sky-500 to-cyan-500 text-white text-[11px] font-bold disabled:opacity-40 active:scale-[0.98] transition-all shadow-sm shadow-sky-500/20">
-                          {methodLoad ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : <><CheckCircle2 className="w-4 h-4" /> {editingMethodId ? "حفظ التعديلات" : "إضافة"}</>}
-                        </button>
                       </div>
-                    </motion.div>
-                  )}
-                  </AnimatePresence>
+                    </div>
+                  ))
+                ) : (
+                  <div className="py-6 text-center">
+                    <p className="text-[10px] text-muted-foreground">لا توجد شبكات USDT</p>
+                    <p className="text-[8px] text-muted-foreground/50 mt-1">أضف عناوين المحفظة لتفعيل الدفع عبر USDT</p>
+                  </div>
+                )}
 
-                  {/* Methods List */}
-                  {localPaymentMethods.length > 0 ? (
-                    <div className="space-y-3">
-                      {localPaymentMethods.map(m => (
-                        <motion.div key={m.id} initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.03 }}
-                          className={`rounded-xl border p-3.5 ${m.isActive ? "border-sky-500/15 bg-sky-500/[0.03]" : "border-border/50 bg-muted/10 opacity-50"}`}>
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center gap-2.5">
-                              <div className={`w-9 h-9 rounded-xl ${m.isActive ? "bg-gradient-to-br from-sky-500/20 to-cyan-500/10" : "bg-muted/30"} border ${m.isActive ? "border-sky-500/20" : "border-border/50"} flex items-center justify-center`}>
-                                <CreditCard className={`w-4 h-4 ${m.isActive ? "text-sky-400" : "text-muted-foreground"}`} />
-                              </div>
-                              <div>
-                                <span className={`text-[11px] font-bold ${m.isActive ? "text-foreground" : "text-muted-foreground"}`}>{m.name}</span>
-                                <div className="flex items-center gap-1 mt-0.5">
-                                  <span className={`w-1.5 h-1.5 rounded-full ${m.isActive ? "bg-emerald-400" : "bg-muted-foreground"}`} />
-                                  <span className="text-[8px] text-muted-foreground">{m.isActive ? "نشطة" : "معطلة"}</span>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="flex gap-1.5">
-                              <button onClick={() => { setEditingMethodId(m.id); setMethodFormName(m.name); setMethodFormWallet(m.walletAddress); setMethodFormWalletName(m.walletName); setMethodFormCurrencyName(m.currencyName); setMethodFormCurrencyCode(m.currencyCode); setMethodFormRate(String(m.exchangeRate)); setShowMethodForm(true); }}
-                                className="p-1.5 rounded-lg text-muted-foreground hover:text-sky-400 hover:bg-sky-500/10 border border-transparent hover:border-sky-500/15 transition-all">
-                                <Settings className="w-3.5 h-3.5" />
-                              </button>
-                              <button onClick={() => handleToggleMethod(m.id, !m.isActive)}
-                                className={`p-1.5 rounded-lg border transition-all ${m.isActive ? "text-amber-300/60 hover:text-amber-300 hover:bg-amber-500/10 border-transparent hover:border-amber-500/15" : "text-muted-foreground hover:text-emerald-400 hover:bg-emerald-500/10 border-transparent hover:border-emerald-500/15"}`}>
-                                <span className="text-[9px] font-medium">{m.isActive ? "إيقاف" : "تشغيل"}</span>
-                              </button>
-                              <button onClick={() => handleDeleteMethod(m.id)}
-                                className="p-1.5 rounded-lg text-muted-foreground hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/15 transition-all">
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </div>
-                          {/* Details */}
-                          <div className="space-y-2 text-[9px]">
-                            <div className="flex items-center gap-2">
-                              <span className="text-muted-foreground/60 w-14 flex-shrink-0">المزود</span>
-                              <span className="text-foreground font-medium font-mono" dir="ltr">{m.walletName}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-muted-foreground/60 w-14 flex-shrink-0">المحفظة</span>
-                              <span className="text-foreground font-mono truncate" dir="ltr">{m.walletAddress}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-muted-foreground/60 w-14 flex-shrink-0">العملة</span>
-                              <span className="text-foreground">{m.currencyName} ({m.currencyCode})</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-muted-foreground/60 w-14 flex-shrink-0">السعر</span>
-                              <span className="text-amber-400 font-bold font-mono" dir="ltr">1 USDT = {m.exchangeRate.toLocaleString()} {m.currencyCode}</span>
-                            </div>
-                          </div>
-                        </motion.div>
+                {/* Add/Edit Network Form */}
+                <AnimatePresence>
+                {showUsdtNetworkForm && (
+                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="rounded-xl border border-amber-500/15 bg-amber-500/[0.03] p-3.5 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-amber-400">{editingUsdtNetworkId ? "تعديل الشبكة" : "شبكة جديدة"}</span>
+                      <button onClick={resetUsdtNetForm} className="text-muted-foreground hover:text-foreground transition-colors"><XCircle className="w-3.5 h-3.5" /></button>
+                    </div>
+                    <div className="flex gap-1.5 h-9">
+                      {["TRC20", "BEP20", "ERC20"].map(n => (
+                        <button key={n} onClick={() => setUsdtNetFormNetwork(n)}
+                          className={`flex-1 rounded-lg text-[9px] font-semibold transition-all border ${usdtNetFormNetwork === n ? "bg-amber-500/20 text-amber-400 border-amber-500/30" : "bg-muted/20 text-muted-foreground border-border/50 hover:bg-muted/30"}`}>
+                          {n}
+                        </button>
                       ))}
                     </div>
-                  ) : !showMethodForm ? (
-                    <div className="py-8 text-center">
-                      <div className="w-12 h-12 rounded-2xl bg-muted/20 border border-border/50 flex items-center justify-center mx-auto mb-3">
-                        <Banknote className="w-5 h-5 text-muted-foreground/40" />
-                      </div>
-                      <p className="text-[11px] text-muted-foreground font-medium">لا توجد طرق دفع محلية</p>
-                      <p className="text-[9px] text-muted-foreground/50 mt-1">أضف طرق دفع للعملات المحلية</p>
-                    </div>
-                  ) : null}
-
-                  {!showMethodForm && localPaymentMethods.length >= 0 && (
-                    <button onClick={() => { resetMethodForm(); setShowMethodForm(true); }}
-                      className="w-full py-3 rounded-xl border border-dashed border-sky-500/20 text-sky-400/60 text-[11px] font-semibold hover:bg-sky-500/5 hover:text-sky-400 hover:border-sky-500/30 transition-all flex items-center justify-center gap-2">
-                      <Plus className="w-4 h-4" /> إضافة طريقة دفع جديدة
+                    <Input value={usdtNetFormAddress} onChange={e => setUsdtNetFormAddress(e.target.value)} placeholder="أدخل عنوان المحفظة..."
+                      className="bg-black/10 border-border/50 text-foreground placeholder:text-muted-foreground/50 h-9 rounded-lg text-[10px] font-mono focus:border-amber-500/30" dir="ltr" />
+                    <button onClick={handleSaveUsdtNetwork}
+                      className="w-full h-9 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 text-black text-[10px] font-bold active:scale-[0.98] transition-all flex items-center justify-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> {editingUsdtNetworkId ? "حفظ" : "إضافة"}
                     </button>
-                  )}
+                  </motion.div>
+                )}
+                </AnimatePresence>
+              </div>
+            </div>
+
+            {/* ══════════════════════════════════════════════════
+                LOCAL PAYMENT METHODS — Professional Card
+               ══════════════════════════════════════════════════ */}
+            <div className="rounded-2xl border border-border overflow-hidden">
+              {/* Section Header */}
+              <div className="px-4 py-3.5 border-b border-border/60 flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-500/20 to-cyan-500/10 border border-sky-500/15 flex items-center justify-center">
+                    <Banknote className="w-4 h-4 text-sky-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold text-foreground">طرق الدفع المحلية</h3>
+                    <p className="text-[8px] text-muted-foreground">{localPaymentMethods.filter(m => m.isActive).length} طريقة نشطة</p>
+                  </div>
                 </div>
-              )}
+                {!showMethodForm && (
+                  <button onClick={() => { resetMethodForm(); setShowMethodForm(true); }}
+                    className="px-3 py-1.5 rounded-lg text-[9px] font-semibold bg-sky-500/10 text-sky-400 border border-sky-500/15 hover:bg-sky-500/15 transition-all flex items-center gap-1 active:scale-95">
+                    <Plus className="w-3 h-3" /> إضافة طريقة
+                  </button>
+                )}
+              </div>
+
+              {/* Methods List */}
+              <div className="p-3 space-y-2">
+                {/* Add/Edit Form */}
+                <AnimatePresence>
+                {showMethodForm && (
+                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="rounded-xl border border-sky-500/15 bg-sky-500/[0.03] p-3.5 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-sky-400">{editingMethodId ? "تعديل طريقة الدفع" : "طريقة دفع جديدة"}</span>
+                      <button onClick={resetMethodForm} className="text-muted-foreground hover:text-foreground transition-colors"><XCircle className="w-3.5 h-3.5" /></button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="col-span-2">
+                        <label className="text-[8px] text-muted-foreground mb-0.5 block">اسم المحفظة</label>
+                        <Input value={methodFormName} onChange={e => setMethodFormName(e.target.value)} placeholder="محفظة YmntPay" dir="rtl"
+                          className="bg-black/10 border-border/50 text-foreground placeholder:text-muted-foreground/50 h-9 rounded-lg text-[10px]" />
+                      </div>
+                      <div className="col-span-2">
+                        <label className="text-[8px] text-muted-foreground mb-0.5 block">اسم المزود</label>
+                        <Input value={methodFormWalletName} onChange={e => setMethodFormWalletName(e.target.value)} placeholder="YmntPay, Chime, MTN" dir="ltr"
+                          className="bg-black/10 border-border/50 text-foreground placeholder:text-muted-foreground/50 h-9 rounded-lg text-[10px] font-mono" />
+                      </div>
+                      <div className="col-span-2">
+                        <label className="text-[8px] text-muted-foreground mb-0.5 block">رقم المحفظة</label>
+                        <Input value={methodFormWallet} onChange={e => setMethodFormWallet(e.target.value)} placeholder="أدخل رقم المحفظة" dir="ltr"
+                          className="bg-black/10 border-border/50 text-foreground placeholder:text-muted-foreground/50 h-9 rounded-lg text-[10px] font-mono" />
+                      </div>
+                      <div>
+                        <label className="text-[8px] text-muted-foreground mb-0.5 block">اسم العملة</label>
+                        <Input value={methodFormCurrencyName} onChange={e => setMethodFormCurrencyName(e.target.value)} placeholder="الريال اليمني" dir="rtl"
+                          className="bg-black/10 border-border/50 text-foreground placeholder:text-muted-foreground/50 h-9 rounded-lg text-[10px]" />
+                      </div>
+                      <div>
+                        <label className="text-[8px] text-muted-foreground mb-0.5 block">رمز العملة</label>
+                        <Input value={methodFormCurrencyCode} onChange={e => setMethodFormCurrencyCode(e.target.value)} placeholder="YER" dir="ltr"
+                          className="bg-black/10 border-border/50 text-foreground placeholder:text-muted-foreground/50 h-9 rounded-lg text-[10px] font-mono" />
+                      </div>
+                      <div className="col-span-2">
+                        <label className="text-[8px] text-muted-foreground mb-0.5 block">سعر الصرف (1 USDT = ?)</label>
+                        <Input type="number" value={methodFormRate} onChange={e => setMethodFormRate(e.target.value)} placeholder="535" dir="ltr"
+                          className="bg-black/10 border-border/50 text-foreground placeholder:text-muted-foreground/50 h-9 rounded-lg text-[10px] font-mono" />
+                      </div>
+                    </div>
+                    <button onClick={handleSaveMethod} disabled={methodLoad}
+                      className="w-full h-9 rounded-lg bg-gradient-to-r from-sky-500 to-cyan-500 text-white text-[10px] font-bold disabled:opacity-40 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5">
+                      {methodLoad ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <><CheckCircle2 className="w-3.5 h-3.5" /> {editingMethodId ? "حفظ التعديلات" : "إضافة"}</>}
+                    </button>
+                  </motion.div>
+                )}
+                </AnimatePresence>
+
+                {/* Methods Cards */}
+                {localPaymentMethods.length > 0 ? (
+                  localPaymentMethods.map(m => (
+                    <motion.div key={m.id} initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.03 }}
+                      className={`rounded-xl border p-3 transition-all ${m.isActive ? "border-sky-500/15 bg-sky-500/[0.03]" : "border-border/40 bg-muted/5 opacity-40"}`}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                          <div className={`w-8 h-8 rounded-lg ${m.isActive ? "bg-gradient-to-br from-sky-500/20 to-cyan-500/10" : "bg-muted/20"} border ${m.isActive ? "border-sky-500/15" : "border-border/40"} flex items-center justify-center flex-shrink-0`}>
+                            <CreditCard className={`w-3.5 h-3.5 ${m.isActive ? "text-sky-400" : "text-muted-foreground"}`} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className={`text-[10px] font-bold ${m.isActive ? "text-foreground" : "text-muted-foreground"}`}>{m.name}</span>
+                              <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[7px] font-bold ${m.isActive ? "bg-emerald-500/10 text-emerald-400" : "bg-muted/20 text-muted-foreground"}`}>
+                                <span className={`w-1 h-1 rounded-full ${m.isActive ? "bg-emerald-400" : "bg-muted-foreground"}`} />
+                                {m.isActive ? "نشطة" : "معطلة"}
+                              </span>
+                            </div>
+                            <div className="text-[8px] text-muted-foreground/60 mt-0.5">
+                              <span className="font-mono" dir="ltr">{m.walletName}</span> · <span>{m.currencyName}</span> · <span className="text-amber-400/80 font-bold font-mono" dir="ltr">1 USDT = {m.exchangeRate.toLocaleString()} {m.currencyCode}</span>
+                            </div>
+                            <div className="text-[8px] font-mono text-foreground/30 truncate mt-0.5" dir="ltr">{m.walletAddress}</div>
+                          </div>
+                        </div>
+                        <div className="flex gap-1 flex-shrink-0">
+                          <button onClick={() => { setEditingMethodId(m.id); setMethodFormName(m.name); setMethodFormWallet(m.walletAddress); setMethodFormWalletName(m.walletName); setMethodFormCurrencyName(m.currencyName); setMethodFormCurrencyCode(m.currencyCode); setMethodFormRate(String(m.exchangeRate)); setShowMethodForm(true); }}
+                            className="p-1.5 rounded-md text-muted-foreground hover:text-sky-400 hover:bg-sky-500/10 transition-all">
+                            <Settings className="w-3 h-3" />
+                          </button>
+                          <button onClick={() => handleToggleMethod(m.id, !m.isActive)}
+                            className={`p-1.5 rounded-md transition-all ${m.isActive ? "text-muted-foreground/50 hover:text-red-400 hover:bg-red-500/10" : "text-muted-foreground hover:text-emerald-400 hover:bg-emerald-500/10"}`}>
+                            {m.isActive ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
+                          </button>
+                          <button onClick={() => handleDeleteMethod(m.id)}
+                            className="p-1.5 rounded-md text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-all">
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))
+                ) : !showMethodForm ? (
+                  <div className="py-6 text-center">
+                    <p className="text-[10px] text-muted-foreground">لا توجد طرق دفع محلية</p>
+                    <p className="text-[8px] text-muted-foreground/50 mt-1">أضف طرق دفع للعملات المحلية</p>
+                  </div>
+                ) : null}
+              </div>
             </div>
 
             {/* ── Payment Requests Review ── */}
@@ -3995,30 +3973,41 @@ export default function HomePage() {
                 const daysColor = remainingDays > 7 ? "text-emerald-400" : remainingDays > 3 ? "text-amber-400" : "text-red-400";
                 const daysBg = remainingDays > 7 ? "bg-emerald-500/15 border-emerald-500/25" : remainingDays > 3 ? "bg-amber-500/15 border-amber-500/25" : "bg-red-500/15 border-red-500/25";
                 const daysTextColor = remainingDays > 7 ? "text-emerald-400" : remainingDays > 3 ? "text-amber-400" : "text-red-400";
+                // Find next paid package for upgrade
+                const paidPkgs = packages.filter(p => p.isActive && p.type === "paid").sort((a, b) => a.order - b.order);
+                const currentPkgIdx = currentPkg ? paidPkgs.findIndex(p => p.id === currentPkg.id) : -1;
+                const nextPkg = currentPkgIdx >= 0 && currentPkgIdx < paidPkgs.length - 1 ? paidPkgs[currentPkgIdx + 1] : null;
+                let upgradePrice = 0;
+                if (nextPkg && currentPkg && currentPkg.type === "paid") {
+                  const remainingValue = (remainingDays / currentPkg.durationDays) * currentPkg.price;
+                  upgradePrice = Math.ceil(Math.max(0, nextPkg.price - remainingValue));
+                } else if (nextPkg && isFreeOrTrial) {
+                  upgradePrice = nextPkg.price;
+                }
                 return (
                   <div className="rounded-2xl border border-emerald-500/20 overflow-hidden" style={{ background: "linear-gradient(145deg, rgba(16,185,129,0.06) 0%, rgba(16,185,129,0.01) 100%)" }}>
                     {/* Top gradient bar */}
                     <div className="h-1 w-full" style={{ background: "linear-gradient(90deg, #10B981, #34D399, #6EE7B7)" }} />
                     <div className="p-4 space-y-3">
-                      {/* Status row */}
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-11 h-11 rounded-xl bg-emerald-500/15 border border-emerald-500/20 flex items-center justify-center flex-shrink-0">
-                            <Crown className="w-5 h-5 text-emerald-400" />
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-extrabold text-foreground">{session.packageName}</span>
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[8px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                                مفعّل
-                              </span>
-                            </div>
-                            <p className="text-[10px] text-muted-foreground mt-0.5">اشتراكك الحالي نشط ومفعل</p>
-                          </div>
+                      {/* Status row: icon + name + badge */}
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-xl bg-emerald-500/15 border border-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                          <Crown className="w-6 h-6 text-emerald-400" />
                         </div>
-                        {/* Days counter */}
-                        <div className={`flex items-center justify-between p-3 rounded-xl border ${daysBg}`}>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-extrabold text-foreground">{session.packageName}</span>
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[8px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                              مفعّل
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">اشتراكك الحالي نشط ومفعل</p>
+                        </div>
+                      </div>
+                      {/* Days counter card */}
+                      <div className={`p-3 rounded-xl border ${daysBg}`}>
+                        <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <CalendarDays className={`w-4 h-4 ${daysTextColor}`} />
                             <span className="text-[10px] text-muted-foreground">تاريخ الانتهاء</span>
@@ -4029,12 +4018,43 @@ export default function HomePage() {
                             <span className="text-[9px] text-muted-foreground">يوم</span>
                           </div>
                         </div>
-                        {/* Cancel button */}
-                        <button onClick={handleCancelSubscription}
-                          className="w-full py-2.5 rounded-xl text-[10px] font-medium text-red-400/70 bg-red-500/5 border border-red-500/10 hover:bg-red-500/10 hover:text-red-400 transition-colors flex items-center justify-center gap-1.5">
-                          <XCircle className="w-3.5 h-3.5" /> إلغاء الاشتراك الآن
-                        </button>
                       </div>
+                      {/* Upgrade to next package */}
+                      {nextPkg && upgradePrice > 0 && (
+                        <div className="rounded-xl border border-sky-500/15 bg-sky-500/[0.04] p-3 space-y-2.5">
+                          <div className="flex items-center gap-2">
+                            <Sparkles className="w-4 h-4 text-sky-400" />
+                            <span className="text-[11px] font-bold text-sky-400">الترقية للباقة التالية</span>
+                          </div>
+                          <div className="flex items-center justify-between gap-2">
+                            <div>
+                              <div className="text-[10px] text-muted-foreground">
+                                {isFreeOrTrial ? "اشترك في" : "ترقية إلى"} <span className="font-bold text-foreground">{nextPkg.name}</span>
+                                {isFreeOrTrial ? "" : " — دفع الفرق فقط"}
+                              </div>
+                              <div className="flex items-center gap-2 mt-1">
+                                {!isFreeOrTrial && <span className="text-[9px] text-muted-foreground line-through">${nextPkg.price}</span>}
+                                <span className="text-base font-black text-sky-400 font-mono">${upgradePrice}</span>
+                                {!isFreeOrTrial && <span className="text-[8px] bg-sky-500/10 text-sky-400 px-1.5 py-0.5 rounded-md font-bold">وفر ${nextPkg.price - upgradePrice}</span>}
+                              </div>
+                              {isFreeOrTrial ? (
+                                <div className="text-[8px] text-muted-foreground mt-1">{nextPkg.durationDays} يوم</div>
+                              ) : (
+                                <div className="text-[8px] text-muted-foreground mt-1">يتم تمديد {nextPkg.durationDays} يوم إضافي من تاريخ الانتهاء الحالي</div>
+                              )}
+                            </div>
+                            <button onClick={() => { setSelectedPkg(nextPkg); setPaymentMethod(null); setSelectedLocalMethod(null); setSelectedUsdtNetwork(null); setUsdtTxid(""); setPaymentProofFile(null); setPaymentProofPreview(null); setPaymentResult(null); }}
+                              className="flex-shrink-0 px-4 py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-cyan-500 text-white text-[10px] font-bold active:scale-[0.98] transition-transform flex items-center gap-1.5 shadow-sm shadow-sky-500/20">
+                              <Sparkles className="w-3.5 h-3.5" /> ترقية الآن
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                      {/* Cancel button */}
+                      <button onClick={handleCancelSubscription}
+                        className="w-full py-2.5 rounded-xl text-[10px] font-medium text-red-400/70 bg-red-500/5 border border-red-500/10 hover:bg-red-500/10 hover:text-red-400 transition-colors flex items-center justify-center gap-1.5">
+                        <XCircle className="w-3.5 h-3.5" /> إلغاء الاشتراك
+                      </button>
                     </div>
                   </div>
                 );
