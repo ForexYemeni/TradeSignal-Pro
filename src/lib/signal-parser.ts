@@ -571,7 +571,7 @@ function extractEntry(text: string): number | null {
 function extractStopLoss(text: string): number | null {
   // Remove "مسافة الوقف: X نقطة" lines FIRST to avoid matching the distance as SL price
   // Also remove "مسافة الوقف: X" without "نقطة" (some formats omit it)
-  const cleanText = text.replace(/مسافة الوقف\s*[:\-–]?\s*[\d,.]+\s*نقطة?/gi, "");
+  const cleanText = text.replace(/مسافة الوقف\s*[:\-–]?\s*[\d,.]+(?:\s*نقطة)?/gi, "");
 
   const patterns = [
     // Primary: "الوقف : <price>" or "الوقف: <price>"
