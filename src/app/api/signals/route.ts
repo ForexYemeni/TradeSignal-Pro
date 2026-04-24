@@ -342,34 +342,54 @@ async function handleUpdateSignal(parsed: any) {
       updateData.partialWin = true;
       // Keep the existing hitTpIndex (number of TPs achieved before SL)
       updateData.hitTpIndex = prevHitTp;
-
-      // Calculate NET P&L: sum of TP wins minus SL loss on remaining position
-      let tpProfitDollars = 0;
-      let tpProfitPoints = 0;
-      for (let i = 0; i < Math.min(prevHitTp, tps.length); i++) {
-        const tpPrice = tps[i].tp;
-        const pts = Math.abs(tpPrice - entry);
-        tpProfitPoints += pts;
-        if (lotSize > 0) tpProfitDollars += pts * pipVal * lotSize;
-        else if (balance > 0 && slDist > 0) tpProfitDollars += (pts / slDist) * (balance * 0.02) * tps[i].rr;
-        else if (balance > 0) tpProfitDollars += (balance * 0.02) * tps[i].rr;
-      }
-      // SL loss on remaining fraction
-      const slPoints = slDist;
-      let slDollars = 0;
-      if (lotSize > 0) slDollars = slPoints * pipVal * lotSize;
-      else if (balance > 0) slDollars = balance * 0.02;
-      // Approximate remaining position after partial closes
-      const remainingFraction = Math.max(0, 1 - (prevHitTp / totalTPsCount));
-      const netDollars = tpProfitDollars - (slDollars * remainingFraction);
-      const netPoints = tpProfitPoints - (slPoints * remainingFraction);
-
       updateData.hitPrice = parsed.hitPrice || stopLoss;
-      updateData.pnlPoints = parsed.pnlPoints || parseFloat(netPoints.toFixed(1));
-      updateData.pnlDollars = validatedParsedDollar != null ? capPnL(validatedParsedDollar) : capPnL(netDollars);
       updateData.totalTPs = totalTPsCount;
-      // Mark TP status list to show which TPs were hit + SL on remainder
       updateData.tpStatusList = parsed.tpStatusList || "";
+
+      // ═══ FIX: Use stored P&L from last TP hit instead of recalculating ═══
+      // Previous bug: summed all TP profits for the FULL lot size ($63.47)
+      // but only applied SL loss on the remaining fraction ($1.92), giving
+      // a wildly inflated net of $61.55 instead of the actual $14.51.
+      //
+      // Now: use the P&L value stored when the last TP was hit (extracted
+      // from the signal text, e.g. "+$14.51"), falling back to a corrected
+      // partial-close calculation only when no text value is available.
+      let finalDollars: number;
+      let finalPoints: number;
+
+      if (validatedParsedDollar != null) {
+        // SL signal text contains a dollar amount — use it directly
+        finalDollars = validatedParsedDollar;
+        finalPoints = parsed.pnlPoints || parent.pnlPoints || 0;
+      } else if (parent.pnlDollars != null && parent.pnlDollars !== 0) {
+        // Use the P&L stored from the last TP hit (from signal text)
+        // This is the actual broker profit reported in the TP notification
+        finalDollars = parent.pnlDollars;
+        finalPoints = parent.pnlPoints || 0;
+      } else {
+        // Fallback: corrected partial-close calculation
+        // Each TP closes 1/totalTPs of the position (not the full lot)
+        let tpProfitDollars = 0;
+        let tpProfitPoints = 0;
+        for (let i = 0; i < Math.min(prevHitTp, tps.length); i++) {
+          const tpPrice = tps[i].tp;
+          const pts = Math.abs(tpPrice - entry);
+          tpProfitPoints += pts;
+          if (lotSize > 0) tpProfitDollars += pts * pipVal * (lotSize / totalTPsCount);
+          else if (balance > 0 && slDist > 0) tpProfitDollars += (pts / slDist) * (balance * 0.02) * tps[i].rr / totalTPsCount;
+          else if (balance > 0) tpProfitDollars += (balance * 0.02) * tps[i].rr / totalTPsCount;
+        }
+        const slPoints = slDist;
+        let slDollars = 0;
+        if (lotSize > 0) slDollars = slPoints * pipVal * lotSize;
+        else if (balance > 0) slDollars = balance * 0.02;
+        const remainingFraction = Math.max(0, 1 - (prevHitTp / totalTPsCount));
+        finalDollars = tpProfitDollars - (slDollars * remainingFraction);
+        finalPoints = tpProfitPoints - (slPoints * remainingFraction);
+      }
+
+      updateData.pnlDollars = capPnL(finalDollars);
+      updateData.pnlPoints = parsed.pnlPoints || parseFloat(finalPoints.toFixed(1));
     } else {
       // No TPs were hit — pure SL loss
       const points = slDist;
