@@ -4586,8 +4586,23 @@ export default function HomePage() {
                         if (allowedCats.size > 0 && !allowedCats.has(getPairCategory(s.pair))) return false;
                         return true;
                       });
-                      const todayEntries = pkgEntrySignals.filter(s => s.createdAt >= todayISO);
-                      const closedPkg = pkgEntrySignals.filter(s => s.status !== "ACTIVE");
+                      // Apply maxSignals per-day limit (simulates what subscriber actually receives)
+                      const limitedSignals = pkg.maxSignals > 0 ? (() => {
+                        const byDay = new Map<string, typeof pkgEntrySignals>();
+                        for (const s of pkgEntrySignals) {
+                          const day = s.createdAt.slice(0, 10);
+                          if (!byDay.has(day)) byDay.set(day, []);
+                          byDay.get(day)!.push(s);
+                        }
+                        const limited: typeof pkgEntrySignals = [];
+                        for (const daySignals of byDay.values()) {
+                          daySignals.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+                          limited.push(...daySignals.slice(0, pkg.maxSignals));
+                        }
+                        return limited;
+                      })() : pkgEntrySignals;
+                      const todayEntries = limitedSignals.filter(s => s.createdAt >= todayISO);
+                      const closedPkg = limitedSignals.filter(s => s.status !== "ACTIVE");
                       const wins = closedPkg.filter(s => s.status === "HIT_TP");
                       const losses = closedPkg.filter(s => s.status === "HIT_SL");
                       const totalPnl = parseFloat(closedPkg.reduce((a, s) => a + (s.pnlDollars ?? 0), 0).toFixed(2));
