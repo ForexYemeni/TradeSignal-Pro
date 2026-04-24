@@ -12,6 +12,28 @@ import type { Signal, SignalCategory, TakeProfit } from "@/lib/types";
 import { timeAgo, isEntry, entryAccent, isTpLike, isSlLike, formatCountdown } from "@/lib/utils";
 import { Stars, Glass, Div, useOnlineStatus } from "@/components/shared";
 
+/* ── Helper: Map pair name to Arabic instrument label ── */
+function getInstrumentLabel(pair: string): string {
+  const p = (pair || "").toUpperCase();
+  if (/XAU|GOLD/.test(p)) return "الذهب";
+  if (/XAG|SILVER/.test(p)) return "الفضة";
+  if (/USOIL|CRUDE|OIL/.test(p)) return "النفط";
+  if (/BTC/.test(p)) return "بيتكوين";
+  if (/ETH/.test(p)) return "إيثريوم";
+  if (/SOL/.test(p)) return "سولانا";
+  if (/BNB/.test(p)) return "بينانس";
+  if (/XRP/.test(p)) return "ريبل";
+  if (/ADA/.test(p)) return "كاردانو";
+  if (/DOGE/.test(p)) return "دوج";
+  if (/NAS|NDX/.test(p)) return "ناسداك";
+  if (/US30|DOW/.test(p)) return "داو جونز";
+  if (/DAX/.test(p)) return "داكس";
+  if (/US500|SPX/.test(p)) return "إس آند بي";
+  if (/JPY/.test(p)) return "ين ياباني";
+  if (/[A-Z]{3,6}(USD|EUR|GBP|AUD|NZD|CAD|CHF)/.test(p)) return "فوركس";
+  return "";
+}
+
 /* ═══════════════════════════════════════════════════════════════
    1. CATEGORY CONFIG
    ═══════════════════════════════════════════════════════════════ */
@@ -465,10 +487,10 @@ export function EntryCard({ s, idx, isAdmin, onUpdate, onDelete, isNew, statusCh
                       <span className="font-mono text-amber-400 font-bold tabular-nums" dir="ltr">1:{s.maxRR}</span>
                     </div>
                   )}
-                  {s.instrument && (
+                  {getInstrumentLabel(s.pair) && (
                     <div className="flex items-center justify-between">
                       <span className="text-muted-foreground/60">الأداة</span>
-                      <span className="text-foreground">{s.instrument}</span>
+                      <span className="text-foreground">{getInstrumentLabel(s.pair)}</span>
                     </div>
                   )}
                 </div>
