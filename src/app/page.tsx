@@ -164,43 +164,47 @@ function ReferralSection({ session, appSettings }: { session: any; appSettings: 
 
   return (
     <div className="space-y-3">
-      {/* ── Share Your Code ── */}
-      <div className="rounded-2xl border border-violet-500/15 overflow-hidden" style={{ background: "linear-gradient(135deg, rgba(139,92,246,0.06) 0%, rgba(109,40,217,0.02) 100%)" }}>
-        <div className="p-4 space-y-3">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-violet-500/15 border border-violet-500/15 flex items-center justify-center">
-              <Gift className="w-4 h-4 text-violet-400" />
+      {/* ── Share Your Code — PROMINENT CARD ── */}
+      <div className="card-premium rounded-2xl overflow-hidden relative">
+        {/* Decorative gradient glow */}
+        <div className="absolute -top-10 -right-10 w-32 h-32 rounded-full bg-violet-500/[0.08] blur-3xl" />
+        <div className="absolute -bottom-8 -left-8 w-24 h-24 rounded-full bg-amber-500/[0.06] blur-3xl" />
+        <div className="relative p-4 space-y-4">
+          {/* Header */}
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shadow-violet-500/25" style={{ boxShadow: "0 4px 12px rgba(139, 92, 246, 0.2), 0 0 20px rgba(139, 92, 246, 0.08)" }}>
+              <Gift className="w-5 h-5 text-white" />
             </div>
             <div className="flex-1">
-              <h3 className="text-xs font-bold text-foreground">دعوة أصدقائك</h3>
-              <p className="text-[9px] text-muted-foreground">شارك كودك واحصل على {referralData.stats.rewardDays} أيام لكل اشتراك مدفوع</p>
+              <h3 className="text-sm font-extrabold text-foreground">كن سفيراً واحصل على اشتراك مجاني</h3>
+              <p className="text-[10px] text-muted-foreground/80 mt-0.5">شارك كودك واحصل على {referralData.stats.rewardDays} أيام لكل اشتراك مدفوع من صديقك</p>
             </div>
           </div>
 
           {/* Referral Code Display */}
-          <div className="flex items-center gap-2">
-            <div className="flex-1 rounded-xl bg-muted/50 border border-border px-3 py-2.5 text-center">
-              <span className="text-lg font-black font-mono tracking-[4px] text-violet-400">{referralData.referralCode || "----"}</span>
+          <div className="flex items-center gap-2.5">
+            <div className="flex-1 rounded-xl bg-white/[0.04] border border-violet-500/20 px-4 py-3 text-center">
+              <span className="text-xl font-black font-mono tracking-[6px] text-violet-400" style={{ textShadow: "0 0 16px rgba(139, 92, 246, 0.4)" }}>{referralData.referralCode || "----"}</span>
             </div>
-            <button onClick={handleCopy} className="px-4 py-2.5 rounded-xl bg-violet-500/15 border border-violet-500/20 text-violet-400 active:scale-95 transition-transform flex items-center gap-1.5">
-              <Copy className="w-3.5 h-3.5" />
-              <span className="text-[10px] font-bold">{copied ? "تم!" : "نسخ"}</span>
+            <button onClick={handleCopy} className="px-5 py-3 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 text-white active:scale-95 transition-transform flex items-center gap-2 shadow-lg shadow-violet-500/20">
+              <Copy className="w-4 h-4" />
+              <span className="text-xs font-bold">{copied ? "تم النسخ!" : "نسخ الكود"}</span>
             </button>
           </div>
 
           {/* Stats Row */}
           <div className="grid grid-cols-3 gap-2">
-            <div className="rounded-lg bg-muted/40 border border-border p-2 text-center">
-              <div className="text-sm font-black text-foreground">{referralData.stats.total}</div>
-              <div className="text-[8px] text-muted-foreground">مدعو</div>
+            <div className="rounded-lg bg-white/[0.03] border border-white/[0.06] p-2.5 text-center">
+              <div className="text-base font-black text-foreground">{referralData.stats.total}</div>
+              <div className="text-[9px] text-muted-foreground/60 font-medium">إجمالي الدعوات</div>
             </div>
-            <div className="rounded-lg bg-emerald-500/[0.08] border border-emerald-500/15 p-2 text-center">
-              <div className="text-sm font-black text-emerald-400">{referralData.stats.active}</div>
-              <div className="text-[8px] text-emerald-400/60">مشترك نشط</div>
+            <div className="rounded-lg bg-emerald-500/[0.06] border border-emerald-500/10 p-2.5 text-center">
+              <div className="text-base font-black text-emerald-400" style={{ textShadow: "0 0 8px rgba(16, 185, 129, 0.3)" }}>{referralData.stats.active}</div>
+              <div className="text-[9px] text-emerald-400/60 font-medium">مشترك نشط</div>
             </div>
-            <div className="rounded-lg bg-violet-500/[0.08] border border-violet-500/15 p-2 text-center">
-              <div className="text-sm font-black text-violet-400">{referralData.stats.rewarded * referralData.stats.rewardDays}</div>
-              <div className="text-[8px] text-violet-400/60">يوم مكافأة</div>
+            <div className="rounded-lg bg-amber-500/[0.06] border border-amber-500/10 p-2.5 text-center">
+              <div className="text-base font-black text-amber-400" style={{ textShadow: "0 0 8px rgba(251, 191, 36, 0.3)" }}>{referralData.stats.rewarded * referralData.stats.rewardDays}</div>
+              <div className="text-[9px] text-amber-400/60 font-medium">أيام مكافأة</div>
             </div>
           </div>
         </div>
@@ -345,6 +349,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState<Stats | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [audioMuted, setAudioMuted] = useState(false);
   const [audioVol, setAudioVol] = useState(0.7);
   const prevIdsRef = useRef<Set<string>>(new Set());
@@ -2074,6 +2079,19 @@ export default function HomePage() {
         return !matched; // If not matched to any category, show it
       });
     }
+    // Category filter
+    if (categoryFilter) {
+      const catMap: Record<string, RegExp> = {
+        gold: /XAU|GOLD/i,
+        currencies: /^(?!.*(XAU|GOLD|XAG|SILVER|USOIL|CRUDE|OIL|BTC|ETH|SOL|BNB|XRP|ADA|DOGE|NAS|US30|DAX|US500|SPX|NDX))[A-Z]{3,6}(USD|EUR|GBP|JPY|AUD|NZD|CAD|CHF)/i,
+        indices: /NAS|US30|DAX|US500|SPX|NDX/i,
+        crypto: /BTC|ETH|SOL|BNB|XRP|ADA|DOGE/i,
+        oil: /USOIL|CRUDE|OIL/i,
+        metals: /XAG|SILVER/i,
+      };
+      const regex = catMap[categoryFilter];
+      if (regex) result = result.filter(s => regex.test(s.pair));
+    }
     return result;
   }
 
@@ -2987,9 +3005,16 @@ export default function HomePage() {
   /* ═══════════════════════════════════════════════════════════════
      RENDER: MAIN APP
      ═══════════════════════════════════════════════════════════════ */
-  const filterChips: { key: Filter; label: string }[] = [
+  const filterChips: { key: Filter | string; label: string; category?: boolean }[] = [
     { key: "all", label: "الكل" }, { key: "buy", label: "شراء" },
     { key: "sell", label: "بيع" }, { key: "active", label: "نشطة" }, { key: "closed", label: "مغلقة" },
+    // Category filters
+    { key: "gold", label: "🥇 ذهب", category: true },
+    { key: "currencies", label: "💱 عملات", category: true },
+    { key: "indices", label: "📈 مؤشرات", category: true },
+    { key: "crypto", label: "₿ كريبتو", category: true },
+    { key: "oil", label: "🛢️ نفط", category: true },
+    { key: "metals", label: "🔩 معادن", category: true },
   ];
 
   const tabs: { key: Tab; label: string; icon: React.ReactNode; badge?: number; adminOnly?: boolean }[] = [
@@ -2997,9 +3022,9 @@ export default function HomePage() {
     { key: "signals", label: "الإشارات", icon: <Activity className="w-5 h-5" />, badge: activeCount },
     { key: "dashboard", label: "الإحصائيات", icon: <BarChart3 className="w-5 h-5" /> },
     ...(isAdmin ? [{ key: "analyst" as Tab, label: "المحلل", icon: <Send className="w-5 h-5" /> }] : []),
-    ...(isAdmin ? [{ key: "users" as Tab, label: "المستخدمين", icon: <User className="w-5 h-5" />, adminOnly: true }] : []),
+    ...(isAdmin ? [{ key: "users" as Tab, label: "المستخدمين", icon: <Users className="w-5 h-5" />, adminOnly: true }] : []),
     { key: "packages" as Tab, label: isAdmin ? "الباقات" : "الاشتراك", icon: <Package className="w-5 h-5" /> },
-    { key: "account", label: "الحساب", icon: <User className="w-5 h-5" /> },
+    { key: "account", label: "الحساب", icon: <Settings className="w-5 h-5" /> },
   ];
 
   const mainContent = (
@@ -3144,6 +3169,93 @@ export default function HomePage() {
                 </div>
               </div>
             </div>
+
+            {/* ── Subscription Card (User Only) ── */}
+            {!isAdmin && (
+              <div className="card-premium rounded-xl overflow-hidden">
+                <div className="p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Crown className="w-4 h-4 text-amber-400" />
+                      <span className="text-xs font-bold text-foreground">حالة الاشتراك</span>
+                    </div>
+                    {session?.subscriptionType && session.subscriptionType !== "none" && (
+                      <div className={`px-2.5 py-1 rounded-lg text-[9px] font-bold ${subDaysLeft && subDaysLeft > 7 ? "bg-emerald-400/10 text-emerald-400 border border-emerald-400/15" : subDaysLeft && subDaysLeft > 0 ? "bg-amber-400/10 text-amber-400 border border-amber-400/15" : "bg-red-400/10 text-red-400 border border-red-400/15"}`}>
+                        {subDaysLeft !== null ? `${subDaysLeft} يوم متبقي` : "نشط"}
+                      </div>
+                    )}
+                  </div>
+                  {session?.subscriptionType && session.subscriptionType !== "none" ? (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className={`inline-block w-2 h-2 rounded-full ${session.subscriptionType === "subscriber" ? "bg-sky-400" : "bg-purple-400"}`} />
+                        <span className={`text-[11px] font-semibold ${session.subscriptionType === "subscriber" ? "text-sky-400" : "text-purple-400"}`}>
+                          {session.subscriptionType === "subscriber" ? "مشترك VIP" : "مسجل تحت وكالة"}
+                        </span>
+                      </div>
+                      {session.packageName && (
+                        <div className="bg-white/[0.03] rounded-lg p-3 border border-white/[0.06] flex items-center justify-between">
+                          <div>
+                            <div className="text-[9px] text-muted-foreground/50">الباقة</div>
+                            <div className="text-[13px] font-bold text-foreground">{session.packageName}</div>
+                          </div>
+                          {session.subscriptionExpiry && (
+                            <div className="text-left">
+                              <div className="text-[9px] text-muted-foreground/50">الانتهاء</div>
+                              <div className="text-[11px] font-semibold text-foreground/70">{new Date(session.subscriptionExpiry).toLocaleDateString("ar-SA", { month: "short", day: "numeric" })}</div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {/* Expiry progress bar */}
+                      {subDaysLeft !== null && subDaysLeft > 0 && (
+                        <div className="mt-1">
+                          <div className="h-1.5 rounded-full bg-white/[0.04] overflow-hidden">
+                            <div className={`h-full rounded-full transition-all duration-500 ${subDaysLeft > 14 ? "bg-emerald-500" : subDaysLeft > 7 ? "bg-amber-500" : "bg-red-500"}`}
+                              style={{ width: `${Math.min(100, (subDaysLeft / 30) * 100)}%` }} />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-center py-3">
+                      <div className="text-xs text-muted-foreground/70">لا يوجد اشتراك نشط</div>
+                      <div className="text-[10px] text-muted-foreground/50 mt-1">تواصل مع الإدارة للاشتراك</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ── Referral Section (Prominent) ── */}
+            <ReferralSection session={session} appSettings={appSettings} />
+
+            {/* ── Admin Quick Stats ── */}
+            {isAdmin && (
+              <div>
+                <div className="flex items-center gap-2 mb-2.5 px-0.5">
+                  <div className="w-1 h-4 rounded-full bg-gradient-to-b from-purple-400 to-pink-500" />
+                  <span className="text-xs font-bold text-foreground">إدارة سريعة</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <button onClick={() => setTab("users")} className="glass-card rounded-xl p-3 text-center active:scale-95 transition-transform hover-lift">
+                    <Users className="w-4 h-4 text-sky-400 mx-auto mb-1.5" />
+                    <div className="text-base font-extrabold text-foreground">{totalActiveUsers}</div>
+                    <div className="text-[8px] text-muted-foreground/60 font-medium">مستخدم نشط</div>
+                  </button>
+                  <button onClick={() => setTab("packages")} className="glass-card rounded-xl p-3 text-center active:scale-95 transition-transform hover-lift">
+                    <Wallet className="w-4 h-4 text-emerald-400 mx-auto mb-1.5" />
+                    <div className="text-base font-extrabold text-foreground">{totalSubscribers}</div>
+                    <div className="text-[8px] text-muted-foreground/60 font-medium">مشترك</div>
+                  </button>
+                  <button onClick={() => setTab("signals")} className="glass-card rounded-xl p-3 text-center active:scale-95 transition-transform hover-lift">
+                    <Activity className="w-4 h-4 text-amber-400 mx-auto mb-1.5" />
+                    <div className="text-base font-extrabold text-foreground">{activeSignals.length}</div>
+                    <div className="text-[8px] text-muted-foreground/60 font-medium">إشارة مفتوحة</div>
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* ── Live Pulse Indicator ── */}
             <div className="flex items-center gap-2 px-0.5">
@@ -3324,90 +3436,6 @@ export default function HomePage() {
                   </div>
                 </div>
               </Glass>
-            )}
-
-            {/* ── Subscription Card (User Only) ── */}
-            {!isAdmin && (
-              <div className="card-premium rounded-xl overflow-hidden">
-                <div className="p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <Crown className="w-4 h-4 text-amber-400" />
-                      <span className="text-xs font-bold text-foreground">حالة الاشتراك</span>
-                    </div>
-                    {session?.subscriptionType && session.subscriptionType !== "none" && (
-                      <div className={`px-2.5 py-1 rounded-lg text-[9px] font-bold ${subDaysLeft && subDaysLeft > 7 ? "bg-emerald-400/10 text-emerald-400 border border-emerald-400/15" : subDaysLeft && subDaysLeft > 0 ? "bg-amber-400/10 text-amber-400 border border-amber-400/15" : "bg-red-400/10 text-red-400 border border-red-400/15"}`}>
-                        {subDaysLeft !== null ? `${subDaysLeft} يوم متبقي` : "نشط"}
-                      </div>
-                    )}
-                  </div>
-                  {session?.subscriptionType && session.subscriptionType !== "none" ? (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <span className={`inline-block w-2 h-2 rounded-full ${session.subscriptionType === "subscriber" ? "bg-sky-400" : "bg-purple-400"}`} />
-                        <span className={`text-[11px] font-semibold ${session.subscriptionType === "subscriber" ? "text-sky-400" : "text-purple-400"}`}>
-                          {session.subscriptionType === "subscriber" ? "مشترك VIP" : "مسجل تحت وكالة"}
-                        </span>
-                      </div>
-                      {session.packageName && (
-                        <div className="bg-white/[0.03] rounded-lg p-3 border border-white/[0.06] flex items-center justify-between">
-                          <div>
-                            <div className="text-[9px] text-muted-foreground/50">الباقة</div>
-                            <div className="text-[13px] font-bold text-foreground">{session.packageName}</div>
-                          </div>
-                          {session.subscriptionExpiry && (
-                            <div className="text-left">
-                              <div className="text-[9px] text-muted-foreground/50">الانتهاء</div>
-                              <div className="text-[11px] font-semibold text-foreground/70">{new Date(session.subscriptionExpiry).toLocaleDateString("ar-SA", { month: "short", day: "numeric" })}</div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      {/* Expiry progress bar */}
-                      {subDaysLeft !== null && subDaysLeft > 0 && (
-                        <div className="mt-1">
-                          <div className="h-1.5 rounded-full bg-white/[0.04] overflow-hidden">
-                            <div className={`h-full rounded-full transition-all duration-500 ${subDaysLeft > 14 ? "bg-emerald-500" : subDaysLeft > 7 ? "bg-amber-500" : "bg-red-500"}`}
-                              style={{ width: `${Math.min(100, (subDaysLeft / 30) * 100)}%` }} />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="text-center py-3">
-                      <div className="text-xs text-muted-foreground/70">لا يوجد اشتراك نشط</div>
-                      <div className="text-[10px] text-muted-foreground/50 mt-1">تواصل مع الإدارة للاشتراك</div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* ── Admin Quick Stats ── */}
-            {isAdmin && (
-              <div>
-                <div className="flex items-center gap-2 mb-2.5 px-0.5">
-                  <div className="w-1 h-4 rounded-full bg-gradient-to-b from-purple-400 to-pink-500" />
-                  <span className="text-xs font-bold text-foreground">إدارة سريعة</span>
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  <button onClick={() => setTab("users")} className="glass-card rounded-xl p-3 text-center active:scale-95 transition-transform hover-lift">
-                    <Users className="w-4 h-4 text-sky-400 mx-auto mb-1.5" />
-                    <div className="text-base font-extrabold text-foreground">{totalActiveUsers}</div>
-                    <div className="text-[8px] text-muted-foreground/60 font-medium">مستخدم نشط</div>
-                  </button>
-                  <button onClick={() => setTab("packages")} className="glass-card rounded-xl p-3 text-center active:scale-95 transition-transform hover-lift">
-                    <Wallet className="w-4 h-4 text-emerald-400 mx-auto mb-1.5" />
-                    <div className="text-base font-extrabold text-foreground">{totalSubscribers}</div>
-                    <div className="text-[8px] text-muted-foreground/60 font-medium">مشترك</div>
-                  </button>
-                  <button onClick={() => setTab("signals")} className="glass-card rounded-xl p-3 text-center active:scale-95 transition-transform hover-lift">
-                    <Activity className="w-4 h-4 text-amber-400 mx-auto mb-1.5" />
-                    <div className="text-base font-extrabold text-foreground">{activeSignals.length}</div>
-                    <div className="text-[8px] text-muted-foreground/60 font-medium">إشارة مفتوحة</div>
-                  </button>
-                </div>
-              </div>
             )}
 
             {/* ── Top Pairs (Mini) ── */}
@@ -3648,12 +3676,25 @@ export default function HomePage() {
 
             {/* ── Filter Chips — Premium Style ── */}
             <div className="flex gap-2 overflow-x-auto scrollbar-none pb-0.5">
-              {filterChips.map(f => (
-                <button key={f.key} onClick={() => setFilter(f.key)}
+              {filterChips.filter(f => !f.category).map(f => (
+                <button key={f.key} onClick={() => { setFilter(f.key as Filter); setCategoryFilter(null); }}
                   className={`px-3.5 py-1.5 rounded-lg text-[10px] font-semibold whitespace-nowrap transition-all duration-200 active:scale-95 ${
                     filter === f.key
                       ? "bg-amber-400/[0.12] text-amber-400 border border-amber-400/20 shadow-sm shadow-amber-400/5"
                       : "bg-white/[0.03] text-muted-foreground/60 border border-white/[0.06] hover:bg-white/[0.05] hover:text-muted-foreground"
+                  }`}>
+                  {f.label}
+                </button>
+              ))}
+              {/* Divider */}
+              <div className="w-px h-5 bg-white/10 mx-1 self-center" />
+              {/* Category filters */}
+              {filterChips.filter(f => f.category).map(f => (
+                <button key={f.key} onClick={() => { setFilter(f.key as Filter); setCategoryFilter(f.key); }}
+                  className={`px-3 py-1 rounded-full text-[10px] font-semibold transition-all whitespace-nowrap ${
+                    categoryFilter === f.key
+                      ? "bg-violet-500/15 text-violet-400 border border-violet-500/20"
+                      : "bg-white/[0.03] text-muted-foreground/70 border border-white/[0.05]"
                   }`}>
                   {f.label}
                 </button>
@@ -5246,9 +5287,6 @@ export default function HomePage() {
               )
             )}
 
-            {/* ── Referral Section ── */}
-            <ReferralSection session={session} appSettings={appSettings} />
-
           </motion.div>
         )}
 
@@ -5643,27 +5681,32 @@ export default function HomePage() {
         )}
         {tab === "account" && session && (
           <motion.div key="account" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }} className="space-y-4">
-            {/* Profile Card */}
-            <div className="glass-card p-5">
-              <div className="flex items-center gap-4">
-                <div className={`w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0 ${isAdmin ? "bg-gradient-to-br from-amber-400 via-yellow-500 to-orange-500 shadow-lg shadow-amber-500/20" : "bg-gradient-to-br from-sky-400 via-blue-500 to-indigo-600 shadow-lg shadow-sky-500/20"}`}>
-                  <span className="text-xl font-black text-white">{session.name?.charAt(0)?.toUpperCase() || "?"}</span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-extrabold text-foreground text-base">{session.name}</span>
-                    {isAdmin && (
-                      <span className="badge-buy text-[7px]">
-                        <Crown className="w-2.5 h-2.5" /> مدير
-                      </span>
-                    )}
+            {/* ── Profile Card ── */}
+            <div className="card-premium rounded-2xl overflow-hidden relative">
+              <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full bg-amber-500/[0.06] blur-3xl" />
+              <div className="relative p-5">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg" style={{ boxShadow: "0 4px 12px rgba(255, 215, 0, 0.2), 0 0 20px rgba(255, 215, 0, 0.08)" }}>
+                    <span className="text-xl font-extrabold text-black">{session?.name?.charAt(0) || "U"}</span>
                   </div>
-                  <div className="text-xs text-muted-foreground mt-0.5 font-mono" dir="ltr">{session.email}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-base font-extrabold text-foreground truncate">{session?.name || "المستخدم"}</h2>
+                      {isAdmin && <span className="badge-vip">مدير</span>}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground/70 mt-0.5 truncate" dir="ltr">{session?.email || ""}</p>
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* ── User Subscription Status ── */}
+            {!isAdmin && (
+              <div className="flex items-center gap-2 mb-2 px-0.5">
+                <div className="w-1 h-4 rounded-full bg-gradient-to-b from-amber-400 to-orange-500" />
+                <span className="text-xs font-bold text-foreground">الاشتراك</span>
+              </div>
+            )}
             {!isAdmin && (
               <div className="card-premium p-5 space-y-4">
                 <div className="flex items-center gap-2.5">
@@ -5769,6 +5812,11 @@ export default function HomePage() {
                 )}
               </div>
             )}
+
+            <div className="flex items-center gap-2 mb-2 px-0.5 mt-1">
+              <div className="w-1 h-4 rounded-full bg-gradient-to-b from-sky-400 to-blue-500" />
+              <span className="text-xs font-bold text-foreground">الإعدادات</span>
+            </div>
 
             {/* Change Password (both admin and user) */}
             <div className="glass-card overflow-hidden">
