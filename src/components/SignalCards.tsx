@@ -1086,7 +1086,7 @@ export function SplashScreen() {
           className="mb-10"
         >
           <p className="text-xs font-semibold tracking-[0.3em] text-center" style={{ color: "rgba(255, 215, 0, 0.6)" }}>
-            VIP TRADING SIGNALS
+            ForexYemeni Signals
           </p>
         </motion.div>
 

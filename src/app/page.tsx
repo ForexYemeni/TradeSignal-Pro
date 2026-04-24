@@ -2529,7 +2529,7 @@ export default function HomePage() {
               </div>
               <div className="text-center">
                 <h1 className="text-2xl font-extrabold text-foreground tracking-wide">ForexYemeni</h1>
-                <p className="text-sm font-bold mt-1.5 gold-gradient-text-animated">VIP TRADING SIGNALS</p>
+                <p className="text-sm font-bold mt-1.5 gold-gradient-text-animated">ForexYemeni Signals</p>
               </div>
             </div>
 
@@ -2782,7 +2782,7 @@ export default function HomePage() {
             </div>
 
             {/* Version & DB Error */}
-            <div className="text-center text-[10px] text-muted-foreground/60 font-mono">v2.0 · FOREXYEMENI VIP</div>
+            <div className="text-center text-[10px] text-muted-foreground/60 font-mono">v2.0 · ForexYemeni Signals</div>
             {dbError && (
               <div className="bg-red-500/10 border border-red-500/20 rounded-2xl px-4 py-3 text-xs text-red-400 text-center">
                 ⚠️ {dbError}

@@ -198,7 +198,7 @@ export function buildOtpEmail(otp: string, type: 'register' | 'login' | 'reset',
           <tr>
             <td align="center" style="padding-top:24px;border-top:1px solid rgba(255,255,255,0.06);">
               <p style="margin:0;font-size:11px;color:rgba(255,255,255,0.2);">
-                ForexYemeni VIP Trading Signals &copy; ${new Date().getFullYear()}
+                ForexYemeni Signals &copy; ${new Date().getFullYear()}
               </p>
             </td>
           </tr>
@@ -452,7 +452,7 @@ export function buildSignalEmail(signal: {
           <tr>
             <td align="center" style="padding-top:16px;">
               <p style="margin:0;font-size:10px;color:rgba(255,255,255,0.12);">
-                ForexYemeni VIP Trading Signals &copy; ${new Date().getFullYear()}
+                ForexYemeni Signals &copy; ${new Date().getFullYear()}
               </p>
             </td>
           </tr>
@@ -766,7 +766,7 @@ export function buildDuplicateAccountEmail(data: {
 <!-- Footer -->
 <tr><td align="center" style="padding:24px 12px 0;">
 <p style="margin:0;font-size:10px;color:#374151;">
-ForexYemeni VIP Trading Signals &copy; ${new Date().getFullYear()} &mdash; Security System
+ForexYemeni Signals &copy; ${new Date().getFullYear()} &mdash; Security System
 </p>
 </td></tr>
 

@@ -16,8 +16,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ForexYemeni — VIP Trading Signals",
-  description: "نظام احترافي لإشارات التداول الذكي — ForexYemeni",
+  title: "ForexYemeni Signals",
+  description: "نظام احترافي لإشارات التداول — ForexYemeni Signals",
   icons: {
     icon: "/icon-192x192.png",
     apple: "/icon-512x512.png",
