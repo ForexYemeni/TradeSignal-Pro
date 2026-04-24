@@ -183,6 +183,7 @@ export async function POST(request: NextRequest) {
         takeProfits: parsedTps,
         confidence: Number(signal.confidence),
         timeframe: String(signal.timeframe || ""),
+        signalId: signal.id,
       }).catch(() => {}); // Fire-and-forget — don't block signal creation
     }
 

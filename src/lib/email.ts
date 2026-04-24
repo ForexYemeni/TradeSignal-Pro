@@ -490,8 +490,9 @@ export async function broadcastSignalToSubscribers(signal: {
   confidence: number;
   timeframe: string;
   instrument?: string;
+  signalId?: string;
 }): Promise<{ sent: number; failed: number; skipped: number }> {
-  const { getUsers, getPackageById } = await import('@/lib/store');
+  const { getUsers, getPackageById, getSignals } = await import('@/lib/store');
   const users = await getUsers();
 
   // Filter to active non-admin users with emails
@@ -508,32 +509,91 @@ export async function broadcastSignalToSubscribers(signal: {
   // Determine the instrument category of this signal
   const signalInstrument = getInstrumentCategory(signal.pair);
 
-  // Build per-user email list, filtering by instrument if user has a package with instrument restrictions
+  // ── Pre-fetch today's entry signals for maxSignals filtering ──
+  // This signal is already in the store, so it will be included in the count.
+  // We use the same logic as GET /api/signals to ensure email matches the app.
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayISO = todayStart.toISOString();
+  let todayAllSignals: { id: string; pair: string; signalCategory: string; createdAt: string }[] = [];
+  try {
+    const allSignals = await getSignals(9999);
+    todayAllSignals = allSignals
+      .filter(s => {
+        const cat = String(s.signalCategory || '');
+        return (cat === 'ENTRY' || cat === 'REENTRY' || cat === 'PYRAMID') && s.createdAt >= todayISO;
+      })
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  } catch {
+    // If signal fetch fails, skip maxSignals filtering (fail-open)
+  }
+
+  // Build per-user email list, filtering by instrument + maxSignals
   const emailRecipients: string[] = [];
-  let skippedCount = 0;
+  let skippedInstrument = 0;
+  let skippedMaxSignals = 0;
 
   for (const user of activeSubscribers) {
-    // If user has a package, check instrument filter
-    if (user.packageId) {
-      try {
-        const pkg = await getPackageById(user.packageId);
-        if (pkg && pkg.instruments && pkg.instruments.length > 0) {
-          const allowedInstruments = new Set(pkg.instruments);
-          if (!allowedInstruments.has(signalInstrument)) {
-            skippedCount++;
+    if (!user.packageId) {
+      // No package → no filtering, send email
+      emailRecipients.push(user.email);
+      continue;
+    }
+
+    try {
+      const pkg = await getPackageById(user.packageId);
+      if (!pkg) {
+        emailRecipients.push(user.email);
+        continue;
+      }
+
+      // 1. Filter by instruments
+      if (pkg.instruments && pkg.instruments.length > 0) {
+        const allowedInstruments = new Set(pkg.instruments);
+        if (!allowedInstruments.has(signalInstrument)) {
+          skippedInstrument++;
+          continue;
+        }
+      }
+
+      // 2. Filter by maxSignals
+      // Replicate the exact same logic as GET /api/signals:
+      // - Start from todayAllSignals (all entry signals today, sorted oldest-first)
+      // - Filter by user's allowed instruments
+      // - If count > maxSignals, only first N are allowed
+      // - Check if this signal is within the allowed set
+      if (pkg.maxSignals > 0 && todayAllSignals.length > 0) {
+        // Filter today's entries by this user's allowed instruments
+        const userTodayEntries = pkg.instruments && pkg.instruments.length > 0
+          ? todayAllSignals.filter(s => {
+              const cat = getInstrumentCategory(s.pair);
+              return pkg.instruments.includes(cat);
+            })
+          : todayAllSignals;
+
+        if (userTodayEntries.length > pkg.maxSignals) {
+          // Only the first maxSignals entries are allowed
+          const allowedIds = new Set(
+            userTodayEntries.slice(0, pkg.maxSignals).map(s => s.id)
+          );
+          // Check if this signal is in the allowed set
+          if (signal.signalId && !allowedIds.has(signal.signalId)) {
+            skippedMaxSignals++;
             continue;
           }
         }
-      } catch {
-        // If package lookup fails, still send the email (fail-open)
       }
+
+      emailRecipients.push(user.email);
+    } catch {
+      // If package lookup fails, still send the email (fail-open)
+      emailRecipients.push(user.email);
     }
-    emailRecipients.push(user.email);
   }
 
   if (emailRecipients.length === 0) {
-    console.log(`Broadcast signal ${signal.pair}: 0 recipients (all ${skippedCount} filtered by instruments)`);
-    return { sent: 0, failed: 0, skipped: skippedCount };
+    console.log(`Broadcast signal ${signal.pair}: 0 recipients (${skippedInstrument} by instruments, ${skippedMaxSignals} by maxSignals)`);
+    return { sent: 0, failed: 0, skipped: skippedInstrument + skippedMaxSignals };
   }
 
   const { subject, html } = buildSignalEmail(signal);
@@ -550,8 +610,8 @@ export async function broadcastSignalToSubscribers(signal: {
     totalFailed += result.failed;
   }
 
-  console.log(`Broadcast signal ${signal.pair} (${signalInstrument}): ${totalSent} sent, ${totalFailed} failed, ${skippedCount} skipped out of ${activeSubscribers.length} subscribers`);
-  return { sent: totalSent, failed: totalFailed, skipped: skippedCount };
+  console.log(`Broadcast signal ${signal.pair} (${signalInstrument}): ${totalSent} sent, ${totalFailed} failed, ${skippedInstrument} by instruments, ${skippedMaxSignals} by maxSignals out of ${activeSubscribers.length} subscribers`);
+  return { sent: totalSent, failed: totalFailed, skipped: skippedInstrument + skippedMaxSignals };
 }
 
 // ═══════════════════════════════════════════════════════════════
