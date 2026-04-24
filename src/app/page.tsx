@@ -2329,10 +2329,7 @@ export default function HomePage() {
 
   const isAdmin = session?.role === "admin";
 
-  // Admin: redirect packages tab to more tab
-  useEffect(() => {
-    if (isAdmin && tab === "packages") setTab("more");
-  }, [isAdmin, tab]);
+  // Admin: packages tab is hidden, no redirect needed
 
   function getFiltered(): Signal[] {
     // ── Subscription gate: unsubscribed users see NO signals ──
@@ -3351,7 +3348,7 @@ export default function HomePage() {
     { key: "dashboard", label: "الإحصائيات", icon: <BarChart3 className="w-5 h-5" /> },
     ...(isAdmin ? [{ key: "analyst" as Tab, label: "المحلل", icon: <Send className="w-5 h-5" /> }] : []),
     ...(isAdmin ? [{ key: "users" as Tab, label: "المستخدمين", icon: <Users className="w-5 h-5" />, adminOnly: true }] : []),
-    { key: "packages" as Tab, label: "الاشتراك", icon: <Package className="w-5 h-5" /> },
+    ...(!isAdmin ? [{ key: "packages" as Tab, label: "الاشتراك", icon: <Package className="w-5 h-5" /> }] : []),
     ...(isAdmin ? [{ key: "more" as Tab, label: "المزيد", icon: <MoreHorizontal className="w-5 h-5" /> }] : []),
     { key: "account", label: "الحساب", icon: <Settings className="w-5 h-5" /> },
   ];
