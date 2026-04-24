@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 
 // ═══ EXTRACTED MODULES ═══
-import type { Signal, AdminSession, Stats, View, Tab, Filter, SubPackage, AppSettingsData, LocalPaymentMethodData, UsdtNetworkAddress } from "@/lib/types";
+import type { Signal, AdminSession, Stats, View, Tab, Filter, SubPackage, AppSettingsData, LocalPaymentMethodData, UsdtNetworkAddress, AdminSubTab } from "@/lib/types";
 import { timeAgo, isEntry, entryAccent, isTpLike, isSlLike, nativeNotify, playSound, registerPushNotification, unregisterPushNotification, formatCountdown, warmAudio, ensureNotificationPermission, showBrowserNotification, notifySignal, shareSessionToken } from "@/lib/utils";
 import { Stars, Div, Glass, SkeletonCard, SignalsLoadingSkeleton, StatsLoadingSkeleton, EmptyState, Confetti, useOnlineStatus, usePullToRefresh, ProgressRing } from "@/components/shared";
 import { TpMiniCard, TradeStatusBanner, EntryCard, ClosedSignalCard, SplashScreen } from "@/components/SignalCards";
@@ -504,6 +504,10 @@ export default function HomePage() {
   const [pkgLoad, setPkgLoad] = useState(false);
   const [showAssignPkg, setShowAssignPkg] = useState<string | null>(null);
   const [assignDays, setAssignDays] = useState("");
+  const [showExtendDays, setShowExtendDays] = useState<string | null>(null);
+  const [extendDays, setExtendDays] = useState("");
+  const [extendDaysLoad, setExtendDaysLoad] = useState(false);
+  const [adminSubTab, setAdminSubTab] = useState<AdminSubTab | null>(null);
   const SUPER_ADMIN_EMAIL = "mhmdlybdhshay@gmail.com";
 
   /* ── Payment & Subscription ── */
@@ -2324,6 +2328,11 @@ export default function HomePage() {
   }
 
   const isAdmin = session?.role === "admin";
+
+  // Admin: redirect packages tab to more tab
+  useEffect(() => {
+    if (isAdmin && tab === "packages") setTab("more");
+  }, [isAdmin, tab]);
 
   function getFiltered(): Signal[] {
     // ── Subscription gate: unsubscribed users see NO signals ──
@@ -4484,7 +4493,7 @@ export default function HomePage() {
                 {/* ── Management Grid ── */}
                 <div className="grid grid-cols-2 gap-3">
                   {/* Packages Management */}
-                  <motion.button whileTap={{ scale: 0.97 }} onClick={() => { setAdminSubTab("packages"); fetchPackages(); }}
+                  <button onClick={() => { setAdminSubTab("packages"); fetchPackages(); }}
                     className="glass-card p-4 text-right space-y-3 hover:border-amber-500/25 transition-all active:scale-[0.98]">
                     <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/10 border border-amber-500/15 flex items-center justify-center">
                       <Package className="w-5 h-5 text-amber-400" />
@@ -4493,10 +4502,10 @@ export default function HomePage() {
                       <h3 className="text-xs font-bold text-foreground">إدارة الباقات</h3>
                       <p className="text-[9px] text-muted-foreground mt-0.5">{packages.filter(p => p.isActive).length} باقة مفعلة</p>
                     </div>
-                  </motion.button>
+                  </button>
 
                   {/* Coupons */}
-                  <motion.button whileTap={{ scale: 0.97 }} onClick={() => { setAdminSubTab("coupons"); fetchCoupons(); }}
+                  <button onClick={() => { setAdminSubTab("coupons"); fetchCoupons(); }}
                     className="glass-card p-4 text-right space-y-3 hover:border-emerald-500/25 transition-all active:scale-[0.98]">
                     <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/20 to-green-500/10 border border-emerald-500/15 flex items-center justify-center">
                       <Ticket className="w-5 h-5 text-emerald-400" />
@@ -4505,10 +4514,10 @@ export default function HomePage() {
                       <h3 className="text-xs font-bold text-foreground">كوبونات الخصم</h3>
                       <p className="text-[9px] text-muted-foreground mt-0.5">{coupons.filter(c => c.isActive).length} كوبون نشط</p>
                     </div>
-                  </motion.button>
+                  </button>
 
                   {/* Payment Requests */}
-                  <motion.button whileTap={{ scale: 0.97 }} onClick={() => { setAdminSubTab("payment_requests"); fetchPaymentRequests(); }}
+                  <button onClick={() => { setAdminSubTab("payment_requests"); fetchPaymentRequests(); }}
                     className="glass-card p-4 text-right space-y-3 hover:border-sky-500/25 transition-all active:scale-[0.98]">
                     <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500/20 to-blue-500/10 border border-sky-500/15 flex items-center justify-center">
                       <CreditCard className="w-5 h-5 text-sky-400" />
@@ -4517,10 +4526,10 @@ export default function HomePage() {
                       <h3 className="text-xs font-bold text-foreground">طلبات الدفع</h3>
                       <p className="text-[9px] text-muted-foreground mt-0.5">{paymentRequests.filter(r => r.status === "pending").length} طلب معلق</p>
                     </div>
-                  </motion.button>
+                  </button>
 
                   {/* USDT Networks */}
-                  <motion.button whileTap={{ scale: 0.97 }} onClick={() => { setAdminSubTab("usdt_networks"); }}
+                  <button onClick={() => { setAdminSubTab("usdt_networks"); }}
                     className="glass-card p-4 text-right space-y-3 hover:border-amber-500/25 transition-all active:scale-[0.98]">
                     <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/10 border border-amber-500/15 flex items-center justify-center">
                       <Wallet className="w-5 h-5 text-amber-400" />
@@ -4529,10 +4538,10 @@ export default function HomePage() {
                       <h3 className="text-xs font-bold text-foreground">شبكات USDT</h3>
                       <p className="text-[9px] text-muted-foreground mt-0.5">{usdtNetworks.filter(n => n.isActive).length} شبكة نشطة</p>
                     </div>
-                  </motion.button>
+                  </button>
 
                   {/* Local Payment Methods */}
-                  <motion.button whileTap={{ scale: 0.97 }} onClick={() => { setAdminSubTab("local_methods"); }}
+                  <button onClick={() => { setAdminSubTab("local_methods"); }}
                     className="glass-card p-4 text-right space-y-3 hover:border-purple-500/25 transition-all active:scale-[0.98]">
                     <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500/20 to-violet-500/10 border border-purple-500/15 flex items-center justify-center">
                       <Banknote className="w-5 h-5 text-purple-400" />
@@ -4541,10 +4550,10 @@ export default function HomePage() {
                       <h3 className="text-xs font-bold text-foreground">طرق الدفع المحلية</h3>
                       <p className="text-[9px] text-muted-foreground mt-0.5">{localPaymentMethods.filter(m => m.isActive).length} طريقة نشطة</p>
                     </div>
-                  </motion.button>
+                  </button>
 
                   {/* App Settings */}
-                  <motion.button whileTap={{ scale: 0.97 }} onClick={() => { setAdminSubTab("settings"); }}
+                  <button onClick={() => { setAdminSubTab("settings"); }}
                     className="glass-card p-4 text-right space-y-3 hover:border-sky-500/25 transition-all active:scale-[0.98]">
                     <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500/20 to-cyan-500/10 border border-sky-500/15 flex items-center justify-center">
                       <Settings className="w-5 h-5 text-sky-400" />
@@ -4553,7 +4562,7 @@ export default function HomePage() {
                       <h3 className="text-xs font-bold text-foreground">إعدادات التطبيق</h3>
                       <p className="text-[9px] text-muted-foreground mt-0.5">الإعدادات العامة والتطبيق</p>
                     </div>
-                  </motion.button>
+                  </button>
                 </div>
               </>
             )}
