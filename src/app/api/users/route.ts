@@ -132,6 +132,24 @@ export async function PUT(request: NextRequest) {
       case "remove_subscription":
         updates = { subscriptionType: "none", subscriptionExpiry: null, packageId: null, packageName: null, status: "expired" };
         break;
+      case "extend_days": {
+        const parsedDays = Number(days);
+        if (!parsedDays || parsedDays < 1 || parsedDays > 3650) {
+          return NextResponse.json({ success: false, error: "عدد الأيام غير صالح (1-3650)" }, { status: 400 });
+        }
+        const existingUser = await getUserById(id);
+        if (!existingUser) return NextResponse.json({ success: false, error: "المستخدم غير موجود" }, { status: 404 });
+        if (!existingUser.subscriptionExpiry || new Date(existingUser.subscriptionExpiry) <= new Date()) {
+          return NextResponse.json({ success: false, error: "لا يوجد اشتراك نشط لهذا المستخدم. قم بتعيين باقة أولاً." }, { status: 400 });
+        }
+        const currentExpiry = new Date(existingUser.subscriptionExpiry);
+        currentExpiry.setDate(currentExpiry.getDate() + parsedDays);
+        updates = {
+          subscriptionExpiry: currentExpiry.toISOString(),
+          status: "active",
+        };
+        break;
+      }
       default:
         return NextResponse.json({ success: false, error: "إجراء غير معروف" }, { status: 400 });
     }

@@ -4455,10 +4455,113 @@ export default function HomePage() {
           </motion.div>
         )}
 
-        {/* ══════ TAB: PACKAGES (Admin) ══════ */}
-        {tab === "packages" && isAdmin && (
-          <motion.div key="packages" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }} className="space-y-5">
+        {/* ══════ TAB: MORE (Admin Management Center) ══════ */}
+        {tab === "more" && isAdmin && (
+          <motion.div key="more" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }} className="space-y-5">
 
+            {/* Back button when in sub-tab */}
+            {adminSubTab && (
+              <button onClick={() => setAdminSubTab(null)}
+                className="flex items-center gap-2 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors mb-1">
+                <ArrowLeft className="w-4 h-4" /> رجوع للإدارة
+              </button>
+            )}
+
+            {!adminSubTab && (
+              <>
+                {/* ── Admin Management Center Header ── */}
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-500/20 to-orange-500/10 border border-amber-500/15 flex items-center justify-center">
+                    <MoreHorizontal className="w-5 h-5 text-amber-400" />
+                  </div>
+                  <div>
+                    <h2 className="text-sm font-bold text-foreground">مركز الإدارة</h2>
+                    <p className="text-[9px] text-muted-foreground">إدارة كاملة للباقات والمدفوعات والإعدادات</p>
+                  </div>
+                </div>
+
+                {/* ── Management Grid ── */}
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Packages Management */}
+                  <motion.button whileTap={{ scale: 0.97 }} onClick={() => { setAdminSubTab("packages"); fetchPackages(); }}
+                    className="glass-card p-4 text-right space-y-3 hover:border-amber-500/25 transition-all active:scale-[0.98]">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/10 border border-amber-500/15 flex items-center justify-center">
+                      <Package className="w-5 h-5 text-amber-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-bold text-foreground">إدارة الباقات</h3>
+                      <p className="text-[9px] text-muted-foreground mt-0.5">{packages.filter(p => p.isActive).length} باقة مفعلة</p>
+                    </div>
+                  </motion.button>
+
+                  {/* Coupons */}
+                  <motion.button whileTap={{ scale: 0.97 }} onClick={() => { setAdminSubTab("coupons"); fetchCoupons(); }}
+                    className="glass-card p-4 text-right space-y-3 hover:border-emerald-500/25 transition-all active:scale-[0.98]">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/20 to-green-500/10 border border-emerald-500/15 flex items-center justify-center">
+                      <Ticket className="w-5 h-5 text-emerald-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-bold text-foreground">كوبونات الخصم</h3>
+                      <p className="text-[9px] text-muted-foreground mt-0.5">{coupons.filter(c => c.isActive).length} كوبون نشط</p>
+                    </div>
+                  </motion.button>
+
+                  {/* Payment Requests */}
+                  <motion.button whileTap={{ scale: 0.97 }} onClick={() => { setAdminSubTab("payment_requests"); fetchPaymentRequests(); }}
+                    className="glass-card p-4 text-right space-y-3 hover:border-sky-500/25 transition-all active:scale-[0.98]">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500/20 to-blue-500/10 border border-sky-500/15 flex items-center justify-center">
+                      <CreditCard className="w-5 h-5 text-sky-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-bold text-foreground">طلبات الدفع</h3>
+                      <p className="text-[9px] text-muted-foreground mt-0.5">{paymentRequests.filter(r => r.status === "pending").length} طلب معلق</p>
+                    </div>
+                  </motion.button>
+
+                  {/* USDT Networks */}
+                  <motion.button whileTap={{ scale: 0.97 }} onClick={() => { setAdminSubTab("usdt_networks"); }}
+                    className="glass-card p-4 text-right space-y-3 hover:border-amber-500/25 transition-all active:scale-[0.98]">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/10 border border-amber-500/15 flex items-center justify-center">
+                      <Wallet className="w-5 h-5 text-amber-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-bold text-foreground">شبكات USDT</h3>
+                      <p className="text-[9px] text-muted-foreground mt-0.5">{usdtNetworks.filter(n => n.isActive).length} شبكة نشطة</p>
+                    </div>
+                  </motion.button>
+
+                  {/* Local Payment Methods */}
+                  <motion.button whileTap={{ scale: 0.97 }} onClick={() => { setAdminSubTab("local_methods"); }}
+                    className="glass-card p-4 text-right space-y-3 hover:border-purple-500/25 transition-all active:scale-[0.98]">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500/20 to-violet-500/10 border border-purple-500/15 flex items-center justify-center">
+                      <Banknote className="w-5 h-5 text-purple-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-bold text-foreground">طرق الدفع المحلية</h3>
+                      <p className="text-[9px] text-muted-foreground mt-0.5">{localPaymentMethods.filter(m => m.isActive).length} طريقة نشطة</p>
+                    </div>
+                  </motion.button>
+
+                  {/* App Settings */}
+                  <motion.button whileTap={{ scale: 0.97 }} onClick={() => { setAdminSubTab("settings"); }}
+                    className="glass-card p-4 text-right space-y-3 hover:border-sky-500/25 transition-all active:scale-[0.98]">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500/20 to-cyan-500/10 border border-sky-500/15 flex items-center justify-center">
+                      <Settings className="w-5 h-5 text-sky-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-bold text-foreground">إعدادات التطبيق</h3>
+                      <p className="text-[9px] text-muted-foreground mt-0.5">الإعدادات العامة والتطبيق</p>
+                    </div>
+                  </motion.button>
+                </div>
+              </>
+            )}
+
+            {/* ══════════════════════════════════════════════════
+                SUB-TAB: USDT NETWORKS
+               ══════════════════════════════════════════════════ */}
+            {adminSubTab === "usdt_networks" && (
+              <>
             {/* ══════════════════════════════════════════════════
                 USDT PAYMENT NETWORKS — Professional Card
                ══════════════════════════════════════════════════ */}
@@ -4558,6 +4661,14 @@ export default function HomePage() {
               </div>
             </div>
 
+              </>
+            )}
+
+            {/* ══════════════════════════════════════════════════
+                SUB-TAB: COUPONS
+               ══════════════════════════════════════════════════ */}
+            {adminSubTab === "coupons" && (
+              <>
             {/* ══════════════════════════════════════════════════
                 COUPON MANAGEMENT — Professional Card
                ══════════════════════════════════════════════════ */}
@@ -4659,6 +4770,14 @@ export default function HomePage() {
               </div>
             </div>
 
+              </>
+            )}
+
+            {/* ══════════════════════════════════════════════════
+                SUB-TAB: LOCAL PAYMENT METHODS
+               ══════════════════════════════════════════════════ */}
+            {adminSubTab === "local_methods" && (
+              <>
             {/* ══════════════════════════════════════════════════
                 LOCAL PAYMENT METHODS — Professional Card
                ══════════════════════════════════════════════════ */}
@@ -4782,6 +4901,14 @@ export default function HomePage() {
               </div>
             </div>
 
+              </>
+            )}
+
+            {/* ══════════════════════════════════════════════════
+                SUB-TAB: PAYMENT REQUESTS
+               ══════════════════════════════════════════════════ */}
+            {adminSubTab === "payment_requests" && (
+              <>
             {/* ── Payment Requests Review ── */}
             {(() => {
               const pendingReqs = paymentRequests.filter(r => r.status === "pending");
@@ -4862,6 +4989,14 @@ export default function HomePage() {
               ) : null;
             })()}
 
+              </>
+            )}
+
+            {/* ══════════════════════════════════════════════════
+                SUB-TAB: APP SETTINGS
+               ══════════════════════════════════════════════════ */}
+            {adminSubTab === "settings" && (
+              <>
             {/* ── App Settings Card ── */}
             <div className="glass-card border-amber-500/15 overflow-hidden">
               <div className="p-4 space-y-3">
@@ -4881,6 +5016,7 @@ export default function HomePage() {
                 </div>
               </div>
             </div>
+
 
             {/* ── Referral Settings Card ── */}
             <div className="glass-card border-violet-500/15 overflow-hidden">
@@ -4942,6 +5078,14 @@ export default function HomePage() {
               </div>
             </div>
 
+              </>
+            )}
+
+            {/* ══════════════════════════════════════════════════
+                SUB-TAB: PACKAGES MANAGEMENT
+               ══════════════════════════════════════════════════ */}
+            {adminSubTab === "packages" && (
+              <>
             {/* ── Per-Package Subscriber Stats ── */}
             {packages.length > 0 && (() => {
               const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
@@ -5025,6 +5169,7 @@ export default function HomePage() {
                 </div>
               );
             })()}
+
 
             {/* ── Packages Header ── */}
             <div className="flex items-center justify-between">
@@ -5300,8 +5445,12 @@ export default function HomePage() {
                 })}
               </div>
             )}
+              </>
+            )}
+
           </motion.div>
         )}
+
 
         {/* ══════ TAB: PACKAGES (User) ══════ */}
         {tab === "packages" && !isAdmin && (

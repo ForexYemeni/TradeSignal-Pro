@@ -29,7 +29,8 @@ export interface Stats {
 }
 
 export type View = "login" | "register" | "forgotPwd" | "pending" | "blocked" | "expired" | "main" | "changePwd";
-export type Tab = "home" | "signals" | "dashboard" | "analyst" | "users" | "packages" | "account";
+export type Tab = "home" | "signals" | "dashboard" | "analyst" | "users" | "packages" | "more" | "account";
+export type AdminSubTab = "packages" | "coupons" | "payments" | "usdt_networks" | "local_methods" | "payment_requests" | "settings";
 export type Filter = "all" | "buy" | "sell" | "active" | "closed" | "favorites";
 export interface SubPackage { id: string; name: string; durationDays: number; price: number; type: string; description: string; isActive: boolean; order: number; features: string[]; maxSignals: number; prioritySupport: boolean; showEntryEarly: boolean; instruments?: string[]; }
 export interface UsdtNetworkAddress {
