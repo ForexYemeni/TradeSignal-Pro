@@ -3786,11 +3786,11 @@ export default function HomePage() {
               if (!userPkg || userPkg.maxSignals <= 0) return null;
               const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
               const todayISO = todayStart.toISOString();
-              const allowedCats = new Set(userPkg.instruments || []);
+              const allowedCats = userPkg.instruments?.length ? new Set(userPkg.instruments) : null;
               const todayEntryCount = signals.filter(s => {
                 if (!isEntry(s.signalCategory)) return false;
                 if (s.createdAt < todayISO) return false;
-                if (allowedCats.size > 0 && !allowedCats.has(getPairCategory(s.pair))) return false;
+                if (allowedCats && !allowedCats.has(getPairCategory(s.pair))) return false;
                 return true;
               }).length;
               const remaining = Math.max(0, userPkg.maxSignals - todayEntryCount);
@@ -4580,10 +4580,10 @@ export default function HomePage() {
                   <div className="p-3 space-y-2">
                     {packages.filter(p => p.isActive).map(pkg => {
                       const subs = users.filter(u => u.packageId === pkg.id && u.status === "active" && u.role === "user");
-                      const allowedCats = new Set(pkg.instruments || []);
+                      const allowedCats = pkg.instruments?.length ? new Set(pkg.instruments) : null;
                       const pkgEntrySignals = signals.filter(s => {
                         if (!isEntry(s.signalCategory)) return false;
-                        if (allowedCats.size > 0 && !allowedCats.has(getPairCategory(s.pair))) return false;
+                        if (allowedCats && !allowedCats.has(getPairCategory(s.pair))) return false;
                         return true;
                       });
                       // Apply maxSignals per-day limit (simulates what subscriber actually receives)
