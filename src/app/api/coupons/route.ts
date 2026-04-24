@@ -24,17 +24,22 @@ async function saveCoupons(coupons: Coupon[]): Promise<void> {
 }
 
 // ─── Helper: check admin session ────────────────────────
-async function isAdminRequest(request: NextRequest): Promise<{ isAdmin: boolean; userId?: string; error?: NextResponse }> {
+async function isAdminRequest(request: NextRequest, preParsedBody?: Record<string, unknown>): Promise<{ isAdmin: boolean; userId?: string; error?: NextResponse }> {
   const { searchParams } = new URL(request.url);
   const userId = searchParams.get("adminId") || searchParams.get("userId");
 
-  // Also check body for POST/PUT
+  // Check pre-parsed body first (for POST where body was already consumed)
   let bodyUserId: string | null = null;
-  try {
-    const cloned = request.clone();
-    const body = await cloned.json();
-    bodyUserId = body.adminId || body.userId || null;
-  } catch { /* no body */ }
+  if (preParsedBody) {
+    bodyUserId = (preParsedBody.adminId as string) || (preParsedBody.userId as string) || null;
+  } else {
+    // Clone and read body (for GET/PUT/DELETE where body hasn't been consumed)
+    try {
+      const cloned = request.clone();
+      const body = await cloned.json();
+      bodyUserId = body.adminId || body.userId || null;
+    } catch { /* no body */ }
+  }
 
   const finalUserId = userId || bodyUserId;
   if (!finalUserId) {
@@ -92,8 +97,8 @@ export async function POST(request: NextRequest) {
       return handleValidate(code.trim().toUpperCase(), userId);
     }
 
-    // Admin: create coupon
-    const admin = await isAdminRequest(request);
+    // Admin: create coupon (pass pre-parsed body since request stream is already consumed)
+    const admin = await isAdminRequest(request, body);
     if (!admin.isAdmin) return admin.error!;
 
     const { code, discountPercent, maxUses, expiresAt } = body;
