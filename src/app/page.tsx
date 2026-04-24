@@ -21,7 +21,7 @@ import {
   Home, Flame, Trophy, ArrowUpRight, ArrowDownRight, Hash, Globe, PieChart, Sparkles, Timer, Wallet,
   MoreHorizontal, CreditCard, Upload, CheckCircle2, XCircle, Image, Copy, Plus, Banknote,
   ShieldCheck, ShieldX, ShieldBan, WifiOff, Gift, Ticket,
-  Search, Unlock, ArrowLeft, X,
+  Search, Unlock, ArrowLeft, X, Check,
 } from "lucide-react";
 
 // ═══ EXTRACTED MODULES ═══
@@ -81,17 +81,18 @@ function LockedCountdown({ lockedUntil }: { lockedUntil: string }) {
 }
 
 // ═══ SIGNAL CARD WRAPPER ═══
-function SignalCard({ s, idx, isAdmin, onUpdate, onDelete, isNew, statusChanged }: {
+function SignalCard({ s, idx, isAdmin, onUpdate, onDelete, isNew, statusChanged, isFavorite, onToggleFavorite }: {
   s: Signal; idx: number; isAdmin: boolean;
   onUpdate: (id: string, status: string, tpIdx?: number) => void;
   onDelete: (id: string) => void;
   isNew?: boolean; statusChanged?: boolean;
+  isFavorite?: boolean; onToggleFavorite?: (id: string) => void;
 }) {
   /* Closed signals (status !== ACTIVE) use compact card — whether category is ENTRY or TP/SL */
-  if (s.status !== "ACTIVE") return <ClosedSignalCard s={s} idx={idx} isAdmin={isAdmin} onDelete={onDelete} statusChanged={statusChanged} />;
+  if (s.status !== "ACTIVE") return <ClosedSignalCard s={s} idx={idx} isAdmin={isAdmin} onDelete={onDelete} statusChanged={statusChanged} isFavorite={isFavorite} onToggleFavorite={onToggleFavorite} />;
   /* Active entry signals use full card */
-  if (isEntry(s.signalCategory)) return <EntryCard s={s} idx={idx} isAdmin={isAdmin} onUpdate={onUpdate} onDelete={onDelete} isNew={isNew} statusChanged={statusChanged} />;
-  return <EntryCard s={s} idx={idx} isAdmin={isAdmin} onUpdate={onUpdate} onDelete={onDelete} isNew={isNew} statusChanged={statusChanged} />;
+  if (isEntry(s.signalCategory)) return <EntryCard s={s} idx={idx} isAdmin={isAdmin} onUpdate={onUpdate} onDelete={onDelete} isNew={isNew} statusChanged={statusChanged} isFavorite={isFavorite} onToggleFavorite={onToggleFavorite} />;
+  return <EntryCard s={s} idx={idx} isAdmin={isAdmin} onUpdate={onUpdate} onDelete={onDelete} isNew={isNew} statusChanged={statusChanged} isFavorite={isFavorite} onToggleFavorite={onToggleFavorite} />;
 }
 
 
@@ -350,12 +351,31 @@ export default function HomePage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  const [signalSearch, setSignalSearch] = useState("");
   const [audioMuted, setAudioMuted] = useState(false);
   const [audioVol, setAudioVol] = useState(0.7);
   const prevIdsRef = useRef<Set<string>>(new Set());
   const prevStateRef = useRef<Map<string, { hitTpIndex: number; status: string }>>(new Map());
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  /* ── Notifications ── */
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState<{id: string; text: string; time: string; read: boolean}[]>([]);
+
+  /* ── Favorites ── */
+  const [favorites, setFavorites] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem("signal_favorites") || "[]")); } catch { return new Set(); }
+  });
+
+  function toggleFavorite(signalId: string) {
+    setFavorites(prev => {
+      const next = new Set(prev);
+      if (next.has(signalId)) next.delete(signalId); else next.add(signalId);
+      localStorage.setItem("signal_favorites", JSON.stringify([...next]));
+      return next;
+    });
+  }
 
   /* ── Confetti / Win Streak ── */
   const [showConfetti, setShowConfetti] = useState(false);
@@ -486,6 +506,7 @@ export default function HomePage() {
 
   /* ── Payment & Subscription ── */
   const [selectedPkg, setSelectedPkg] = useState<SubPackage | null>(null);
+  const [paymentStep, setPaymentStep] = useState(0); // 0=select package, 1=select method, 2=payment details, 3=confirmation
   const [paymentMethod, setPaymentMethod] = useState<"usdt" | "local" | null>(null);
   const [selectedLocalMethod, setSelectedLocalMethod] = useState<LocalPaymentMethodData | null>(null);
   const [userPaymentMethods, setUserPaymentMethods] = useState<LocalPaymentMethodData[]>([]);
@@ -638,7 +659,14 @@ export default function HomePage() {
         if (oldIds.size > 0) {
           for (const s of newSignals) {
             if (!oldIds.has(s.id)) {
-              // Brand new signal — play sound + native notification + browser notification
+              // Brand new signal — add notification
+              setNotifications(prev => [{
+                id: Date.now().toString(),
+                text: `إشارة ${s.type === "BUY" ? "شراء" : "بيع"} جديدة: ${s.pair}`,
+                time: new Date().toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" }),
+                read: false
+              }, ...prev].slice(0, 20));
+              // Play sound + native notification + browser notification
               if (!audioMuted) {
                 if (isEntry(s.signalCategory)) {
                   const isBuy = s.type === "BUY";
@@ -1742,7 +1770,7 @@ export default function HomePage() {
     setSelectedPkg(null); setPaymentMethod(null); setSelectedLocalMethod(null);
     setSelectedUsdtNetwork(null); setUsdtTxid("");
     setPaymentProofFile(null); setPaymentProofPreview(null);
-    setPaymentLoad(false); setPaymentResult(null);
+    setPaymentLoad(false); setPaymentResult(null); setPaymentStep(0);
   }
 
   async function handleAssignPackage(userId: string, packageId: string) {
@@ -2065,6 +2093,7 @@ export default function HomePage() {
       case "sell": result = result.filter(s => s.type === "SELL"); break;
       case "active": result = result.filter(s => s.status === "ACTIVE"); break;
       case "closed": result = result.filter(s => s.status !== "ACTIVE"); break;
+      case "favorites": result = result.filter(s => favorites.has(s.id)); break;
     }
     if (allowed) {
       result = result.filter(s => {
@@ -2091,6 +2120,15 @@ export default function HomePage() {
       };
       const regex = catMap[categoryFilter];
       if (regex) result = result.filter(s => regex.test(s.pair));
+    }
+    // Search filter
+    if (signalSearch.trim()) {
+      const q = signalSearch.trim().toLowerCase();
+      result = result.filter(s => 
+        s.pair?.toLowerCase().includes(q) || 
+        s.type?.toLowerCase().includes(q) ||
+        (s.signalCategory || "").toLowerCase().includes(q)
+      );
     }
     return result;
   }
@@ -3008,6 +3046,7 @@ export default function HomePage() {
   const filterChips: { key: Filter | string; label: string; category?: boolean }[] = [
     { key: "all", label: "الكل" }, { key: "buy", label: "شراء" },
     { key: "sell", label: "بيع" }, { key: "active", label: "نشطة" }, { key: "closed", label: "مغلقة" },
+    { key: "favorites", label: "⭐ المفضلة" },
     // Category filters
     { key: "gold", label: "🥇 ذهب", category: true },
     { key: "currencies", label: "💱 عملات", category: true },
@@ -3060,6 +3099,42 @@ export default function HomePage() {
           </div>
           {/* Controls */}
           <div className="flex items-center gap-1">
+            {/* Notification Bell */}
+            <div className="relative">
+              <button onClick={() => { setShowNotifications(!showNotifications); setNotifications(prev => prev.map(n => ({ ...n, read: true }))); }}
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-all duration-300 hover:shadow-sm active:scale-90">
+                <Bell className="w-4 h-4" />
+              </button>
+              {notifications.filter(n => !n.read).length > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 rounded-full bg-red-500 text-[8px] font-bold text-white flex items-center justify-center px-1">
+                  {notifications.filter(n => !n.read).length > 9 ? "9+" : notifications.filter(n => !n.read).length}
+                </span>
+              )}
+              {/* Notification Panel */}
+              {showNotifications && (
+                <div className="absolute top-full left-0 right-0 mt-2 bg-[#0f172a]/95 backdrop-blur-xl border border-white/[0.08] rounded-xl shadow-2xl z-50 max-h-64 overflow-hidden" style={{ minWidth: 240 }}>
+                  <div className="px-3 py-2 border-b border-white/[0.06] flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-foreground">الإشعارات</span>
+                    {notifications.length > 0 && (
+                      <button onClick={() => setNotifications([])} className="text-[10px] text-red-400/70 hover:text-red-400">مسح الكل</button>
+                    )}
+                  </div>
+                  <div className="max-h-52 overflow-y-auto scrollbar-thin">
+                    {notifications.length === 0 ? (
+                      <div className="px-3 py-4 text-center text-[10px] text-muted-foreground/50">لا توجد إشعارات</div>
+                    ) : (
+                      notifications.map(n => (
+                        <div key={n.id} className={`px-3 py-2.5 border-b border-white/[0.04] last:border-0 ${n.read ? "opacity-60" : ""}`}>
+                          <div className="text-[10px] text-foreground">{n.text}</div>
+                          <div className="text-[9px] text-muted-foreground/50 mt-0.5">{n.time}</div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+              {showNotifications && <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)} />}
+            </div>
             {/* Audio Controls */}
             <button onClick={() => setAudioMuted(!audioMuted)} className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-all duration-300 hover:shadow-sm active:scale-90">
               {audioMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
@@ -3169,6 +3244,24 @@ export default function HomePage() {
                 </div>
               </div>
             </div>
+
+            {/* ── Subscription Expiry Warning ── */}
+            {!isAdmin && subDaysLeft !== null && subDaysLeft <= 3 && subDaysLeft > 0 && (
+              <div className="rounded-xl bg-red-500/[0.08] border border-red-500/15 p-3.5 animate-[fadeInUp_0.4s_ease-out]">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-red-500/15 border border-red-500/20 flex items-center justify-center shrink-0">
+                    <AlertTriangle className="w-4.5 h-4.5 text-red-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-bold text-red-300">اشتراكك ينتهي قريباً!</div>
+                    <div className="text-[10px] text-red-400/70 mt-0.5">متبقي {subDaysLeft} يوم — جدد اشتراكك لتجنب انقطاع الإشارات</div>
+                  </div>
+                  <button onClick={() => setTab("packages")} className="px-3 py-2 rounded-lg bg-red-500/15 border border-red-500/20 text-red-400 text-[10px] font-bold active:scale-95 transition-transform whitespace-nowrap">
+                    تجديد
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* ── Subscription Card (User Only) ── */}
             {!isAdmin && (
@@ -3674,6 +3767,23 @@ export default function HomePage() {
               );
             })()}
 
+            {/* ── Search Bar ── */}
+            <div className="relative mb-1">
+              <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/40" />
+              <input
+                type="text"
+                value={signalSearch}
+                onChange={e => setSignalSearch(e.target.value)}
+                placeholder="بحث بالزوج أو النوع..."
+                className="w-full bg-white/[0.03] border border-white/[0.06] rounded-xl pr-9 pl-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-amber-500/30 focus:ring-1 focus:ring-amber-500/10 transition-all"
+              />
+              {signalSearch && (
+                <button onClick={() => setSignalSearch("")} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/40 hover:text-foreground transition-colors">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
             {/* ── Filter Chips — Premium Style ── */}
             <div className="flex gap-2 overflow-x-auto scrollbar-none pb-0.5">
               {filterChips.filter(f => !f.category).map(f => (
@@ -3722,7 +3832,7 @@ export default function HomePage() {
                     <div className="space-y-3">
                       {activeSignals.map((s, i) => (
                         <div key={s.id} className={newSignalIdsRef.current.has(s.id) ? "animate-slide-in-right animate-new-signal-glow" : ""}>
-                          <SignalCard s={s} idx={i} isAdmin={isAdmin} onUpdate={handleUpdate} onDelete={handleDelete} isNew={newSignalIdsRef.current.has(s.id)} statusChanged={statusChangeIdsRef.current.has(s.id)} />
+                          <SignalCard s={s} idx={i} isAdmin={isAdmin} onUpdate={handleUpdate} onDelete={handleDelete} isNew={newSignalIdsRef.current.has(s.id)} statusChanged={statusChangeIdsRef.current.has(s.id)} isFavorite={favorites.has(s.id)} onToggleFavorite={toggleFavorite} />
                         </div>
                       ))}
                     </div>
@@ -3750,7 +3860,7 @@ export default function HomePage() {
                         const isSlHit = s.status === "HIT_SL";
                         return (
                           <div key={s.id} className={`${isNew ? "animate-slide-in-right" : ""} ${isStatusChange ? (isTpHit ? "animate-tp-hit-pulse" : isSlHit ? "animate-sl-hit-pulse" : "animate-status-pulse") : ""}`}>
-                            <SignalCard s={s} idx={i + (activeSignals.length || 0)} isAdmin={isAdmin} onUpdate={handleUpdate} onDelete={handleDelete} isNew={isNew} statusChanged={isStatusChange} />
+                            <SignalCard s={s} idx={i + (activeSignals.length || 0)} isAdmin={isAdmin} onUpdate={handleUpdate} onDelete={handleDelete} isNew={isNew} statusChanged={isStatusChange} isFavorite={favorites.has(s.id)} onToggleFavorite={toggleFavorite} />
                           </div>
                         );
                       })}
@@ -4837,7 +4947,7 @@ export default function HomePage() {
                                 <div className="text-[8px] text-muted-foreground mt-1">يتم تمديد {nextPkg.durationDays} يوم إضافي من تاريخ الانتهاء الحالي</div>
                               )}
                             </div>
-                            <button onClick={() => { setSelectedPkg(nextPkg); setPaymentMethod(null); setSelectedLocalMethod(null); setSelectedUsdtNetwork(null); setUsdtTxid(""); setPaymentProofFile(null); setPaymentProofPreview(null); setPaymentResult(null); }}
+                            <button onClick={() => { setSelectedPkg(nextPkg); setPaymentStep(1); setPaymentMethod(null); setSelectedLocalMethod(null); setSelectedUsdtNetwork(null); setUsdtTxid(""); setPaymentProofFile(null); setPaymentProofPreview(null); setPaymentResult(null); }}
                               className="flex-shrink-0 px-4 py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-cyan-500 text-white text-[10px] font-bold active:scale-[0.98] transition-transform flex items-center gap-1.5 shadow-sm shadow-sky-500/20">
                               <Sparkles className="w-3.5 h-3.5" /> ترقية الآن
                             </button>
@@ -4890,6 +5000,37 @@ export default function HomePage() {
                 <button onClick={resetPaymentState} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
                   ← العودة للباقات
                 </button>
+
+                {/* ── Payment Steps Indicator ── */}
+                <div className="flex items-center justify-center gap-0 mb-4">
+                  {/* Step 1 */}
+                  <button onClick={() => { setPaymentStep(0); resetPaymentState(); }}
+                    className="flex flex-col items-center gap-1">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${paymentStep >= 0 ? "bg-amber-400 text-black" : "bg-white/[0.06] text-muted-foreground/50"}`}>
+                      {paymentStep > 0 ? <Check className="w-4 h-4" /> : "1"}
+                    </div>
+                    <span className={`text-[10px] font-medium ${paymentStep >= 0 ? "text-amber-400" : "text-muted-foreground/40"}`}>الباقة</span>
+                  </button>
+                  {/* Connector */}
+                  <div className={`w-10 h-0.5 mb-4 rounded-full transition-all ${paymentStep > 0 ? "bg-amber-400" : "bg-white/[0.08]"}`} />
+                  {/* Step 2 */}
+                  <button onClick={() => paymentStep > 1 && setPaymentStep(1)}
+                    className="flex flex-col items-center gap-1">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${paymentStep >= 1 ? "bg-amber-400 text-black" : "bg-white/[0.06] text-muted-foreground/50"}`}>
+                      {paymentStep > 1 ? <Check className="w-4 h-4" /> : "2"}
+                    </div>
+                    <span className={`text-[10px] font-medium ${paymentStep >= 1 ? "text-amber-400" : "text-muted-foreground/40"}`}>الدفع</span>
+                  </button>
+                  {/* Connector */}
+                  <div className={`w-10 h-0.5 mb-4 rounded-full transition-all ${paymentStep > 1 ? "bg-amber-400" : "bg-white/[0.08]"}`} />
+                  {/* Step 3 */}
+                  <div className="flex flex-col items-center gap-1">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${paymentStep >= 2 ? "bg-amber-400 text-black" : "bg-white/[0.06] text-muted-foreground/50"}`}>
+                      3
+                    </div>
+                    <span className={`text-[10px] font-medium ${paymentStep >= 2 ? "text-amber-400" : "text-muted-foreground/40"}`}>التأكيد</span>
+                  </div>
+                </div>
 
                 {/* Selected Package Summary */}
                 <div className="glass-card border-amber-500/20 p-4">
@@ -4947,9 +5088,14 @@ export default function HomePage() {
                 {!paymentMethod && (
                   <div className="space-y-2">
                     <p className="text-xs font-bold text-foreground">اختر طريقة الدفع</p>
+                    <button onClick={() => setPaymentStep(Math.max(0, paymentStep - 1))}
+                      className="flex items-center gap-1.5 text-[10px] text-muted-foreground/60 hover:text-foreground transition-colors mb-3">
+                      <ArrowLeft className="w-3.5 h-3.5" />
+                      رجوع
+                    </button>
                     {/* USDT Payment Card - show if any networks configured */}
                     {(appSettings.usdtNetworks || []).filter(n => n.isActive).length > 0 && (
-                      <button onClick={() => setPaymentMethod("usdt")} className="w-full glass-card p-4 flex items-center gap-3 active:scale-[0.98] transition-transform hover:border-amber-500/25">
+                      <button onClick={() => { setPaymentMethod("usdt"); setPaymentStep(2); }} className="w-full glass-card p-4 flex items-center gap-3 active:scale-[0.98] transition-transform hover:border-amber-500/25">
                         <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/20 flex items-center justify-center flex-shrink-0">
                           <Wallet className="w-5 h-5 text-amber-400" />
                         </div>
@@ -4962,7 +5108,7 @@ export default function HomePage() {
                     )}
                     {/* Local Currency Payment Methods */}
                     {userPaymentMethods.map(m => (
-                      <button key={m.id} onClick={() => { setPaymentMethod("local"); setSelectedLocalMethod(m); }} className="w-full glass-card p-4 flex items-center gap-3 active:scale-[0.98] transition-transform hover:border-sky-500/25">
+                      <button key={m.id} onClick={() => { setPaymentMethod("local"); setSelectedLocalMethod(m); setPaymentStep(2); }} className="w-full glass-card p-4 flex items-center gap-3 active:scale-[0.98] transition-transform hover:border-sky-500/25">
                         <div className="w-10 h-10 rounded-xl bg-sky-500/15 border border-sky-500/20 flex items-center justify-center flex-shrink-0">
                           <CreditCard className="w-5 h-5 text-sky-400" />
                         </div>
@@ -4999,6 +5145,11 @@ export default function HomePage() {
                 {/* USDT Payment Form */}
                 {paymentMethod === "usdt" && (
                   <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
+                    <button onClick={() => { setPaymentStep(Math.max(0, paymentStep - 1)); setPaymentMethod(null); setSelectedUsdtNetwork(null); setUsdtTxid(""); }}
+                      className="flex items-center gap-1.5 text-[10px] text-muted-foreground/60 hover:text-foreground transition-colors mb-3">
+                      <ArrowLeft className="w-3.5 h-3.5" />
+                      رجوع
+                    </button>
                     <div className="glass-card border-amber-500/20 p-4 space-y-3">
                       <div className="flex items-center gap-2">
                         <Wallet className="w-4 h-4 text-amber-400" />
@@ -5079,6 +5230,11 @@ export default function HomePage() {
                 {/* Local Payment Form */}
                 {paymentMethod === "local" && selectedLocalMethod && (
                   <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
+                    <button onClick={() => { setPaymentStep(Math.max(0, paymentStep - 1)); setPaymentMethod(null); setSelectedLocalMethod(null); setPaymentProofFile(null); setPaymentProofPreview(null); }}
+                      className="flex items-center gap-1.5 text-[10px] text-muted-foreground/60 hover:text-foreground transition-colors mb-3">
+                      <ArrowLeft className="w-3.5 h-3.5" />
+                      رجوع
+                    </button>
                     <div className="glass-card border-sky-500/20 p-4 space-y-3">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
@@ -5274,7 +5430,7 @@ export default function HomePage() {
                               <CheckCircle2 className="w-3.5 h-3.5" /> الباقة الحالية
                             </div>
                           ) : (
-                            <button onClick={() => { setSelectedPkg(pkg); setPaymentMethod(null); setSelectedLocalMethod(null); setSelectedUsdtNetwork(null); setUsdtTxid(""); setPaymentProofFile(null); setPaymentProofPreview(null); setPaymentResult(null); }}
+                            <button onClick={() => { setSelectedPkg(pkg); setPaymentStep(1); setPaymentMethod(null); setSelectedLocalMethod(null); setSelectedUsdtNetwork(null); setUsdtTxid(""); setPaymentProofFile(null); setPaymentProofPreview(null); setPaymentResult(null); }}
                               className={`w-full h-10 rounded-xl text-[11px] font-bold active:scale-[0.98] transition-transform flex items-center justify-center gap-1.5 ${isUpgrade ? "bg-gradient-to-r from-sky-500 to-cyan-500 text-white" : "gold-gradient text-black"}`}>
                               {isUpgrade ? <><Sparkles className="w-3.5 h-3.5" /> ترقية الآن</> : <><Crown className="w-3.5 h-3.5" /> اشترك الآن</>}
                             </button>

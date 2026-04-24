@@ -79,7 +79,7 @@ export function TpMiniCard({ tp, index, isHit, isLastHit, entry, type }: {
               <span className={`text-xs font-bold font-mono tabular-nums ${isHit ? "text-emerald-300 line-through decoration-emerald-500/40" : "text-foreground/90"}`}>
                 {tp.tp}
               </span>
-              <span className={`text-[9px] font-mono tabular-nums px-1.5 py-0.5 rounded-md ${
+              <span className={`text-[10px] font-mono tabular-nums px-1.5 py-0.5 rounded-md ${
                 isHit ? "bg-emerald-500/15 text-emerald-400" : "bg-white/[0.04] text-muted-foreground"
               }`}>
                 {direction}{diff}
@@ -207,7 +207,7 @@ export function TradeStatusBanner({ s }: { s: Signal }) {
                 {isPartialWin ? (catLabel ? `${catLabel} ربح جزئي` : "ربح جزئي") : isProfit ? (catLabel ? `${catLabel} رابح` : "صفقة رابحة") : isLoss ? (isReentry ? "تعويض خاسر" : isPyramid ? "تعزيز خاسر" : "صفقة خاسرة") : "صفقة مغلقة يدويا"}
               </span>
               {isProfit && hitCount > 0 && totalTPs > 0 && (
-                <span className={`text-[9px] ${theme.badge} px-1.5 py-0.5 rounded-md font-bold flex items-center gap-1`}>
+                <span className={`text-[10px] ${theme.badge} px-1.5 py-0.5 rounded-md font-bold flex items-center gap-1`}>
                   {catIcon}{hitCount}/{totalTPs} {catLabel || "أهداف"}
                 </span>
               )}
@@ -216,13 +216,13 @@ export function TradeStatusBanner({ s }: { s: Signal }) {
             {isProfit && (s.pnlDollars ?? 0) !== 0 && (
               <div className={`text-[11px] font-mono font-bold ${theme.text} mt-0.5 tabular-nums`} dir="ltr">
                 {s.pnlDollars! >= 0 ? "+" : ""}{(s.pnlDollars!).toFixed(2)}{" "}
-                <span className={`text-[9px] font-normal ${theme.sub}`}>({s.pnlPoints! >= 0 ? "+" : ""}{s.pnlPoints ?? 0} نقطة)</span>
+                <span className={`text-[10px] font-normal ${theme.sub}`}>({s.pnlPoints! >= 0 ? "+" : ""}{s.pnlPoints ?? 0} نقطة)</span>
               </div>
             )}
             {isLoss && (s.pnlDollars ?? 0) !== 0 && (
               <div className="text-[11px] font-mono font-bold text-red-400 mt-0.5 tabular-nums" dir="ltr">
                 -${Math.abs(s.pnlDollars ?? 0).toFixed(2)}{" "}
-                <span className="text-[9px] font-normal text-red-400/50">({s.pnlPoints ?? 0} نقطة)</span>
+                <span className="text-[10px] font-normal text-red-400/50">({s.pnlPoints ?? 0} نقطة)</span>
               </div>
             )}
             {isManual && (
@@ -252,12 +252,14 @@ export function TradeStatusBanner({ s }: { s: Signal }) {
 /* ═══════════════════════════════════════════════════════════════
    4. ENTRY CARD — Full Active Signal Card (Major Redesign)
    ═══════════════════════════════════════════════════════════════ */
-export function EntryCard({ s, idx, isAdmin, onUpdate, onDelete, isNew, statusChanged }: {
+export function EntryCard({ s, idx, isAdmin, onUpdate, onDelete, isNew, statusChanged, isFavorite, onToggleFavorite }: {
   s: Signal; idx: number; isAdmin: boolean;
   onUpdate: (id: string, status: string, tpIdx?: number) => void;
   onDelete: (id: string) => void;
   isNew?: boolean;
   statusChanged?: boolean;
+  isFavorite?: boolean;
+  onToggleFavorite?: (id: string) => void;
 }) {
   const ac = entryAccent(s);
   const isBuy = s.type === "BUY";
@@ -284,9 +286,16 @@ export function EntryCard({ s, idx, isAdmin, onUpdate, onDelete, isNew, statusCh
       transition={{ duration: 0.4, delay: isNew ? 0 : idx * 0.04 }}
       className={statusChanged ? "animate-status-pulse" : ""}
     >
-      <Glass className={`overflow-hidden ${ac.border} ${isClosed ? "opacity-80" : ""} shadow-layered hover-lift-premium`} padding="none">
+      <Glass className={`overflow-hidden relative ${ac.border} ${isClosed ? "opacity-80" : ""} shadow-layered hover-lift-premium`} padding="none">
         {/* 1. Top accent bar */}
         <div className={`h-[3px] bg-gradient-to-l ${ac.accent}`} style={{ boxShadow: `0 0 12px ${isBuy ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}` }} />
+
+        {/* Favorite star button */}
+        <button onClick={(e) => { e.stopPropagation(); onToggleFavorite?.(s.id); }}
+          className="absolute top-3 left-3 z-10 w-7 h-7 rounded-lg flex items-center justify-center transition-all active:scale-90"
+          style={{ background: isFavorite ? "rgba(251, 191, 36, 0.15)" : "rgba(255,255,255,0.04)", border: isFavorite ? "1px solid rgba(251, 191, 36, 0.3)" : "1px solid rgba(255,255,255,0.06)" }}>
+          <Star className={`w-3.5 h-3.5 ${isFavorite ? "text-amber-400 fill-amber-400" : "text-muted-foreground/40"}`} />
+        </button>
 
         <div className="p-4 space-y-3.5">
           {/* 2. Header row */}
@@ -303,7 +312,7 @@ export function EntryCard({ s, idx, isAdmin, onUpdate, onDelete, isNew, statusCh
                 <div className="flex items-center gap-2">
                   <span className="font-extrabold text-foreground text-[16px] tracking-wide">{s.pair}</span>
                   {/* BUY/SELL pill badge */}
-                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                     isBuy
                       ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20"
                       : "bg-red-500/15 text-red-400 border border-red-500/20"
@@ -312,12 +321,12 @@ export function EntryCard({ s, idx, isAdmin, onUpdate, onDelete, isNew, statusCh
                   </span>
                   {/* Timeframe badges */}
                   {s.timeframe && (
-                    <span className="text-[9px] bg-white/[0.04] text-muted-foreground px-1.5 py-0.5 rounded-md font-medium border border-white/[0.06]">
+                    <span className="text-[10px] bg-white/[0.04] text-muted-foreground px-1.5 py-0.5 rounded-md font-medium border border-white/[0.06]">
                       {s.timeframe}
                     </span>
                   )}
                   {s.htfTimeframe && (
-                    <span className="text-[9px] bg-white/[0.04] text-muted-foreground px-1.5 py-0.5 rounded-md font-medium border border-white/[0.06]">
+                    <span className="text-[10px] bg-white/[0.04] text-muted-foreground px-1.5 py-0.5 rounded-md font-medium border border-white/[0.06]">
                       {s.htfTimeframe}
                     </span>
                   )}
@@ -331,11 +340,11 @@ export function EntryCard({ s, idx, isAdmin, onUpdate, onDelete, isNew, statusCh
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-50" />
                         <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
                       </span>
-                      <span className="text-[9px] text-emerald-400 font-semibold tracking-wider">LIVE</span>
+                      <span className="text-[10px] text-emerald-400 font-semibold tracking-wider">LIVE</span>
                     </div>
                   )}
                   {isClosed && (
-                    <span className={`text-[9px] font-semibold ${
+                    <span className={`text-[10px] font-semibold ${
                       s.status === "HIT_TP" ? "text-emerald-400" : s.status === "HIT_SL" ? "text-red-400" : "text-muted-foreground"
                     }`}>
                       {s.status === "HIT_TP" ? (s.partialWin ? "ربح جزئي" : "مغلقة بربح") : s.status === "HIT_SL" ? "مغلقة بخسارة" : "مغلقة"}
@@ -356,7 +365,7 @@ export function EntryCard({ s, idx, isAdmin, onUpdate, onDelete, isNew, statusCh
                     {s.pnlDollars >= 0 ? "+" : ""}{s.pnlDollars.toFixed(2)}$
                   </div>
                   {s.pnlPoints != null && s.pnlPoints !== 0 && (
-                    <div className={`text-[9px] font-mono tabular-nums ${s.pnlDollars >= 0 ? "text-emerald-400/40" : "text-red-400/40"}`} dir="ltr">
+                    <div className={`text-[10px] font-mono tabular-nums ${s.pnlDollars >= 0 ? "text-emerald-400/40" : "text-red-400/40"}`} dir="ltr">
                       {s.pnlPoints >= 0 ? "+" : ""}{s.pnlPoints} نقطة
                     </div>
                   )}
@@ -395,7 +404,7 @@ export function EntryCard({ s, idx, isAdmin, onUpdate, onDelete, isNew, statusCh
             }`}>
               <div className="flex items-center gap-1.5 mb-2">
                 <Activity className={`w-3 h-3 ${isBuy ? "text-emerald-400" : "text-red-400"}`} />
-                <span className="text-[9px] text-muted-foreground font-medium">سعر الدخول</span>
+                <span className="text-[10px] text-muted-foreground font-medium">سعر الدخول</span>
               </div>
               <div className={`text-[16px] font-extrabold font-mono tabular-nums ${isBuy ? "text-emerald-300" : "text-red-300"}`} dir="ltr">
                 {s.entry}
@@ -405,12 +414,12 @@ export function EntryCard({ s, idx, isAdmin, onUpdate, onDelete, isNew, statusCh
             <div className="bg-red-500/[0.04] rounded-xl p-3 border border-red-500/15">
               <div className="flex items-center gap-1.5 mb-2">
                 <ShieldAlert className="w-3 h-3 text-red-400" />
-                <span className="text-[9px] text-red-400/60 font-medium">وقف الخسارة</span>
+                <span className="text-[10px] text-red-400/60 font-medium">وقف الخسارة</span>
               </div>
               <div className="text-[16px] font-extrabold font-mono text-red-400 tabular-nums" dir="ltr">
                 {s.stopLoss}
               </div>
-              <div className="text-[9px] text-muted-foreground/40 mt-1.5 font-mono tabular-nums" dir="ltr">
+              <div className="text-[10px] text-muted-foreground/40 mt-1.5 font-mono tabular-nums" dir="ltr">
                 {s.slDistance || Math.abs(s.entry - s.stopLoss).toFixed(1)} نقطة
               </div>
             </div>
@@ -481,13 +490,13 @@ export function EntryCard({ s, idx, isAdmin, onUpdate, onDelete, isNew, statusCh
                       <motion.span
                         initial={{ scale: 0.8 }}
                         animate={{ scale: 1 }}
-                        className="text-[9px] bg-emerald-500/15 text-emerald-400 px-2 py-0.5 rounded-full font-bold"
+                        className="text-[10px] bg-emerald-500/15 text-emerald-400 px-2 py-0.5 rounded-full font-bold"
                       >
                         {hitCount}/{s.takeProfits.length}
                       </motion.span>
                     )}
                   </div>
-                  <span className="text-[9px] text-muted-foreground/40 font-mono">R:R</span>
+                  <span className="text-[10px] text-muted-foreground/40 font-mono">R:R</span>
                 </div>
 
                 {/* TP cards list */}
@@ -527,8 +536,8 @@ export function EntryCard({ s, idx, isAdmin, onUpdate, onDelete, isNew, statusCh
                       })}
                     </div>
                     <div className="flex items-center justify-between mt-1.5">
-                      <span className="text-[8px] text-emerald-400/60 font-medium tabular-nums">{hitCount}/{s.takeProfits.length} أهداف</span>
-                      <span className="text-[8px] text-red-400/40 font-medium">SL</span>
+                      <span className="text-[10px] text-emerald-400/60 font-medium tabular-nums">{hitCount}/{s.takeProfits.length} أهداف</span>
+                      <span className="text-[10px] text-red-400/40 font-medium">SL</span>
                     </div>
                   </div>
                 )}
@@ -631,8 +640,9 @@ export function EntryCard({ s, idx, isAdmin, onUpdate, onDelete, isNew, statusCh
 /* ═══════════════════════════════════════════════════════════════
    5. CLOSED SIGNAL CARD — Compact Expandable
    ═══════════════════════════════════════════════════════════════ */
-export function ClosedSignalCard({ s, idx, isAdmin, onDelete, statusChanged }: {
+export function ClosedSignalCard({ s, idx, isAdmin, onDelete, statusChanged, isFavorite, onToggleFavorite }: {
   s: Signal; idx: number; isAdmin: boolean; onDelete: (id: string) => void; statusChanged?: boolean;
+  isFavorite?: boolean; onToggleFavorite?: (id: string) => void;
 }) {
   const isProfit = s.status === "HIT_TP";
   const isLoss = s.status === "HIT_SL";
@@ -667,9 +677,16 @@ export function ClosedSignalCard({ s, idx, isAdmin, onDelete, statusChanged }: {
       transition={{ duration: 0.3, delay: idx * 0.03 }}
       className={statusChanged ? "animate-status-pulse" : ""}
     >
-      <div className={`rounded-2xl border overflow-hidden ${theme.bg} ${theme.border} card-transition-premium hover-lift-premium`}>
+      <div className={`rounded-2xl border overflow-hidden relative ${theme.bg} ${theme.border} card-transition-premium hover-lift-premium ${isProfit ? "border-r-2 border-r-emerald-400" : isLoss ? "border-r-2 border-r-red-400" : ""}`}>
         {/* Top accent line */}
         <div className={`h-[2px] bg-gradient-to-l ${theme.accent}`} style={{ boxShadow: `0 1px 8px ${isProfit ? 'rgba(16, 185, 129, 0.2)' : isLoss ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255,255,255,0.05)'}` }} />
+
+        {/* Favorite star button */}
+        <button onClick={(e) => { e.stopPropagation(); onToggleFavorite?.(s.id); }}
+          className="absolute top-2.5 left-2.5 z-10 w-7 h-7 rounded-lg flex items-center justify-center transition-all active:scale-90"
+          style={{ background: isFavorite ? "rgba(251, 191, 36, 0.15)" : "rgba(255,255,255,0.04)", border: isFavorite ? "1px solid rgba(251, 191, 36, 0.3)" : "1px solid rgba(255,255,255,0.06)" }}>
+          <Star className={`w-3.5 h-3.5 ${isFavorite ? "text-amber-400 fill-amber-400" : "text-muted-foreground/40"}`} />
+        </button>
 
         {/* Compact Header — Always Visible */}
         <motion.button
@@ -692,33 +709,46 @@ export function ClosedSignalCard({ s, idx, isAdmin, onDelete, statusChanged }: {
               <div>
                 <div className="flex items-center gap-1.5">
                   <span className="font-bold text-foreground text-[13px]">{s.pair}</span>
-                  <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-md ${
+                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
                     isBuy ? "bg-emerald-500/15 text-emerald-400" : "bg-red-500/15 text-red-400"
                   }`}>
                     {isBuy ? "BUY" : "SELL"}
                   </span>
                   {hitCount > 0 && isProfit && (
-                    <span className={`text-[8px] ${theme.badge} px-1.5 py-0.5 rounded-md font-bold flex items-center gap-0.5`}>
+                    <span className={`text-[10px] ${theme.badge} px-1.5 py-0.5 rounded-md font-bold flex items-center gap-0.5`}>
                       {catIcon}{hitCount}/{totalTPs}
                     </span>
                   )}
                 </div>
                 <div className="flex items-center gap-1 mt-0.5">
                   {catIcon && <span className={theme.text}>{catIcon}</span>}
-                  <span className={`text-[9px] font-medium ${theme.text}/60`}>
+                  <span className={`text-[10px] font-medium ${theme.text}/60`}>
                     {isPartialWin ? "ربح جزئي" : catLabel}
                   </span>
                 </div>
+                {/* TP Progress Bar */}
+                {s.totalTPs && s.hitTpIndex > 0 && (
+                  <div className="mt-1.5">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[10px] text-muted-foreground/60">الأهداف المحققة</span>
+                      <span className="text-[10px] font-bold text-amber-400">{s.hitTpIndex}/{s.totalTPs}</span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-white/[0.04] overflow-hidden">
+                      <div className="h-full rounded-full bg-gradient-to-l from-amber-400 to-orange-500 transition-all duration-500"
+                        style={{ width: `${(s.hitTpIndex / s.totalTPs) * 100}%` }} />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
             <div className="flex items-center gap-2">
               {/* PnL */}
-              <div className="text-left">
-                <div className={`text-[13px] font-extrabold font-mono tabular-nums ${isProfit ? theme.text : "text-red-400"}`} dir="ltr">
+              <div className={`text-left rounded-lg px-2.5 py-1.5 ${isProfit ? "bg-emerald-500/[0.06]" : isLoss ? "bg-red-500/[0.06]" : ""}`}>
+                <div className={`text-lg font-extrabold font-mono tabular-nums ${isProfit ? theme.text : "text-red-400"} ${isProfit ? "drop-shadow-[0_0_6px_rgba(16,185,129,0.4)]" : isLoss ? "drop-shadow-[0_0_6px_rgba(239,68,68,0.4)]" : ""}`} dir="ltr">
                   {pnl >= 0 ? "+" : "-"}${Math.abs(pnl).toFixed(2)}
                 </div>
-                <div className={`text-[8px] font-mono tabular-nums ${isProfit ? theme.text + "/40" : "text-red-400/40"}`} dir="ltr">
+                <div className={`text-[10px] font-mono tabular-nums ${isProfit ? theme.text + "/40" : "text-red-400/40"}`} dir="ltr">
                   {points >= 0 ? "+" : ""}{points} نقطة
                 </div>
               </div>
@@ -745,17 +775,17 @@ export function ClosedSignalCard({ s, idx, isAdmin, onDelete, statusChanged }: {
                 {/* Entry / SL / Hit Price grid */}
                 <div className="grid grid-cols-3 gap-2">
                   <div className="bg-white/[0.02] rounded-lg p-2.5 border border-white/[0.06]">
-                    <div className="text-[8px] text-muted-foreground/50 mb-1">الدخول</div>
+                    <div className="text-[10px] text-muted-foreground/50 mb-1">الدخول</div>
                     <div className="text-[11px] font-bold font-mono text-foreground tabular-nums" dir="ltr">{s.entry}</div>
                   </div>
                   <div className="bg-red-500/[0.03] rounded-lg p-2.5 border border-red-500/10">
-                    <div className="text-[8px] text-red-400/40 mb-1">الوقف</div>
+                    <div className="text-[10px] text-red-400/40 mb-1">الوقف</div>
                     <div className="text-[11px] font-bold font-mono text-red-300 tabular-nums" dir="ltr">{s.stopLoss}</div>
                   </div>
                   <div className={`rounded-lg p-2.5 border ${
                     isProfit ? theme.iconBg + " " + theme.border : "bg-red-500/[0.04] border-red-500/10"
                   }`}>
-                    <div className="text-[8px] text-muted-foreground/50 mb-1">
+                    <div className="text-[10px] text-muted-foreground/50 mb-1">
                       {isReentry ? "تعويض" : isPyramid ? "تعزيز" : isProfit ? "الهدف" : "الإغلاق"}
                       {hitCount > 0 && totalTPs > 0 && ` (${hitCount}/${totalTPs})`}
                     </div>
@@ -768,14 +798,14 @@ export function ClosedSignalCard({ s, idx, isAdmin, onDelete, statusChanged }: {
                 {/* TP Targets */}
                 {s.takeProfits?.length > 0 ? (
                   <div className="space-y-1.5">
-                    <div className="text-[9px] text-muted-foreground/50 font-medium">الأهداف ({hitCount}/{totalTPs})</div>
+                    <div className="text-[10px] text-muted-foreground/50 font-medium">الأهداف ({hitCount}/{totalTPs})</div>
                     <div className="flex gap-1.5 flex-wrap">
                       {s.takeProfits.map((tp, i) => {
                         const hit = s.hitTpIndex > 0 && i < s.hitTpIndex;
                         return (
                           <div
                             key={i}
-                            className={`px-2 py-1 rounded-lg text-[9px] font-mono border tabular-nums ${
+                            className={`px-2 py-1 rounded-lg text-[10px] font-mono border tabular-nums ${
                               hit
                                 ? theme.tpBadge
                                 : "bg-white/[0.02] text-muted-foreground/40 border-white/[0.06] line-through"
@@ -794,14 +824,14 @@ export function ClosedSignalCard({ s, idx, isAdmin, onDelete, statusChanged }: {
                       <span className="text-[10px] font-bold flex items-center gap-1">
                         {catIcon} {isReentry ? "تعويض" : isPyramid ? "تعزيز" : "هدف"} {hitCount} من {totalTPs}
                       </span>
-                      <span className="text-[9px] opacity-60">متبقي {totalTPs - hitCount}</span>
+                      <span className="text-[10px] opacity-60">متبقي {totalTPs - hitCount}</span>
                     </div>
                   </div>
                 ) : null}
 
                 {/* Risk Info */}
                 {(s.balance || s.lotSize) && (
-                  <div className="flex gap-4 text-[9px]">
+                  <div className="flex gap-4 text-[10px]">
                     {s.balance && (
                       <div className="flex items-center gap-1">
                         <span className="text-muted-foreground/50">الرصيد:</span>
@@ -822,7 +852,7 @@ export function ClosedSignalCard({ s, idx, isAdmin, onDelete, statusChanged }: {
 
                 {/* Time + Delete */}
                 <div className="flex items-center justify-between pt-1">
-                  <span className="text-[9px] text-muted-foreground/40 flex items-center gap-1">
+                  <span className="text-[10px] text-muted-foreground/40 flex items-center gap-1">
                     <Clock className="w-2.5 h-2.5" />
                     {timeAgo(s.createdAt)}
                   </span>
@@ -830,7 +860,7 @@ export function ClosedSignalCard({ s, idx, isAdmin, onDelete, statusChanged }: {
                     <motion.button
                       whileTap={{ scale: 0.95 }}
                       onClick={(e) => { e.stopPropagation(); onDelete(s.id); }}
-                      className="px-2.5 py-1 rounded-lg text-[9px] font-medium bg-red-500/[0.04] text-red-400/50 border border-red-500/10 hover:bg-red-500/10 hover:text-red-400 transition-all duration-200 flex items-center gap-1"
+                      className="px-2.5 py-1 rounded-lg text-[10px] font-medium bg-red-500/[0.04] text-red-400/50 border border-red-500/10 hover:bg-red-500/10 hover:text-red-400 transition-all duration-200 flex items-center gap-1"
                     >
                       <Trash2 className="w-3 h-3" />
                       حذف
@@ -1083,10 +1113,10 @@ export function SplashScreen() {
               ))}
 
               {/* Price labels */}
-              <div className="absolute left-1 top-3 text-[7px] font-mono text-white/15 tabular-nums">2,450</div>
-              <div className="absolute left-1 top-[42px] text-[7px] font-mono text-white/15 tabular-nums">2,445</div>
-              <div className="absolute left-1 top-[72px] text-[7px] font-mono text-white/15 tabular-nums">2,440</div>
-              <div className="absolute left-1 top-[102px] text-[7px] font-mono text-white/15 tabular-nums">2,435</div>
+              <div className="absolute left-1 top-3 text-[10px] font-mono text-white/15 tabular-nums">2,450</div>
+              <div className="absolute left-1 top-[42px] text-[10px] font-mono text-white/15 tabular-nums">2,445</div>
+              <div className="absolute left-1 top-[72px] text-[10px] font-mono text-white/15 tabular-nums">2,440</div>
+              <div className="absolute left-1 top-[102px] text-[10px] font-mono text-white/15 tabular-nums">2,435</div>
 
               {/* Candlesticks */}
               <svg
@@ -1148,7 +1178,7 @@ export function SplashScreen() {
                 }}
               />
               <div
-                className="absolute right-2 px-1.5 py-0.5 rounded text-[7px] font-mono font-bold tabular-nums"
+                className="absolute right-2 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold tabular-nums"
                 style={{
                   top: "51px",
                   background: "#FFD700",
@@ -1171,15 +1201,15 @@ export function SplashScreen() {
         >
           <div className="text-center">
             <div className="text-lg font-bold tabular-nums" style={{ color: "#FFD700" }}>150+</div>
-            <div className="text-[9px]" style={{ color: "rgba(255,215,0,0.4)" }}>إشارة</div>
+            <div className="text-[10px]" style={{ color: "rgba(255,215,0,0.4)" }}>إشارة</div>
           </div>
           <div className="text-center">
             <div className="text-lg font-bold tabular-nums" style={{ color: "#00E676" }}>78%</div>
-            <div className="text-[9px]" style={{ color: "rgba(0,230,118,0.4)" }}>نسبة نجاح</div>
+            <div className="text-[10px]" style={{ color: "rgba(0,230,118,0.4)" }}>نسبة نجاح</div>
           </div>
           <div className="text-center">
             <div className="text-lg font-bold" style={{ color: "#06b6d4" }}>VIP</div>
-            <div className="text-[9px]" style={{ color: "rgba(6,182,212,0.4)" }}>عضوية</div>
+            <div className="text-[10px]" style={{ color: "rgba(6,182,212,0.4)" }}>عضوية</div>
           </div>
         </motion.div>
 
