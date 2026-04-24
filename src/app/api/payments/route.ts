@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getPaymentRequests, getPaymentRequestsByUser, getPendingPaymentRequests, addPaymentRequest, updatePaymentRequest } from "@/lib/store";
 import { getPackageById, getUserById, updateUser, getAppSettings, getUserByReferralCode } from "@/lib/store";
 import { verifyUsdtTransaction, checkDuplicateTxId, type BlockchainVerification } from "@/lib/blockchain-verify";
+import { useCoupon } from "@/app/api/coupons/route";
 
 // ── Referral reward: grant referrer bonus days when referred user activates paid plan ──
 async function grantReferralReward(
@@ -77,7 +78,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { userId, packageId, paymentMethod, txId, txid, paymentMethodId, usdtNetwork: bodyNetwork, localAmount, localCurrencyCode, proofUrl, paymentProofUrl } = body;
+    const { userId, packageId, paymentMethod, txId, txid, paymentMethodId, usdtNetwork: bodyNetwork, localAmount, localCurrencyCode, proofUrl, paymentProofUrl, couponCode } = body;
 
     // Normalize txId (support both txId and txid from frontend)
     const normalizedTxId = txId || txid;
@@ -124,6 +125,17 @@ export async function POST(request: NextRequest) {
     let remainingDays = 0;
     let remainingValue = 0;
     let upgradePrice = 0;
+    let couponDiscount = 0;
+
+    // ── Apply Coupon Discount ──
+    if (couponCode) {
+      const couponValidateRes = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || ''}/api/coupons?action=validate&code=${encodeURIComponent(couponCode)}&userId=${userId}`);
+      const couponData = await couponValidateRes.json();
+      if (couponData.success && couponData.coupon) {
+        couponDiscount = Math.round(effectivePrice * (couponData.coupon.discountPercent / 100));
+        effectivePrice = Math.max(0, effectivePrice - couponDiscount);
+      }
+    }
 
     if (user.subscriptionType !== "none" && user.subscriptionExpiry && new Date(user.subscriptionExpiry) > new Date()) {
       // Same package → block
@@ -267,6 +279,10 @@ export async function POST(request: NextRequest) {
 
       // 4. If verification passed → auto-activate subscription
       if (verification.success && verification.valid) {
+        // Mark coupon as used if coupon was applied
+        if (couponCode && couponDiscount > 0) {
+          await useCoupon(couponCode.toUpperCase(), userId);
+        }
         let expiry: Date;
 
         if (isUpgrade && user.subscriptionExpiry) {
@@ -351,6 +367,11 @@ export async function POST(request: NextRequest) {
       paymentProofUrl: normalizedProofUrl || undefined,
       createdAt: new Date().toISOString(),
     });
+
+    // Mark coupon as used for local payment
+    if (couponCode && couponDiscount > 0) {
+      await useCoupon(couponCode.toUpperCase(), userId);
+    }
 
     return NextResponse.json({
       success: true,

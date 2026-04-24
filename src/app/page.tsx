@@ -352,6 +352,8 @@ export default function HomePage() {
   const [filter, setFilter] = useState<Filter>("all");
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [signalSearch, setSignalSearch] = useState("");
+  const [pairFilter, setPairFilter] = useState<string>("");
+  const [showPairDropdown, setShowPairDropdown] = useState(false);
   const [audioMuted, setAudioMuted] = useState(false);
   const [audioVol, setAudioVol] = useState(0.7);
   const prevIdsRef = useRef<Set<string>>(new Set());
@@ -516,7 +518,7 @@ export default function HomePage() {
   const [paymentProofPreview, setPaymentProofPreview] = useState<string | null>(null);
   const [paymentLoad, setPaymentLoad] = useState(false);
   const [paymentResult, setPaymentResult] = useState<null | "success" | "pending">(null);
-  const [paymentRequests, setPaymentRequests] = useState<{ id: string; userId: string; userName: string; userEmail: string; packageId: string; packageName: string; amount: number; paymentMethod: string; txid?: string; proofUrl?: string; status: string; createdAt: string }[]>([]);
+  const [paymentRequests, setPaymentRequests] = useState<{ id: string; userId: string; userName: string; userEmail: string; packageId: string; packageName: string; amount: number; paymentMethod: string; txid?: string; proofUrl?: string; status: string; createdAt: string; rejectReason?: string }[]>([]);
   const [payReqLoad, setPayReqLoad] = useState(false);
   const [showPaymentSettings, setShowPaymentSettings] = useState(false);
   const [paySettingsForm, setPaySettingsForm] = useState({ usdtWalletAddress: "", usdtNetwork: "TRC20" });
@@ -530,6 +532,18 @@ export default function HomePage() {
   const [methodFormCurrencyCode, setMethodFormCurrencyCode] = useState("");
   const [methodFormRate, setMethodFormRate] = useState("");
   const [methodLoad, setMethodLoad] = useState(false);
+
+  /* ── Coupon System ── */
+  const [coupons, setCoupons] = useState<{ code: string; discountPercent: number; maxUses: number; currentUses: number; isActive: boolean; expiresAt: string | null; createdAt: string }[]>([]);
+  const [couponLoad, setCouponLoad] = useState(false);
+  const [showCouponForm, setShowCouponForm] = useState(false);
+  const [couponFormCode, setCouponFormCode] = useState("");
+  const [couponFormDiscount, setCouponFormDiscount] = useState("");
+  const [couponFormMaxUses, setCouponFormMaxUses] = useState("");
+  const [couponFormExpiry, setCouponFormExpiry] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discountPercent: number } | null>(null);
+  const [couponInput, setCouponInput] = useState("");
+  const [couponApplying, setCouponApplying] = useState(false);
 
   /* ── Proof Image Modal ── */
   const [proofModalOpen, setProofModalOpen] = useState(false);
@@ -600,6 +614,7 @@ export default function HomePage() {
   /* ── Real-time Session Refresh ── */
   const sessionRefreshRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const prevSessionHashRef = useRef<string>("");
+  const expiryWarningShownRef = useRef<{ threeDay: boolean; oneDay: boolean }>({ threeDay: false, oneDay: false });
 
   const refreshSessionFromServer = useCallback(async () => {
     if (!session?.id) return;
@@ -660,6 +675,21 @@ export default function HomePage() {
 
             return updated;
           });
+        }
+
+        // ── Subscription Expiry Warning Notifications ──
+        if (s.subscriptionType === "subscriber" && s.subscriptionExpiry) {
+          const expiryMs = new Date(s.subscriptionExpiry).getTime();
+          const nowMs = Date.now();
+          const daysUntilExpiry = (expiryMs - nowMs) / 86400000;
+
+          if (daysUntilExpiry <= 1 && daysUntilExpiry > 0 && !expiryWarningShownRef.current.oneDay) {
+            expiryWarningShownRef.current.oneDay = true;
+            toast.error("🚨 اشتراكك ينتهي اليوم! قم بتجديد الباقة فوراً");
+          } else if (daysUntilExpiry <= 3 && daysUntilExpiry > 1 && !expiryWarningShownRef.current.threeDay) {
+            expiryWarningShownRef.current.threeDay = true;
+            toast.warning("⚠️ اشتراكك ينتهي خلال أقل من 3 أيام! قم بتجديد باقتك لتجنب انقطاع الإشارات");
+          }
         }
       }
     } catch { /* ignore — will retry on next interval */ }
@@ -985,8 +1015,8 @@ export default function HomePage() {
     }
     if (view === "main" && tab === "packages") {
       fetchPackages();
-      if (isAdmin) { fetchPaymentRequests(); fetchLocalPaymentMethods(); }
-      if (!isAdmin) fetchUserPaymentMethods();
+      if (isAdmin) { fetchPaymentRequests(); fetchLocalPaymentMethods(); fetchCoupons(); }
+      if (!isAdmin) { fetchUserPaymentMethods(); fetchPaymentRequests(); }
     }
   }, [tab, view]);
 
@@ -1708,11 +1738,100 @@ export default function HomePage() {
     } catch (e) { console.error("Toggle method:", e); toast.error("فشل الاتصال", { description: "تعذر الوصول إلى الخادم، حاول مجدداً" }); }
   }
 
+  /* ── Coupon Handlers ── */
+  async function fetchCoupons() {
+    setCouponLoad(true);
+    try {
+      const res = await fetch(`/api/coupons?adminId=${session?.id}`);
+      const data = await res.json();
+      if (data.success) setCoupons(data.coupons || []);
+    } catch (e) { console.error("Fetch coupons:", e); }
+    finally { setCouponLoad(false); }
+  }
+
+  async function handleCreateCoupon() {
+    if (!couponFormCode.trim() || !couponFormDiscount || !couponFormMaxUses) return;
+    setCouponLoad(true);
+    try {
+      const res = await fetch("/api/coupons", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          adminId: session?.id,
+          code: couponFormCode.trim().toUpperCase(),
+          discountPercent: Number(couponFormDiscount),
+          maxUses: Number(couponFormMaxUses),
+          expiresAt: couponFormExpiry ? new Date(couponFormExpiry).toISOString() : null,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success("تم إنشاء الكوبون بنجاح");
+        setCouponFormCode(""); setCouponFormDiscount(""); setCouponFormMaxUses(""); setCouponFormExpiry("");
+        setShowCouponForm(false);
+        fetchCoupons();
+      } else { toast.error(data.error || "فشل إنشاء الكوبون"); }
+    } catch (e) { toast.error("فشل الاتصال"); }
+    finally { setCouponLoad(false); }
+  }
+
+  async function handleToggleCoupon(code: string, isActive: boolean) {
+    try {
+      const res = await fetch("/api/coupons", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ adminId: session?.id, code, isActive }),
+      });
+      const data = await res.json();
+      if (data.success) fetchCoupons();
+      else toast.error(data.error || "فشل التحديث");
+    } catch (e) { toast.error("فشل الاتصال"); }
+  }
+
+  async function handleDeleteCoupon(code: string) {
+    try {
+      const res = await fetch("/api/coupons", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ adminId: session?.id, code }),
+      });
+      const data = await res.json();
+      if (data.success) { toast.success("تم حذف الكوبون"); fetchCoupons(); }
+      else toast.error(data.error || "فشل الحذف");
+    } catch (e) { toast.error("فشل الاتصال"); }
+  }
+
+  async function handleApplyCoupon() {
+    if (!couponInput.trim() || !session) return;
+    setCouponApplying(true);
+    try {
+      const res = await fetch("/api/coupons", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "validate", code: couponInput.trim().toUpperCase(), userId: session.id }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAppliedCoupon({ code: data.coupon.code, discountPercent: data.coupon.discountPercent });
+        toast.success(`تم تطبيق كوبون "${data.coupon.code}" — خصم ${data.coupon.discountPercent}%`);
+        setCouponInput("");
+      } else { toast.error(data.error || "كوبون غير صالح"); }
+    } catch (e) { toast.error("فشل الاتصال"); }
+    finally { setCouponApplying(false); }
+  }
+
+  /* ── Reject Payment Dialog State ── */
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [rejectReqId, setRejectReqId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejectLoad, setRejectLoad] = useState(false);
+
   /* ── Payment Request Handlers ── */
   async function fetchPaymentRequests() {
     setPayReqLoad(true);
     try {
-      const res = await fetch("/api/payments");
+      const url = isAdmin ? "/api/payments" : (session?.id ? `/api/payments?userId=${session.id}` : "/api/payments");
+      const res = await fetch(url);
       const data = await res.json();
       if (data.success) setPaymentRequests(data.requests || []);
     } catch (e) { console.error("Fetch payment requests:", e); }
@@ -1723,21 +1842,53 @@ export default function HomePage() {
     const req = paymentRequests.find(r => r.id === id);
     const userName = req?.userName || "";
     const pkgName = req?.packageName || "";
+
+    if (action === "reject") {
+      // Show reject dialog with reason input
+      setRejectReqId(id);
+      setRejectReason("");
+      setRejectDialogOpen(true);
+      return;
+    }
+
     askConfirm({
-      title: action === "approve" ? "قبول طلب الدفع" : "رفض طلب الدفع",
-      description: action === "approve" ? `هل تريد قبول طلب الدفع من "${userName}" لباقة "${pkgName}"؟ سيتم تفعيل الاشتراك فوراً.` : `هل تريد رفض طلب الدفع من "${userName}" لباقة "${pkgName}"؟ سيتم إبلاغ المستخدم بالرفض.`,
-      variant: action === "approve" ? "info" : "danger",
-      confirmLabel: action === "approve" ? "نعم، قبول" : "نعم، رفض",
-      icon: action === "approve" ? <CheckCircle2 className="w-5 h-5 text-emerald-400" /> : <XCircle className="w-5 h-5 text-red-400" />,
+      title: "قبول طلب الدفع",
+      description: `هل تريد قبول طلب الدفع من "${userName}" لباقة "${pkgName}"؟ سيتم تفعيل الاشتراك فوراً.`,
+      variant: "info",
+      confirmLabel: "نعم، قبول",
+      icon: <CheckCircle2 className="w-5 h-5 text-emerald-400" />,
       action: async () => {
         try {
           const res = await fetch("/api/payments", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ requestId: id, action, adminId: session?.id }) });
           const data = await res.json();
-          if (data.success) { fetchPaymentRequests(); fetchUsers(); toast.success(action === "approve" ? "تم قبول طلب الدفع" : "تم رفض طلب الدفع", { description: action === "approve" ? "تم تفعيل اشتراك المستخدم بنجاح" : "تم إبلاغ المستخدم بالرفض" }); }
+          if (data.success) { fetchPaymentRequests(); fetchUsers(); toast.success("تم قبول طلب الدفع", { description: "تم تفعيل اشتراك المستخدم بنجاح" }); }
           else { toast.error(data.error || "فشل تحديث الطلب", { description: "تعذر معالجة طلب الدفع" }); }
         } catch (e) { console.error("Payment action:", e); toast.error("فشل الاتصال", { description: "تعذر الوصول إلى الخادم، حاول مجدداً" }); }
       },
     });
+  }
+
+  async function handleRejectWithReason() {
+    if (!rejectReqId || !rejectReason.trim()) return;
+    setRejectLoad(true);
+    try {
+      const res = await fetch("/api/payments", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requestId: rejectReqId, action: "reject", rejectReason: rejectReason.trim(), adminId: session?.id }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        fetchPaymentRequests(); fetchUsers();
+        toast.success("تم رفض طلب الدفع", { description: "تم إبلاغ المستخدم بالرفض" });
+        setRejectDialogOpen(false);
+        setRejectReqId(null);
+        setRejectReason("");
+      } else {
+        toast.error(data.error || "فشل تحديث الطلب");
+      }
+    } catch (e) { console.error("Reject payment:", e); toast.error("فشل الاتصال"); }
+    finally { setRejectLoad(false); }
   }
 
   /* ── User Payment Handlers ── */
@@ -1757,6 +1908,7 @@ export default function HomePage() {
           paymentMethodId: networkId,
           usdtNetwork: networkName,
           paymentMethodName: networkName,
+          couponCode: appliedCoupon?.code,
         }),
       });
       const data = await res.json();
@@ -1827,6 +1979,7 @@ export default function HomePage() {
           localAmount,
           localCurrencyCode: selectedLocalMethod.currencyCode,
           proofUrl: uploadData.url,
+          couponCode: appliedCoupon?.code,
         }),
       });
       const data = await res.json();
@@ -1872,6 +2025,7 @@ export default function HomePage() {
     setSelectedUsdtNetwork(null); setUsdtTxid("");
     setPaymentProofFile(null); setPaymentProofPreview(null);
     setPaymentLoad(false); setPaymentResult(null); setPaymentStep(0);
+    setAppliedCoupon(null); setCouponInput("");
   }
 
   async function handleAssignPackage(userId: string, packageId: string) {
@@ -2212,6 +2366,11 @@ export default function HomePage() {
         s.type?.toLowerCase().includes(q) ||
         (s.signalCategory || "").toLowerCase().includes(q)
       );
+    }
+    // Pair filter
+    if (pairFilter.trim()) {
+      const q = pairFilter.trim().toUpperCase();
+      result = result.filter(s => s.pair?.toUpperCase() === q);
     }
     return result;
   }
@@ -3910,7 +4069,7 @@ export default function HomePage() {
             {/* ── Filter Chips — Premium Style ── */}
             <div className="flex gap-2 overflow-x-auto scrollbar-none pb-0.5">
               {filterChips.filter(f => !f.category).map(f => (
-                <button key={f.key} onClick={() => { setFilter(f.key as Filter); setCategoryFilter(null); }}
+                <button key={f.key} onClick={() => { setFilter(f.key as Filter); setCategoryFilter(null); setPairFilter(""); }}
                   className={`px-3.5 py-1.5 rounded-lg text-[10px] font-semibold whitespace-nowrap transition-all duration-200 active:scale-95 ${
                     filter === f.key
                       ? "bg-amber-400/[0.12] text-amber-400 border border-amber-400/20 shadow-sm shadow-amber-400/5"
@@ -3923,7 +4082,7 @@ export default function HomePage() {
               <div className="w-px h-5 bg-white/10 mx-1 self-center" />
               {/* Category filters */}
               {filterChips.filter(f => f.category).map(f => (
-                <button key={f.key} onClick={() => { setFilter(f.key as Filter); setCategoryFilter(f.key); }}
+                <button key={f.key} onClick={() => { setFilter(f.key as Filter); setCategoryFilter(f.key); setPairFilter(""); }}
                   className={`px-3 py-1 rounded-full text-[10px] font-semibold transition-all whitespace-nowrap ${
                     categoryFilter === f.key
                       ? "bg-violet-500/15 text-violet-400 border border-violet-500/20"
@@ -3933,6 +4092,60 @@ export default function HomePage() {
                 </button>
               ))}
             </div>
+
+            {/* ── Pair Filter Dropdown ── */}
+            {(() => {
+              const allPairs = [...new Set(filtered.map(s => s.pair).filter(Boolean))].sort();
+              return allPairs.length > 0 ? (
+                <div className="relative">
+                  <button
+                    onClick={() => setShowPairDropdown(!showPairDropdown)}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-semibold transition-all border whitespace-nowrap ${
+                      pairFilter
+                        ? "bg-violet-500/15 text-violet-400 border-violet-500/20"
+                        : "bg-white/[0.03] text-muted-foreground/60 border-white/[0.06] hover:bg-white/[0.05]"
+                    }`}
+                  >
+                    <Hash className="w-3 h-3" />
+                    {pairFilter || "تصفية بالزوج"}
+                    {pairFilter && (
+                      <button onClick={(e) => { e.stopPropagation(); setPairFilter(""); }}
+                        className="text-violet-400/60 hover:text-violet-400 ml-1">
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </button>
+                  {showPairDropdown && (
+                    <div className="absolute top-full left-0 right-0 mt-1 z-30 rounded-xl border border-white/10 overflow-hidden max-h-48 overflow-y-auto scrollbar-thin" style={{ background: "rgba(15, 23, 42, 0.98)", backdropFilter: "blur(12px)" }}>
+                      <div className="p-1">
+                        <input
+                          type="text"
+                          placeholder="بحث بالزوج..."
+                          className="w-full px-3 py-2 bg-white/[0.04] rounded-lg text-xs text-foreground placeholder:text-muted-foreground/40 focus:outline-none border border-white/[0.06] focus:border-violet-500/30"
+                          onChange={e => {
+                            const q = e.target.value.toUpperCase();
+                            const match = allPairs.find(p => p.startsWith(q));
+                            if (match) setPairFilter(match);
+                          }}
+                          onKeyDown={e => { if (e.key === "Enter") setShowPairDropdown(false); }}
+                          autoFocus
+                        />
+                        {allPairs.map(pair => (
+                          <button key={pair} onClick={() => { setPairFilter(pair); setShowPairDropdown(false); }}
+                            className={`w-full text-right px-3 py-2 text-[10px] font-mono rounded-lg transition-colors ${
+                              pairFilter === pair
+                                ? "bg-violet-500/15 text-violet-400"
+                                : "text-muted-foreground/80 hover:bg-white/[0.05] hover:text-foreground"
+                            }`}>
+                            {pair}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : null;
+            })()}
 
             {loading && filtered.length === 0 ? (
               <SignalsLoadingSkeleton />
@@ -4346,6 +4559,107 @@ export default function HomePage() {
             </div>
 
             {/* ══════════════════════════════════════════════════
+                COUPON MANAGEMENT — Professional Card
+               ══════════════════════════════════════════════════ */}
+            <div className="glass-card overflow-hidden">
+              {/* Section Header */}
+              <div className="px-4 py-3.5 border-b border-white/[0.05] flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500/20 to-green-500/10 border border-emerald-500/15 flex items-center justify-center">
+                    <Ticket className="w-4 h-4 text-emerald-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold text-foreground">إدارة الكوبونات</h3>
+                    <p className="text-[8px] text-muted-foreground">{coupons.filter(c => c.isActive).length} كوبون نشط</p>
+                  </div>
+                </div>
+                {!showCouponForm && (
+                  <button onClick={() => setShowCouponForm(true)}
+                    className="px-3 py-1.5 rounded-lg text-[9px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/15 hover:bg-emerald-500/15 transition-all flex items-center gap-1 active:scale-95">
+                    <Plus className="w-3 h-3" /> كوبون جديد
+                  </button>
+                )}
+              </div>
+
+              <div className="p-3 space-y-2">
+                {/* Create Coupon Form */}
+                {showCouponForm && (
+                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass-card border-emerald-500/15 p-3.5 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-emerald-400">كوبون جديد</span>
+                      <button onClick={() => { setShowCouponForm(false); setCouponFormCode(""); setCouponFormDiscount(""); setCouponFormMaxUses(""); setCouponFormExpiry(""); }} className="text-muted-foreground hover:text-foreground transition-colors"><XCircle className="w-3.5 h-3.5" /></button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="col-span-2">
+                        <label className="text-[8px] text-muted-foreground mb-0.5 block">كود الكوبون</label>
+                        <Input value={couponFormCode} onChange={e => setCouponFormCode(e.target.value.toUpperCase())} placeholder="مثال: WELCOME20" dir="ltr"
+                          className="glass-input text-foreground placeholder:text-muted-foreground/50 h-9 text-[10px] font-mono uppercase" maxLength={20} />
+                      </div>
+                      <div>
+                        <label className="text-[8px] text-muted-foreground mb-0.5 block">نسبة الخصم %</label>
+                        <Input type="number" value={couponFormDiscount} onChange={e => setCouponFormDiscount(e.target.value)} placeholder="20" dir="ltr"
+                          className="glass-input text-foreground placeholder:text-muted-foreground/50 h-9 text-[10px] font-mono" min={1} max={100} />
+                      </div>
+                      <div>
+                        <label className="text-[8px] text-muted-foreground mb-0.5 block">عدد الاستخدامات</label>
+                        <Input type="number" value={couponFormMaxUses} onChange={e => setCouponFormMaxUses(e.target.value)} placeholder="100" dir="ltr"
+                          className="glass-input text-foreground placeholder:text-muted-foreground/50 h-9 text-[10px] font-mono" min={1} />
+                      </div>
+                      <div className="col-span-2">
+                        <label className="text-[8px] text-muted-foreground mb-0.5 block">تاريخ الانتهاء (اختياري)</label>
+                        <Input type="date" value={couponFormExpiry} onChange={e => setCouponFormExpiry(e.target.value)} dir="ltr"
+                          className="glass-input text-foreground placeholder:text-muted-foreground/50 h-9 text-[10px] font-mono" />
+                      </div>
+                    </div>
+                    <button onClick={handleCreateCoupon} disabled={couponLoad || !couponFormCode.trim() || !couponFormDiscount || !couponFormMaxUses}
+                      className="w-full h-9 rounded-lg bg-gradient-to-r from-emerald-500 to-green-500 text-black text-[10px] font-bold disabled:opacity-40 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5">
+                      {couponLoad ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <><CheckCircle2 className="w-3.5 h-3.5" /> إنشاء الكوبون</>}
+                    </button>
+                  </motion.div>
+                )}
+
+                {/* Coupons List */}
+                {coupons.length > 0 ? coupons.map(coupon => (
+                  <div key={coupon.code} className={`rounded-xl border p-3 transition-all glass-subtle ${coupon.isActive ? "border-emerald-500/15" : "border-border/40 opacity-40"}`}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                        <div className={`w-8 h-8 rounded-lg ${coupon.isActive ? "bg-gradient-to-br from-emerald-500/20 to-green-500/10" : "bg-muted/20"} border ${coupon.isActive ? "border-emerald-500/15" : "border-border/40"} flex items-center justify-center flex-shrink-0`}>
+                          <Ticket className={`w-3.5 h-3.5 ${coupon.isActive ? "text-emerald-400" : "text-muted-foreground"}`} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold font-mono text-foreground">{coupon.code}</span>
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[7px] font-bold bg-emerald-500/10 text-emerald-400">-{coupon.discountPercent}%</span>
+                            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[7px] font-bold ${coupon.isActive ? "bg-emerald-500/10 text-emerald-400" : "bg-muted/20 text-muted-foreground"}`}>
+                              <span className={`w-1 h-1 rounded-full ${coupon.isActive ? "bg-emerald-400" : "bg-muted-foreground"}`} />
+                              {coupon.isActive ? "نشط" : "معطل"}
+                            </span>
+                          </div>
+                          <div className="text-[8px] text-muted-foreground mt-0.5">{coupon.currentUses}/{coupon.maxUses} استخدام — {coupon.expiresAt ? new Date(coupon.expiresAt).toLocaleDateString("ar-SA") : "بدون انتهاء"}</div>
+                        </div>
+                      </div>
+                      <div className="flex gap-1 flex-shrink-0">
+                        <button onClick={() => handleToggleCoupon(coupon.code, !coupon.isActive)}
+                          className={`p-1.5 rounded-md transition-all ${coupon.isActive ? "text-muted-foreground/50 hover:text-red-400 hover:bg-red-500/10" : "text-muted-foreground hover:text-emerald-400 hover:bg-emerald-500/10"}`}>
+                          {coupon.isActive ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
+                        </button>
+                        <button onClick={() => handleDeleteCoupon(coupon.code)}
+                          className="p-1.5 rounded-md text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-all">
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )) : !showCouponForm ? (
+                  <div className="py-6 text-center">
+                    <p className="text-[10px] text-muted-foreground">لا توجد كوبونات</p>
+                    <p className="text-[8px] text-muted-foreground/50 mt-1">أضف كوبونات خصم لجذب المستخدمين</p>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+
+            {/* ══════════════════════════════════════════════════
                 LOCAL PAYMENT METHODS — Professional Card
                ══════════════════════════════════════════════════ */}
             <div className="glass-card overflow-hidden">
@@ -4538,7 +4852,7 @@ export default function HomePage() {
                             <CheckCircle2 className="w-3 h-3" /> قبول
                           </button>
                           <button onClick={() => handlePaymentAction(req.id, "reject")} className="flex-1 py-1.5 rounded-lg text-[9px] font-medium bg-red-500/10 text-red-400 border border-red-500/15 active:scale-95 transition-transform flex items-center justify-center gap-1">
-                            <XCircle className="w-3 h-3" /> رفض
+                            <XCircle className="w-3 h-3" /> رفض مع السبب
                           </button>
                         </div>
                       </div>
@@ -5130,6 +5444,34 @@ export default function HomePage() {
             )}
             </AnimatePresence>
 
+            {/* ── User's Rejected Payment Requests ── */}
+            {paymentRequests.filter(r => r.status === "rejected").length > 0 && !selectedPkg && !paymentResult && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 px-1">
+                  <XCircle className="w-3.5 h-3.5 text-red-400" />
+                  <span className="text-[11px] font-bold text-red-400">طلبات مرفوضة</span>
+                </div>
+                {paymentRequests.filter(r => r.status === "rejected").slice(0, 3).map(req => (
+                  <div key={req.id} className="rounded-xl border border-red-500/15 bg-red-500/[0.03] p-3 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <div className="text-[11px] font-bold text-foreground">{req.packageName}</div>
+                      <div className="text-[9px] bg-red-500/10 text-red-400 px-2 py-0.5 rounded-md font-bold">مرفوض</div>
+                    </div>
+                    {req.rejectReason && (
+                      <div className="rounded-lg bg-red-500/5 border border-red-500/10 p-2.5">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <AlertTriangle className="w-3 h-3 text-red-400" />
+                          <span className="text-[9px] font-bold text-red-400">سبب الرفض</span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground leading-relaxed">{req.rejectReason}</p>
+                      </div>
+                    )}
+                    <div className="text-[8px] text-muted-foreground">{new Date(req.createdAt).toLocaleDateString("ar-SA", { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {/* ── Payment Flow (USDT or Local) ── */}
             <AnimatePresence>
             {selectedPkg && !paymentResult && (
@@ -5187,6 +5529,8 @@ export default function HomePage() {
                     } else if (hasActiveSub && isCurFreeTrial) {
                       effectivePrice = selectedPkg.price;
                     }
+                    // Apply coupon discount
+                    const couponPrice = appliedCoupon ? Math.max(0, Math.round(effectivePrice * (1 - appliedCoupon.discountPercent / 100))) : effectivePrice;
                     return <>
                     <div className="flex items-center justify-between">
                       <div>
@@ -5194,7 +5538,21 @@ export default function HomePage() {
                         <p className="text-[10px] text-muted-foreground mt-0.5">{selectedPkg.durationDays} يوم</p>
                       </div>
                       <div className="text-right">
-                        {upgradeInfo ? (
+                        {appliedCoupon ? (
+                          <>
+                            {upgradeInfo ? (
+                              <>
+                                <div className="text-[10px] text-muted-foreground line-through">${effectivePrice}</div>
+                              </>
+                            ) : (
+                              <div className="text-[10px] text-muted-foreground line-through">${effectivePrice}</div>
+                            )}
+                            <div className="text-2xl font-black text-emerald-400 font-mono">${couponPrice}</div>
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                              <Ticket className="w-3 h-3" /> -{appliedCoupon.discountPercent}%
+                            </span>
+                          </>
+                        ) : upgradeInfo ? (
                           <>
                             <div className="text-[10px] text-muted-foreground line-through">${selectedPkg.price}</div>
                             <div className="text-2xl font-black text-sky-400 font-mono">${effectivePrice}</div>
@@ -5221,6 +5579,34 @@ export default function HomePage() {
                     </>;
                   })()}
                 </div>
+
+                {/* Coupon Code Input */}
+                {!appliedCoupon ? (
+                  <div className="glass-card border-emerald-500/15 p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Ticket className="w-4 h-4 text-emerald-400" />
+                      <span className="text-xs font-bold text-foreground">هل لديك كوبون خصم؟</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <Input value={couponInput} onChange={e => setCouponInput(e.target.value.toUpperCase())} placeholder="أدخل كود الكوبون..."
+                        className="flex-1 glass-input text-foreground placeholder:text-muted-foreground/50 h-10 text-xs font-mono uppercase" dir="ltr" maxLength={20} />
+                      <button onClick={handleApplyCoupon} disabled={couponApplying || couponInput.trim().length < 3}
+                        className="px-5 py-2.5 rounded-xl bg-emerald-500/15 text-emerald-400 text-[10px] font-bold border border-emerald-500/20 hover:bg-emerald-500/20 active:scale-95 transition-all disabled:opacity-40 flex items-center gap-1.5">
+                        {couponApplying ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "تطبيق"}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-xl bg-emerald-500/[0.06] border border-emerald-500/15 p-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                      <span className="text-[11px] text-emerald-400 font-medium">تم تطبيق كوبون "{appliedCoupon.code}" — خصم {appliedCoupon.discountPercent}%</span>
+                    </div>
+                    <button onClick={() => setAppliedCoupon(null)} className="text-muted-foreground hover:text-red-400 transition-colors">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
 
                 {/* Payment Method Selection (if not chosen yet) */}
                 {!paymentMethod && (
@@ -5432,6 +5818,9 @@ export default function HomePage() {
                         <div className="relative">
                           <input type="file" accept="image/*" className="hidden" id="payment-proof" onChange={e => {
                             const f = e.target.files?.[0]; if (!f) return;
+                            const validTypes = ["image/jpeg","image/jpg","image/png","image/gif","image/webp","image/bmp"];
+                            if (!validTypes.includes(f.type)) { toast.error("يجب اختيار صورة فقط", { description: "الصيغ المدعومة: JPG, PNG, GIF, WebP" }); e.target.value = ""; return; }
+                            if (f.size > 5 * 1024 * 1024) { toast.error("حجم الصورة كبير جداً", { description: "الحد الأقصى 5 ميجابايت" }); e.target.value = ""; return; }
                             setPaymentProofFile(f);
                             const r = new FileReader(); r.onload = () => setPaymentProofPreview(r.result as string); r.readAsDataURL(f);
                           }} />
@@ -6311,6 +6700,43 @@ export default function HomePage() {
           ))}
         </div>
       </nav>
+
+      {/* ═══ Reject Payment Reason Dialog ═══ */}
+      <AlertDialog open={rejectDialogOpen} onOpenChange={(open) => { if (!open) setRejectDialogOpen(false); }}>
+        <AlertDialogContent className="sm:max-w-md" dir="rtl">
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3 mb-1">
+              <div className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0 bg-red-500/15 border border-red-500/20">
+                <XCircle className="w-5 h-5 text-red-400" />
+              </div>
+              <AlertDialogTitle className="text-base font-bold">رفض طلب الدفع</AlertDialogTitle>
+            </div>
+            <AlertDialogDescription className="text-sm leading-relaxed text-muted-foreground pr-14">
+              أدخل سبب الرفض ليتم إبلاغ المستخدم
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="mt-3">
+            <Textarea
+              value={rejectReason}
+              onChange={e => setRejectReason(e.target.value)}
+              placeholder="أدخل سبب رفض الطلب..."
+              className="glass-input text-foreground placeholder:text-muted-foreground/50 min-h-[100px] text-sm"
+            />
+          </div>
+          <AlertDialogFooter className="flex gap-2 sm:gap-3 mt-3">
+            <AlertDialogCancel className="flex-1 h-11 rounded-xl text-sm font-medium cursor-pointer" onClick={() => setRejectDialogOpen(false)}>
+              إلغاء
+            </AlertDialogCancel>
+            <button
+              onClick={handleRejectWithReason}
+              disabled={rejectLoad || !rejectReason.trim()}
+              className="flex-1 h-11 rounded-xl text-sm font-bold bg-red-500/15 text-red-400 border border-red-500/20 hover:bg-red-500/25 active:scale-[0.98] transition-all disabled:opacity-40 flex items-center justify-center gap-2 cursor-pointer"
+            >
+              {rejectLoad ? <Loader2 className="w-4 h-4 animate-spin" /> : <><XCircle className="w-4 h-4" /> تأكيد الرفض</>}
+            </button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* ═══ Professional Confirmation Dialog ═══ */}
       <AlertDialog open={!!confirmAction} onOpenChange={(open) => { if (!open) setConfirmAction(null); }}>

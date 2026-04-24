@@ -1,7 +1,7 @@
 {
-  "name": "trade-signal-pro",
+  "name": "forexyemeni-signals",
   "version": "2.0.0",
-  "description": "TradeSignal Pro - نظام إشارات التداول الذكي | FOREXYEMENI PRO",
+  "description": "ForexYemeni Signals - نظام إشارات التداول الذكي",
   "author": "FOREXYEMENI",
   "private": true,
   "scripts": {
