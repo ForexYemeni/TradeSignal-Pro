@@ -129,11 +129,20 @@ export async function POST(request: NextRequest) {
 
     // ── Apply Coupon Discount ──
     if (couponCode) {
-      const couponValidateRes = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || ''}/api/coupons?action=validate&code=${encodeURIComponent(couponCode)}&userId=${userId}`);
-      const couponData = await couponValidateRes.json();
-      if (couponData.success && couponData.coupon) {
-        couponDiscount = Math.round(effectivePrice * (couponData.coupon.discountPercent / 100));
-        effectivePrice = Math.max(0, effectivePrice - couponDiscount);
+      try {
+        const couponUrl = new URL('/api/coupons', process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000');
+        couponUrl.searchParams.set('action', 'validate');
+        couponUrl.searchParams.set('code', couponCode);
+        couponUrl.searchParams.set('userId', userId);
+        const couponValidateRes = await fetch(couponUrl.toString());
+        const couponData = await couponValidateRes.json();
+        if (couponData.success && couponData.coupon) {
+          couponDiscount = Math.round(effectivePrice * (couponData.coupon.discountPercent / 100));
+          effectivePrice = Math.max(0, effectivePrice - couponDiscount);
+        }
+      } catch (couponErr) {
+        console.error("Coupon validation error (non-blocking):", couponErr);
+        // Don't block payment if coupon validation fails — proceed without discount
       }
     }
 

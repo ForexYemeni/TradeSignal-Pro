@@ -518,7 +518,7 @@ export default function HomePage() {
   const [paymentProofPreview, setPaymentProofPreview] = useState<string | null>(null);
   const [paymentLoad, setPaymentLoad] = useState(false);
   const [paymentResult, setPaymentResult] = useState<null | "success" | "pending">(null);
-  const [paymentRequests, setPaymentRequests] = useState<{ id: string; userId: string; userName: string; userEmail: string; packageId: string; packageName: string; amount: number; paymentMethod: string; txid?: string; proofUrl?: string; status: string; createdAt: string; rejectReason?: string }[]>([]);
+  const [paymentRequests, setPaymentRequests] = useState<{ id: string; userId: string; userName: string; userEmail: string; packageId: string; packageName: string; packagePrice: number; paymentMethod: string; txId?: string; paymentProofUrl?: string; status: string; createdAt: string; rejectReason?: string; [key: string]: any }[]>([]);
   const [payReqLoad, setPayReqLoad] = useState(false);
   const [showPaymentSettings, setShowPaymentSettings] = useState(false);
   const [paySettingsForm, setPaySettingsForm] = useState({ usdtWalletAddress: "", usdtNetwork: "TRC20" });
@@ -3342,7 +3342,8 @@ export default function HomePage() {
     { key: "dashboard", label: "الإحصائيات", icon: <BarChart3 className="w-5 h-5" /> },
     ...(isAdmin ? [{ key: "analyst" as Tab, label: "المحلل", icon: <Send className="w-5 h-5" /> }] : []),
     ...(isAdmin ? [{ key: "users" as Tab, label: "المستخدمين", icon: <Users className="w-5 h-5" />, adminOnly: true }] : []),
-    { key: "packages" as Tab, label: isAdmin ? "الباقات" : "الاشتراك", icon: <Package className="w-5 h-5" /> },
+    { key: "packages" as Tab, label: "الاشتراك", icon: <Package className="w-5 h-5" /> },
+    ...(isAdmin ? [{ key: "more" as Tab, label: "المزيد", icon: <MoreHorizontal className="w-5 h-5" /> }] : []),
     { key: "account", label: "الحساب", icon: <Settings className="w-5 h-5" /> },
   ];
 
@@ -4937,7 +4938,7 @@ export default function HomePage() {
                             <div className="text-[9px] text-muted-foreground font-mono truncate" dir="ltr">{req.userEmail}</div>
                           </div>
                           <div className="text-left flex-shrink-0">
-                            <div className="text-sm font-black text-amber-400 font-mono">${req.packagePrice || req.amount}</div>
+                            <div className="text-sm font-black text-amber-400 font-mono">${req.packagePrice}</div>
                             <div className="text-[8px] text-muted-foreground">{req.packageName}</div>
                           </div>
                         </div>
@@ -4945,7 +4946,6 @@ export default function HomePage() {
                           <span className="px-1.5 py-0.5 rounded-md bg-sky-500/10 text-sky-400 font-medium">
                             {req.paymentMethod === "usdt" ? `USDT${req.usdtNetwork ? ` (${req.usdtNetwork})` : ""}` : (req.paymentMethodName || "محلي")}
                           </span>
-                          {req.txid && <span className="truncate font-mono" dir="ltr">TX: {req.txid}</span>}
                           {req.txId && <span className="truncate font-mono" dir="ltr">TX: {req.txId}</span>}
                           {req.localAmount && <span className="font-mono" dir="ltr">{req.localAmount.toLocaleString()} {req.localCurrencyCode || ""}</span>}
                           <span className="mr-auto">{new Date(req.createdAt).toLocaleDateString("ar-SA", { month: "short", day: "numeric" })}</span>
@@ -4967,9 +4967,9 @@ export default function HomePage() {
                             <span>لم يتم التحقق التلقائي (مشكلة اتصال) — راجع يدوياً</span>
                           </div>
                         )}
-                        {(req.proofUrl || req.paymentProofUrl) && (
+                        {req.paymentProofUrl && (
                           <div className="mt-1">
-                            <button onClick={() => handleViewProofImage(req.proofUrl || req.paymentProofUrl || "")} className="flex items-center gap-1.5 text-[10px] text-sky-400 hover:text-sky-300 transition-colors">
+                            <button onClick={() => handleViewProofImage(req.paymentProofUrl)} className="flex items-center gap-1.5 text-[10px] text-sky-400 hover:text-sky-300 transition-colors">
                               <Image className="w-3.5 h-3.5" aria-hidden="true" /> عرض صورة الإثبات
                             </button>
                           </div>
