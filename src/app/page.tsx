@@ -2076,37 +2076,19 @@ export default function HomePage() {
       const hasSub = session.subscriptionType === "subscriber" && session.subscriptionExpiry && new Date(session.subscriptionExpiry).getTime() > Date.now();
       if (!hasSub) return [];
     }
-    // Instrument category mapping — covers all formats from TradingView Pine Script
-    const instMap: Record<string, string> = {
-      "ذهب": "gold", "الذهب": "gold", "gold": "gold",
-      "عملات": "currencies", "فوركس": "currencies", "الفوركس": "currencies",
-      "مؤشرات": "indices",
-      "نفط": "oil",
-      "عملات رقمية": "crypto", "كريبتو": "crypto",
-      "معادن": "metals",
-    };
     const upkg = packages.find(p => p.id === session?.packageId);
-    const allowed = (!isAdmin && upkg?.instruments?.length) ? upkg.instruments : null;
+    const allowedCats = (!isAdmin && upkg?.instruments?.length) ? new Set(upkg.instruments!) : null;
     let result = signals;
+    // Instrument filter — unified: use getPairCategory(s.pair) for consistency
+    if (allowedCats) {
+      result = result.filter(s => allowedCats.has(getPairCategory(s.pair)));
+    }
     switch (filter) {
       case "buy": result = result.filter(s => s.type === "BUY"); break;
       case "sell": result = result.filter(s => s.type === "SELL"); break;
       case "active": result = result.filter(s => s.status === "ACTIVE"); break;
       case "closed": result = result.filter(s => s.status !== "ACTIVE"); break;
       case "favorites": result = result.filter(s => favorites.has(s.id)); break;
-    }
-    if (allowed) {
-      result = result.filter(s => {
-        if (!s.instrument) return true; // no instrument info → show to all
-        const normalized = (s.instrument || "").toLowerCase();
-        // Check if any instrument category keyword matches
-        for (const [keyword, cat] of Object.entries(instMap)) {
-          if (normalized.includes(keyword.toLowerCase()) && allowed.includes(cat)) return true;
-        }
-        // If instrument doesn't match any known category, show it (don't hide unknown instruments)
-        const matched = Object.entries(instMap).some(([keyword]) => normalized.includes(keyword.toLowerCase()));
-        return !matched; // If not matched to any category, show it
-      });
     }
     // Category filter
     if (categoryFilter) {
@@ -2140,27 +2122,11 @@ export default function HomePage() {
       const hasSub = session.subscriptionType === "subscriber" && session.subscriptionExpiry && new Date(session.subscriptionExpiry).getTime() > Date.now();
       if (!hasSub) return [];
     }
-    // Instrument category mapping
-    const instMap: Record<string, string> = {
-      "ذهب": "gold", "الذهب": "gold", "gold": "gold",
-      "عملات": "currencies", "فوركس": "currencies", "الفوركس": "currencies",
-      "مؤشرات": "indices",
-      "نفط": "oil",
-      "عملات رقمية": "crypto", "كريبتو": "crypto",
-      "معادن": "metals",
-    };
     const upkg = packages.find(p => p.id === session?.packageId);
-    const allowed = (!isAdmin && upkg?.instruments?.length) ? upkg.instruments : null;
-    if (!allowed) return signals;
-    return signals.filter(s => {
-      if (!s.instrument) return true;
-      const normalized = (s.instrument || "").toLowerCase();
-      for (const [keyword, cat] of Object.entries(instMap)) {
-        if (normalized.includes(keyword.toLowerCase()) && allowed.includes(cat)) return true;
-      }
-      const matched = Object.entries(instMap).some(([keyword]) => normalized.includes(keyword.toLowerCase()));
-      return !matched;
-    });
+    const allowedCats = (!isAdmin && upkg?.instruments?.length) ? new Set(upkg.instruments!) : null;
+    // No instruments defined → show all signals (admin or legacy package)
+    if (!allowedCats) return signals;
+    return signals.filter(s => allowedCats.has(getPairCategory(s.pair)));
   }
 
   const activeCount = signals.filter(s => s.status === "ACTIVE").length;
@@ -5710,6 +5676,63 @@ export default function HomePage() {
                               {new Date(u.createdAt).toLocaleDateString("ar-SA", { year: "numeric", month: "short", day: "numeric" })}
                             </div>
                           </div>
+
+                          {/* Per-User Package Stats */}
+                          {u.packageId && (() => {
+                            const uPkg = packages.find(p => p.id === u.packageId);
+                            if (!uPkg) return null;
+                            const uAllowedCats = uPkg.instruments?.length ? new Set(uPkg.instruments) : null;
+                            const uSignals = signals.filter(s => {
+                              if (!isEntry(s.signalCategory)) return false;
+                              if (uAllowedCats && !uAllowedCats.has(getPairCategory(s.pair))) return false;
+                              return true;
+                            });
+                            // Apply maxSignals per-day limit
+                            const uLimited = uPkg.maxSignals > 0 ? (() => {
+                              const byDay = new Map<string, typeof uSignals>();
+                              for (const s of uSignals) {
+                                const day = s.createdAt.slice(0, 10);
+                                if (!byDay.has(day)) byDay.set(day, []);
+                                byDay.get(day)!.push(s);
+                              }
+                              const lim: typeof uSignals = [];
+                              for (const ds of byDay.values()) {
+                                ds.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+                                lim.push(...ds.slice(0, uPkg.maxSignals));
+                              }
+                              return lim;
+                            })() : uSignals;
+                            const uClosed = uLimited.filter(s => s.status !== "ACTIVE");
+                            const uWins = uClosed.filter(s => s.status === "HIT_TP").length;
+                            const uLosses = uClosed.filter(s => s.status === "HIT_SL").length;
+                            const uPnl = parseFloat(uClosed.reduce((a, s) => a + (s.pnlDollars ?? 0), 0).toFixed(2));
+                            const uWinRate = uClosed.length > 0 ? Math.round((uWins / uClosed.length) * 100) : 0;
+                            if (uLimited.length === 0) return null;
+                            return (
+                              <div className="grid grid-cols-5 gap-1.5 mt-2.5 pt-2.5 border-t border-border/30">
+                                <div className="text-center">
+                                  <div className="text-[10px] font-black text-foreground">{uLimited.length}</div>
+                                  <div className="text-[7px] text-muted-foreground/50">إشارة</div>
+                                </div>
+                                <div className="text-center">
+                                  <div className="text-[10px] font-black text-emerald-400">{uWins}</div>
+                                  <div className="text-[7px] text-muted-foreground/50">رابحة</div>
+                                </div>
+                                <div className="text-center">
+                                  <div className="text-[10px] font-black text-red-400">{uLosses}</div>
+                                  <div className="text-[7px] text-muted-foreground/50">خاسرة</div>
+                                </div>
+                                <div className="text-center">
+                                  <div className={`text-[10px] font-black ${uWinRate >= 50 ? "text-emerald-400" : "text-amber-400"}`}>{uWinRate}%</div>
+                                  <div className="text-[7px] text-muted-foreground/50">نسبة</div>
+                                </div>
+                                <div className="text-center">
+                                  <div className={`text-[10px] font-black ${uPnl >= 0 ? "text-emerald-400" : "text-red-400"}`}>{uPnl >= 0 ? "+" : ""}{uPnl.toFixed(2)}$</div>
+                                  <div className="text-[7px] text-muted-foreground/50">ربح</div>
+                                </div>
+                              </div>
+                            );
+                          })()}
 
                           {/* Action Buttons - Regular users (NOT super admin, NOT promoted admins) */}
                           {!isSuperAdmin && !isPromotedAdmin && (
