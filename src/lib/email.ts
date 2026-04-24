@@ -220,6 +220,43 @@ export async function sendOtpEmail(to: string, otp: string, type: 'register' | '
 //  SIGNAL NOTIFICATION EMAIL
 // ═══════════════════════════════════════════════════════════════
 
+/**
+ * Map signal pair name to instrument category.
+ * Used for per-user package filtering in email broadcasts.
+ */
+function getInstrumentCategory(pair: string): string {
+  const p = (pair || '').toUpperCase();
+  if (/XAU|GOLD/.test(p)) return 'gold';
+  if (/XAG|SILVER/.test(p)) return 'metals';
+  if (/USOIL|CRUDE|OIL/.test(p)) return 'oil';
+  if (/BTC|ETH|SOL|BNB|XRP|ADA|DOGE/.test(p)) return 'crypto';
+  if (/NAS|US30|DAX|US500|SPX|NDX/.test(p)) return 'indices';
+  if (/[A-Z]{3,6}(USD|EUR|GBP|JPY|AUD|NZD|CAD|CHF)/.test(p)) return 'currencies';
+  return 'other';
+}
+
+/**
+ * Get Arabic instrument name for display in email.
+ */
+function getInstrumentArabic(pair: string): string {
+  const p = (pair || '').toUpperCase();
+  if (/XAU|GOLD/.test(p)) return 'الذهب';
+  if (/XAG|SILVER/.test(p)) return 'الفضة';
+  if (/USOIL|CRUDE|OIL/.test(p)) return 'النفط';
+  if (/BTC/.test(p)) return 'بيتكوين';
+  if (/ETH/.test(p)) return 'إيثريوم';
+  if (/SOL/.test(p)) return 'سولانا';
+  if (/BNB/.test(p)) return 'بينانس';
+  if (/XRP/.test(p)) return 'ريبل';
+  if (/NAS|NDX/.test(p)) return 'ناسداك';
+  if (/US30|DOW/.test(p)) return 'داو جونز';
+  if (/DAX/.test(p)) return 'داكس';
+  if (/US500|SPX/.test(p)) return 'إس آند بي';
+  if (/JPY/.test(p)) return 'ين ياباني';
+  if (/EUR|USD|GBP|AUD|NZD|CAD|CHF/.test(p)) return 'عملات';
+  return 'أدوات';
+}
+
 export function buildSignalEmail(signal: {
   pair: string;
   type: 'BUY' | 'SELL';
@@ -236,18 +273,37 @@ export function buildSignalEmail(signal: {
   const isBuy = signal.type === 'BUY';
   const directionColor = isBuy ? '#00E676' : '#FF5252';
   const directionText = isBuy ? 'شراء' : 'بيع';
+  const directionEmoji = isBuy ? '&#9650;' : '&#9660;';
+  const instrumentAr = getInstrumentArabic(signal.pair);
 
+  // Calculate SL distance
+  const slDistance = signal.entry > 0 && signal.stopLoss > 0
+    ? Math.abs(signal.entry - signal.stopLoss).toFixed(signal.entry > 100 ? 2 : signal.entry > 10 ? 3 : 5)
+    : '—';
+
+  // Build TP rows with better styling
   const tpRows = signal.takeProfits.map((tp, i) => `
-    <tr>
-      <td style="padding:10px 16px;border-bottom:1px solid rgba(255,255,255,0.04);font-size:13px;color:rgba(255,255,255,0.5);">TP${i + 1}</td>
-      <td style="padding:10px 16px;border-bottom:1px solid rgba(255,255,255,0.04);font-size:14px;color:#FFD700;font-weight:600;font-family:'Courier New',monospace;">${tp.tp}</td>
-      <td style="padding:10px 16px;border-bottom:1px solid rgba(255,255,255,0.04);font-size:13px;color:rgba(255,255,255,0.4);">${tp.rr.toFixed(2)} R:R</td>
-    </tr>`).join('');
+                        <tr>
+                          <td style="padding:11px 16px;border-bottom:1px solid rgba(255,255,255,0.04);font-size:13px;color:rgba(255,255,255,0.6);font-weight:600;">الهدف ${i + 1}</td>
+                          <td style="padding:11px 16px;border-bottom:1px solid rgba(255,255,255,0.04);font-size:15px;color:#FFD700;font-weight:700;font-family:'Courier New',monospace;text-align:center;">${tp.tp}</td>
+                          <td style="padding:11px 16px;border-bottom:1px solid rgba(255,255,255,0.04);font-size:12px;color:rgba(255,255,255,0.45);text-align:left;">${tp.rr.toFixed(2)} :R</td>
+                        </tr>`).join('');
 
   const confPct = signal.confidence;
   const confColor = confPct >= 75 ? '#00E676' : confPct >= 50 ? '#FFD700' : '#FF5252';
+  const confText = confPct >= 75 ? 'ثقة عالية' : confPct >= 50 ? 'ثقة متوسطة' : 'ثقة منخفضة';
 
-  const subject = `${isBuy ? '▲' : '▼'} ${directionText} ${signal.pair} @ ${signal.entry}`;
+  // Current date/time in Arabic
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' });
+  const timeStr = now.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+
+  const subject = `${directionEmoji} ${directionText} ${signal.pair} | ${instrumentAr} | ${signal.timeframe || 'H4'}`;
+
+  // Determine SL display - if no valid SL, show warning
+  const hasValidSl = signal.stopLoss > 0;
+  const slDisplay = hasValidSl ? String(signal.stopLoss) : 'غير محدد';
+  const slColor = hasValidSl ? '#FF5252' : '#FF9800';
 
   return {
     subject,
@@ -256,100 +312,151 @@ export function buildSignalEmail(signal: {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>إشارة تداول جديدة</title>
+  <title>إشارة تداول جديدة - ${escapeHtml(signal.pair)}</title>
 </head>
-<body style="margin:0;padding:0;background-color:#070b14;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#070b14;min-height:100vh;">
+<body style="margin:0;padding:0;background-color:#050a15;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#050a15;min-height:100vh;">
     <tr>
-      <td align="center" style="padding:32px 16px;">
+      <td align="center" style="padding:24px 12px;">
         <table role="presentation" width="520" cellpadding="0" cellspacing="0" style="max-width:520px;width:100%;">
+
+          <!-- Header: Logo + Badge -->
           <tr>
-            <td style="padding-bottom:28px;">
+            <td style="padding-bottom:20px;">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                 <tr>
-                  <td align="right">
-                    <div style="width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,#FFD700,#FFA500);display:inline-flex;align-items:center;justify-content:center;">
-                      <span style="font-size:20px;font-weight:900;color:#070b14;">FY</span>
+                  <td align="right" style="vertical-align:middle;">
+                    <div style="width:50px;height:50px;border-radius:14px;background:linear-gradient(135deg,#FFD700,#FFA500);display:inline-flex;align-items:center;justify-content:center;">
+                      <span style="font-size:20px;font-weight:900;color:#050a15;">FY</span>
                     </div>
                   </td>
-                  <td align="left">
-                    <span style="display:inline-block;padding:6px 16px;border-radius:20px;font-size:11px;font-weight:700;color:#FFD700;background:rgba(255,215,0,0.1);border:1px solid rgba(255,215,0,0.2);letter-spacing:1px;">
-                      إشارة جديدة
+                  <td align="left" style="vertical-align:middle;">
+                    <span style="display:inline-block;padding:5px 14px;border-radius:20px;font-size:10px;font-weight:700;color:#FFD700;background:rgba(255,215,0,0.08);border:1px solid rgba(255,215,0,0.15);letter-spacing:1px;">
+                      FOREXYEMENI VIP
                     </span>
                   </td>
                 </tr>
               </table>
             </td>
           </tr>
+
+          <!-- Signal Card -->
           <tr>
             <td>
-              <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:20px;overflow:hidden;">
-                <div style="background:linear-gradient(135deg,${directionColor}15,${directionColor}08);padding:24px 28px;border-bottom:1px solid rgba(255,255,255,0.04);">
+              <div style="background:linear-gradient(180deg,rgba(255,255,255,0.04) 0%,rgba(255,255,255,0.01) 100%);border:1px solid rgba(255,255,255,0.07);border-radius:20px;overflow:hidden;">
+
+                <!-- Pair Header -->
+                <div style="background:linear-gradient(135deg,${directionColor}12,${directionColor}05);padding:22px 24px;border-bottom:1px solid rgba(255,255,255,0.05);">
                   <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                     <tr>
                       <td>
-                        <div style="font-size:12px;color:rgba(255,255,255,0.4);margin-bottom:6px;">${signal.timeframe || 'H4'}</div>
-                        <div style="font-size:26px;font-weight:800;color:#ffffff;letter-spacing:0.5px;">${signal.pair}</div>
+                        <table role="presentation" cellpadding="0" cellspacing="0">
+                          <tr>
+                            <td style="vertical-align:middle;">
+                              <div style="font-size:11px;color:rgba(255,255,255,0.35);margin-bottom:4px;">${instrumentAr} &bull; ${signal.timeframe || 'H4'}</div>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td>
+                              <div style="font-size:28px;font-weight:800;color:#ffffff;letter-spacing:0.5px;">${escapeHtml(signal.pair)}</div>
+                            </td>
+                          </tr>
+                        </table>
                       </td>
                       <td align="left" style="vertical-align:middle;">
-                        <div style="width:56px;height:56px;border-radius:16px;background:${directionColor}18;border:1px solid ${directionColor}35;text-align:center;line-height:56px;">
-                          <span style="font-size:22px;color:${directionColor};font-weight:900;">${directionText}</span>
+                        <div style="width:60px;height:60px;border-radius:18px;background:linear-gradient(135deg,${directionColor}20,${directionColor}08);border:1.5px solid ${directionColor}30;text-align:center;line-height:60px;">
+                          <span style="font-size:20px;color:${directionColor};font-weight:900;letter-spacing:1px;">${directionText}</span>
                         </div>
                       </td>
                     </tr>
                   </table>
                 </div>
-                <div style="padding:24px 28px;">
-                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+
+                <!-- Prices Section -->
+                <div style="padding:20px 24px 16px;">
+
+                  <!-- Entry Price -->
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:4px;">
                     <tr>
-                      <td style="padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
-                        <span style="font-size:12px;color:rgba(255,255,255,0.35);display:block;margin-bottom:4px;">Entry</span>
-                        <span style="font-size:22px;font-weight:700;color:#ffffff;font-family:'Courier New',monospace;">${signal.entry}</span>
+                      <td style="width:50%;padding:10px 14px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.05);border-radius:12px 0 0 12px;">
+                        <div style="font-size:11px;color:rgba(255,255,255,0.3);margin-bottom:6px;font-weight:600;">&#128200; سعر الدخول</div>
+                        <div style="font-size:24px;font-weight:700;color:#ffffff;font-family:'Courier New',monospace;letter-spacing:0.5px;">${signal.entry}</div>
                       </td>
-                      <td style="padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.04);text-align:center;">
-                        <span style="font-size:12px;color:rgba(255,255,255,0.35);display:block;margin-bottom:4px;">SL</span>
-                        <span style="font-size:22px;font-weight:700;color:#FF5252;font-family:'Courier New',monospace;">${signal.stopLoss}</span>
-                      </td>
-                      <td style="padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.04);text-align:right;">
-                        <span style="font-size:12px;color:rgba(255,255,255,0.35);display:block;margin-bottom:4px;">Confidence</span>
-                        <div style="text-align:right;">
-                          <span style="font-size:18px;font-weight:700;color:${confColor};">${confPct}%</span>
-                          <div style="width:48px;height:6px;border-radius:3px;background:rgba(255,255,255,0.08);overflow:hidden;margin-top:4px;">
-                            <div style="width:${confPct}%;height:100%;border-radius:3px;background:${confColor};"></div>
-                          </div>
-                        </div>
+
+                      <!-- Stop Loss -->
+                      <td style="width:50%;padding:10px 14px;background:rgba(255,82,82,0.06);border:1px solid rgba(255,82,82,0.12);border-radius:0 12px 12px 0;">
+                        <div style="font-size:11px;color:rgba(255,82,82,0.6);margin-bottom:6px;font-weight:600;">&#128308; وقف الخسارة</div>
+                        <div style="font-size:24px;font-weight:700;color:${slColor};font-family:'Courier New',monospace;letter-spacing:0.5px;">${slDisplay}</div>
                       </td>
                     </tr>
                   </table>
-                  ${signal.takeProfits.length > 0 ? `
-                  <div style="margin-top:20px;border:1px solid rgba(255,255,255,0.06);border-radius:12px;overflow:hidden;">
+
+                  ${hasValidSl ? `
+                  <!-- SL Distance Info -->
+                  <div style="margin-top:8px;margin-bottom:16px;padding:8px 14px;background:rgba(255,82,82,0.04);border-radius:8px;border:1px solid rgba(255,82,82,0.06);">
                     <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                      <tr style="background:rgba(255,215,0,0.05);">
-                        <th style="padding:10px 16px;font-size:11px;font-weight:600;color:rgba(255,255,255,0.4);text-align:right;border-bottom:1px solid rgba(255,215,0,0.1);">الهدف</th>
-                        <th style="padding:10px 16px;font-size:11px;font-weight:600;color:rgba(255,255,255,0.4);text-align:center;border-bottom:1px solid rgba(255,215,0,0.1);">السعر</th>
-                        <th style="padding:10px 16px;font-size:11px;font-weight:600;color:rgba(255,255,255,0.4);text-align:left;border-bottom:1px solid rgba(255,215,0,0.1);">R:R</th>
+                      <tr>
+                        <td style="font-size:11px;color:rgba(255,255,255,0.3);">مسافة الوقف</td>
+                        <td style="font-size:11px;color:rgba(255,255,255,0.5);font-weight:600;font-family:'Courier New',monospace;text-align:center;">${slDistance}</td>
+                        <td style="font-size:11px;color:rgba(255,255,255,0.3);text-align:right;">${confText}</td>
+                        <td style="font-size:12px;color:${confColor};font-weight:700;text-align:left;">${confPct}%</td>
+                      </tr>
+                    </table>
+                  </div>` : `
+                  <div style="margin-top:8px;margin-bottom:16px;"></div>`}
+
+                  <!-- Take Profits Table -->
+                  ${signal.takeProfits.length > 0 ? `
+                  <div style="border:1px solid rgba(255,215,0,0.1);border-radius:14px;overflow:hidden;">
+                    <!-- TP Header -->
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                      <tr style="background:linear-gradient(90deg,rgba(255,215,0,0.08),rgba(255,215,0,0.03));">
+                        <th style="padding:10px 16px;font-size:10px;font-weight:700;color:rgba(255,215,0,0.5);text-align:right;border-bottom:1px solid rgba(255,215,0,0.08);letter-spacing:1px;">&#127919; الهدف</th>
+                        <th style="padding:10px 16px;font-size:10px;font-weight:700;color:rgba(255,215,0,0.5);text-align:center;border-bottom:1px solid rgba(255,215,0,0.08);letter-spacing:1px;">&#128176; السعر</th>
+                        <th style="padding:10px 16px;font-size:10px;font-weight:700;color:rgba(255,215,0,0.5);text-align:left;border-bottom:1px solid rgba(255,215,0,0.08);letter-spacing:1px;">نسبة الربح</th>
                       </tr>
                       ${tpRows}
                     </table>
                   </div>` : ''}
                 </div>
+
+                <!-- Footer inside card -->
+                <div style="padding:14px 24px;border-top:1px solid rgba(255,255,255,0.04);background:rgba(255,255,255,0.01);">
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                      <td style="font-size:10px;color:rgba(255,255,255,0.2);">
+                        ${dateStr} &bull; ${timeStr}
+                      </td>
+                      <td style="font-size:10px;color:rgba(255,255,255,0.2);text-align:left;">
+                        ForexYemeni VIP
+                      </td>
+                    </tr>
+                  </table>
+                </div>
               </div>
             </td>
           </tr>
+
+          <!-- Risk Disclaimer -->
           <tr>
-            <td align="center" style="padding-top:24px;">
-              <p style="margin:0;font-size:11px;color:rgba(255,255,255,0.2);line-height:1.6;text-align:center;max-width:400px;">
-                تنبيه: التداول ينطوي على مخاطر عالية. هذه الإشارة لأغراض تعليمية فقط وليست نصيحة مالية.
-              </p>
+            <td align="center" style="padding-top:20px;">
+              <div style="max-width:420px;padding:12px 18px;background:rgba(255,152,0,0.04);border:1px solid rgba(255,152,0,0.08);border-radius:10px;">
+                <p style="margin:0;font-size:10px;color:rgba(255,255,255,0.25);line-height:1.8;text-align:center;">
+                  &#9888;&#65039; تنبيه: التداول ينطوي على مخاطر عالية وقد لا يكون مناسباً لجميع المستثمرين. يرجى إدارة المخاطر بحكمة وعدم المخاطرة بأكثر مما يمكنك تحمل خسارته.
+                </p>
+              </div>
             </td>
           </tr>
+
+          <!-- Bottom Footer -->
           <tr>
-            <td align="center" style="padding-top:20px;border-top:1px solid rgba(255,255,255,0.06);">
-              <p style="margin:0;font-size:11px;color:rgba(255,255,255,0.15);">
+            <td align="center" style="padding-top:16px;">
+              <p style="margin:0;font-size:10px;color:rgba(255,255,255,0.12);">
                 ForexYemeni VIP Trading Signals &copy; ${new Date().getFullYear()}
               </p>
             </td>
           </tr>
+
         </table>
       </td>
     </tr>
@@ -383,22 +490,54 @@ export async function broadcastSignalToSubscribers(signal: {
   confidence: number;
   timeframe: string;
   instrument?: string;
-}): Promise<{ sent: number; failed: number }> {
-  const { getUsers } = await import('@/lib/store');
+}): Promise<{ sent: number; failed: number; skipped: number }> {
+  const { getUsers, getPackageById } = await import('@/lib/store');
   const users = await getUsers();
 
-  const subscribers = users.filter(u =>
+  // Filter to active non-admin users with emails
+  const activeSubscribers = users.filter(u =>
     u.status === 'active' &&
     u.role !== 'admin' &&
     u.email
   );
 
-  if (subscribers.length === 0) {
-    return { sent: 0, failed: 0 };
+  if (activeSubscribers.length === 0) {
+    return { sent: 0, failed: 0, skipped: 0 };
+  }
+
+  // Determine the instrument category of this signal
+  const signalInstrument = getInstrumentCategory(signal.pair);
+
+  // Build per-user email list, filtering by instrument if user has a package with instrument restrictions
+  const emailRecipients: string[] = [];
+  let skippedCount = 0;
+
+  for (const user of activeSubscribers) {
+    // If user has a package, check instrument filter
+    if (user.packageId) {
+      try {
+        const pkg = await getPackageById(user.packageId);
+        if (pkg && pkg.instruments && pkg.instruments.length > 0) {
+          const allowedInstruments = new Set(pkg.instruments);
+          if (!allowedInstruments.has(signalInstrument)) {
+            skippedCount++;
+            continue;
+          }
+        }
+      } catch {
+        // If package lookup fails, still send the email (fail-open)
+      }
+    }
+    emailRecipients.push(user.email);
+  }
+
+  if (emailRecipients.length === 0) {
+    console.log(`Broadcast signal ${signal.pair}: 0 recipients (all ${skippedCount} filtered by instruments)`);
+    return { sent: 0, failed: 0, skipped: skippedCount };
   }
 
   const { subject, html } = buildSignalEmail(signal);
-  const batchEmails = subscribers.map(u => ({ to: u.email, subject, html }));
+  const batchEmails = emailRecipients.map(email => ({ to: email, subject, html }));
 
   let totalSent = 0;
   let totalFailed = 0;
@@ -411,8 +550,8 @@ export async function broadcastSignalToSubscribers(signal: {
     totalFailed += result.failed;
   }
 
-  console.log(`Broadcast signal: ${totalSent} sent, ${totalFailed} failed to ${subscribers.length} subscribers`);
-  return { sent: totalSent, failed: totalFailed };
+  console.log(`Broadcast signal ${signal.pair} (${signalInstrument}): ${totalSent} sent, ${totalFailed} failed, ${skippedCount} skipped out of ${activeSubscribers.length} subscribers`);
+  return { sent: totalSent, failed: totalFailed, skipped: skippedCount };
 }
 
 // ═══════════════════════════════════════════════════════════════
