@@ -2133,8 +2133,62 @@ export default function HomePage() {
     return result;
   }
 
+  /* ── getPackageSignals: returns signals filtered by user's package/instruments only (no display filters) ── */
+  function getPackageSignals(): Signal[] {
+    // Subscription gate: unsubscribed users see NO signals
+    if (!isAdmin && session) {
+      const hasSub = session.subscriptionType === "subscriber" && session.subscriptionExpiry && new Date(session.subscriptionExpiry).getTime() > Date.now();
+      if (!hasSub) return [];
+    }
+    // Instrument category mapping
+    const instMap: Record<string, string> = {
+      "ذهب": "gold", "الذهب": "gold", "gold": "gold",
+      "عملات": "currencies", "فوركس": "currencies", "الفوركس": "currencies",
+      "مؤشرات": "indices",
+      "نفط": "oil",
+      "عملات رقمية": "crypto", "كريبتو": "crypto",
+      "معادن": "metals",
+    };
+    const upkg = packages.find(p => p.id === session?.packageId);
+    const allowed = (!isAdmin && upkg?.instruments?.length) ? upkg.instruments : null;
+    if (!allowed) return signals;
+    return signals.filter(s => {
+      if (!s.instrument) return true;
+      const normalized = (s.instrument || "").toLowerCase();
+      for (const [keyword, cat] of Object.entries(instMap)) {
+        if (normalized.includes(keyword.toLowerCase()) && allowed.includes(cat)) return true;
+      }
+      const matched = Object.entries(instMap).some(([keyword]) => normalized.includes(keyword.toLowerCase()));
+      return !matched;
+    });
+  }
+
   const activeCount = signals.filter(s => s.status === "ACTIVE").length;
   const filtered = getFiltered();
+
+  /* ── userStats: compute stats from package-filtered signals for non-admin users ── */
+  const userSignals = getPackageSignals();
+  const userStats = (() => {
+    const all = userSignals;
+    const total = all.length;
+    const active = all.filter(s => s.status === 'ACTIVE').length;
+    const hitTp = all.filter(s => s.status === 'HIT_TP').length;
+    const hitSl = all.filter(s => s.status === 'HIT_SL').length;
+    const closed = hitTp + hitSl;
+    const winRate = closed > 0 ? Math.round((hitTp / closed) * 100) : 0;
+    const buyCount = all.filter(s => s.type === 'BUY').length;
+    const sellCount = all.filter(s => s.type === 'SELL').length;
+    const sevenDaysAgo = Date.now() - 7 * 86400000;
+    const recentWeek = all.filter(s => new Date(s.createdAt).getTime() > sevenDaysAgo).length;
+    const avgConfidence = total > 0 ? +(all.reduce((sum, s) => sum + s.confidence, 0) / total).toFixed(1) : 0;
+    const pairCount: Record<string, number> = {};
+    all.forEach(s => { pairCount[s.pair] = (pairCount[s.pair] || 0) + 1; });
+    const topPairs = Object.entries(pairCount).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([pair, count]) => ({ pair, count }));
+    return { total, active, hitTp, hitSl, winRate, buyCount, sellCount, recentWeek, avgConfidence, topPairs };
+  })();
+
+  /* ── displayStats: use userStats for non-admin, global stats for admin ── */
+  const displayStats = isAdmin ? stats : userStats;
 
   /* ═══════════════════════════════════════════════════════════════
      DEVICE WARNING DIALOG (extracted for use in all views)
@@ -3163,13 +3217,15 @@ export default function HomePage() {
 
         {/* ══════ TAB: HOME — PROFESSIONAL DASHBOARD ══════ */}
         {tab === "home" && (<motion.div key="home" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>{(() => {
-          const activeSignals = signals.filter(s => s.status === "ACTIVE");
-          const closedSignals = signals.filter(s => s.status !== "ACTIVE");
+          /* ── Use userSignals (package-filtered) for non-admin, signals for admin ── */
+          const statsSource = isAdmin ? signals : userSignals;
+          const activeSignals = statsSource.filter(s => s.status === "ACTIVE");
+          const closedSignals = statsSource.filter(s => s.status !== "ACTIVE");
           const winClosed = closedSignals.filter(s => s.status === "HIT_TP");
           const lossClosed = closedSignals.filter(s => s.status === "HIT_SL");
-          const totalPnl = parseFloat(signals.reduce((acc, s) => acc + (s.pnlDollars ?? 0), 0).toFixed(2));
-          const totalPoints = signals.reduce((acc, s) => acc + (s.pnlPoints ?? 0), 0);
-          const todaySignals = signals.filter(s => {
+          const totalPnl = parseFloat(statsSource.reduce((acc, s) => acc + (s.pnlDollars ?? 0), 0).toFixed(2));
+          const totalPoints = statsSource.reduce((acc, s) => acc + (s.pnlPoints ?? 0), 0);
+          const todaySignals = statsSource.filter(s => {
             const d = new Date(s.createdAt);
             const now = new Date();
             return d.toDateString() === now.toDateString();
@@ -3180,7 +3236,7 @@ export default function HomePage() {
           const subDaysLeft = session?.subscriptionExpiry ? Math.max(0, Math.ceil((new Date(session.subscriptionExpiry).getTime() - Date.now()) / 86400000)) : null;
           const totalActiveUsers = users.filter(u => u.status === "active" && u.role === "user").length;
           const totalSubscribers = users.filter(u => u.subscriptionType === "subscriber").length;
-          const weeklySignals = signals.filter(s => {
+          const weeklySignals = statsSource.filter(s => {
             const d = new Date(s.createdAt);
             const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
             return d >= weekAgo;
@@ -3426,11 +3482,11 @@ export default function HomePage() {
                         <Trophy className="w-3 h-3 text-amber-400" />
                         <span className="text-[10px] text-muted-foreground/70 font-medium">نسبة الفوز</span>
                       </div>
-                      <div className={`text-xl font-extrabold ${stats && stats.winRate >= 60 ? "text-emerald-400" : stats && stats.winRate >= 40 ? "text-amber-400" : "text-red-400"}`}>
-                        {stats ? `${stats.winRate}%` : "—"}
+                      <div className={`text-xl font-extrabold ${displayStats && displayStats.winRate >= 60 ? "text-emerald-400" : displayStats && displayStats.winRate >= 40 ? "text-amber-400" : "text-red-400"}`}>
+                        {displayStats ? `${displayStats.winRate}%` : "—"}
                       </div>
                     </div>
-                    <ProgressRing value={stats?.winRate ?? 0} size={48} strokeWidth={3.5} color={stats && stats.winRate >= 60 ? "green" : stats && stats.winRate >= 40 ? "gold" : "red"} />
+                    <ProgressRing value={displayStats?.winRate ?? 0} size={48} strokeWidth={3.5} color={displayStats && displayStats.winRate >= 60 ? "green" : displayStats && displayStats.winRate >= 40 ? "gold" : "red"} />
                   </div>
                 </Glass>
 
@@ -3481,9 +3537,9 @@ export default function HomePage() {
                     <span className="text-[10px] text-muted-foreground/70 font-medium">إجمالي الصفقات</span>
                   </div>
                   <div className="flex items-end gap-1.5">
-                    <span className="text-xl font-extrabold text-purple-400">{stats?.total || 0}</span>
+                    <span className="text-xl font-extrabold text-purple-400">{displayStats?.total || 0}</span>
                   </div>
-                  <div className="text-[10px] text-muted-foreground/50 mt-0.5">{stats?.active || 0} نشطة</div>
+                  <div className="text-[10px] text-muted-foreground/50 mt-0.5">{displayStats?.active || 0} نشطة</div>
                 </Glass>
 
                 {/* Avg Confidence */}
@@ -3493,8 +3549,8 @@ export default function HomePage() {
                     <span className="text-[10px] text-muted-foreground/70 font-medium">متوسط الثقة</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-xl font-extrabold text-amber-400">{stats?.avgConfidence || 0}</span>
-                    <Stars r={Math.round(stats?.avgConfidence || 0)} />
+                    <span className="text-xl font-extrabold text-amber-400">{displayStats?.avgConfidence || 0}</span>
+                    <Stars r={Math.round(displayStats?.avgConfidence || 0)} />
                   </div>
                   <div className="text-[10px] text-muted-foreground/50 mt-0.5">من 5 نجوم</div>
                 </Glass>
@@ -3502,7 +3558,7 @@ export default function HomePage() {
             </div>
 
             {/* ── Win/Loss Visual Bar ── */}
-            {stats && (stats.hitTp + stats.hitSl) > 0 && (
+            {displayStats && (displayStats.hitTp + displayStats.hitSl) > 0 && (
               <Glass className="p-3.5 rounded-xl">
                 <div className="flex items-center justify-between mb-2.5">
                   <div className="flex items-center gap-1.5">
@@ -3510,21 +3566,21 @@ export default function HomePage() {
                     <span className="text-xs font-bold text-foreground">نتائج الصفقات</span>
                   </div>
                   <div className="flex items-center gap-2 text-[10px]">
-                    <span className="text-emerald-400 font-semibold">{stats.hitTp} ربح</span>
+                    <span className="text-emerald-400 font-semibold">{displayStats.hitTp} ربح</span>
                     <span className="text-muted-foreground/30">|</span>
-                    <span className="text-red-400 font-semibold">{stats.hitSl} خسارة</span>
+                    <span className="text-red-400 font-semibold">{displayStats.hitSl} خسارة</span>
                   </div>
                 </div>
                 <div className="h-3 rounded-full bg-white/[0.04] overflow-hidden flex">
                   <div className="bg-gradient-to-l from-emerald-400 to-emerald-500 h-full rounded-r-full transition-all duration-700 flex items-center justify-center"
-                    style={{ width: `${(stats.hitTp / (stats.hitTp + stats.hitSl)) * 100}%` }}>
-                    {(stats.hitTp / (stats.hitTp + stats.hitSl)) * 100 > 18 && (
-                      <span className="text-[8px] font-bold text-white/90">{Math.round((stats.hitTp / (stats.hitTp + stats.hitSl)) * 100)}%</span>
+                    style={{ width: `${(displayStats.hitTp / (displayStats.hitTp + displayStats.hitSl)) * 100}%` }}>
+                    {(displayStats.hitTp / (displayStats.hitTp + displayStats.hitSl)) * 100 > 18 && (
+                      <span className="text-[8px] font-bold text-white/90">{Math.round((displayStats.hitTp / (displayStats.hitTp + displayStats.hitSl)) * 100)}%</span>
                     )}
                   </div>
                   <div className="bg-gradient-to-l from-red-500 to-red-400 h-full rounded-l-full flex-1 flex items-center justify-center">
-                    {((stats.hitSl / (stats.hitTp + stats.hitSl)) * 100) > 18 && (
-                      <span className="text-[8px] font-bold text-white/90">{Math.round((stats.hitSl / (stats.hitTp + stats.hitSl)) * 100)}%</span>
+                    {((displayStats.hitSl / (displayStats.hitTp + displayStats.hitSl)) * 100) > 18 && (
+                      <span className="text-[8px] font-bold text-white/90">{Math.round((displayStats.hitSl / (displayStats.hitTp + displayStats.hitSl)) * 100)}%</span>
                     )}
                   </div>
                 </div>
@@ -3532,7 +3588,7 @@ export default function HomePage() {
             )}
 
             {/* ── Top Pairs (Mini) ── */}
-            {stats && stats.topPairs?.length > 0 && (
+            {displayStats && displayStats.topPairs?.length > 0 && (
               <Glass className="p-3.5 rounded-xl">
                 <div className="flex items-center justify-between mb-2.5">
                   <div className="flex items-center gap-1.5">
@@ -3541,8 +3597,8 @@ export default function HomePage() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  {stats.topPairs.slice(0, 5).map((p, i) => {
-                    const maxCount = stats.topPairs[0].count;
+                  {displayStats.topPairs.slice(0, 5).map((p, i) => {
+                    const maxCount = displayStats.topPairs[0].count;
                     return (
                       <div key={i} className="flex items-center gap-2">
                         <div className={`w-5 h-5 rounded-md flex items-center justify-center text-[9px] font-bold shrink-0 ${i === 0 ? "bg-amber-400/10 text-amber-400" : i === 1 ? "bg-white/[0.05] text-foreground/70" : i === 2 ? "bg-orange-400/8 text-orange-400" : "bg-white/[0.03] text-muted-foreground/50"}`}>
@@ -3606,7 +3662,7 @@ export default function HomePage() {
             )}
 
             {/* ── Buy/Sell Ratio (Visual) ── */}
-            {stats && (stats.buyCount + stats.sellCount) > 0 && (
+            {displayStats && (displayStats.buyCount + displayStats.sellCount) > 0 && (
               <Glass className="p-3.5 rounded-xl">
                 <div className="flex items-center gap-1.5 mb-2.5">
                   <PieChart className="w-3 h-3 text-amber-400" />
@@ -3615,18 +3671,18 @@ export default function HomePage() {
                 <div className="flex gap-2.5">
                   <div className="flex-1 rounded-lg bg-emerald-400/[0.04] border border-emerald-400/8 p-2.5 text-center">
                     <ArrowUpRight className="w-3.5 h-3.5 text-emerald-400 mx-auto mb-1" />
-                    <div className="text-base font-extrabold text-emerald-400">{stats.buyCount}</div>
+                    <div className="text-base font-extrabold text-emerald-400">{displayStats.buyCount}</div>
                     <div className="text-[8px] text-emerald-400/60 font-medium">شراء</div>
                   </div>
                   <div className="flex-1 rounded-lg bg-red-400/[0.04] border border-red-400/8 p-2.5 text-center">
                     <ArrowDownRight className="w-3.5 h-3.5 text-red-400 mx-auto mb-1" />
-                    <div className="text-base font-extrabold text-red-400">{stats.sellCount}</div>
+                    <div className="text-base font-extrabold text-red-400">{displayStats.sellCount}</div>
                     <div className="text-[8px] text-red-400/60 font-medium">بيع</div>
                   </div>
                 </div>
                 <div className="mt-2.5 h-2 rounded-full bg-white/[0.04] overflow-hidden flex">
                   <div className="bg-gradient-to-l from-emerald-500 to-emerald-400 h-full rounded-r-full transition-all duration-500"
-                    style={{ width: `${(stats.buyCount / (stats.buyCount + stats.sellCount)) * 100}%` }} />
+                    style={{ width: `${(displayStats.buyCount / (displayStats.buyCount + displayStats.sellCount)) * 100}%` }} />
                   <div className="bg-gradient-to-l from-red-500 to-red-400 h-full rounded-l-full flex-1" />
                 </div>
               </Glass>
@@ -3637,9 +3693,9 @@ export default function HomePage() {
               <div className="inline-flex items-center gap-1.5 bg-white/[0.03] rounded-full px-4 py-2 border border-white/[0.05]">
                 <Sparkles className="w-3 h-3 text-amber-400/60" />
                 <span className="text-[10px] text-muted-foreground/50">
-                  {stats && stats.winRate >= 70
+                  {displayStats && displayStats.winRate >= 70
                     ? "أداء استثنائي! استمر بنفس المستوى"
-                    : stats && stats.winRate >= 50
+                    : displayStats && displayStats.winRate >= 50
                     ? "أداء جيد! يمكنك تحسين النتائج أكثر"
                     : "ركز على إدارة المخاطر واتبع الخطة"}
                 </span>
@@ -3683,7 +3739,7 @@ export default function HomePage() {
             )}
 
             {/* ── Premium Stats Header ── */}
-            {stats && (
+            {displayStats && (
               <div className="glass-card rounded-xl overflow-hidden">
                 <div className="p-3.5">
                   <div className="flex items-center gap-2 mb-3">
@@ -3692,19 +3748,19 @@ export default function HomePage() {
                   </div>
                   <div className="grid grid-cols-4 gap-2">
                     <div className="text-center">
-                      <div className="text-base font-extrabold text-foreground">{stats.active}</div>
+                      <div className="text-base font-extrabold text-foreground">{displayStats.active}</div>
                       <div className="text-[8px] text-emerald-400/70 font-medium">نشطة</div>
                     </div>
                     <div className="text-center">
-                      <div className="text-base font-extrabold text-foreground">{stats.total}</div>
+                      <div className="text-base font-extrabold text-foreground">{displayStats.total}</div>
                       <div className="text-[8px] text-muted-foreground/60 font-medium">إجمالي</div>
                     </div>
                     <div className="text-center">
-                      <div className="text-base font-extrabold text-amber-400">{stats.winRate}%</div>
+                      <div className="text-base font-extrabold text-amber-400">{displayStats.winRate}%</div>
                       <div className="text-[8px] text-muted-foreground/60 font-medium">نسبة الفوز</div>
                     </div>
                     <div className="text-center">
-                      <div className="text-base font-extrabold text-sky-400">{stats.recentWeek}</div>
+                      <div className="text-base font-extrabold text-sky-400">{displayStats.recentWeek}</div>
                       <div className="text-[8px] text-muted-foreground/60 font-medium">هذا الأسبوع</div>
                     </div>
                   </div>
@@ -3876,9 +3932,9 @@ export default function HomePage() {
         {/* ══════ TAB: DASHBOARD ══════ */}
         {tab === "dashboard" && (
           <motion.div key="dashboard" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }} className="space-y-5">
-            {loading && !stats ? (
+            {loading && !displayStats ? (
               <StatsLoadingSkeleton />
-            ) : stats ? (
+            ) : displayStats ? (
               <>
                 {/* Header */}
                 <div className="flex items-center gap-3">
@@ -3901,7 +3957,7 @@ export default function HomePage() {
                       </div>
                       <span className="text-[10px] text-muted-foreground font-medium">إجمالي الصفقات</span>
                     </div>
-                    <div className="text-2xl font-bold text-white tabular-nums">{stats.total}</div>
+                    <div className="text-2xl font-bold text-white tabular-nums">{displayStats.total}</div>
                   </div>
 
                   {/* الصفقات النشطة */}
@@ -3912,7 +3968,7 @@ export default function HomePage() {
                       </div>
                       <span className="text-[10px] text-muted-foreground font-medium">الصفقات النشطة</span>
                     </div>
-                    <div className="text-2xl font-bold text-emerald-400 tabular-nums">{stats.active}</div>
+                    <div className="text-2xl font-bold text-emerald-400 tabular-nums">{displayStats.active}</div>
                   </div>
 
                   {/* نسبة الفوز */}
@@ -3923,7 +3979,7 @@ export default function HomePage() {
                       </div>
                       <span className="text-[10px] text-muted-foreground font-medium">نسبة الفوز</span>
                     </div>
-                    <div className="text-2xl font-bold text-amber-400 tabular-nums">{stats.winRate}%</div>
+                    <div className="text-2xl font-bold text-amber-400 tabular-nums">{displayStats.winRate}%</div>
                   </div>
 
                   {/* أداء الأسبوع */}
@@ -3934,7 +3990,7 @@ export default function HomePage() {
                       </div>
                       <span className="text-[10px] text-muted-foreground font-medium">أداء الأسبوع</span>
                     </div>
-                    <div className="text-2xl font-bold text-sky-400 tabular-nums">{stats.recentWeek}</div>
+                    <div className="text-2xl font-bold text-sky-400 tabular-nums">{displayStats.recentWeek}</div>
                   </div>
 
                   {/* نسبة الشراء/البيع */}
@@ -3946,12 +4002,12 @@ export default function HomePage() {
                       <span className="text-[10px] text-muted-foreground font-medium">شراء / بيع</span>
                     </div>
                     <div className="flex items-center gap-2 mb-1.5">
-                      <span className="text-lg font-bold text-emerald-400 tabular-nums">{stats.buyCount}</span>
+                      <span className="text-lg font-bold text-emerald-400 tabular-nums">{displayStats.buyCount}</span>
                       <span className="text-xs text-muted-foreground/50">/</span>
-                      <span className="text-lg font-bold text-red-400 tabular-nums">{stats.sellCount}</span>
+                      <span className="text-lg font-bold text-red-400 tabular-nums">{displayStats.sellCount}</span>
                     </div>
                     <div className="h-1.5 rounded-full bg-white/5 overflow-hidden flex">
-                      <div className="bg-gradient-to-l from-emerald-500 to-emerald-400 h-full rounded-r-full transition-all duration-500" style={{ width: `${stats.buyCount + stats.sellCount > 0 ? (stats.buyCount / (stats.buyCount + stats.sellCount)) * 100 : 50}%` }} />
+                      <div className="bg-gradient-to-l from-emerald-500 to-emerald-400 h-full rounded-r-full transition-all duration-500" style={{ width: `${displayStats.buyCount + displayStats.sellCount > 0 ? (displayStats.buyCount / (displayStats.buyCount + displayStats.sellCount)) * 100 : 50}%` }} />
                       <div className="bg-gradient-to-l from-red-500 to-red-400 h-full rounded-l-full flex-1" />
                     </div>
                   </div>
@@ -3965,8 +4021,8 @@ export default function HomePage() {
                       <span className="text-[10px] text-muted-foreground font-medium">متوسط الثقة</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-2xl font-bold text-amber-400 tabular-nums">{stats.avgConfidence}</span>
-                      <Stars r={Math.round(stats.avgConfidence)} />
+                      <span className="text-2xl font-bold text-amber-400 tabular-nums">{displayStats.avgConfidence}</span>
+                      <Stars r={Math.round(displayStats.avgConfidence)} />
                     </div>
                   </div>
                 </div>
@@ -3984,30 +4040,30 @@ export default function HomePage() {
                       <span className="text-emerald-400 font-semibold flex items-center gap-1">
                         <span className="w-2 h-2 rounded-full bg-emerald-400" />
                         ربح
-                        <span className="text-muted-foreground font-normal">({stats.hitTp})</span>
+                        <span className="text-muted-foreground font-normal">({displayStats.hitTp})</span>
                       </span>
                       <span className="text-red-400 font-semibold flex items-center gap-1">
                         <span className="w-2 h-2 rounded-full bg-red-400" />
                         خسارة
-                        <span className="text-muted-foreground font-normal">({stats.hitSl})</span>
+                        <span className="text-muted-foreground font-normal">({displayStats.hitSl})</span>
                       </span>
                     </div>
                     <div className="h-3.5 rounded-xl bg-white/5 overflow-hidden flex">
-                      {stats.hitTp + stats.hitSl > 0 && (
-                        <div className="bg-gradient-to-l from-emerald-400 to-emerald-500 h-full transition-all duration-700 rounded-xl" style={{ width: `${(stats.hitTp / (stats.hitTp + stats.hitSl)) * 100}%` }} />
+                      {displayStats.hitTp + displayStats.hitSl > 0 && (
+                        <div className="bg-gradient-to-l from-emerald-400 to-emerald-500 h-full transition-all duration-700 rounded-xl" style={{ width: `${(displayStats.hitTp / (displayStats.hitTp + displayStats.hitSl)) * 100}%` }} />
                       )}
                       <div className="bg-gradient-to-l from-red-400 to-red-500 h-full flex-1 transition-all duration-700 rounded-xl" />
                     </div>
                     <div className="flex items-center justify-center gap-4 text-[10px] text-muted-foreground">
-                      <span>{stats.hitTp + stats.hitSl > 0 ? Math.round((stats.hitTp / (stats.hitTp + stats.hitSl)) * 100) : 0}% فوز</span>
+                      <span>{displayStats.hitTp + displayStats.hitSl > 0 ? Math.round((displayStats.hitTp / (displayStats.hitTp + displayStats.hitSl)) * 100) : 0}% فوز</span>
                       <span className="w-1 h-1 rounded-full bg-muted-foreground/30" />
-                      <span>{stats.hitTp + stats.hitSl > 0 ? Math.round((stats.hitSl / (stats.hitTp + stats.hitSl)) * 100) : 0}% خسارة</span>
+                      <span>{displayStats.hitTp + displayStats.hitSl > 0 ? Math.round((displayStats.hitSl / (displayStats.hitTp + displayStats.hitSl)) * 100) : 0}% خسارة</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Top Performing Pairs */}
-                {stats.topPairs?.length > 0 && (
+                {displayStats.topPairs?.length > 0 && (
                   <div className="glass-card rounded-xl p-4">
                     <div className="text-xs font-bold text-foreground/90 mb-3 flex items-center gap-2">
                       <div className="w-6 h-6 rounded-md bg-amber-500/15 flex items-center justify-center">
@@ -4016,8 +4072,8 @@ export default function HomePage() {
                       الأزواج الأكثر أداءً
                     </div>
                     <div className="space-y-2.5">
-                      {stats.topPairs.slice(0, 5).map((p, i) => {
-                        const maxCount = stats.topPairs[0].count;
+                      {displayStats.topPairs.slice(0, 5).map((p, i) => {
+                        const maxCount = displayStats.topPairs[0].count;
                         return (
                           <div key={i} className="flex items-center gap-3">
                             <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-bold ${i === 0 ? "bg-amber-500/20 text-amber-400" : i === 1 ? "bg-slate-400/15 text-slate-300" : i === 2 ? "bg-orange-500/15 text-orange-400" : "bg-white/5 text-muted-foreground"}`}>
