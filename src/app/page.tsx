@@ -5682,6 +5682,7 @@ export default function HomePage() {
                             const uPkg = packages.find(p => p.id === u.packageId);
                             if (!uPkg) return null;
                             const uAllowedCats = uPkg.instruments?.length ? new Set(uPkg.instruments) : null;
+                            // All entry signals matching package instruments (null = all instruments)
                             const uSignals = signals.filter(s => {
                               if (!isEntry(s.signalCategory)) return false;
                               if (uAllowedCats && !uAllowedCats.has(getPairCategory(s.pair))) return false;
@@ -5707,7 +5708,7 @@ export default function HomePage() {
                             const uLosses = uClosed.filter(s => s.status === "HIT_SL").length;
                             const uPnl = parseFloat(uClosed.reduce((a, s) => a + (s.pnlDollars ?? 0), 0).toFixed(2));
                             const uWinRate = uClosed.length > 0 ? Math.round((uWins / uClosed.length) * 100) : 0;
-                            if (uLimited.length === 0) return null;
+                            // Show even when no signals yet — display zeros
                             return (
                               <div className="grid grid-cols-5 gap-1.5 mt-2.5 pt-2.5 border-t border-border/30">
                                 <div className="text-center">
