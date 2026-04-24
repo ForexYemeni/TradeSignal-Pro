@@ -144,7 +144,7 @@ function ReferralSection({ session, appSettings }: { session: any; appSettings: 
       } else {
         toast.error(data.error || "فشل تطبيق الكود");
       }
-    } catch { toast.error("خطأ في الاتصال"); }
+    } catch { toast.error("فشل الاتصال", { description: "تعذر الوصول إلى الخادم" }); }
     finally { setApplyingCode(false); }
   }
 
@@ -153,7 +153,7 @@ function ReferralSection({ session, appSettings }: { session: any; appSettings: 
     const text = `انضم إلى ForexYemeni VIP واستخدم كود الاحالة: ${referralData.referralCode} للحصول على ${referralData.stats.inviteeRewardDays} أيام مجانية!`;
     navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
-      toast.success("تم نسخ رابط الدعوة!");
+      toast.success("تم نسخ رابط الدعوة", { description: "شاركه مع أصدقائك للحصول على مكافآت" });
       setTimeout(() => setCopied(false), 2000);
     });
   }
@@ -578,7 +578,7 @@ export default function HomePage() {
       setView("login");
       setSession(null);
       localStorage.removeItem("adminSession");
-      toast.warning("تم تسجيل الخروج تلقائياً بسبب عدم النشاط");
+      toast.warning("تم تسجيل الخروج تلقائياً", { description: "لم يتم تسجيل أي نشاط خلال آخر 30 دقيقة" });
     }, SESSION_TIMEOUT_MS);
   }, [autoLogoutEnabled]);
 
@@ -635,12 +635,12 @@ export default function HomePage() {
 
             // Handle status changes (blocked, expired, etc.)
             if (s.status === "blocked" && prev.status !== "blocked") {
-              toast.error("تم حظر حسابك من قبل الإدارة");
+              toast.error("تم حظر حسابك", { description: "تواصل مع الإدارة لمزيد من التفاصيل" });
               setTimeout(() => {
                 setView("blocked");
               }, 1500);
             } else if (s.status === "expired" && prev.status !== "expired" && s.role === "user") {
-              toast.warning("انتهت مدة اشتراكك");
+              toast.warning("انتهت صلاحية الاشتراك", { description: "يرجى تجديد الاشتراك لاستعادة الوصول" });
               setTimeout(() => {
                 setView("expired");
               }, 1500);
@@ -648,12 +648,12 @@ export default function HomePage() {
             // Notify user about subscription changes
             if (s.subscriptionType !== prev.subscriptionType || s.packageId !== prev.packageId) {
               if (s.subscriptionType === "subscriber" && s.packageName) {
-                toast.success(`تم تفعيل باقة "${s.packageName}" بنجاح`);
+                toast.success(`تم تفعيل باقة "${s.packageName}"`, { description: "تم تحديث صلاحياتك تلقائياً" });
                 // Refresh packages & users if admin
                 fetchPackages();
                 if (prev.role === "admin" || s.role === "admin") fetchUsers();
               } else if (s.subscriptionType === "none" && prev.subscriptionType === "subscriber") {
-                toast.info("تم إلغاء اشتراكك");
+                toast.info("تم إلغاء الاشتراك", { description: "لم تعد مشتركاً في أي باقة" });
                 fetchPackages();
               }
             }
@@ -1076,9 +1076,9 @@ export default function HomePage() {
         registerPushNotification(s.id).catch(() => {});
         // Share session token with Android native service
         shareSessionToken(s.id);
-        toast.success("تم تسجيل الدخول بنجاح");
+        toast.success("تم تسجيل الدخول بنجاح", { description: `مرحباً بك` });
       }
-    } catch { setLoginErr("خطأ في الاتصال بالخادم"); toast.error("خطأ في الاتصال بالخادم"); }
+    } catch { setLoginErr("خطأ في الاتصال بالخادم"); toast.error("فشل الاتصال بالخادم", { description: "تحقق من اتصالك بالإنترنت وحاول مجدداً" }); }
     finally { setLoginLoad(false); }
   }
 
@@ -1105,7 +1105,7 @@ export default function HomePage() {
       localStorage.setItem("adminSession", JSON.stringify(s));
       setView("main");
       setCpCur(""); setCpEmail(""); setCpNew(""); setCpConf("");
-      toast.success("تم تغيير كلمة المرور");
+      toast.success("تم تحديث كلمة المرور", { description: "استخدم كلمة المرور الجديدة في تسجيل الدخول القادم" });
     } catch { setCpErr("خطأ في الاتصال بالخادم"); }
     finally { setCpLoad(false); }
   }
@@ -1184,7 +1184,7 @@ export default function HomePage() {
       }
     } catch {
       setOtpErr("خطأ في الاتصال");
-      toast.error("خطأ في الاتصال");
+      toast.error("فشل الاتصال", { description: "تعذر الوصول إلى الخادم، حاول مجدداً" });
       setOtpStep("none");
     }
   }
@@ -1216,7 +1216,7 @@ export default function HomePage() {
         // For password reset — go to forgot password view with token ready
         setOtpStep("done");
         setView("forgotPwd");
-        toast.success("تم التحقق بنجاح. أدخل كلمة المرور الجديدة.");
+          toast.success("تم التحقق بنجاح", { description: "يمكنك الآن إدخال كلمة المرور الجديدة" });
       } else if (otpPurpose === "register") {
         setRegLoad(true);
         try {
@@ -1341,7 +1341,7 @@ export default function HomePage() {
       }
     } catch {
       setFpErr("خطأ في الاتصال");
-      toast.error("خطأ في الاتصال");
+      toast.error("فشل الاتصال", { description: "تعذر الوصول إلى الخادم، حاول مجدداً" });
     } finally { setFpResetLoad(false); }
   }
 
@@ -1354,7 +1354,7 @@ export default function HomePage() {
     prevIdsRef.current = new Set();
     prevStateRef.current = new Map();
     resetOtp();
-    toast.success("تم تسجيل الدخول بنجاح");
+    toast.success("تم تسجيل الدخول بنجاح", { description: "مرحباً بك في ForexYemeni" });
   }
 
   async function fetchUsers() {
@@ -1413,9 +1413,9 @@ export default function HomePage() {
       const payload = editingPkgId ? { id: editingPkgId, ...body } : body;
       const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const data = await res.json();
-      if (data.success) { resetPkgForm(); fetchPackages(); toast.success(editingPkgId ? "تم تحديث الباقة بنجاح" : "تم إنشاء الباقة بنجاح"); }
-      else toast.error(data.error || "فشل حفظ الباقة");
-    } catch (e) { console.error("Save package:", e); toast.error("خطأ في الاتصال"); }
+      if (data.success) { resetPkgForm(); fetchPackages(); toast.success(editingPkgId ? "تم تحديث الباقة" : "تم إنشاء الباقة", { description: editingPkgId ? "تم حفظ التعديلات على الباقة" : "تمت إضافة باقة جديدة للنظام" }); }
+      else toast.error(data.error || "فشل حفظ الباقة", { description: "تحقق من البيانات المدخلة" });
+    } catch (e) { console.error("Save package:", e); toast.error("فشل الاتصال", { description: "تعذر الوصول إلى الخادم، حاول مجدداً" }); }
     finally { setPkgLoad(false); }
   }
 
@@ -1432,7 +1432,7 @@ export default function HomePage() {
         try {
           await fetch("/api/packages", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
           fetchPackages();
-          toast.success("تم حذف الباقة");
+          toast.success("تم حذف الباقة", { description: "تمت إزالة الباقة من النظام نهائياً" });
         } catch (e) { console.error("Delete package:", e); }
       },
     });
@@ -1495,18 +1495,18 @@ export default function HomePage() {
         setAppSettings(data.settings);
         // Sync USDT networks from settings
         setUsdtNetworks(data.settings.usdtNetworks || []);
-        toast.success("تم حفظ إعدادات USDT");
+        toast.success("تم حفظ إعدادات الدفع", { description: "تم تحديث بيانات المحفظة بنجاح" });
       } else {
-        toast.error(data.error || "فشل حفظ الإعدادات");
+        toast.error(data.error || "فشل حفظ الإعدادات", { description: "تحقق من البيانات المدخلة" });
       }
-    } catch (e) { console.error("Save payment settings:", e); toast.error("خطأ في الاتصال"); }
+    } catch (e) { console.error("Save payment settings:", e); toast.error("فشل الاتصال", { description: "تعذر الوصول إلى الخادم، حاول مجدداً" }); }
   }
 
   /* ── Proof Image Viewer ── */
   async function handleViewProofImage(proofUrl: string) {
     // Extract proof ID from "proof:<uuid>" format
     const proofId = proofUrl.replace("proof:", "");
-    if (!proofId) { toast.error("رابط الصورة غير صالح"); return; }
+    if (!proofId) { toast.error("رابط الصورة غير صالح", { description: "الرجاء التأكد من صحة الرابط" }); return; }
     setProofModalOpen(true);
     setProofModalLoading(true);
     setProofModalImage(null);
@@ -1516,12 +1516,12 @@ export default function HomePage() {
       if (data.success && data.image) {
         setProofModalImage(data.image);
       } else {
-        toast.error(data.error || "الصورة غير موجودة أو انتهت صلاحيتها");
+        toast.error("الصورة غير موجودة", { description: "انتهت صلاحية الرابط أو تم حذف الصورة" });
         setProofModalOpen(false);
       }
     } catch (e) {
       console.error("View proof:", e);
-      toast.error("خطأ في تحميل الصورة");
+      toast.error("فشل تحميل الصورة", { description: "تعذر تحميل صورة الإثبات" });
       setProofModalOpen(false);
     } finally {
       setProofModalLoading(false);
@@ -1537,7 +1537,7 @@ export default function HomePage() {
   }
 
   async function handleSaveUsdtNetwork() {
-    if (!usdtNetFormAddress.trim()) { toast.error("عنوان المحفظة مطلوب"); return; }
+    if (!usdtNetFormAddress.trim()) { toast.error("عنوان المحفظة مطلوب", { description: "يرجى إدخال عنوان المحفظة للمتابعة" }); return; }
     const currentNetworks = [...(appSettings.usdtNetworks || appSettings.usdtNetwork ? [{
       id: appSettings.usdtWalletAddress || "legacy",
       network: appSettings.usdtNetwork || "TRC20",
@@ -1572,11 +1572,11 @@ export default function HomePage() {
         setAppSettings(data.settings);
         setUsdtNetworks(data.settings.usdtNetworks || []);
         resetUsdtNetForm();
-        toast.success(editingUsdtNetworkId ? "تم تحديث عنوان الشبكة" : "تم إضافة عنوان الشبكة");
+        toast.success(editingUsdtNetworkId ? "تم تحديث عنوان الشبكة" : "تم إضافة عنوان الشبكة", { description: editingUsdtNetworkId ? "تم حفظ التعديلات" : "تمت إضافة شبكة دفع جديدة" });
       } else {
-        toast.error(data.error || "فشل الحفظ");
+        toast.error(data.error || "فشل الحفظ", { description: "تحقق من البيانات المدخلة" });
       }
-    } catch (e) { console.error("Save USDT network:", e); toast.error("خطأ في الاتصال"); }
+    } catch (e) { console.error("Save USDT network:", e); toast.error("فشل الاتصال", { description: "تعذر الوصول إلى الخادم، حاول مجدداً" }); }
   }
 
   async function handleDeleteUsdtNetwork(id: string) {
@@ -1597,11 +1597,11 @@ export default function HomePage() {
       if (data.success) {
         setAppSettings(data.settings);
         setUsdtNetworks(data.settings.usdtNetworks || []);
-        toast.success("تم حذف عنوان الشبكة");
+        toast.success("تم حذف عنوان الشبكة", { description: "تمت إزالة الشبكة من النظام" });
       } else {
-        toast.error(data.error || "فشل الحذف");
+        toast.error(data.error || "فشل الحذف", { description: "تعذر حذف عنوان الشبكة" });
       }
-    } catch (e) { console.error("Delete USDT network:", e); toast.error("خطأ في الاتصال"); }
+    } catch (e) { console.error("Delete USDT network:", e); toast.error("فشل الاتصال", { description: "تعذر الوصول إلى الخادم، حاول مجدداً" }); }
   }
 
   async function handleToggleUsdtNetwork(id: string, active: boolean) {
@@ -1622,11 +1622,9 @@ export default function HomePage() {
       if (data.success) {
         setAppSettings(data.settings);
         setUsdtNetworks(data.settings.usdtNetworks || []);
-        toast.success(active ? "تم تفعيل الشبكة" : "تم تعطيل الشبكة");
-      } else {
-        toast.error(data.error || "فشل التحديث");
-      }
-    } catch (e) { console.error("Toggle USDT network:", e); toast.error("خطأ في الاتصال"); }
+        toast.success(active ? "تم تفعيل الشبكة" : "تم تعطيل الشبكة", { description: active ? "الشبكة الآن متاحة للمستخدمين" : "لن تظهر الشبكة للمستخدمين" });
+      } else { toast.error(data.error || "فشل التحديث", { description: "تعذر تحديث حالة الشبكة" }); }
+    } catch (e) { console.error("Toggle USDT network:", e); toast.error("فشل الاتصال", { description: "تعذر الوصول إلى الخادم، حاول مجدداً" }); }
   }
 
   /* ── Local Payment Methods Handlers ── */
@@ -1654,7 +1652,7 @@ export default function HomePage() {
 
   async function handleSaveMethod() {
     if (!methodFormName.trim() || !methodFormWallet.trim() || !methodFormWalletName.trim() || !methodFormCurrencyName.trim() || !methodFormCurrencyCode.trim() || !methodFormRate) {
-      toast.error("جميع الحقول مطلوبة");
+      toast.error("جميع الحقول مطلوبة", { description: "يرجى ملء جميع البيانات المطلوبة" });
       return;
     }
     setMethodLoad(true);
@@ -1670,15 +1668,15 @@ export default function HomePage() {
       if (editingMethodId) {
         const res = await fetch("/api/payment-methods", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editingMethodId, ...body }) });
         const data = await res.json();
-        if (data.success) { resetMethodForm(); fetchLocalPaymentMethods(); toast.success("تم تحديث طريقة الدفع"); }
-        else { toast.error(data.error || "فشل التحديث"); }
+        if (data.success) { resetMethodForm(); fetchLocalPaymentMethods(); toast.success("تم تحديث طريقة الدفع", { description: "تم حفظ التعديلات بنجاح" }); }
+        else { toast.error(data.error || "فشل التحديث", { description: "تحقق من البيانات المدخلة" }); }
       } else {
         const res = await fetch("/api/payment-methods", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
         const data = await res.json();
-        if (data.success) { resetMethodForm(); fetchLocalPaymentMethods(); toast.success("تم إضافة طريقة الدفع"); }
-        else { toast.error(data.error || "فشل الإضافة"); }
+        if (data.success) { resetMethodForm(); fetchLocalPaymentMethods(); toast.success("تم إضافة طريقة الدفع", { description: "تمت إضافة طريقة دفع جديدة للنظام" }); }
+        else { toast.error(data.error || "فشل الإضافة", { description: "تحقق من البيانات المدخلة" }); }
       }
-    } catch (e) { console.error("Save method:", e); toast.error("خطأ في الاتصال"); }
+    } catch (e) { console.error("Save method:", e); toast.error("فشل الاتصال", { description: "تعذر الوصول إلى الخادم، حاول مجدداً" }); }
     finally { setMethodLoad(false); }
   }
 
@@ -1694,9 +1692,9 @@ export default function HomePage() {
         try {
           const res = await fetch(`/api/payment-methods?id=${id}`, { method: "DELETE" });
           const data = await res.json();
-          if (data.success) { fetchLocalPaymentMethods(); toast.success("تم حذف طريقة الدفع"); }
-          else { toast.error(data.error || "فشل الحذف"); }
-        } catch (e) { console.error("Delete method:", e); toast.error("خطأ في الاتصال"); }
+          if (data.success) { fetchLocalPaymentMethods(); toast.success("تم حذف طريقة الدفع", { description: "تمت إزالة طريقة الدفع من النظام" }); }
+          else { toast.error(data.error || "فشل الحذف", { description: "تعذر حذف طريقة الدفع" }); }
+        } catch (e) { console.error("Delete method:", e); toast.error("فشل الاتصال", { description: "تعذر الوصول إلى الخادم، حاول مجدداً" }); }
       },
     });
   }
@@ -1705,9 +1703,9 @@ export default function HomePage() {
     try {
       const res = await fetch("/api/payment-methods", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, isActive: active }) });
       const data = await res.json();
-      if (data.success) { fetchLocalPaymentMethods(); toast.success(active ? "تم تفعيل طريقة الدفع" : "تم تعطيل طريقة الدفع"); }
-      else { toast.error(data.error || "فشل التحديث"); }
-    } catch (e) { console.error("Toggle method:", e); toast.error("خطأ في الاتصال"); }
+      if (data.success) { fetchLocalPaymentMethods(); toast.success(active ? "تم تفعيل طريقة الدفع" : "تم تعطيل طريقة الدفع", { description: active ? "الطريقة الآن متاحة للمستخدمين" : "لن تظهر للمستخدمين" }); }
+      else { toast.error(data.error || "فشل التحديث", { description: "تعذر تحديث حالة طريقة الدفع" }); }
+    } catch (e) { console.error("Toggle method:", e); toast.error("فشل الاتصال", { description: "تعذر الوصول إلى الخادم، حاول مجدداً" }); }
   }
 
   /* ── Payment Request Handlers ── */
@@ -1735,9 +1733,9 @@ export default function HomePage() {
         try {
           const res = await fetch("/api/payments", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ requestId: id, action, adminId: session?.id }) });
           const data = await res.json();
-          if (data.success) { fetchPaymentRequests(); fetchUsers(); toast.success(action === "approve" ? "تم قبول طلب الدفع وتفعيل الاشتراك" : "تم رفض طلب الدفع"); }
-          else { toast.error(data.error || "فشل تحديث الطلب"); }
-        } catch (e) { console.error("Payment action:", e); toast.error("خطأ في الاتصال"); }
+          if (data.success) { fetchPaymentRequests(); fetchUsers(); toast.success(action === "approve" ? "تم قبول طلب الدفع" : "تم رفض طلب الدفع", { description: action === "approve" ? "تم تفعيل اشتراك المستخدم بنجاح" : "تم إبلاغ المستخدم بالرفض" }); }
+          else { toast.error(data.error || "فشل تحديث الطلب", { description: "تعذر معالجة طلب الدفع" }); }
+        } catch (e) { console.error("Payment action:", e); toast.error("فشل الاتصال", { description: "تعذر الوصول إلى الخادم، حاول مجدداً" }); }
       },
     });
   }
@@ -1784,7 +1782,7 @@ export default function HomePage() {
         toast.error(data.error || "فشل تفعيل الاشتراك");
         if (data.samePackage) resetPaymentState();
       }
-    } catch (e) { console.error("USDT payment:", e); toast.error("خطأ في الاتصال"); }
+    } catch (e) { console.error("USDT payment:", e); toast.error("فشل الاتصال", { description: "تعذر الوصول إلى الخادم، حاول مجدداً" }); }
     finally { setPaymentLoad(false); }
   }
 
@@ -1804,7 +1802,7 @@ export default function HomePage() {
         body: JSON.stringify({ image: fileDataUrl }),
       });
       const uploadData = await uploadRes.json();
-      if (!uploadData.success || !uploadData.url) { toast.error("فشل رفع صورة الإثبات"); setPaymentLoad(false); return; }
+      if (!uploadData.success || !uploadData.url) { toast.error("فشل رفع صورة الإثبات", { description: "تعذر رفع الصورة، حاول مجدداً" }); setPaymentLoad(false); return; }
 
       // Calculate effective price (upgrade or full) for local currency conversion
       const hasActiveSub = session?.subscriptionType === "subscriber" && session?.subscriptionExpiry && new Date(session.subscriptionExpiry).getTime() > Date.now();
@@ -1839,7 +1837,7 @@ export default function HomePage() {
         toast.error(data.error || "فشل إرسال طلب الدفع");
         if (data.samePackage) resetPaymentState();
       }
-    } catch (e) { console.error("Local payment:", e); toast.error("خطأ في الاتصال"); }
+    } catch (e) { console.error("Local payment:", e); toast.error("فشل الاتصال", { description: "تعذر الوصول إلى الخادم، حاول مجدداً" }); }
     finally { setPaymentLoad(false); }
   }
 
@@ -1857,14 +1855,14 @@ export default function HomePage() {
           const res = await fetch("/api/subscription/cancel", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: session.id }) });
           const data = await res.json();
           if (data.success) {
-            toast.success("تم إلغاء الاشتراك بنجاح");
+            toast.success("تم إلغاء الاشتراك بنجاح", { description: "لن تتمكن من الوصول إلى الإشارات المدفوعة" });
             fetchPackages();
             // Update session locally
             setSession(s => s ? { ...s, subscriptionType: "none", subscriptionExpiry: undefined, packageId: undefined, packageName: undefined, status: "expired" } : s);
           } else {
-            toast.error(data.error || "فشل إلغاء الاشتراك");
+            toast.error(data.error || "فشل إلغاء الاشتراك", { description: "تعذر إلغاء الاشتراك حالياً" });
           }
-        } catch (e) { console.error("Cancel subscription:", e); toast.error("خطأ في الاتصال"); }
+        } catch (e) { console.error("Cancel subscription:", e); toast.error("فشل الاتصال", { description: "تعذر الوصول إلى الخادم، حاول مجدداً" }); }
       },
     });
   }
@@ -1902,14 +1900,14 @@ export default function HomePage() {
                 action: () => {},
               });
             } else {
-              toast.error(data.error || "فشل تعيين الباقة");
+              toast.error(data.error || "فشل تعيين الباقة", { description: "تعذر تفعيل الباقة للمستخدم" });
             }
             return;
           }
           setShowAssignPkg(null); setAssignDays("");
           fetchUsers();
-          toast.success("تم تفعيل الباقة بنجاح");
-        } catch (e) { console.error("Assign package:", e); toast.error("خطأ في الاتصال"); }
+          toast.success("تم تفعيل الباقة بنجاح", { description: `تم تفعيل الباقة للمستخدم \"${userName}\"` });
+        } catch (e) { console.error("Assign package:", e); toast.error("فشل الاتصال", { description: "تعذر الوصول إلى الخادم، حاول مجدداً" }); }
       },
     });
   }
@@ -1927,7 +1925,7 @@ export default function HomePage() {
         try {
           await fetch("/api/users", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: userId, action: "set_agency" }) });
           fetchUsers();
-          toast.success("تم تعيين الوكالة");
+          toast.success("تم تعيين الوكالة", { description: `تم تعيين \"${userName}\" كوكالة` });
         } catch (e) { console.error("Set agency:", e); }
       },
     });
@@ -1993,12 +1991,12 @@ export default function HomePage() {
       });
       const data = await res.json();
       if (!data.success) {
-        toast.error(data.error || "فشل تحديث المستخدم");
+        toast.error(data.error || "فشل تحديث المستخدم", { description: "تعذر إجراء التعديل المطلوب" });
         return;
       }
       fetchUsers();
-      toast.success(action === "remove_admin" ? "تم إزالة صلاحية المدير" : action === "make_admin" ? `تم ترقية ${userName} لمدير` : "تم تحديث حالة المستخدم");
-    } catch (e) { console.error("User action:", e); toast.error("خطأ في الاتصال"); }
+      toast.success(action === "remove_admin" ? "تم إزالة صلاحية المدير" : action === "make_admin" ? `تم ترقية ${userName} لمدير` : "تم تحديث حالة المستخدم", { description: action === "remove_admin" ? `تمت إزالة صلاحيات الإدارة عن ${userName}` : action === "make_admin" ? `${userName} أصبح الآن مدير في النظام` : "تم تحديث بيانات المستخدم" });
+    } catch (e) { console.error("User action:", e); toast.error("فشل الاتصال", { description: "تعذر الوصول إلى الخادم، حاول مجدداً" }); }
   }
 
   async function handleDeleteUser(id: string) {
@@ -2019,12 +2017,12 @@ export default function HomePage() {
           });
           const data = await res.json();
           if (!data.success) {
-            toast.error(data.error || "فشل حذف المستخدم");
+            toast.error(data.error || "فشل حذف المستخدم", { description: "تعذر حذف المستخدم من النظام" });
             return;
           }
           fetchUsers();
-          toast.success("تم حذف المستخدم نهائياً");
-        } catch (e) { console.error("Delete user:", e); toast.error("خطأ في الاتصال"); }
+          toast.success("تم حذف المستخدم نهائياً", { description: `تم حذف حساب \"${userName}\" من النظام` });
+        } catch (e) { console.error("Delete user:", e); toast.error("فشل الاتصال", { description: "تعذر الوصول إلى الخادم، حاول مجدداً" }); }
       },
     });
   }
@@ -2091,7 +2089,7 @@ export default function HomePage() {
               body: JSON.stringify({ status, hitTpIndex: tpIdx }),
             });
             fetchSignals(); fetchStats();
-            toast.success(status === "HIT_TP" ? "تم إغلاق الإشارة بربح" : status === "HIT_SL" ? "تم إغلاق الإشارة بخسارة" : "تم التحديث");
+            toast.success(status === "HIT_TP" ? "تم إغلاق الإشارة بربح" : status === "HIT_SL" ? "تم إغلاق الإشارة بخسارة" : "تم تحديث الإشارة", { description: status === "HIT_TP" ? "تحقق هدف الربح" : status === "HIT_SL" ? "تم ضرب وقف الخسارة" : "تم تحديث حالة الإشارة" });
           } catch (e) { console.error("Update:", e); }
         },
       });
@@ -2104,7 +2102,7 @@ export default function HomePage() {
         body: JSON.stringify({ status, hitTpIndex: tpIdx }),
       });
       fetchSignals(); fetchStats();
-      toast.success("تم التحديث");
+      toast.success("تم تحديث الإشارة", { description: "تم حفظ التعديلات" });
     } catch (e) { console.error("Update:", e); }
   }
 
@@ -2121,7 +2119,7 @@ export default function HomePage() {
         try {
           await fetch(`/api/signals/${id}`, { method: "DELETE" });
           fetchSignals(); fetchStats();
-          toast.success("تم حذف الإشارة");
+          toast.success("تم حذف الإشارة", { description: "تمت إزالة الإشارة من النظام" });
         } catch (e) { console.error("Delete:", e); }
       },
     });
@@ -2132,7 +2130,7 @@ export default function HomePage() {
       await Promise.allSettled(signals.map(s => fetch(`/api/signals/${s.id}`, { method: "DELETE" })));
       setConfirmClear(false);
       fetchSignals(); fetchStats();
-      toast.success("تم حذف جميع الإشارات");
+      toast.success("تم حذف جميع الإشارات", { description: "تمت إزالة جميع الإشارات من النظام نهائياً" });
     } catch (e) { console.error("Clear:", e); }
   }
 
@@ -2165,7 +2163,7 @@ export default function HomePage() {
       if (data.success) {
         setRawText(""); setParseResult(null); setParseError("");
         fetchSignals(); fetchStats();
-        toast.success("تم إرسال الإشارة بنجاح");
+        toast.success("تم إرسال الإشارة بنجاح", { description: "تم نشر الإشارة للمستخدمين" });
       }
     } catch (e) { console.error("Send:", e); }
     finally { setSendLoad(false); }
@@ -4736,7 +4734,7 @@ export default function HomePage() {
                 variant: "info",
                 confirmLabel: "نعم، إضافة",
                 icon: <Sparkles className="w-5 h-5 text-emerald-400" />,
-                action: async () => { await fetch("/api/seed", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ force: false }) }); fetchPackages(); toast.success("تم إنشاء الباقات الافتراضية"); },
+                action: async () => { await fetch("/api/seed", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ force: false }) }); fetchPackages(); toast.success("تم إنشاء الباقات الافتراضية", { description: "تمت إضافة الباقات الأساسية للنظام" }); },
               })}
                 className="px-3 py-1.5 rounded-xl text-[10px] font-bold bg-gradient-to-r from-emerald-500/20 to-green-500/15 text-emerald-400 border border-emerald-500/25 active:scale-95 transition-transform flex items-center gap-1">
                 <Sparkles className="w-3 h-3" /> باقات افتراضية
@@ -5344,7 +5342,7 @@ export default function HomePage() {
                               <div className="bg-black/20 rounded-lg p-2.5">
                                 <div className="text-[10px] font-mono text-foreground break-all select-all" dir="ltr">{displayAddress}</div>
                               </div>
-                              <button onClick={() => { navigator.clipboard.writeText(displayAddress); toast.success("تم نسخ العنوان"); }}
+                              <button onClick={() => { navigator.clipboard.writeText(displayAddress); toast.success("تم نسخ العنوان", { description: "تم نسخ عنوان المحفظة إلى الحافظة" }); }}
                                 className="mt-2 w-full py-2 rounded-lg text-[10px] text-amber-400 font-medium bg-amber-500/10 border border-amber-500/15 hover:bg-amber-500/15 transition-colors flex items-center justify-center gap-1.5">
                                 <Copy className="w-3 h-3" /> نسخ عنوان المحفظة
                               </button>
@@ -5391,7 +5389,7 @@ export default function HomePage() {
                           <div className="bg-black/20 rounded-lg p-2.5">
                             <div className="text-[10px] font-mono text-foreground break-all select-all" dir="ltr">{selectedLocalMethod.walletAddress}</div>
                           </div>
-                          <button onClick={() => { navigator.clipboard.writeText(selectedLocalMethod.walletAddress || ""); toast.success("تم نسخ رقم المحفظة"); }}
+                          <button onClick={() => { navigator.clipboard.writeText(selectedLocalMethod.walletAddress || ""); toast.success("تم نسخ رقم المحفظة", { description: "تم نسخ رقم المحفظة إلى الحافظة" }); }}
                             className="mt-1.5 text-[10px] text-sky-400 font-medium hover:text-sky-300 transition-colors flex items-center gap-1">
                             <Copy className="w-3 h-3" /> نسخ رقم المحفظة
                           </button>
@@ -6189,7 +6187,7 @@ export default function HomePage() {
                     const newVal = !autoLogoutEnabled;
                     setAutoLogoutEnabled(newVal);
                     localStorage.setItem("fy_auto_logout", String(newVal));
-                    toast.success(newVal ? "تم تفعيل تسجيل الخروج التلقائي" : "تم إيقاف تسجيل الخروج التلقائي — ستبقى logged in");
+                    toast.success(newVal ? "تم تفعيل تسجيل الخروج التلقائي" : "تم إيقاف تسجيل الخروج التلقائي", { description: newVal ? "سيتم تسجيل الخروج بعد 30 دقيقة من عدم النشاط" : "ستبقى مسجلاً الدخول طوال الوقت" });
                   }}
                   className={`relative w-11 h-6 rounded-full transition-colors duration-300 ${autoLogoutEnabled ? "bg-sky-500" : "bg-white/10 border border-white/10"}`}
                 >
