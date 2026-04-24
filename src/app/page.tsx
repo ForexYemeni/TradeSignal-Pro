@@ -554,12 +554,24 @@ export default function HomePage() {
   /* ── Track status change signals for pulse animation ── */
   const statusChangeIdsRef = useRef<Set<string>>(new Set());
 
-  /* ── Session Auto-Logout (30 min inactivity) ── */
+  /* ── Session Auto-Logout (configurable: 30 min inactivity or always active) ── */
   const SESSION_TIMEOUT_MS = 30 * 60 * 1000;
   const lastActivityRef = useRef(Date.now());
   const logoutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Read user preference for auto-logout from localStorage (default: enabled)
+  const [autoLogoutEnabled, setAutoLogoutEnabled] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem("fy_auto_logout");
+      return saved === null ? true : saved === "true";
+    } catch { return true; }
+  });
 
   const resetActivityTimer = useCallback(() => {
+    if (!autoLogoutEnabled) {
+      // If auto-logout is disabled, clear any existing timer
+      if (logoutTimerRef.current) clearTimeout(logoutTimerRef.current);
+      return;
+    }
     lastActivityRef.current = Date.now();
     if (logoutTimerRef.current) clearTimeout(logoutTimerRef.current);
     logoutTimerRef.current = setTimeout(() => {
@@ -568,10 +580,13 @@ export default function HomePage() {
       localStorage.removeItem("adminSession");
       toast.warning("تم تسجيل الخروج تلقائياً بسبب عدم النشاط");
     }, SESSION_TIMEOUT_MS);
-  }, []);
+  }, [autoLogoutEnabled]);
 
   useEffect(() => {
-    if (!session) return;
+    if (!session || !autoLogoutEnabled) {
+      if (logoutTimerRef.current) clearTimeout(logoutTimerRef.current);
+      return;
+    }
     const events = ["mousedown", "keydown", "touchstart", "scroll"] as const;
     const handler = () => resetActivityTimer();
     for (const e of events) window.addEventListener(e, handler, { passive: true });
@@ -580,7 +595,95 @@ export default function HomePage() {
       for (const e of events) window.removeEventListener(e, handler);
       if (logoutTimerRef.current) clearTimeout(logoutTimerRef.current);
     };
-  }, [session, resetActivityTimer]);
+  }, [session, autoLogoutEnabled, resetActivityTimer]);
+
+  /* ── Real-time Session Refresh ── */
+  const sessionRefreshRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const prevSessionHashRef = useRef<string>("");
+
+  const refreshSessionFromServer = useCallback(async () => {
+    if (!session?.id) return;
+    try {
+      const res = await fetch(`/api/session/refresh?userId=${session.id}`);
+      const data = await res.json();
+      if (data.success && data.session) {
+        const s = data.session;
+        // Build a hash of the key session fields to detect changes
+        const hash = JSON.stringify({
+          status: s.status,
+          subscriptionType: s.subscriptionType,
+          subscriptionExpiry: s.subscriptionExpiry,
+          packageId: s.packageId,
+          packageName: s.packageName,
+          role: s.role,
+        });
+        // Only update if something changed
+        if (hash !== prevSessionHashRef.current) {
+          prevSessionHashRef.current = hash;
+          setSession(prev => {
+            if (!prev) return prev;
+            const updated = {
+              ...prev,
+              status: s.status,
+              subscriptionType: s.subscriptionType,
+              subscriptionExpiry: s.subscriptionExpiry,
+              packageId: s.packageId,
+              packageName: s.packageName,
+              role: s.role,
+            };
+            localStorage.setItem("adminSession", JSON.stringify(updated));
+
+            // Handle status changes (blocked, expired, etc.)
+            if (s.status === "blocked" && prev.status !== "blocked") {
+              toast.error("تم حظر حسابك من قبل الإدارة");
+              setTimeout(() => {
+                setView("blocked");
+              }, 1500);
+            } else if (s.status === "expired" && prev.status !== "expired" && s.role === "user") {
+              toast.warning("انتهت مدة اشتراكك");
+              setTimeout(() => {
+                setView("expired");
+              }, 1500);
+            }
+            // Notify user about subscription changes
+            if (s.subscriptionType !== prev.subscriptionType || s.packageId !== prev.packageId) {
+              if (s.subscriptionType === "subscriber" && s.packageName) {
+                toast.success(`تم تفعيل باقة "${s.packageName}" بنجاح`);
+                // Refresh packages & users if admin
+                fetchPackages();
+                if (prev.role === "admin" || s.role === "admin") fetchUsers();
+              } else if (s.subscriptionType === "none" && prev.subscriptionType === "subscriber") {
+                toast.info("تم إلغاء اشتراكك");
+                fetchPackages();
+              }
+            }
+
+            return updated;
+          });
+        }
+      }
+    } catch { /* ignore — will retry on next interval */ }
+  }, [session?.id]);
+
+  useEffect(() => {
+    if (view !== "main" || !session?.id) {
+      if (sessionRefreshRef.current) {
+        clearInterval(sessionRefreshRef.current);
+        sessionRefreshRef.current = null;
+      }
+      return;
+    }
+    // Initial refresh
+    refreshSessionFromServer();
+    // Poll every 5 seconds for session changes
+    sessionRefreshRef.current = setInterval(refreshSessionFromServer, 5000);
+    return () => {
+      if (sessionRefreshRef.current) {
+        clearInterval(sessionRefreshRef.current);
+        sessionRefreshRef.current = null;
+      }
+    };
+  }, [view, session?.id, refreshSessionFromServer]);
 
   useEffect(() => {
     // Auto-setup database tables on first load
@@ -6067,6 +6170,32 @@ export default function HomePage() {
             <div className="flex items-center gap-2 mb-2 px-0.5 mt-1">
               <div className="w-1 h-4 rounded-full bg-gradient-to-b from-sky-400 to-blue-500" />
               <span className="text-xs font-bold text-foreground">الإعدادات</span>
+            </div>
+
+            {/* Auto-Logout Setting */}
+            <div className="glass-card overflow-hidden">
+              <div className="p-4 flex items-center justify-between">
+                <span className="flex items-center gap-2.5">
+                  <div className="w-7 h-7 rounded-lg bg-sky-500/15 border border-sky-500/15 flex items-center justify-center">
+                    <Timer className="w-3.5 h-3.5 text-sky-400" />
+                  </div>
+                  <div>
+                    <div className="text-sm text-foreground/80">تسجيل الخروج التلقائي</div>
+                    <div className="text-[9px] text-muted-foreground/60 mt-0.5">خروج تلقائي بعد 30 دقيقة من عدم النشاط</div>
+                  </div>
+                </span>
+                <button
+                  onClick={() => {
+                    const newVal = !autoLogoutEnabled;
+                    setAutoLogoutEnabled(newVal);
+                    localStorage.setItem("fy_auto_logout", String(newVal));
+                    toast.success(newVal ? "تم تفعيل تسجيل الخروج التلقائي" : "تم إيقاف تسجيل الخروج التلقائي — ستبقى logged in");
+                  }}
+                  className={`relative w-11 h-6 rounded-full transition-colors duration-300 ${autoLogoutEnabled ? "bg-sky-500" : "bg-white/10 border border-white/10"}`}
+                >
+                  <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-md transition-all duration-300 ${autoLogoutEnabled ? "left-0.5" : "left-[22px]"}`} />
+                </button>
+              </div>
             </div>
 
             {/* Change Password (both admin and user) */}
