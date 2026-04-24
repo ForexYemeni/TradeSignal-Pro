@@ -54,15 +54,14 @@ export async function GET(request: NextRequest) {
           const todayStart = new Date();
           todayStart.setHours(0, 0, 0, 0);
           const todayISO = todayStart.toISOString();
-          const todayEntryIds: string[] = [];
-          for (const s of signals) {
-            if (isEntry(String(s.signalCategory)) && s.createdAt >= todayISO) {
-              todayEntryIds.push(s.id);
-            }
-          }
-          if (todayEntryIds.length > pkg.maxSignals) {
-            const allowed = new Set(todayEntryIds.slice(0, pkg.maxSignals));
-            signals = signals.filter(s => {
+          // Sort by createdAt ASCENDING (oldest first) so slice picks the
+          // FIRST N entries of the day, not the last N.
+          const todayEntries = signals
+            .filter(s => isEntry(String(s.signalCategory)) && s.createdAt >= todayISO)
+            .sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+          if (todayEntries.length > pkg.maxSignals) {
+            const allowed = new Set(todayEntries.slice(0, pkg.maxSignals).map((s: any) => s.id));
+            signals = signals.filter((s: any) => {
               if (!isEntry(String(s.signalCategory))) return true;
               return allowed.has(s.id);
             });

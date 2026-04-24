@@ -490,17 +490,17 @@ export async function GET(request: NextRequest) {
           todayStart.setHours(0, 0, 0, 0);
           const todayISO = todayStart.toISOString();
 
-          // Collect ALL entry signal IDs from today (active + closed)
-          const todayEntryIds: string[] = [];
-          for (const s of filteredSignals) {
-            if (isEntry(String(s.signalCategory)) && s.createdAt >= todayISO) {
-              todayEntryIds.push(s.id);
-            }
-          }
+          // Collect ALL entry signals from today and sort by createdAt ASCENDING
+          // (oldest first) so that slice(0, maxSignals) picks the FIRST N entries
+          // of the day, not the last N. Signals are stored newest-first via unshift(),
+          // so we must reverse the order before slicing.
+          const todayEntries = filteredSignals
+            .filter(s => isEntry(String(s.signalCategory)) && s.createdAt >= todayISO)
+            .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
           // If exceeds limit, only keep signals within the first N entries
-          if (todayEntryIds.length > pkg.maxSignals) {
-            const allowedIds = new Set(todayEntryIds.slice(0, pkg.maxSignals));
+          if (todayEntries.length > pkg.maxSignals) {
+            const allowedIds = new Set(todayEntries.slice(0, pkg.maxSignals).map(s => s.id));
             filteredSignals = filteredSignals.filter(s => {
               if (!isEntry(String(s.signalCategory))) return true;
               // Only show entry signals that were within the daily limit
