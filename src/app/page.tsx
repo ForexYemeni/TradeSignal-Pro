@@ -334,7 +334,7 @@ export default function HomePage() {
   const [loginErr, setLoginErr] = useState("");
   const [showPwd, setShowPwd] = useState(false);
   /* ── Login Feedback States ── */
-  const [loginFeedback, setLoginFeedback] = useState<null | { type: "email_not_found" | "wrong_password" | "account_locked"; attemptsLeft?: number; maxAttempts?: number; lockedUntil?: string; retryAfterMinutes?: number; email?: string }>(null);
+  const [loginFeedback, setLoginFeedback] = useState<null | { type: "email_not_found" | "wrong_password" | "account_locked"; attemptsLeft?: number; maxAttempts?: number; lockedUntil?: string; retryAfterMinutes?: number; email?: string; locked?: boolean }>(null);
 
   /* ── Change Password ── */
   const [cpCur, setCpCur] = useState("");
@@ -475,7 +475,7 @@ export default function HomePage() {
   const [fpSuccess, setFpSuccess] = useState(false);
 
   /* ── Users Management ── */
-  const [users, setUsers] = useState<{ id: string; name: string; email: string; role: string; status: string; createdAt: string; subscriptionType?: string; subscriptionExpiry?: string; packageName?: string; packageId?: string }[]>([]);
+  const [users, setUsers] = useState<{ id: string; name: string; email: string; role: string; status: string; createdAt: string; subscriptionType?: string; subscriptionExpiry?: string; packageName?: string; packageId?: string; hadFreeTrial?: boolean }[]>([]);
   const [usersLoad, setUsersLoad] = useState(false);
 
   /* ── Email Change Request ── */
@@ -4526,7 +4526,7 @@ export default function HomePage() {
                   </button>
 
                   {/* USDT Networks */}
-                  <button onClick={() => { setAdminSubTab("usdt_networks"); }}
+                  <button onClick={() => { setAdminSubTab("usdt_networks"); fetchPackages(); }}
                     className="glass-card p-4 text-right space-y-3 hover:border-amber-500/25 transition-all active:scale-[0.98]">
                     <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/10 border border-amber-500/15 flex items-center justify-center">
                       <Wallet className="w-5 h-5 text-amber-400" />
@@ -4538,7 +4538,7 @@ export default function HomePage() {
                   </button>
 
                   {/* Local Payment Methods */}
-                  <button onClick={() => { setAdminSubTab("local_methods"); }}
+                  <button onClick={() => { setAdminSubTab("local_methods"); fetchLocalPaymentMethods(); }}
                     className="glass-card p-4 text-right space-y-3 hover:border-purple-500/25 transition-all active:scale-[0.98]">
                     <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500/20 to-violet-500/10 border border-purple-500/15 flex items-center justify-center">
                       <Banknote className="w-5 h-5 text-purple-400" />
@@ -4877,7 +4877,7 @@ export default function HomePage() {
                               </span>
                             </div>
                             <div className="text-[8px] text-muted-foreground/60 mt-0.5">
-                              <span className="font-mono" dir="ltr">{m.walletName}</span> · <span>{m.currencyName}</span> · <span className="text-amber-400/80 font-bold font-mono" dir="ltr">1 USDT = {m.exchangeRate.toLocaleString()} {m.currencyCode}</span>
+                              <span className="font-mono" dir="ltr">{m.walletName}</span> · <span>{m.currencyName}</span> · <span className="text-amber-400/80 font-bold font-mono" dir="ltr">1 USDT = {(m.exchangeRate ?? 0).toLocaleString()} {m.currencyCode}</span>
                             </div>
                             <div className="text-[8px] font-mono text-foreground/30 truncate mt-0.5" dir="ltr">{m.walletAddress}</div>
                           </div>
@@ -4953,7 +4953,7 @@ export default function HomePage() {
                             {req.paymentMethod === "usdt" ? `USDT${req.usdtNetwork ? ` (${req.usdtNetwork})` : ""}` : (req.paymentMethodName || "محلي")}
                           </span>
                           {req.txId && <span className="truncate font-mono" dir="ltr">TX: {req.txId}</span>}
-                          {req.localAmount && <span className="font-mono" dir="ltr">{req.localAmount.toLocaleString()} {req.localCurrencyCode || ""}</span>}
+                          {req.localAmount && <span className="font-mono" dir="ltr">{(req.localAmount ?? 0).toLocaleString()} {req.localCurrencyCode || ""}</span>}
                           <span className="mr-auto">{new Date(req.createdAt).toLocaleDateString("ar-SA", { month: "short", day: "numeric" })}</span>
                         </div>
                         {/* Blockchain verification status */}
@@ -5806,7 +5806,7 @@ export default function HomePage() {
                               const remVal = (remDays / curPkg.durationDays) * curPkg.price;
                               eff = Math.ceil(Math.max(0, selectedPkg.price - remVal));
                             }
-                            return (eff * m.exchangeRate).toLocaleString();
+                            return ((eff * (m.exchangeRate ?? 0))).toLocaleString();
                           })()}</div>
                           <div className="text-[8px] text-muted-foreground">{m.currencyCode}</div>
                         </div>
@@ -5953,15 +5953,15 @@ export default function HomePage() {
                           <div className="bg-gradient-to-r from-sky-500/10 to-cyan-500/5 rounded-xl p-3 border border-sky-500/15">
                             <div className="text-[9px] text-muted-foreground mb-1">{isUpg ? "المبلغ المطلوب للترقية" : "المبلغ المطلوب التحويل"}</div>
                             <div className="text-xl font-black text-foreground">
-                              {(eff * selectedLocalMethod.exchangeRate).toLocaleString()} <span className="text-xs text-muted-foreground">{selectedLocalMethod.currencyCode}</span>
+                              {(eff * (selectedLocalMethod.exchangeRate ?? 0)).toLocaleString()} <span className="text-xs text-muted-foreground">{selectedLocalMethod.currencyCode}</span>
                             </div>
                             {isUpg ? (
                               <>
-                                <div className="text-[9px] text-muted-foreground mt-1" dir="ltr"><span className="line-through">{selectedPkg.price} USDT × {selectedLocalMethod.exchangeRate.toLocaleString()} = {(selectedPkg.price * selectedLocalMethod.exchangeRate).toLocaleString()} {selectedLocalMethod.currencyCode}</span></div>
-                                <div className="text-[9px] text-sky-400 mt-0.5" dir="ltr">{eff} USDT × {selectedLocalMethod.exchangeRate.toLocaleString()} = {(eff * selectedLocalMethod.exchangeRate).toLocaleString()} {selectedLocalMethod.currencyCode}</div>
+                                <div className="text-[9px] text-muted-foreground mt-1" dir="ltr"><span className="line-through">{selectedPkg.price} USDT × {(selectedLocalMethod.exchangeRate ?? 0).toLocaleString()} = {(selectedPkg.price * (selectedLocalMethod.exchangeRate ?? 0)).toLocaleString()} {selectedLocalMethod.currencyCode}</span></div>
+                                <div className="text-[9px] text-sky-400 mt-0.5" dir="ltr">{eff} USDT × {(selectedLocalMethod.exchangeRate ?? 0).toLocaleString()} = {(eff * (selectedLocalMethod.exchangeRate ?? 0)).toLocaleString()} {selectedLocalMethod.currencyCode}</div>
                               </>
                             ) : (
-                              <div className="text-[9px] text-muted-foreground mt-1" dir="ltr">{eff} USDT × {selectedLocalMethod.exchangeRate.toLocaleString()} = {(eff * selectedLocalMethod.exchangeRate).toLocaleString()} {selectedLocalMethod.currencyCode}</div>
+                              <div className="text-[9px] text-muted-foreground mt-1" dir="ltr">{eff} USDT × {(selectedLocalMethod.exchangeRate ?? 0).toLocaleString()} = {(eff * (selectedLocalMethod.exchangeRate ?? 0)).toLocaleString()} {selectedLocalMethod.currencyCode}</div>
                             )}
                           </div>
                         );
@@ -6070,7 +6070,7 @@ export default function HomePage() {
                                   <div className="text-[8px] text-muted-foreground mt-0.5">{pkg.durationDays} يوم</div>
                                   {userPaymentMethods.length > 0 && (
                                     <div className="text-[8px] text-muted-foreground mt-0.5">
-                                      {userPaymentMethods.map(m => `${(pkg.price * m.exchangeRate).toLocaleString()} ${m.currencyCode}`).join(" / ")}
+                                      {userPaymentMethods.map(m => `${(pkg.price * (m.exchangeRate ?? 0)).toLocaleString()} ${m.currencyCode}`).join(" / ")}
                                     </div>
                                   )}
                                 </div>
