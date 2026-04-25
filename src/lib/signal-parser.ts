@@ -707,16 +707,24 @@ function extractStopLoss(text: string): number | null {
   const cleanText = text.replace(/مسافة الوقف\s*[:\-–]?\s*[\d,.]+(?:\s*نقطة)?/gi, "");
 
   const patterns = [
-    // Primary: "الوقف : <price>" or "الوقف: <price>"
-    /(?:الوقف|وقف الخسارة|Stop\s*Loss|SL)\s*[:\-–]?\s*([\d,]+\.?\d*)/i,
-    // Fallback: "الوقف: <price>" with space before colon (Pine Script format)
-    /الوقف\s*:\s*([\d,]+\.?\d*)/i,
+    // Primary: "الوقف : <price>" or "الوقف: <price>" or "الوقف :<price>"
+    // Handles all Unicode colons/space variations from the indicator
+    /(?:الوقف|وقف الخسارة|Stop\s*Loss|SL)\s*[:\u003A\uFF1A\uFE55\-–—]\s*([\d,]+\.?\d*)/i,
+    // Fallback: just find "الوقف" and grab the FIRST number after it (within 30 chars)
+    /الوقف[^\d]{0,30}([\d,]+\.?\d*)/i,
+    // Fallback: "الوقف" followed by any separator then digits on the same line
+    /الوقف[^\n]*?([\d,]+\.\d+)/i,
     // Fallback: "❌ <price> │" pattern from SL hit alerts
     /❌\s*([\d,]+\.?\d*)\s*[│|]/,
+    // Fallback: 🔴 followed by digits near "وقف"
+    /🔴[^\n]*?الوقف[^\d]*([\d,]+\.?\d*)/i,
   ];
   for (const p of patterns) {
     const m = cleanText.match(p);
-    if (m) return parseFloat(m[1].replace(/,/g, ""));
+    if (m && m[1]) {
+      const val = parseFloat(m[1].replace(/,/g, ""));
+      if (val > 0) return val;
+    }
   }
   return null;
 }

@@ -4256,7 +4256,7 @@ export default function HomePage() {
                             </div>
                             <div className="flex items-center gap-3 mt-1 text-[10px]">
                               <span className="text-muted-foreground/70">دخول: <span className="font-mono font-semibold text-foreground/90">{s.entry}</span></span>
-                              <span className="text-red-400/50">وقف: <span className="font-mono font-semibold text-red-300/80">{s.stopLoss}</span></span>
+                              <span className="text-red-400/50">وقف: <span className="font-mono font-semibold text-red-300/80">{s.stopLoss || "—"}</span></span>
                             </div>
                           </div>
                           <div className="flex flex-col items-end gap-1 shrink-0">

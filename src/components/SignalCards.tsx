@@ -418,18 +418,14 @@ export function EntryCard({ s, idx, isAdmin, onUpdate, onDelete, isNew, statusCh
 
           {/* 5. Price grid */}
           <div className="grid grid-cols-2 gap-2.5">
-            {/* Entry price */}
-            <div className={`rounded-xl p-3 border transition-all duration-300 ${
-              isBuy
-                ? "bg-emerald-500/[0.04] border-emerald-500/15"
-                : "bg-red-500/[0.04] border-red-500/15"
-            }`}>
+            {/* Entry price — neutral color for all signals */}
+            <div className="rounded-xl p-3 border transition-all duration-300 bg-blue-500/[0.04] border-blue-500/15">
               <div className="flex items-center gap-1.5 mb-2">
-                <Activity className={`w-3 h-3 ${isBuy ? "text-emerald-400" : "text-red-400"}`} />
+                <Activity className="w-3 h-3 text-blue-400" />
                 <span className="text-[10px] text-muted-foreground font-medium">سعر الدخول</span>
               </div>
-              <div className={`text-[16px] font-extrabold font-mono tabular-nums ${isBuy ? "text-emerald-300" : "text-red-300"}`} dir="ltr">
-                {s.entry}
+              <div className="text-[16px] font-extrabold font-mono tabular-nums text-blue-300" dir="ltr">
+                {s.entry || "—"}
               </div>
             </div>
             {/* Stop Loss */}
@@ -439,10 +435,10 @@ export function EntryCard({ s, idx, isAdmin, onUpdate, onDelete, isNew, statusCh
                 <span className="text-[10px] text-red-400/60 font-medium">وقف الخسارة</span>
               </div>
               <div className="text-[16px] font-extrabold font-mono text-red-400 tabular-nums" dir="ltr">
-                {s.stopLoss}
+                {s.stopLoss || "—"}
               </div>
               <div className="text-[10px] text-muted-foreground/40 mt-1.5 font-mono tabular-nums" dir="ltr">
-                {s.slDistance || Math.abs(s.entry - s.stopLoss).toFixed(1)} نقطة
+                {s.slDistance || (s.stopLoss && s.entry ? Math.abs(s.entry - s.stopLoss).toFixed(1) : "—")} نقطة
               </div>
             </div>
           </div>
@@ -802,7 +798,7 @@ export function ClosedSignalCard({ s, idx, isAdmin, onDelete, statusChanged, isF
                   </div>
                   <div className="bg-red-500/[0.03] rounded-lg p-2.5 border border-red-500/10">
                     <div className="text-[10px] text-red-400/40 mb-1">الوقف</div>
-                    <div className="text-[11px] font-bold font-mono text-red-300 tabular-nums" dir="ltr">{s.stopLoss}</div>
+                    <div className="text-[11px] font-bold font-mono text-red-300 tabular-nums" dir="ltr">{s.stopLoss || "—"}</div>
                   </div>
                   <div className={`rounded-lg p-2.5 border ${
                     isProfit ? theme.iconBg + " " + theme.border : "bg-red-500/[0.04] border-red-500/10"
