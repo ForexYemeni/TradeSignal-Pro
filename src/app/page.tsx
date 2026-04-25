@@ -1371,10 +1371,44 @@ export default function HomePage() {
           const regData = await regRes.json();
           console.log("[Register]", JSON.stringify(regData));
           if (regData.success) {
-            setRegSuccess(regData.message);
             setRegName(""); setRegEmail(""); setRegPwd("");
             toast.success(regData.message);
-            setView("login");
+            // Auto-login after registration (email already verified, no OTP needed)
+            try {
+              const loginRes = await fetch("/api/admin", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "login", email: otpEmail, password: otpPwd, deviceId: getDeviceId() }),
+              });
+              const loginData = await loginRes.json();
+              console.log("[Auto-login after register]", JSON.stringify(loginData));
+              if (loginData.success) {
+                setRegSuccess("");
+                completeLogin(loginData);
+                toast.success("تم إنشاء الحساب وتسجيل الدخول بنجاح");
+              } else if (loginData.pending) {
+                resetOtp();
+                setOtpVerifying(false);
+                setView("pending");
+                toast.info(regData.message);
+              } else {
+                // Auto-login failed, redirect to login page
+                resetOtp();
+                setOtpVerifying(false);
+                setRegSuccess(regData.message);
+                setView("login");
+                setEmail(otpEmail);
+                setPwd(otpPwd);
+              }
+            } catch (loginErr) {
+              console.error("[Auto-login Error]", loginErr);
+              resetOtp();
+              setOtpVerifying(false);
+              setRegSuccess(regData.message);
+              setView("login");
+              setEmail(otpEmail);
+              setPwd(otpPwd);
+            }
           } else if (regData.deviceBlocked) {
             setDeviceWarning({
               show: true,
