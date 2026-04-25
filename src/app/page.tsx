@@ -2457,6 +2457,42 @@ export default function HomePage() {
     });
   }
 
+  async function handleExtendDays(userId: string) {
+    const user = users.find(u => u.id === userId);
+    const userName = user?.name || user?.email || "";
+    const daysVal = Number(extendDays);
+    if (!daysVal || daysVal < 1) {
+      toast.error("أدخل عدد الأيام", { description: "يجب إدخال عدد أيام صالح (1 على الأقل)" });
+      return;
+    }
+    if (daysVal > 3650) {
+      toast.error("عدد أيام كبير جداً", { description: "الحد الأقصى 3650 يوم" });
+      return;
+    }
+    askConfirm({
+      title: "إضافة أيام",
+      description: `هل تريد إضافة ${daysVal} يوم لاشتراك المستخدم "${userName}"؟`,
+      variant: "info",
+      confirmLabel: "نعم، إضافة",
+      icon: <Clock className="w-5 h-5 text-emerald-400" />,
+      action: async () => {
+        setExtendDaysLoad(true);
+        try {
+          const res = await fetch("/api/users", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: userId, action: "extend_days", days: daysVal }) });
+          const data = await res.json();
+          if (!data.success) {
+            toast.error(data.error || "فشل إضافة الأيام", { description: "تعذر إضافة الأيام للاشتراك" });
+            return;
+          }
+          setShowExtendDays(null); setExtendDays("");
+          fetchUsers();
+          toast.success(`تم إضافة ${daysVal} يوم بنجاح`, { description: `تم تمديد اشتراك المستخدم "${userName}"` });
+        } catch (e) { console.error("Extend days:", e); toast.error("فشل الاتصال", { description: "تعذر الوصول إلى الخادم" }); }
+        finally { setExtendDaysLoad(false); }
+      },
+    });
+  }
+
   async function handleSetAgency(userId: string) {
     const user = users.find(u => u.id === userId);
     const userName = user?.name || user?.email || "";
@@ -7095,6 +7131,10 @@ export default function HomePage() {
                               className="px-2.5 py-1.5 rounded-lg text-[9px] font-medium bg-sky-500/10 text-sky-400 border border-sky-500/15 active:scale-95 transition-transform flex items-center gap-1 hover:bg-sky-500/20">
                               <Package className="w-3 h-3" /> باقة
                             </button>
+                            <button onClick={() => setShowExtendDays(u.id)}
+                              className="px-2.5 py-1.5 rounded-lg text-[9px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/15 active:scale-95 transition-transform flex items-center gap-1 hover:bg-emerald-500/20">
+                              <Clock className="w-3 h-3" /> أيام
+                            </button>
                             <button onClick={() => handleSetAgency(u.id)}
                               className={`px-2.5 py-1.5 rounded-lg text-[9px] font-medium active:scale-95 transition-transform flex items-center gap-1 ${isAgency ? "bg-purple-500/20 text-purple-400 border border-purple-500/25 hover:bg-purple-500/30" : "bg-purple-500/10 text-purple-400 border border-purple-500/15 hover:bg-purple-500/20"}`}>
                               {isAgency ? "✓ وكالة" : "وكالة"}
@@ -7163,7 +7203,39 @@ export default function HomePage() {
                               <div className="flex items-center gap-2">
                                 <Input type="number" value={assignDays} onChange={e => setAssignDays(e.target.value)} placeholder="أيام مخصصة (اختياري)"
                                   className="glass-input flex-1 h-9 text-[10px]" dir="ltr" />
-                                <button onClick={() => setShowAssignPkg(null)} className="px-3 h-9 rounded-lg bg-muted/40 text-muted-foreground text-[9px] font-medium border border-border/50 hover:bg-muted/60 transition-colors">إلغاء</button>
+                                <button onClick={() => { setShowAssignPkg(null); setAssignDays(""); }} className="px-3 h-9 rounded-lg bg-muted/40 text-muted-foreground text-[9px] font-medium border border-border/50 hover:bg-muted/60 transition-colors">إلغاء</button>
+                              </div>
+                            </div>
+                          )}
+                          {/* Extend Days Panel */}
+                          {showExtendDays === u.id && (
+                            <div className="mt-2.5 glass-card p-3.5 space-y-3 animate-[fadeIn_0.2s_ease-out] border-emerald-500/20">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-1.5">
+                                  <Clock className="w-3.5 h-3.5 text-emerald-400" />
+                                  <span className="text-[10px] font-bold text-emerald-400">إضافة أيام مخصصة</span>
+                                </div>
+                                <button onClick={() => { setShowExtendDays(null); setExtendDays(""); }} className="w-6 h-6 rounded-lg bg-muted/40 flex items-center justify-center hover:bg-muted/60 transition-colors">
+                                  <X className="w-3 h-3 text-muted-foreground" />
+                                </button>
+                              </div>
+                              {u.subscriptionExpiry && new Date(u.subscriptionExpiry) > new Date() ? (
+                                <div className="text-[9px] text-muted-foreground/70">
+                                  الاشتراك الحالي ينتهي: <span className="text-emerald-400 font-medium">{new Date(u.subscriptionExpiry).toLocaleDateString("ar-YE")}</span>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-1.5 bg-amber-500/10 rounded-lg px-2.5 py-2 border border-amber-500/15">
+                                  <AlertTriangle className="w-3 h-3 text-amber-400 flex-shrink-0" />
+                                  <span className="text-[9px] text-amber-300/80">لا يوجد اشتراك نشط. قم بتعيين باقة أولاً.</span>
+                                </div>
+                              )}
+                              <div className="flex items-center gap-2">
+                                <Input type="number" value={extendDays} onChange={e => setExtendDays(e.target.value)} placeholder="عدد الأيام" min="1" max="3650"
+                                  className="glass-input flex-1 h-9 text-[10px]" dir="ltr" />
+                                <button onClick={() => handleExtendDays(u.id)} disabled={extendDaysLoad || !extendDays || (u.subscriptionExpiry && new Date(u.subscriptionExpiry) <= new Date())}
+                                  className="px-3 h-9 rounded-lg bg-emerald-500/15 text-emerald-400 text-[9px] font-medium border border-emerald-500/20 hover:bg-emerald-500/25 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                                  {extendDaysLoad ? "جارٍ..." : "إضافة"}
+                                </button>
                               </div>
                             </div>
                           )}
