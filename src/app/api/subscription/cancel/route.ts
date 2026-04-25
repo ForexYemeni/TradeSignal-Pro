@@ -36,6 +36,10 @@ export async function POST(request: NextRequest) {
       status: "expired",
     });
 
+    if (!updated) {
+      return NextResponse.json({ success: false, error: "فشل تحديث بيانات المستخدم" }, { status: 500 });
+    }
+
     return NextResponse.json({
       success: true,
       message: "تم إلغاء الاشتراك بنجاح",

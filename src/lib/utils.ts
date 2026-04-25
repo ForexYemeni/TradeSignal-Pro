@@ -182,7 +182,7 @@ export function showBrowserNotification(title: string, body: string, tag?: strin
       tag: tag || `fy-${Date.now()}`,
       requireInteraction: true,
       vibrate: [200, 100, 200, 100, 200],
-    });
+    } as NotificationOptions);
   } catch { /* not supported */ }
 }
 

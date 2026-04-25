@@ -4,7 +4,9 @@ import { getPackageById, getUserById, updateUser, getAppSettings, getUserByRefer
 import { verifyUsdtTransaction, checkDuplicateTxId, type BlockchainVerification } from "@/lib/blockchain-verify";
 import { useCoupon } from "@/app/api/coupons/route";
 import { sendPushToAdmins } from "@/lib/push";
-import { requireAdmin } from "@/lib/admin-auth";
+import { addAdminNotification } from "@/lib/store";
+import { requireAdmin, getSessionUserId, validateAdmin } from "@/lib/admin-auth";
+import { kvRateLimit } from "@/lib/rate-limit";
 
 // ── Referral reward: grant referrer bonus days when referred user activates paid plan ──
 async function grantReferralReward(
@@ -49,13 +51,29 @@ async function grantReferralReward(
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get("userId");
+    const requestedUserId = searchParams.get("userId");
     const pendingOnly = searchParams.get("pending") === "true";
 
-    if (userId) {
-      const requests = await getPaymentRequestsByUser(userId);
+    if (requestedUserId) {
+      // User requesting their own payments — verify session matches
+      const sessionUserId = getSessionUserId(request);
+      if (!sessionUserId) {
+        return NextResponse.json({ success: false, error: "يرجى تسجيل الدخول أولاً" }, { status: 401 });
+      }
+      if (sessionUserId !== requestedUserId) {
+        // Check if session belongs to an admin (admins can view any user's payments)
+        const adminResult = await validateAdmin(request);
+        if (!adminResult.isAdmin) {
+          return NextResponse.json({ success: false, error: "ليس لديك صلاحية الوصول لهذا الإجراء" }, { status: 403 });
+        }
+      }
+      const requests = await getPaymentRequestsByUser(requestedUserId);
       return NextResponse.json({ success: true, requests });
     }
+
+    // No userId specified — listing all or pending payments requires admin auth
+    const authError = await requireAdmin(request);
+    if (authError) return authError;
 
     if (pendingOnly) {
       const requests = await getPendingPaymentRequests();
@@ -81,6 +99,24 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { userId, packageId, paymentMethod, txId, txid, paymentMethodId, usdtNetwork: bodyNetwork, localAmount, localCurrencyCode, proofUrl, paymentProofUrl, couponCode } = body;
+
+    // KV-based rate limiting: 3 payment requests per user per 10 minutes
+    if (userId) {
+      const rl = await kvRateLimit(`payment:${userId}`, 3, 10 * 60);
+      if (!rl.allowed) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "طلبات دفع كثيرة. حاول بعد قليل",
+            retryAfter: rl.resetIn,
+          },
+          {
+            status: 429,
+            headers: { "Retry-After": String(rl.resetIn), "X-RateLimit-Remaining": "0" },
+          }
+        );
+      }
+    }
 
     // Normalize txId (support both txId and txid from frontend)
     const normalizedTxId = txId || txid;
@@ -357,6 +393,14 @@ export async function POST(request: NextRequest) {
         data: { type: 'new_payment', requestId: paymentRequest.id, userId, packageId, amount: effectivePrice },
       }).catch(() => {});
 
+      // In-app notification for admin
+      addAdminNotification({
+        type: "new_payment",
+        title: `طلب اشتراك جديد — ${pkg.name}`,
+        message: `${user.name} — USDT (${networkName}) | $${effectivePrice}`,
+        data: { requestId: paymentRequest.id, userId, packageId },
+      }).catch(() => {});
+
       return NextResponse.json({
         success: true,
         message: userMessage,
@@ -404,6 +448,14 @@ export async function POST(request: NextRequest) {
       requireInteraction: true,
       urgency: 'high',
       data: { type: 'new_payment', requestId: paymentRequest.id, userId, packageId, amount: effectivePrice },
+    }).catch(() => {});
+
+    // In-app notification for admin
+    addAdminNotification({
+      type: "new_payment",
+      title: `طلب اشتراك جديد — ${pkg.name}`,
+      message: `${user.name} — تحويل محلي | ${localAmount} ${localCurrencyCode || ""}`,
+      data: { requestId: paymentRequest.id, userId, packageId },
     }).catch(() => {});
 
     return NextResponse.json({
@@ -504,6 +556,13 @@ export async function PUT(request: NextRequest) {
         }
       }
     }
+
+    // In-app notification for admin
+    addAdminNotification({
+      type: "subscription_change",
+      title: action === "approve" ? `تم قبول اشتراك — ${req.userName}` : `تم رفض اشتراك — ${req.userName}`,
+      message: action === "approve" ? `باقة: ${req.packageName}` : `السبب: ${rejectReason || "لم يحدد"}`,
+    }).catch(() => {});
 
     return NextResponse.json({
       success: true,

@@ -118,8 +118,7 @@ function ReferralSection({ session, appSettings }: { session: any; appSettings: 
     fetch(`/api/referral?userId=${session.id}`)
       .then(r => r.json())
       .then(data => { if (data.success) setReferralData(data); })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+      .catch(() => toast.error("فشل في جلب بيانات الاحالة"))
   }, [session?.id]);
 
   // Check if user already has a referral applied
@@ -361,9 +360,14 @@ export default function HomePage() {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  /* ── Notifications ── */
+  /* ── Notifications (signal-based in-browser) ── */
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState<{id: string; text: string; time: string; read: boolean}[]>([]);
+
+  /* ── Admin Notifications (stored in KV) ── */
+  const [adminNotifications, setAdminNotifications] = useState<{ id: string; type: string; title: string; message: string; read: boolean; createdAt: string }[]>([]);
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
+  const [showAdminNotif, setShowAdminNotif] = useState(false);
 
   /* ── Favorites ── */
   const [favorites, setFavorites] = useState<Set<string>>(() => {
@@ -508,7 +512,7 @@ export default function HomePage() {
   const [extendDays, setExtendDays] = useState("");
   const [extendDaysLoad, setExtendDaysLoad] = useState(false);
   const [adminSubTab, setAdminSubTab] = useState<AdminSubTab | null>(null);
-  const SUPER_ADMIN_EMAIL = "mhmdlybdhshay@gmail.com";
+  // Super admin identification is now handled by the backend (users API hides super admin from the list)
 
   /* ── Payment & Subscription ── */
   const [selectedPkg, setSelectedPkg] = useState<SubPackage | null>(null);
@@ -548,6 +552,7 @@ export default function HomePage() {
   const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discountPercent: number } | null>(null);
   const [couponInput, setCouponInput] = useState("");
   const [couponApplying, setCouponApplying] = useState(false);
+  const [confirmDeleteCoupon, setConfirmDeleteCoupon] = useState<string | null>(null); // coupon code to confirm
 
   /* ── Proof Image Modal ── */
   const [proofModalOpen, setProofModalOpen] = useState(false);
@@ -555,6 +560,10 @@ export default function HomePage() {
   const [proofModalLoading, setProofModalLoading] = useState(false);
 
   /* ── USDT Multiple Networks ── */
+  const SIGNALS_PER_PAGE = 30;
+  const [signalsPage, setSignalsPage] = useState(0);
+  const [totalSignals, setTotalSignals] = useState(0);
+
   const [usdtNetworks, setUsdtNetworks] = useState<UsdtNetworkAddress[]>([]);
   const [showUsdtNetworkForm, setShowUsdtNetworkForm] = useState(false);
   const [editingUsdtNetworkId, setEditingUsdtNetworkId] = useState<string | null>(null);
@@ -709,9 +718,30 @@ export default function HomePage() {
     }
     // Initial refresh
     refreshSessionFromServer();
-    // Poll every 5 seconds for session changes
-    sessionRefreshRef.current = setInterval(refreshSessionFromServer, 5000);
+    // Poll every 5 seconds when tab is visible, pause when hidden
+    const startPolling = () => {
+      if (sessionRefreshRef.current) clearInterval(sessionRefreshRef.current);
+      sessionRefreshRef.current = setInterval(refreshSessionFromServer, 5000);
+    };
+    const stopPolling = () => {
+      if (sessionRefreshRef.current) {
+        clearInterval(sessionRefreshRef.current);
+        sessionRefreshRef.current = null;
+      }
+    };
+    // Only poll when tab is visible
+    if (document.visibilityState === "visible") startPolling();
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        refreshSessionFromServer(); // immediate refresh when tab becomes visible
+        startPolling();
+      } else {
+        stopPolling();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
     return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
       if (sessionRefreshRef.current) {
         clearInterval(sessionRefreshRef.current);
         sessionRefreshRef.current = null;
@@ -785,10 +815,11 @@ export default function HomePage() {
   /* ── Fetch Signals ── */
   const fetchSignals = useCallback(async () => {
     try {
-      const res = await fetch("/api/signals?limit=100");
+      const res = await fetch(`/api/signals?limit=${SIGNALS_PER_PAGE}&offset=${signalsPage * SIGNALS_PER_PAGE}`);
       const data = await res.json();
       if (data.success) {
         const newSignals: Signal[] = data.signals;
+        if (data.total !== undefined) setTotalSignals(data.total);
         const newIds = new Set(newSignals.map((s: Signal) => s.id));
         const oldIds = prevIdsRef.current;
         const oldStates = prevStateRef.current;
@@ -857,7 +888,7 @@ export default function HomePage() {
         setSignals(newSignals);
       }
     } catch (e) { console.error("Fetch signals:", e); }
-  }, [audioMuted, audioVol]);
+  }, [audioMuted, audioVol, signalsPage]);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -866,6 +897,70 @@ export default function HomePage() {
       if (data.success) setStats(data.stats);
     } catch (e) { console.error("Fetch stats:", e); }
   }, []);
+
+  /* ── Admin Notification Functions ── */
+  const fetchAdminNotifications = useCallback(async () => {
+    if (!session?.id || session.role !== "admin") return;
+    try {
+      const res = await fetch("/api/notifications");
+      const data = await res.json();
+      if (data.success) setAdminNotifications(data.notifications);
+    } catch {}
+  }, [session?.id, session?.role]);
+
+  const fetchUnreadNotifCount = useCallback(async () => {
+    try {
+      const res = await fetch("/api/notifications?action=count");
+      const data = await res.json();
+      if (data.success) setUnreadNotifCount(data.count);
+    } catch {}
+  }, []);
+
+  const handleMarkNotificationRead = async (id: string) => {
+    try {
+      await fetch("/api/notifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "mark_read", notificationId: id }),
+      });
+      setAdminNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+      setUnreadNotifCount(prev => Math.max(0, prev - 1));
+    } catch {}
+  };
+
+  const handleMarkAllNotificationsRead = async () => {
+    try {
+      await fetch("/api/notifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "mark_all_read" }),
+      });
+      setAdminNotifications(prev => prev.map(n => ({ ...n, read: true })));
+      setUnreadNotifCount(0);
+    } catch {}
+  };
+
+  const handleClearNotifications = async () => {
+    try {
+      await fetch("/api/notifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "clear" }),
+      });
+      setAdminNotifications([]);
+      setUnreadNotifCount(0);
+      setShowAdminNotif(false);
+    } catch {}
+  };
+
+  // Poll unread notification count every 15 seconds for admin
+  useEffect(() => {
+    if (session?.role === "admin") {
+      fetchUnreadNotifCount();
+      const interval = setInterval(fetchUnreadNotifCount, 15000);
+      return () => clearInterval(interval);
+    }
+  }, [session?.role, fetchUnreadNotifCount]);
 
   /* ── Pull to refresh (for signals tab) ── */
   const handlePullRefresh = useCallback(async () => {
@@ -2863,7 +2958,7 @@ export default function HomePage() {
               {/* Verify Button */}
               <button
                 onClick={() => handleVerifyOtp()}
-                disabled={otpCode.length !== 6 || otpStep === "done" || otpVerifying}
+                disabled={otpCode.length !== 6 || otpVerifying}
                 className="w-full h-14 rounded-2xl gold-gradient text-black font-bold text-base hover:brightness-110 hover:shadow-amber-500/30 hover:shadow-xl transition-all active:scale-[0.97] disabled:opacity-50 shadow-lg shadow-amber-500/20"
               >
                 {otpVerifying ? (
@@ -3386,7 +3481,65 @@ export default function HomePage() {
           </div>
           {/* Controls */}
           <div className="flex items-center gap-1">
-            {/* Notification Bell */}
+            {/* Admin Notification Bell (in-app notifications from KV) */}
+            {session?.role === "admin" && (
+              <div className="relative">
+                <button onClick={() => { setShowAdminNotif(!showAdminNotif); if (!showAdminNotif) fetchAdminNotifications(); }}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-amber-400 hover:bg-white/[0.06] transition-all duration-300 hover:shadow-sm active:scale-90">
+                  <Bell className="w-4 h-4" />
+                  {unreadNotifCount > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-[16px] h-4 rounded-full bg-red-500 text-[8px] font-bold text-white flex items-center justify-center px-1 animate-pulse">
+                      {unreadNotifCount > 99 ? "99+" : unreadNotifCount}
+                    </span>
+                  )}
+                </button>
+                {/* Admin Notification Panel */}
+                {showAdminNotif && (
+                  <div className="absolute top-full left-0 mt-2 bg-[#0f172a]/95 backdrop-blur-xl border border-white/[0.08] rounded-xl shadow-2xl z-50 max-h-80 overflow-hidden" style={{ minWidth: 280 }}>
+                    <div className="px-3 py-2 border-b border-white/[0.06] flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-foreground">مركز الإشعارات</span>
+                      <div className="flex items-center gap-2">
+                        {unreadNotifCount > 0 && (
+                          <button onClick={handleMarkAllNotificationsRead} className="text-[10px] text-amber-400/70 hover:text-amber-400">تحديد الكل كمقروء</button>
+                        )}
+                        {adminNotifications.length > 0 && (
+                          <button onClick={handleClearNotifications} className="text-[10px] text-red-400/70 hover:text-red-400">مسح الكل</button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="max-h-60 overflow-y-auto scrollbar-thin">
+                      {adminNotifications.length === 0 ? (
+                        <div className="px-3 py-6 text-center">
+                          <Bell className="w-5 h-5 text-muted-foreground/30 mx-auto mb-1.5" />
+                          <div className="text-[10px] text-muted-foreground/50">لا توجد إشعارات</div>
+                        </div>
+                      ) : (
+                        adminNotifications.map(n => {
+                          const typeIcon = n.type === "new_user" ? "👤" : n.type === "new_payment" ? "💰" : n.type === "subscription_change" ? "🔄" : "⚙️";
+                          return (
+                            <button key={n.id}
+                              onClick={() => { if (!n.read) handleMarkNotificationRead(n.id); }}
+                              className={`w-full text-right px-3 py-2.5 border-b border-white/[0.04] last:border-0 hover:bg-white/[0.03] transition-colors ${!n.read ? "bg-amber-500/[0.04]" : ""}`}>
+                              <div className="flex items-start gap-2">
+                                <span className="text-sm mt-0.5 shrink-0">{typeIcon}</span>
+                                <div className="flex-1 min-w-0">
+                                  <div className={`text-[10px] font-bold ${!n.read ? "text-foreground" : "text-muted-foreground"}`}>{n.title}</div>
+                                  <div className="text-[9px] text-muted-foreground/70 mt-0.5 leading-relaxed truncate">{n.message}</div>
+                                  <div className="text-[8px] text-muted-foreground/40 mt-1">{new Date(n.createdAt).toLocaleString("ar-SA", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</div>
+                                </div>
+                                {!n.read && <div className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-1.5 shrink-0" />}
+                              </div>
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                )}
+                {showAdminNotif && <div className="fixed inset-0 z-40" onClick={() => setShowAdminNotif(false)} />}
+              </div>
+            )}
+            {/* Notification Bell (signal-based in-browser) */}
             <div className="relative">
               <button onClick={() => { setShowNotifications(!showNotifications); setNotifications(prev => prev.map(n => ({ ...n, read: true }))); }}
                 className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-all duration-300 hover:shadow-sm active:scale-90">
@@ -4212,6 +4365,39 @@ export default function HomePage() {
                 )}
               </>
             )}
+
+            {/* ── Load More Button (Pagination) ── */}
+            {totalSignals > 0 && (signalsPage + 1) * SIGNALS_PER_PAGE < totalSignals && (
+              <div className="flex justify-center pt-2 pb-4">
+                <button onClick={() => setSignalsPage(p => p + 1)}
+                  className="flex items-center gap-2 px-5 py-2 rounded-xl text-[11px] font-semibold bg-white/[0.04] border border-white/[0.08] text-muted-foreground hover:bg-white/[0.07] hover:text-foreground transition-all active:scale-95">
+                  <Loader2 className="w-3.5 h-3.5" />
+                  تحميل المزيد
+                  <span className="text-[9px] text-muted-foreground/50">({totalSignals - (signalsPage + 1) * SIGNALS_PER_PAGE} متبقي)</span>
+                </button>
+              </div>
+            )}
+
+            {/* ── Page indicator ── */}
+            {totalSignals > SIGNALS_PER_PAGE && (
+              <div className="flex items-center justify-center gap-3 pb-2">
+                {signalsPage > 0 && (
+                  <button onClick={() => setSignalsPage(p => p - 1)}
+                    className="px-3 py-1.5 rounded-lg text-[10px] font-medium bg-white/[0.04] border border-white/[0.06] text-muted-foreground hover:text-foreground transition-all active:scale-95">
+                    السابق
+                  </button>
+                )}
+                <span className="text-[9px] text-muted-foreground/50">
+                  {signalsPage * SIGNALS_PER_PAGE + 1}-{Math.min((signalsPage + 1) * SIGNALS_PER_PAGE, totalSignals)} من {totalSignals}
+                </span>
+                {(signalsPage + 1) * SIGNALS_PER_PAGE < totalSignals && (
+                  <button onClick={() => setSignalsPage(p => p + 1)}
+                    className="px-3 py-1.5 rounded-lg text-[10px] font-medium bg-white/[0.04] border border-white/[0.06] text-muted-foreground hover:text-foreground transition-all active:scale-95">
+                    التالي
+                  </button>
+                )}
+              </div>
+            )}
           </div>
           );
         })()}</motion.div>)}
@@ -4737,23 +4923,34 @@ export default function HomePage() {
                 )}
 
                 {/* Coupons List */}
-                {coupons.length > 0 ? coupons.map(coupon => (
-                  <div key={coupon.code} className={`rounded-xl border p-3 transition-all glass-subtle ${coupon.isActive ? "border-emerald-500/15" : "border-border/40 opacity-40"}`}>
+                {coupons.length > 0 ? coupons.map(coupon => {
+                  const usagePercent = Math.round((coupon.currentUses / coupon.maxUses) * 100);
+                  const isExpired = coupon.expiresAt && new Date(coupon.expiresAt) < new Date();
+                  const isExhausted = coupon.currentUses >= coupon.maxUses;
+                  const progressColor = isExhausted || isExpired ? "bg-red-500" : usagePercent > 75 ? "bg-amber-500" : "bg-emerald-500";
+                  return (
+                  <div key={coupon.code} className={`rounded-xl border p-3 transition-all glass-subtle ${coupon.isActive && !isExpired && !isExhausted ? "border-emerald-500/15" : "border-border/40 opacity-40"}`}>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2.5 flex-1 min-w-0">
-                        <div className={`w-8 h-8 rounded-lg ${coupon.isActive ? "bg-gradient-to-br from-emerald-500/20 to-green-500/10" : "bg-muted/20"} border ${coupon.isActive ? "border-emerald-500/15" : "border-border/40"} flex items-center justify-center flex-shrink-0`}>
-                          <Ticket className={`w-3.5 h-3.5 ${coupon.isActive ? "text-emerald-400" : "text-muted-foreground"}`} />
+                        <div className={`w-8 h-8 rounded-lg ${coupon.isActive && !isExpired && !isExhausted ? "bg-gradient-to-br from-emerald-500/20 to-green-500/10" : "bg-muted/20"} border ${coupon.isActive && !isExpired && !isExhausted ? "border-emerald-500/15" : "border-border/40"} flex items-center justify-center flex-shrink-0`}>
+                          <Ticket className={`w-3.5 h-3.5 ${coupon.isActive && !isExpired && !isExhausted ? "text-emerald-400" : "text-muted-foreground"}`} />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-[10px] font-bold font-mono text-foreground">{coupon.code}</span>
                             <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[7px] font-bold bg-emerald-500/10 text-emerald-400">-{coupon.discountPercent}%</span>
-                            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[7px] font-bold ${coupon.isActive ? "bg-emerald-500/10 text-emerald-400" : "bg-muted/20 text-muted-foreground"}`}>
+                            {isExpired && <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[7px] font-bold bg-red-500/10 text-red-400">منتهي</span>}
+                            {isExhausted && !isExpired && <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[7px] font-bold bg-amber-500/10 text-amber-400">مستنفد</span>}
+                            {!isExpired && !isExhausted && <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[7px] font-bold ${coupon.isActive ? "bg-emerald-500/10 text-emerald-400" : "bg-muted/20 text-muted-foreground"}`}>
                               <span className={`w-1 h-1 rounded-full ${coupon.isActive ? "bg-emerald-400" : "bg-muted-foreground"}`} />
                               {coupon.isActive ? "نشط" : "معطل"}
-                            </span>
+                            </span>}
                           </div>
                           <div className="text-[8px] text-muted-foreground mt-0.5">{coupon.currentUses}/{coupon.maxUses} استخدام — {coupon.expiresAt ? new Date(coupon.expiresAt).toLocaleDateString("ar-SA") : "بدون انتهاء"}</div>
+                          {/* Usage progress bar */}
+                          <div className="mt-1.5 h-1 bg-muted/20 rounded-full overflow-hidden">
+                            <div className={`h-full rounded-full transition-all ${progressColor}`} style={{ width: `${Math.min(100, usagePercent)}%` }} />
+                          </div>
                         </div>
                       </div>
                       <div className="flex gap-1 flex-shrink-0">
@@ -4761,20 +4958,40 @@ export default function HomePage() {
                           className={`p-1.5 rounded-md transition-all ${coupon.isActive ? "text-muted-foreground/50 hover:text-red-400 hover:bg-red-500/10" : "text-muted-foreground hover:text-emerald-400 hover:bg-emerald-500/10"}`}>
                           {coupon.isActive ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
                         </button>
-                        <button onClick={() => handleDeleteCoupon(coupon.code)}
+                        <button onClick={() => setConfirmDeleteCoupon(coupon.code)}
                           className="p-1.5 rounded-md text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-all">
                           <Trash2 className="w-3 h-3" />
                         </button>
                       </div>
                     </div>
                   </div>
-                )) : !showCouponForm ? (
+                  )
+                }) : !showCouponForm ? (
                   <div className="py-6 text-center">
                     <p className="text-[10px] text-muted-foreground">لا توجد كوبونات</p>
                     <p className="text-[8px] text-muted-foreground/50 mt-1">أضف كوبونات خصم لجذب المستخدمين</p>
                   </div>
                 ) : null}
               </div>
+
+              {/* Coupon Delete Confirmation */}
+              <AlertDialog open={!!confirmDeleteCoupon} onOpenChange={() => setConfirmDeleteCoupon(null)}>
+                <AlertDialogContent className="glass-card border-red-500/20">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="text-red-400">حذف الكوبون</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      هل أنت متأكد من حذف كوبون &quot;{confirmDeleteCoupon}&quot؛؟ سيتم حذفه نهائياً ولا يمكن التراجع عن هذا الإجراء.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter className="gap-2">
+                    <AlertDialogCancel className="glass-input text-[10px]">إلغاء</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => { if (confirmDeleteCoupon) { handleDeleteCoupon(confirmDeleteCoupon); setConfirmDeleteCoupon(null); } }}
+                      className="bg-red-500/15 text-red-400 border border-red-500/20 hover:bg-red-500/25 text-[10px]">
+                      نعم، حذف الكوبون
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
 
               </>
@@ -4975,7 +5192,7 @@ export default function HomePage() {
                         )}
                         {req.paymentProofUrl && (
                           <div className="mt-1">
-                            <button onClick={() => handleViewProofImage(req.paymentProofUrl)} className="flex items-center gap-1.5 text-[10px] text-sky-400 hover:text-sky-300 transition-colors">
+                            <button onClick={() => handleViewProofImage(req.paymentProofUrl!)} className="flex items-center gap-1.5 text-[10px] text-sky-400 hover:text-sky-300 transition-colors">
                               <Image className="w-3.5 h-3.5" aria-hidden="true" /> عرض صورة الإثبات
                             </button>
                           </div>
@@ -5675,7 +5892,7 @@ export default function HomePage() {
                     const isCurFreeTrial = curPkg && (curPkg.type === "free" || curPkg.type === "trial");
                     const isUpg = hasActiveSub && curPkg && curPkg.id !== selectedPkg.id && curPkg.type === "paid" && selectedPkg.type === "paid";
                     let effectivePrice = selectedPkg.price;
-                    let upgradeInfo = null;
+                    let upgradeInfo: { remainingDays: number; currentName: string; saved: number } | null = null;
                     if (isUpg && curPkg && session?.subscriptionExpiry) {
                       const remDays = Math.max(0, Math.ceil((new Date(session.subscriptionExpiry).getTime() - Date.now()) / 86400000));
                       const remVal = (remDays / curPkg.durationDays) * curPkg.price;
@@ -6255,35 +6472,31 @@ export default function HomePage() {
                       const isAgency = u.subscriptionType === "agency";
                       const isSub = u.subscriptionType === "subscriber";
                       const expDays = u.subscriptionExpiry ? Math.ceil((new Date(u.subscriptionExpiry).getTime() - Date.now()) / 86400000) : null;
-                      const isSuperAdmin = u.email?.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
-                      const isPromotedAdmin = u.role === "admin" && !isSuperAdmin;
-                      const avatarGradient = isSuperAdmin
-                        ? "from-amber-400 via-yellow-500 to-orange-500 shadow-lg shadow-amber-500/20"
-                        : isPromotedAdmin
+                      const isPromotedAdmin = u.role === "admin";
+                      const isSuperAdmin = isPromotedAdmin && u.id === session?.id;
+                      const avatarGradient = isPromotedAdmin
                           ? "from-amber-500/30 to-amber-600/15"
                           : isAgency
                             ? "from-purple-500/25 to-violet-500/15"
                             : isSub
                               ? "from-sky-500/25 to-cyan-500/15"
                               : "from-emerald-500/20 to-green-500/10";
-                      const avatarBorder = isSuperAdmin
-                        ? "border-amber-400/30"
-                        : isPromotedAdmin
+                      const avatarBorder = isPromotedAdmin
                           ? "border-amber-500/20"
                           : isAgency
                             ? "border-purple-500/20"
                             : isSub
                               ? "border-sky-500/20"
                               : "border-emerald-500/15";
-                      const textColor = isSuperAdmin ? "text-white" : isPromotedAdmin ? "text-amber-400" : isAgency ? "text-purple-300" : isSub ? "text-sky-300" : "text-emerald-300";
+                      const textColor = isPromotedAdmin ? "text-amber-400" : isAgency ? "text-purple-300" : isSub ? "text-sky-300" : "text-emerald-300";
 
                       return (
-                        <div key={u.id} className={`rounded-xl border p-3 transition-all hover:bg-white/[0.02] ${isSuperAdmin ? "border-amber-500/20 bg-gradient-to-l from-amber-500/[0.04]" : "border-border/40 bg-white/[0.01]"}`}>
+                        <div key={u.id} className="rounded-xl border p-3 transition-all hover:bg-white/[0.02] border-border/40 bg-white/[0.01]">
                           {/* Main Row */}
                           <div className="flex items-center gap-3">
                             {/* Avatar */}
                             <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${avatarGradient} border ${avatarBorder} flex items-center justify-center flex-shrink-0`}>
-                              {isSuperAdmin || isPromotedAdmin ? <Crown className={`w-4 h-4 ${textColor}`} /> : <span className={`text-sm font-black ${textColor}`}>{u.name?.charAt(0)?.toUpperCase() || "?"}</span>}
+                              {isPromotedAdmin ? <Crown className={`w-4 h-4 ${textColor}`} /> : <span className={`text-sm font-black ${textColor}`}>{u.name?.charAt(0)?.toUpperCase() || "?"}</span>}
                             </div>
                             {/* Info */}
                             <div className="flex-1 min-w-0">

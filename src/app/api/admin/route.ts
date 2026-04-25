@@ -3,13 +3,14 @@ import { kv } from "@vercel/kv";
 import { getAdmin, setAdmin, getUserByEmail, migrateAdminToUsers, comparePassword, hashPassword, getUserById, updateUser, trackLoginAttempt, getLoginAttempts, resetLoginAttempts, getUserByDeviceId, getUsers } from "@/lib/store";
 import { validateEmail, validatePassword, validateAction, validateUUID } from "@/lib/validation";
 import { sendDuplicateAccountAlert } from "@/lib/email";
+import { kvRateLimit } from "@/lib/rate-limit";
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { action } = body;
 
-    if (action === "login") return handleLogin(body);
+    if (action === "login") return handleLogin(request, body);
     if (action === "change-password") return handleChangePassword(body);
 
     const actionVal = validateAction(action, ["login", "change-password"]);
@@ -20,7 +21,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function handleLogin(body: Record<string, unknown>) {
+async function handleLogin(request: NextRequest, body: Record<string, unknown>) {
   const { email, password, verifyToken, deviceId } = body as { email: string; password: string; verifyToken?: string; deviceId?: string };
 
   // Validate inputs
@@ -28,6 +29,22 @@ async function handleLogin(body: Record<string, unknown>) {
   if (!emailVal.valid) return NextResponse.json({ success: false, error: emailVal.error }, { status: 400 });
   const pwdVal = validatePassword(password);
   if (!pwdVal.valid) return NextResponse.json({ success: false, error: pwdVal.error }, { status: 400 });
+
+  // KV-based rate limiting: 5 login attempts per email per 15 minutes
+  const rl = await kvRateLimit(`login:${emailVal.sanitized}`, 5, 15 * 60);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: "محاولات تسجيل دخول كثيرة. حاول بعد قليل",
+        retryAfter: rl.resetIn,
+      },
+      {
+        status: 429,
+        headers: { "Retry-After": String(rl.resetIn), "X-RateLimit-Remaining": "0" },
+      }
+    );
+  }
 
   // Ensure admin is migrated to users
   await migrateAdminToUsers();

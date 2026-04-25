@@ -2,11 +2,33 @@ import { NextRequest, NextResponse } from "next/server";
 import { kv } from "@vercel/kv";
 import { getUserByEmail, getUserByDeviceId, addUser, updateUser, migrateAdminToUsers, getAppSettings, getPackageById, getUsers, hashPassword } from "@/lib/store";
 import { sendPushToAdmins } from "@/lib/push";
+import { addAdminNotification } from "@/lib/store";
 import { validateText, validateEmail, validatePassword } from "@/lib/validation";
 import { sendDuplicateAccountAlert } from "@/lib/email";
+import { kvRateLimit } from "@/lib/rate-limit";
 
 export async function POST(request: NextRequest) {
   try {
+    // KV-based rate limiting: 3 registrations per IP per hour
+    const clientIP =
+      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      request.headers.get("x-real-ip") ||
+      "unknown";
+    const rl = await kvRateLimit(`register:${clientIP}`, 3, 60 * 60);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "محاولات تسجيل كثيرة. حاول بعد قليل",
+          retryAfter: rl.resetIn,
+        },
+        {
+          status: 429,
+          headers: { "Retry-After": String(rl.resetIn), "X-RateLimit-Remaining": "0" },
+        }
+      );
+    }
+
     await migrateAdminToUsers();
 
     const { name, email, password, verifyToken, deviceId } = await request.json();
@@ -135,6 +157,9 @@ export async function POST(request: NextRequest) {
       packageId: trialPkgId,
       packageName: trialPkgName,
       deviceId: deviceId?.trim() || null,
+      referralCode: crypto.randomUUID().slice(0, 8).toUpperCase(),
+      referredBy: null,
+      referralRewardClaimed: false,
     });
 
     // ── Notify admins about new registration ──
@@ -146,6 +171,13 @@ export async function POST(request: NextRequest) {
       requireInteraction: true,
       urgency: 'high',
       data: { type: 'new_registration', userName: nameVal.sanitized, userEmail: emailVal.sanitized, userId: user.id },
+    }).catch(() => {});
+
+    // In-app notification for admin
+    addAdminNotification({
+      type: "new_user",
+      title: "مستخدم جديد",
+      message: `تم تسجيل حساب جديد: ${nameVal.sanitized} (${emailVal.sanitized})${settings.autoApproveOnRegister ? " (تم التفعيل تلقائياً)" : " (بانتظار الموافقة)"}`,
     }).catch(() => {});
 
     return NextResponse.json({

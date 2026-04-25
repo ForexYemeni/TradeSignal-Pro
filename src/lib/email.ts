@@ -567,7 +567,7 @@ export async function broadcastSignalToSubscribers(signal: {
         const userTodayEntries = pkg.instruments && pkg.instruments.length > 0
           ? todayAllSignals.filter(s => {
               const cat = getInstrumentCategory(s.pair);
-              return pkg.instruments.includes(cat);
+              return pkg.instruments!.includes(cat);
             })
           : todayAllSignals;
 

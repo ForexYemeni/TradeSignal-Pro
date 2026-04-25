@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { kv } from "@vercel/kv";
-import { getUserById } from "@/lib/store";
+import { requireAdmin } from "@/lib/admin-auth";
 
 // ─── Types ───────────────────────────────────────────────
 interface Coupon {
@@ -23,38 +23,7 @@ async function saveCoupons(coupons: Coupon[]): Promise<void> {
   await kv.set("coupons_list", coupons);
 }
 
-// ─── Helper: check admin session ────────────────────────
-async function isAdminRequest(request: NextRequest, preParsedBody?: Record<string, unknown>): Promise<{ isAdmin: boolean; userId?: string; error?: NextResponse }> {
-  const { searchParams } = new URL(request.url);
-  const userId = searchParams.get("adminId") || searchParams.get("userId");
-
-  // Check pre-parsed body first (for POST where body was already consumed)
-  let bodyUserId: string | null = null;
-  if (preParsedBody) {
-    bodyUserId = (preParsedBody.adminId as string) || (preParsedBody.userId as string) || null;
-  } else {
-    // Clone and read body (for GET/PUT/DELETE where body hasn't been consumed)
-    try {
-      const cloned = request.clone();
-      const body = await cloned.json();
-      bodyUserId = body.adminId || body.userId || null;
-    } catch { /* no body */ }
-  }
-
-  const finalUserId = userId || bodyUserId;
-  if (!finalUserId) {
-    return { isAdmin: false, error: NextResponse.json({ success: false, error: "معرف المستخدم مطلوب" }, { status: 401 }) };
-  }
-
-  const user = await getUserById(finalUserId);
-  if (!user || user.role !== "admin") {
-    return { isAdmin: false, error: NextResponse.json({ success: false, error: "غير مصرح بهذا الإجراء" }, { status: 403 }) };
-  }
-
-  return { isAdmin: true, userId: finalUserId };
-}
-
-// ─── GET: List all coupons (admin) ─────────────────────
+// ─── GET: List all coupons (admin) or validate (public) ─
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -71,8 +40,8 @@ export async function GET(request: NextRequest) {
     }
 
     // Admin: list all coupons
-    const admin = await isAdminRequest(request);
-    if (!admin.isAdmin) return admin.error!;
+    const authError = await requireAdmin(request);
+    if (authError) return authError;
 
     const coupons = await getCoupons();
     return NextResponse.json({ success: true, coupons });
@@ -82,7 +51,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// ─── POST: Create coupon or validate (public) ──────────
+// ─── POST: Create coupon (admin) or validate (public) ───
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -97,9 +66,9 @@ export async function POST(request: NextRequest) {
       return handleValidate(code.trim().toUpperCase(), userId);
     }
 
-    // Admin: create coupon (pass pre-parsed body since request stream is already consumed)
-    const admin = await isAdminRequest(request, body);
-    if (!admin.isAdmin) return admin.error!;
+    // Admin: create coupon
+    const authError = await requireAdmin(request);
+    if (authError) return authError;
 
     const { code, discountPercent, maxUses, expiresAt } = body;
     if (!code || discountPercent === undefined || !maxUses) {
@@ -141,8 +110,8 @@ export async function POST(request: NextRequest) {
 // ─── PUT: Update coupon (admin) ────────────────────────
 export async function PUT(request: NextRequest) {
   try {
-    const admin = await isAdminRequest(request);
-    if (!admin.isAdmin) return admin.error!;
+    const authError = await requireAdmin(request);
+    if (authError) return authError;
 
     const { code, ...updates } = await request.json();
     if (!code) {
@@ -177,8 +146,8 @@ export async function PUT(request: NextRequest) {
 // ─── DELETE: Delete coupon (admin) ─────────────────────
 export async function DELETE(request: NextRequest) {
   try {
-    const admin = await isAdminRequest(request);
-    if (!admin.isAdmin) return admin.error!;
+    const authError = await requireAdmin(request);
+    if (authError) return authError;
 
     const { code } = await request.json();
     if (!code) {

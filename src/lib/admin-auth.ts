@@ -43,16 +43,6 @@ export async function validateAdmin(request: NextRequest): Promise<AdminAuthResu
     }
   }
 
-  // 3. Check body/body params (for backward compatibility with existing frontend)
-  if (!userId) {
-    try {
-      const body = await request.json();
-      userId = body.adminId || body.userId || "";
-    } catch {
-      // No body or invalid JSON
-    }
-  }
-
   if (!userId) {
     return { isAdmin: false, userId: "", user: null, error: "معرف المستخدم مطلوب" };
   }
@@ -67,6 +57,34 @@ export async function validateAdmin(request: NextRequest): Promise<AdminAuthResu
   }
 
   return { isAdmin: true, userId, user };
+}
+
+/**
+ * Extract session userId from request (cookie or Authorization header).
+ * Does NOT check admin role — use validateAdmin for admin checks.
+ * Returns the userId string, or null if no session found.
+ */
+export function getSessionUserId(request: NextRequest): string | null {
+  // 1. Check session cookie
+  const sessionCookie = request.cookies.get("fy_session")?.value;
+  if (sessionCookie) {
+    try {
+      const sessionData = JSON.parse(atob(sessionCookie));
+      const userId = sessionData.id || sessionData.userId || "";
+      if (userId) return userId;
+    } catch {
+      // Invalid cookie format
+    }
+  }
+
+  // 2. Check Authorization header (Bearer token)
+  const authHeader = request.headers.get("authorization");
+  if (authHeader?.startsWith("Bearer ")) {
+    const userId = authHeader.slice(7);
+    if (userId) return userId;
+  }
+
+  return null;
 }
 
 /**

@@ -176,7 +176,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         updateData.partialWin = false;
         updateData.hitPrice = stopLoss;
         updateData.pnlPoints = parseFloat(points.toFixed(1));
-        updateData.pnlDollars = parseFloat(-dollars.toFixed(2));
+        updateData.pnlDollars = parseFloat((-dollars).toFixed(2));
       }
       updateData.hitPrice = stopLoss;
     }

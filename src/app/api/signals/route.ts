@@ -117,8 +117,8 @@ export async function POST(request: NextRequest) {
     if (!isEntry(cat)) {
       const recent = await getSignals(20);
       const isDup = recent.some(s => {
-        if (String(s.pair).toUpperCase() !== String(parseResult.signal.pair || "").toUpperCase()) return false;
-        if (s.rawText.trim() === (parseResult.signal.rawText || "").trim()) return true;
+        if (String(s.pair).toUpperCase() !== String(parseResult.signal!.pair || "").toUpperCase()) return false;
+        if (s.rawText.trim() === (parseResult.signal!.rawText || "").trim()) return true;
         return false;
       });
       if (isDup) {
@@ -481,7 +481,8 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get("limit") || "100");
-    const allSignals = await getSignals(limit);
+    const offset = parseInt(searchParams.get("offset") || "0");
+    const allSignals = await getSignals(9999);
 
     // ── Identify user and determine filtering ──
     const userId = getRequestUserId(request);
@@ -538,13 +539,19 @@ export async function GET(request: NextRequest) {
       filteredSignals = [];
     }
 
+    const total = filteredSignals.length;
+    const paginatedSignals = filteredSignals.slice(offset, offset + limit);
+
     return NextResponse.json({
       success: true,
-      signals: filteredSignals.map(s => {
+      signals: paginatedSignals.map(s => {
         let tps: { tp: number; rr: number }[] = [];
         try { tps = JSON.parse(s.takeProfits); } catch { tps = []; }
         return { ...s, takeProfits: tps };
       }),
+      total,
+      offset,
+      limit,
     });
   } catch (error) {
     console.error("Error fetching signals:", error);

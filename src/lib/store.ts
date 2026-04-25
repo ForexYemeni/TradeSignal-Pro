@@ -320,6 +320,10 @@ export async function migrateAdminToUsers(): Promise<void> {
       packageName: null,
       createdAt: admin.createdAt,
       updatedAt: admin.updatedAt,
+      deviceId: null,
+      referralCode: null,
+      referredBy: null,
+      referralRewardClaimed: false,
     });
   } else if (!existing.emailVerified) {
     // Existing user missing emailVerified — mark admin accounts as verified
@@ -700,7 +704,7 @@ export async function getUserByReferralCode(code: string): Promise<StoredUser | 
 export async function getReferrals(userId: string): Promise<{ referrer: StoredUser; referred: StoredUser[] }> {
   const users = await getUsers();
   const referrer = users.find(u => u.id === userId);
-  if (!referrer || !referrer.referralCode) return { referrer, referred: [] };
+  if (!referrer || !referrer.referralCode) return { referrer: referrer!, referred: [] };
   const referred = users.filter(u => u.referredBy === referrer.referralCode && u.id !== userId);
   return { referrer, referred };
 }
@@ -717,4 +721,58 @@ export function generateReferralCode(): string {
     code += chars[Math.floor(Math.random() * chars.length)];
   }
   return code;
+}
+
+// ─── Admin Notifications ──────────────────────────────
+export interface AdminNotification {
+  id: string;
+  type: "new_user" | "new_payment" | "subscription_change" | "system";
+  title: string;
+  message: string;
+  read: boolean;
+  createdAt: string;
+  data?: Record<string, unknown>;
+}
+
+export async function getAdminNotifications(limit = 50): Promise<AdminNotification[]> {
+  const data = await kv.get<AdminNotification[]>('admin_notifications');
+  return (data || []).slice(0, limit);
+}
+
+export async function addAdminNotification(notification: Omit<AdminNotification, 'id' | 'read' | 'createdAt'>): Promise<AdminNotification> {
+  const newNotification: AdminNotification = {
+    ...notification,
+    id: crypto.randomUUID(),
+    read: false,
+    createdAt: new Date().toISOString(),
+  };
+  // Keep max 200 notifications
+  const notifications = await getAdminNotifications(200);
+  notifications.unshift(newNotification);
+  await kv.set('admin_notifications', notifications.slice(0, 200));
+  return newNotification;
+}
+
+export async function markNotificationRead(id: string): Promise<void> {
+  const notifications = await getAdminNotifications(200);
+  const idx = notifications.findIndex(n => n.id === id);
+  if (idx !== -1) {
+    notifications[idx].read = true;
+    await kv.set('admin_notifications', notifications);
+  }
+}
+
+export async function markAllNotificationsRead(): Promise<void> {
+  const notifications = await getAdminNotifications(200);
+  for (const n of notifications) n.read = true;
+  await kv.set('admin_notifications', notifications);
+}
+
+export async function getUnreadNotificationCount(): Promise<number> {
+  const notifications = await getAdminNotifications(200);
+  return notifications.filter(n => !n.read).length;
+}
+
+export async function clearNotifications(): Promise<void> {
+  await kv.set('admin_notifications', []);
 }
