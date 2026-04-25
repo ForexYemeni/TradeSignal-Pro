@@ -732,10 +732,10 @@ export default function HomePage() {
     }
     // Initial refresh
     refreshSessionFromServer();
-    // Poll every 5 seconds when tab is visible, pause when hidden
+    // Poll every 30 seconds when tab is visible, pause when hidden (optimized — was 5s)
     const startPolling = () => {
       if (sessionRefreshRef.current) clearInterval(sessionRefreshRef.current);
-      sessionRefreshRef.current = setInterval(refreshSessionFromServer, 5000);
+      sessionRefreshRef.current = setInterval(refreshSessionFromServer, 30000);
     };
     const stopPolling = () => {
       if (sessionRefreshRef.current) {
@@ -1022,11 +1022,11 @@ export default function HomePage() {
     } catch {}
   };
 
-  // Poll unread notification count every 8 seconds for admin (stable interval — never restarts)
+  // Poll unread notification count every 60 seconds for admin (optimized — was 8s)
   useEffect(() => {
     if (session?.role === "admin") {
       checkAdminNotifications(); // Initial check
-      const interval = setInterval(checkAdminNotifications, 8000);
+      const interval = setInterval(checkAdminNotifications, 60000);
       return () => clearInterval(interval);
     }
   }, [session?.role, checkAdminNotifications]);
@@ -1055,7 +1055,7 @@ export default function HomePage() {
     return () => navigator.serviceWorker.removeEventListener("message", handler);
   }, [fetchSignals, fetchStats]);
 
-  // Fast polling for new signals (every 2 seconds — reduced from 3 for faster detection)
+  // Polling for new signals (every 30 seconds — optimized, SSE handles real-time)
   const checkForUpdates = useCallback(async () => {
     try {
       const res = await fetch(`/api/signals/updates?since=${lastCheckTimeRef.current}`);
@@ -1081,11 +1081,11 @@ export default function HomePage() {
     // Ensure notification permission is granted
     ensureNotificationPermission().catch(() => {});
 
-    // Fast update check every 2 seconds (was 3 — faster detection)
-    const updateInterval = setInterval(checkForUpdates, 2000);
+    // Update check every 30 seconds (optimized — SSE handles instant updates)
+    const updateInterval = setInterval(checkForUpdates, 30000);
 
-    // Full signal refresh every 10 seconds (was 15 — more responsive)
-    const fullInterval = setInterval(() => { fetchSignals(); fetchStats(); }, 10000);
+    // Full signal refresh every 60 seconds (optimized — was 10s)
+    const fullInterval = setInterval(() => { fetchSignals(); fetchStats(); }, 60000);
 
     // Try to connect to SSE for instant updates
     try {
@@ -1195,6 +1195,13 @@ export default function HomePage() {
       fetchPackages();
       if (isAdmin) { fetchPaymentRequests(); fetchLocalPaymentMethods(); fetchCoupons(); }
       if (!isAdmin) { fetchUserPaymentMethods(); fetchPaymentRequests(); }
+    }
+    /* ── Prefetch all admin data when entering "More" management center ── */
+    if (view === "main" && tab === "more" && isAdmin) {
+      fetchPackages();
+      fetchCoupons();
+      fetchLocalPaymentMethods();
+      fetchPaymentRequests();
     }
   }, [tab, view]);
 
