@@ -3495,7 +3495,7 @@ export default function HomePage() {
                 </button>
                 {/* Admin Notification Panel */}
                 {showAdminNotif && (
-                  <div className="absolute top-full left-0 mt-2 bg-[#0f172a]/95 backdrop-blur-xl border border-white/[0.08] rounded-xl shadow-2xl z-50 max-h-80 overflow-hidden" style={{ minWidth: 280 }}>
+                  <div className="fixed top-[60px] right-4 bg-[#0f172a]/95 backdrop-blur-xl border border-white/[0.08] rounded-xl shadow-2xl z-[200] max-h-80 overflow-hidden w-[calc(100vw-2rem)] max-w-[320px]">
                     <div className="px-3 py-2 border-b border-white/[0.06] flex items-center justify-between">
                       <span className="text-[11px] font-bold text-foreground">مركز الإشعارات</span>
                       <div className="flex items-center gap-2">
@@ -3553,7 +3553,7 @@ export default function HomePage() {
               )}
               {/* Notification Panel */}
               {showNotifications && (
-                <div className="absolute top-full left-0 right-0 mt-2 bg-[#0f172a]/95 backdrop-blur-xl border border-white/[0.08] rounded-xl shadow-2xl z-50 max-h-64 overflow-hidden" style={{ minWidth: 240 }}>
+                <div className="fixed top-[60px] right-4 bg-[#0f172a]/95 backdrop-blur-xl border border-white/[0.08] rounded-xl shadow-2xl z-[200] max-h-64 overflow-hidden w-[calc(100vw-2rem)] max-w-[280px]">
                   <div className="px-3 py-2 border-b border-white/[0.06] flex items-center justify-between">
                     <span className="text-[11px] font-bold text-foreground">الإشعارات</span>
                     {notifications.length > 0 && (
