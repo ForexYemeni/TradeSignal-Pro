@@ -922,13 +922,62 @@ export default function HomePage() {
     } catch {}
   }, [session?.id, session?.role]);
 
-  const fetchUnreadNotifCount = useCallback(async () => {
+  /* ── Admin Notification Sound Alert ── */
+  const prevUnreadCountRef = useRef<number>(-1); // -1 = not initialized yet (skip first load sound)
+  const adminNotifFetchLockRef = useRef<boolean>(false);
+  const audioVolRef = useRef(audioVol);
+  const audioMutedRef = useRef(audioMuted);
+  const fetchAdminNotifsRef = useRef(fetchAdminNotifications);
+
+  // Keep refs in sync without causing re-creation of the polling function
+  useEffect(() => { audioVolRef.current = audioVol; }, [audioVol]);
+  useEffect(() => { audioMutedRef.current = audioMuted; }, [audioMuted]);
+  useEffect(() => { fetchAdminNotifsRef.current = fetchAdminNotifications; }, [fetchAdminNotifications]);
+
+  // Stable function that never re-creates — reads from refs instead
+  const checkAdminNotifications = useCallback(async () => {
     try {
       const res = await fetch("/api/notifications?action=count");
       const data = await res.json();
-      if (data.success) setUnreadNotifCount(data.count);
+      if (!data.success) return;
+
+      const newCount = data.count as number;
+      const prevCount = prevUnreadCountRef.current;
+
+      // Skip first load (prevCount === -1) — don't play sound for old notifications
+      // Only play sound when count INCREASES (new notification arrived)
+      if (prevCount >= 0 && newCount > prevCount && newCount > 0 && !audioMutedRef.current) {
+        // Play admin notification sound (distinctive chime)
+        playSound("admin", audioVolRef.current);
+
+        // Fetch the latest notification list to show details
+        if (!adminNotifFetchLockRef.current) {
+          adminNotifFetchLockRef.current = true;
+          fetchAdminNotifsRef.current().then(() => { adminNotifFetchLockRef.current = false; }).catch(() => { adminNotifFetchLockRef.current = false; });
+        }
+
+        // Send to service worker for background notification
+        if (typeof navigator !== "undefined" && navigator.serviceWorker && navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage({
+            type: "BACKGROUND_NOTIFY",
+            title: "🔔 إشعار إدارة جديد",
+            body: `لديك ${newCount} إشعار${newCount > 1 ? "ات غير مقروءة" : " غير مقروء"}`,
+            sound: "new_signal",
+            tag: `fy-admin-notif-${Date.now()}`,
+          });
+        }
+
+        // Native Android notification
+        nativeNotify("🔔 إشعار إدارة جديد", `لديك ${newCount} إشعار${newCount > 1 ? "ات غير مقروءة" : " غير مقروء"}`, "admin_alert");
+
+        // Also fetch full notification list to update badge
+        fetchAdminNotifsRef.current().catch(() => {});
+      }
+
+      prevUnreadCountRef.current = newCount;
+      setUnreadNotifCount(newCount);
     } catch {}
-  }, []);
+  }, []); // Empty deps — stable reference, never re-creates
 
   const handleMarkNotificationRead = async (id: string) => {
     try {
@@ -938,7 +987,11 @@ export default function HomePage() {
         body: JSON.stringify({ action: "mark_read", notificationId: id }),
       });
       setAdminNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
-      setUnreadNotifCount(prev => Math.max(0, prev - 1));
+      setUnreadNotifCount(prev => {
+        const next = Math.max(0, prev - 1);
+        prevUnreadCountRef.current = next; // Keep ref in sync
+        return next;
+      });
     } catch {}
   };
 
@@ -951,6 +1004,7 @@ export default function HomePage() {
       });
       setAdminNotifications(prev => prev.map(n => ({ ...n, read: true })));
       setUnreadNotifCount(0);
+      prevUnreadCountRef.current = 0; // Keep ref in sync
     } catch {}
   };
 
@@ -963,18 +1017,19 @@ export default function HomePage() {
       });
       setAdminNotifications([]);
       setUnreadNotifCount(0);
+      prevUnreadCountRef.current = 0; // Keep ref in sync
       setShowAdminNotif(false);
     } catch {}
   };
 
-  // Poll unread notification count every 15 seconds for admin
+  // Poll unread notification count every 8 seconds for admin (stable interval — never restarts)
   useEffect(() => {
     if (session?.role === "admin") {
-      fetchUnreadNotifCount();
-      const interval = setInterval(fetchUnreadNotifCount, 15000);
+      checkAdminNotifications(); // Initial check
+      const interval = setInterval(checkAdminNotifications, 8000);
       return () => clearInterval(interval);
     }
-  }, [session?.role, fetchUnreadNotifCount]);
+  }, [session?.role, checkAdminNotifications]);
 
   /* ── Pull to refresh (for signals tab) ── */
   const handlePullRefresh = useCallback(async () => {
@@ -1066,6 +1121,12 @@ export default function HomePage() {
             // Then fetch full signals to update UI (runs in parallel with notification)
             fetchSignals();
           }
+
+          // ── Also check admin notifications on ANY SSE event (near real-time) ──
+          // SSE is our fastest real-time channel — piggyback admin notification checks on it
+          if (session?.role === "admin") {
+            checkAdminNotifications();
+          }
         } catch { /* ignore */ }
       };
       es.onerror = () => { /* SSE not supported or disconnected - polling handles it */ };
@@ -1080,6 +1141,10 @@ export default function HomePage() {
         // Immediately fetch latest signals
         fetchSignals();
         fetchStats();
+        // Also check admin notifications immediately when returning to foreground
+        if (session?.role === "admin") {
+          checkAdminNotifications();
+        }
       }
     };
     document.addEventListener("visibilitychange", handleVisibility);

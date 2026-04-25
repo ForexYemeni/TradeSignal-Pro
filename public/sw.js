@@ -95,6 +95,7 @@ self.addEventListener('push', (event) => {
     sl_hit: [300, 100, 300, 100, 300],
     buy: [200, 100, 200, 100, 200],
     sell: [200, 100, 200, 100, 200],
+    admin_alert: [150, 80, 150, 80, 150, 200, 150, 80, 150, 80, 300],
   };
 
   const options = {
@@ -168,6 +169,7 @@ self.addEventListener('message', (event) => {
       sl_hit: [300, 100, 300, 100, 300],
       buy: [200, 100, 200, 100, 200],
       sell: [200, 100, 200, 100, 200],
+      admin_alert: [150, 80, 150, 80, 150, 200, 150, 80, 150, 80, 300],
     };
 
     self.registration.showNotification(title, {

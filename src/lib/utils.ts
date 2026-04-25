@@ -82,7 +82,7 @@ export function playTone(freq: number, duration: number, startTime: number, ctx:
   osc.stop(startTime + duration);
 }
 
-export function playSound(type: "buy" | "sell" | "tp" | "sl" | "message", volume: number) {
+export function playSound(type: "buy" | "sell" | "tp" | "sl" | "message" | "admin", volume: number) {
   try {
     const ctx = getAudioContext();
     // Resume context if suspended (autoplay policy)
@@ -123,6 +123,12 @@ function _play(ctx: AudioContext, type: string, volume: number) {
       break;
     case "message":
       playTone(523.25, 0.4, t, ctx, v);
+      break;
+    case "admin":
+      // Two-tone ascending chime — distinctive admin alert
+      playTone(659.25, 0.18, t, ctx, v * 1.2);
+      playTone(880, 0.18, t + 0.15, ctx, v * 1.2);
+      playTone(1046.5, 0.25, t + 0.30, ctx, v * 1.2);
       break;
   }
 }
@@ -187,7 +193,7 @@ export function showBrowserNotification(title: string, body: string, tag?: strin
 }
 
 /** Play sound + show notification combo (instant, no delay) */
-export function notifySignal(type: "buy" | "sell" | "tp" | "sl" | "message", title: string, body: string, soundType: string) {
+export function notifySignal(type: "buy" | "sell" | "tp" | "sl" | "message" | "admin", title: string, body: string, soundType: string) {
   // 1. Play sound immediately (Web Audio API - foreground)
   playSound(type, typeof window !== "undefined" ? (JSON.parse(localStorage.getItem("fy_audioVol") || "0.7") as number) : 0.7);
   // 2. Native Android bridge
