@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getUsers, updateUser, deleteUser, getUserById, getPackageById, getAppSettings, enforceSubscriptions, getAdmin } from "@/lib/store";
+import { getUsers, updateUser, deleteUser, getUserById, getPackageById, getAppSettings, enforceSubscriptions, getAdmin, setUserUpdateFlag } from "@/lib/store";
 import { sendPushToAdmins } from "@/lib/push";
 import { requireAdmin } from "@/lib/admin-auth";
 
@@ -166,6 +166,9 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ success: false, error: "المستخدم غير موجود" }, { status: 404 });
     }
 
+    // ── Real-time: notify affected user to refresh immediately ──
+    setUserUpdateFlag(id, action, { action }).catch(() => {});
+
     // ── Notify admins about important actions ──
     if (action === "approve") {
       sendPushToAdmins({ title: "تم قبول مستخدم", body: `${user.name} — ${user.email}`, tag: `user-${id}`, sound: 'tp_hit' }).catch(() => {});
@@ -211,7 +214,7 @@ export async function DELETE(request: NextRequest) {
     }
     // Fetch user info before deletion for notification
     const userToDelete = await getUserById(id);
-    const deleted = await deleteUser(id);
+    const deleted = await deleteUser(id); // deleteUser already sets force_logout flag
     if (!deleted) {
       return NextResponse.json({ success: false, error: "المستخدم غير موجود" }, { status: 404 });
     }

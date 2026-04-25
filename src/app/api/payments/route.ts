@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPaymentRequests, getPaymentRequestsByUser, getPendingPaymentRequests, addPaymentRequest, updatePaymentRequest } from "@/lib/store";
-import { getPackageById, getUserById, updateUser, getAppSettings, getUserByReferralCode } from "@/lib/store";
+import { getPackageById, getUserById, updateUser, getAppSettings, getUserByReferralCode, setUserUpdateFlag } from "@/lib/store";
 import { verifyUsdtTransaction, checkDuplicateTxId, type BlockchainVerification } from "@/lib/blockchain-verify";
 import { useCoupon } from "@/app/api/coupons/route";
 import { sendPushToAdmins } from "@/lib/push";
@@ -350,6 +350,9 @@ export async function POST(request: NextRequest) {
           status: "active",
         });
 
+        // Real-time: notify user to refresh
+        setUserUpdateFlag(userId, "payment_approved", { packageId: pkg.id, packageName: pkg.name }).catch(() => {});
+
         // Update the payment request status to approved
         await updatePaymentRequest(paymentRequest.id, { status: "approved" });
 
@@ -549,6 +552,9 @@ export async function PUT(request: NextRequest) {
           packageName: pkg.name,
           status: "active",
         });
+
+        // Real-time: notify user to refresh
+        setUserUpdateFlag(req.userId, "payment_approved", { packageId: pkg.id, packageName: pkg.name }).catch(() => {});
 
         // ── Grant referral reward (admin-approved payment) ──
         if (pkg.type === "paid") {

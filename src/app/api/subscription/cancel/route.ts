@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getUserById, updateUser } from "@/lib/store";
+import { getUserById, updateUser, setUserUpdateFlag } from "@/lib/store";
 
 /**
  * POST /api/subscription/cancel
@@ -39,6 +39,8 @@ export async function POST(request: NextRequest) {
     if (!updated) {
       return NextResponse.json({ success: false, error: "فشل تحديث بيانات المستخدم" }, { status: 500 });
     }
+
+    setUserUpdateFlag(userId, "subscription_cancelled").catch(() => {});
 
     return NextResponse.json({
       success: true,

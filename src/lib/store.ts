@@ -327,6 +327,26 @@ export async function hasDeviceUsedFreeTrial(deviceId: string): Promise<boolean>
   return members.length > 0;
 }
 
+// ── Real-time user update flags ──
+// Admin sets these after any user-affecting action → client polls and refreshes instantly
+export async function setUserUpdateFlag(userId: string, eventType: string, extra?: Record<string, unknown>): Promise<void> {
+  const key = `user_update:${userId}`;
+  const payload = { type: eventType, ts: Date.now(), ...extra };
+  await kv.set(key, JSON.stringify(payload), { ex: 300 }); // 5 min TTL
+}
+
+export async function getUserUpdateFlag(userId: string): Promise<{ type: string; ts: number; [key: string]: unknown } | null> {
+  const key = `user_update:${userId}`;
+  const data = await kv.get<string>(key);
+  if (!data) return null;
+  await kv.del(key); // consume the event
+  try {
+    return JSON.parse(data);
+  } catch {
+    return null;
+  }
+}
+
 // ─── Migrate Admin to Users ─────────────────────────────
 export async function migrateAdminToUsers(): Promise<void> {
   const admin = await getAdmin();

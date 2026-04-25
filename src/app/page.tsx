@@ -739,6 +739,36 @@ export default function HomePage() {
     }
     // Initial refresh
     refreshSessionFromServer();
+
+    // ── Fast lightweight poll for real-time admin updates (every 5 seconds) ──
+    const userEventsInterval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/user-events?userId=${session.id}`);
+        const data = await res.json();
+        if (data.dirty && data.event) {
+          // Admin changed something — refresh immediately
+          refreshSessionFromServer();
+          // Show contextual toast
+          const evt = data.event;
+          if (evt.type === "assign_package" || evt.type === "payment_approved") {
+            toast.success("تم تحديث اشتراكك", { description: "تم تعديل باقتك بواسطة الإدارة" });
+          } else if (evt.type === "extend_days") {
+            toast.success("تم تمديد اشتراكك", { description: "تم إضافة أيام لاشتراكك" });
+          } else if (evt.type === "block") {
+            toast.error("تم حظر حسابك", { description: "تواصل مع الإدارة" });
+          } else if (evt.type === "approve") {
+            toast.success("تم تفعيل حسابك", { description: "مرحباً بك!" });
+          } else if (evt.type === "make_admin") {
+            toast.info("تم ترقية حسابك", { description: "لقد أصبحت مديراً" });
+          } else if (evt.type === "remove_admin") {
+            toast.info("تم إزالة صلاحية الإدارة", { description: "تم تغيير صلاحياتك" });
+          } else if (evt.type === "subscription_cancelled") {
+            toast.info("تم إلغاء الاشتراك");
+          }
+        }
+      } catch { /* ignore */ }
+    }, 5000);
+
     // Poll every 30 seconds when tab is visible, pause when hidden (optimized — was 5s)
     const startPolling = () => {
       if (sessionRefreshRef.current) clearInterval(sessionRefreshRef.current);
@@ -762,6 +792,7 @@ export default function HomePage() {
     };
     document.addEventListener("visibilitychange", handleVisibility);
     return () => {
+      clearInterval(userEventsInterval);
       document.removeEventListener("visibilitychange", handleVisibility);
       if (sessionRefreshRef.current) {
         clearInterval(sessionRefreshRef.current);
