@@ -3,6 +3,8 @@ import { getPaymentRequests, getPaymentRequestsByUser, getPendingPaymentRequests
 import { getPackageById, getUserById, updateUser, getAppSettings, getUserByReferralCode } from "@/lib/store";
 import { verifyUsdtTransaction, checkDuplicateTxId, type BlockchainVerification } from "@/lib/blockchain-verify";
 import { useCoupon } from "@/app/api/coupons/route";
+import { sendPushToAdmins } from "@/lib/push";
+import { requireAdmin } from "@/lib/admin-auth";
 
 // ── Referral reward: grant referrer bonus days when referred user activates paid plan ──
 async function grantReferralReward(
@@ -344,6 +346,17 @@ export async function POST(request: NextRequest) {
         ? `تم إرسال طلب الاشتراك. يتعذر التحقق التلقائي من المعاملة حالياً بسبب مشكلة في الاتصال بالبلوكتشين. سيتم مراجعة طلبك يدوياً من قبل الإدارة.`
         : `تعذر التحقق من المعاملة: ${verification.error}. تم تحويل طلبك للمراجعة اليدوية.`;
 
+      // ── Notify admins about new payment request ──
+      sendPushToAdmins({
+        title: `💰 طلب اشتراك جديد — ${pkg.name}`,
+        body: `${user.name} — USDT (${networkName}) | $${effectivePrice}${isApiError ? " | يحتاج مراجعة يدوية" : " | تحقق البلوكتشين فشل"}`,
+        tag: `payment-${paymentRequest.id}`,
+        sound: 'new_signal',
+        requireInteraction: true,
+        urgency: 'high',
+        data: { type: 'new_payment', requestId: paymentRequest.id, userId, packageId, amount: effectivePrice },
+      }).catch(() => {});
+
       return NextResponse.json({
         success: true,
         message: userMessage,
@@ -382,6 +395,17 @@ export async function POST(request: NextRequest) {
       await useCoupon(couponCode.toUpperCase(), userId);
     }
 
+    // ── Notify admins about new local payment request ──
+    sendPushToAdmins({
+      title: `💰 طلب اشتراك جديد — ${pkg.name}`,
+      body: `${user.name} — تحويل محلي | ${localAmount} ${localCurrencyCode || ""} (~$${effectivePrice})`,
+      tag: `payment-${paymentRequest.id}`,
+      sound: 'new_signal',
+      requireInteraction: true,
+      urgency: 'high',
+      data: { type: 'new_payment', requestId: paymentRequest.id, userId, packageId, amount: effectivePrice },
+    }).catch(() => {});
+
     return NextResponse.json({
       success: true,
       message: isUpgrade
@@ -405,6 +429,9 @@ export async function POST(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
+    const authError = await requireAdmin(request);
+    if (authError) return authError;
+
     const { requestId, action, rejectReason, adminId } = await request.json();
 
     if (!requestId || !action) {

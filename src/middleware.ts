@@ -120,6 +120,45 @@ export function middleware(request: NextRequest) {
       }
     }
 
+    // OTP send — 3 attempts per minute (per IP)
+    if (pathname === "/api/otp/send") {
+      const result = checkRateLimit(`otp:${clientIP}`, 3, 60 * 1000);
+      response.headers.set("X-RateLimit-Remaining", String(result.remaining));
+
+      if (!result.allowed) {
+        return NextResponse.json(
+          { success: false, error: `طلبات كثيرة. حاول بعد ${result.resetIn} ثانية` },
+          { status: 429, headers: { "Retry-After": String(result.resetIn) } }
+        );
+      }
+    }
+
+    // Forgot password — 3 attempts per minute (per IP)
+    if (pathname === "/api/forgot-password") {
+      const result = checkRateLimit(`forgot:${clientIP}`, 3, 60 * 1000);
+      response.headers.set("X-RateLimit-Remaining", String(result.remaining));
+
+      if (!result.allowed) {
+        return NextResponse.json(
+          { success: false, error: `طلبات كثيرة. حاول بعد ${result.resetIn} ثانية` },
+          { status: 429, headers: { "Retry-After": String(result.resetIn) } }
+        );
+      }
+    }
+
+    // Payment creation — 10 attempts per minute (prevent spam)
+    if (pathname === "/api/payments" && request.method === "POST") {
+      const result = checkRateLimit(`payment-create:${clientIP}`, 10, 60 * 1000);
+      response.headers.set("X-RateLimit-Remaining", String(result.remaining));
+
+      if (!result.allowed) {
+        return NextResponse.json(
+          { success: false, error: "طلبات دفع كثيرة. حاول بعد قليل" },
+          { status: 429, headers: { "Retry-After": String(result.resetIn) } }
+        );
+      }
+    }
+
     // All other API routes — 100 requests per minute
     if (pathname !== "/api/admin" && pathname !== "/api/register") {
       const result = checkRateLimit(`api:${clientIP}`, 100, 60 * 1000);

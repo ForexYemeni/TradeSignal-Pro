@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserById, getUserByEmail, addEmailChangeRequest, getEmailChangeRequests, updateEmailChangeRequest, updateUser } from "@/lib/store";
+import { sendPushToAdmins } from "@/lib/push";
+import { requireAdmin } from "@/lib/admin-auth";
 
 export async function POST(request: NextRequest) {
   try {
@@ -37,6 +39,17 @@ export async function POST(request: NextRequest) {
       createdAt: new Date().toISOString(),
     });
 
+    // ── Notify admins about new email change request ──
+    sendPushToAdmins({
+      title: `📧 طلب تغيير بريد إلكتروني`,
+      body: `${user.name} يريد تغيير بريده من ${user.email} إلى ${newEmail.toLowerCase()}`,
+      tag: `email-change-${req.id}`,
+      sound: 'new_signal',
+      requireInteraction: true,
+      urgency: 'normal',
+      data: { type: 'email_change', requestId: req.id, userId },
+    }).catch(() => {});
+
     return NextResponse.json({
       success: true,
       message: "تم إرسال طلب تغيير البريد. في انتظار موافقة الإدارة.",
@@ -48,8 +61,11 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const authError = await requireAdmin(request);
+    if (authError) return authError;
+
     const requests = await getEmailChangeRequests();
     return NextResponse.json({ success: true, requests });
   } catch (error) {
@@ -60,6 +76,9 @@ export async function GET() {
 
 export async function PUT(request: NextRequest) {
   try {
+    const authError = await requireAdmin(request);
+    if (authError) return authError;
+
     const { id, action } = await request.json();
 
     if (!id || !action) {

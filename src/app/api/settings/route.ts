@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAppSettings, updateAppSettings } from "@/lib/store";
+import { requireAdmin } from "@/lib/admin-auth";
 
 export async function GET() {
   try {
@@ -12,6 +13,9 @@ export async function GET() {
 
 export async function PUT(request: NextRequest) {
   try {
+    const authError = await requireAdmin(request);
+    if (authError) return authError;
+
     const updates = await request.json();
     const settings = await updateAppSettings(updates);
     return NextResponse.json({ success: true, settings });

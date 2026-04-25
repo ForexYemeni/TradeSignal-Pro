@@ -6,6 +6,7 @@ import {
   updateLocalPaymentMethod,
   deleteLocalPaymentMethod,
 } from "@/lib/store";
+import { requireAdmin } from "@/lib/admin-auth";
 
 /**
  * GET /api/payment-methods?active=true
@@ -35,6 +36,9 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    const authError = await requireAdmin(request);
+    if (authError) return authError;
+
     const { name, walletAddress, walletName, currencyName, currencyCode, exchangeRate } = await request.json();
 
     if (!name || !walletAddress || !walletName || !currencyName || !currencyCode || !exchangeRate) {
@@ -74,6 +78,9 @@ export async function POST(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
+    const authError = await requireAdmin(request);
+    if (authError) return authError;
+
     const { id, ...updates } = await request.json();
 
     if (!id) {
@@ -111,6 +118,9 @@ export async function PUT(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
+    const authError = await requireAdmin(request);
+    if (authError) return authError;
+
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
 

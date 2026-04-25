@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPackages, addPackage, updatePackage, deletePackage } from "@/lib/store";
+import { requireAdmin } from "@/lib/admin-auth";
 
 export async function GET() {
   try {
@@ -12,6 +13,9 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const authError = await requireAdmin(request);
+    if (authError) return authError;
+
     const { name, durationDays, price, type, description, isActive, order, features, maxSignals, prioritySupport, showEntryEarly, instruments } = await request.json();
     if (!name || durationDays === undefined || price === undefined) {
       return NextResponse.json({ success: false, error: "الاسم والمدة والسعر مطلوبة" }, { status: 400 });
@@ -40,6 +44,9 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
+    const authError = await requireAdmin(request);
+    if (authError) return authError;
+
     const { id, ...updates } = await request.json();
     if (!id) return NextResponse.json({ success: false, error: "معرف الباقة مطلوب" }, { status: 400 });
     if (updates.features !== undefined) updates.features = Array.isArray(updates.features) ? updates.features : [];
@@ -56,6 +63,9 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const authError = await requireAdmin(request);
+    if (authError) return authError;
+
     const { id } = await request.json();
     if (!id) return NextResponse.json({ success: false, error: "معرف الباقة مطلوب" }, { status: 400 });
     const deleted = await deletePackage(id);

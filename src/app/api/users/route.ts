@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUsers, updateUser, deleteUser, getUserById, getPackageById, getAppSettings, enforceSubscriptions, getAdmin } from "@/lib/store";
 import { sendPushToAdmins } from "@/lib/push";
+import { requireAdmin } from "@/lib/admin-auth";
 
 /**
  * Get the real super admin ID from the admin KV record.
@@ -17,8 +18,11 @@ async function isSuperAdmin(userId: string): Promise<boolean> {
   return userId === superId;
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const authError = await requireAdmin(request);
+    if (authError) return authError;
+
     await enforceSubscriptions();
     const users = await getUsers();
     // Hide the system admin from users list — identify by ID (never changes, unlike email)
@@ -35,6 +39,9 @@ export async function GET() {
 
 export async function PUT(request: NextRequest) {
   try {
+    const authError = await requireAdmin(request);
+    if (authError) return authError;
+
     const { id, action, packageId, days, subscriptionType } = await request.json();
 
     if (!id || !action) {
@@ -191,6 +198,9 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const authError = await requireAdmin(request);
+    if (authError) return authError;
+
     const { id } = await request.json();
     if (!id) {
       return NextResponse.json({ success: false, error: "معرف المستخدم مطلوب" }, { status: 400 });
