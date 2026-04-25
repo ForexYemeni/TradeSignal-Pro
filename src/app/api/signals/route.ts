@@ -78,22 +78,28 @@ export async function POST(request: NextRequest) {
         if (cat === "TP_HIT" || cat === "REENTRY_TP" || cat === "PYRAMID_TP") {
           notifyTpHit(parseResult.signal.pair, parseResult.signal.hitTpIndex ?? 0, undefined, cat).catch(() => {});
           // Telegram: TP hit notification
+          let parsedParentTps: { tp: number; rr: number }[] = [];
+          try { parsedParentTps = JSON.parse(String(updated.takeProfits || "[]")); } catch { parsedParentTps = []; }
           sendSignalUpdateToTelegram({
             pair: updated.pair,
             updateType: cat as "TP_HIT" | "REENTRY_TP" | "PYRAMID_TP",
-            tpIndex: updated.hitTpIndex ?? undefined,
+            tpIndex: updated.hitTpIndex != null && updated.hitTpIndex >= 0 ? updated.hitTpIndex + 1 : undefined,
+            totalTPs: parsedParentTps.length || updated.totalTPs || undefined,
             hitPrice: updated.hitPrice ?? undefined,
             pnlDollars: updated.pnlDollars ?? undefined,
             pnlPoints: updated.pnlPoints ?? undefined,
             partialWin: updated.partialWin ?? false,
-          }).catch(() => {});
+            entry: Number(updated.entry) || undefined,
+            stopLoss: Number(updated.stopLoss) || undefined,
+          }).catch((e) => { console.error("[Telegram] TP update failed:", e); });
         } else if (cat === "BREAKEVEN") {
           notifySignalEvent({ type: "breakeven", pair: parseResult.signal.pair, signalType: cat, timestamp: Date.now() });
           // Telegram: Breakeven notification
           sendSignalUpdateToTelegram({
             pair: updated.pair,
             updateType: "BREAKEVEN",
-          }).catch(() => {});
+            entry: Number(updated.entry) || undefined,
+          }).catch((e) => { console.error("[Telegram] Breakeven update failed:", e); });
         } else if (cat === "SL_HIT" || cat === "REENTRY_SL" || cat === "PYRAMID_SL") {
           // If it was a partial win (TPs hit before SL), send TP notification instead
           if (updated.partialWin && updated.status === "HIT_TP") {
@@ -109,7 +115,9 @@ export async function POST(request: NextRequest) {
             pnlDollars: updated.pnlDollars ?? undefined,
             pnlPoints: updated.pnlPoints ?? undefined,
             partialWin: updated.partialWin ?? false,
-          }).catch(() => {});
+            entry: Number(updated.entry) || undefined,
+            stopLoss: Number(updated.stopLoss) || undefined,
+          }).catch((e) => { console.error("[Telegram] SL update failed:", e); });
         }
         return NextResponse.json({ success: true, signal: updated, updated: true, warnings: parseResult.warnings });
       }
@@ -211,7 +219,10 @@ export async function POST(request: NextRequest) {
         htfTrend: signal.htfTrend,
         smcTrend: signal.smcTrend,
         signalCategory: cat,
-      }).catch(() => {}); // Fire-and-forget
+        instrument: signal.instrument || undefined,
+        slDistance: signal.slDistance || undefined,
+        maxRR: signal.maxRR || undefined,
+      }).catch((e) => { console.error("[Telegram] Signal send failed:", e); }); // Fire-and-forget
     }
 
     // ── Email notification: broadcast signal to all active subscribers ──
