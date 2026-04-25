@@ -1657,17 +1657,26 @@ export default function HomePage() {
           chatId: (appSettings as any).telegramChatId || "",
         }),
       });
-      const data = await res.json();
-      setTgTestResult({ success: data.success, message: data.message || (data.success ? "تم بنجاح" : "فشل") });
+      let data: any;
+      try {
+        data = await res.json();
+      } catch {
+        setTgTestResult({ success: false, message: `خطأ في الخادم (HTTP ${res.status}) — حاول مرة أخرى بعد قليل` });
+        toast.error("فشل الاتصال", { description: `الخادم أرجع حالة ${res.status}` });
+        return;
+      }
+      const msg = data.message || data.error || (data.success ? "تم بنجاح" : "فشل غير معروف");
+      setTgTestResult({ success: !!data.success, message: msg });
       if (data.success) {
         toast.success("تم اختبار الاتصال بنجاح!");
       } else {
-        toast.error("فشل اختبار الاتصال", { description: data.message });
+        toast.error("فشل اختبار الاتصال", { description: msg });
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error("Test telegram:", e);
-      setTgTestResult({ success: false, message: "فشل الاتصال بالخادم" });
-      toast.error("فشل الاتصال", { description: "تعذر الوصول إلى الخادم" });
+      const errDesc = e?.message || e?.toString() || "خطأ غير معروف";
+      setTgTestResult({ success: false, message: `فشل الاتصال بالخادم: ${errDesc}` });
+      toast.error("فشل الاتصال", { description: errDesc });
     } finally {
       setTgTesting(false);
     }
