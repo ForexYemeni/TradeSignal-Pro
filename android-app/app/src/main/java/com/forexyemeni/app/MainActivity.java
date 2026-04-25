@@ -47,7 +47,14 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 
 /**
- * ForexYemeni VIP Trading Signals - Android App v3.2
+ * ForexYemeni VIP Trading Signals - Android App v3.3
+ *
+ * v3.3 CHANGES:
+ * - Professional Telegram signal formatting with Unicode box headers
+ * - Fixed TP/SL hit notifications reaching Telegram channels
+ * - Multi-bot Telegram support with add/edit/delete/toggle
+ * - Enhanced risk management section in signals
+ * - Confirmation dialogs for destructive actions
  *
  * v3.2 CHANGES:
  * - Added file chooser support (onShowFileChooser) so users can upload
@@ -158,7 +165,7 @@ public class MainActivity extends Activity {
         s.setMediaPlaybackRequiresUserGesture(false);
         s.setBuiltInZoomControls(false);
         s.setDisplayZoomControls(false);
-        s.setUserAgentString(s.getUserAgentString() + " ForexYemeni/App/3.2");
+        s.setUserAgentString(s.getUserAgentString() + " ForexYemeni/App/3.3");
         wv.setBackgroundColor(Color.parseColor("#070b14"));
         wv.setLayerType(View.LAYER_TYPE_HARDWARE, null);
     }

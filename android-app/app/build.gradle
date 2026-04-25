@@ -10,7 +10,7 @@ android {
         applicationId "com.forexyemeni.app"
         minSdk 21
         targetSdk 34
-        versionCode 15
+        versionCode 16
         versionName "3.3"
         ndk {
             abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
