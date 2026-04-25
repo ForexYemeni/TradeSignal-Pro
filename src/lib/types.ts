@@ -41,6 +41,15 @@ export interface UsdtNetworkAddress {
   order: number;
 }
 
+export interface TelegramConnectionData {
+  id: string;
+  label: string;
+  botToken: string;
+  chatId: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
 export interface AppSettingsData {
   freeTrialPackageId: string | null;
   autoApproveOnRegister: boolean;
@@ -54,6 +63,7 @@ export interface AppSettingsData {
   /* Telegram integration */
   telegramBotToken: string | null;
   telegramChatId: string | null;
+  telegramConnections?: TelegramConnectionData[];
 }
 
 export interface LocalPaymentMethodData {

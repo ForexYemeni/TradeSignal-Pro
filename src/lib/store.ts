@@ -543,13 +543,23 @@ export interface AppSettings {
   referralRewardDays: number;         // extra days given to referrer
   referralInviteeRewardDays: number;  // extra days given to invitee
   /* Telegram integration */
-  telegramBotToken: string | null;    // e.g. "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
-  telegramChatId: string | null;      // e.g. "@channel" or "-100123456789"
+  telegramBotToken: string | null;    // legacy single bot (kept for backward compat)
+  telegramChatId: string | null;      // legacy single channel
+  telegramConnections?: TelegramConnection[];  // multiple bot+channel pairs
+}
+
+export interface TelegramConnection {
+  id: string;               // unique UUID
+  label: string;            // e.g. "قناة VIP", "مجموعة مجانية"
+  botToken: string;         // e.g. "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
+  chatId: string;           // e.g. "2463619819" or "@channel"
+  isActive: boolean;        // enable/disable without deleting
+  createdAt: string;
 }
 
 export async function getAppSettings(): Promise<AppSettings> {
   const data = await kv.get<AppSettings>('app_settings');
-  return data || { freeTrialPackageId: null, autoApproveOnRegister: true, usdtWalletAddress: null, usdtNetwork: null, localCurrencyName: null, localCurrencyCode: null, usdtToLocalRate: null, referralEnabled: false, referralRewardDays: 7, referralInviteeRewardDays: 3, telegramBotToken: null, telegramChatId: null };
+  return data || { freeTrialPackageId: null, autoApproveOnRegister: true, usdtWalletAddress: null, usdtNetwork: null, localCurrencyName: null, localCurrencyCode: null, usdtToLocalRate: null, referralEnabled: false, referralRewardDays: 7, referralInviteeRewardDays: 3, telegramBotToken: null, telegramChatId: null, telegramConnections: [] };
 }
 
 export async function updateAppSettings(updates: Partial<AppSettings>): Promise<AppSettings> {

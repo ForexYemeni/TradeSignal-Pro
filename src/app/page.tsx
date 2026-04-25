@@ -21,7 +21,7 @@ import {
   Home, Flame, Trophy, ArrowUpRight, ArrowDownRight, Hash, Globe, PieChart, Sparkles, Timer, Wallet,
   MoreHorizontal, CreditCard, Upload, CheckCircle2, XCircle, Image, Copy, Plus, Banknote,
   ShieldCheck, ShieldX, ShieldBan, WifiOff, Gift, Ticket,
-  Search, Unlock, ArrowLeft, X, Check, Save, Wifi,
+  Search, Unlock, ArrowLeft, X, Check, Save, Wifi, Pencil, Pause, Play,
 } from "lucide-react";
 
 // ═══ EXTRACTED MODULES ═══
@@ -559,6 +559,13 @@ export default function HomePage() {
   const [tgSaving, setTgSaving] = useState(false);
   const [tgTesting, setTgTesting] = useState(false);
   const [tgTestResult, setTgTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [tgConnections, setTgConnections] = useState<Array<{id:string;label:string;botToken:string;chatId:string;isActive:boolean;createdAt:string}>>([]);
+  const [tgShowForm, setTgShowForm] = useState(false);
+  const [tgEditId, setTgEditId] = useState<string | null>(null);
+  const [tgFormLabel, setTgFormLabel] = useState("");
+  const [tgFormToken, setTgFormToken] = useState("");
+  const [tgFormChatId, setTgFormChatId] = useState("");
+  const [tgTestConnId, setTgTestConnId] = useState<string | null>(null);
 
   /* ── Proof Image Modal ── */
   const [proofModalOpen, setProofModalOpen] = useState(false);
@@ -1511,6 +1518,7 @@ export default function HomePage() {
       if (setData.success) {
         setAppSettings(setData.settings);
         setUsdtNetworks(setData.settings.usdtNetworks || []);
+        setTgConnections(setData.settings.telegramConnections || []);
       }
     } catch (e) { console.error("Fetch packages:", e); }
   }
@@ -1619,66 +1627,171 @@ export default function HomePage() {
   }
 
   /* ── Telegram Settings Handlers ── */
-  async function handleSaveTelegramSettings() {
+  function handleLoadTelegramConnections() {
+    const conns = (appSettings as any).telegramConnections || [];
+    setTgConnections(conns);
+  }
+
+  function handleOpenTgForm(editId?: string) {
+    if (editId) {
+      const conn = tgConnections.find(c => c.id === editId);
+      if (conn) {
+        setTgEditId(editId);
+        setTgFormLabel(conn.label);
+        setTgFormToken(conn.botToken);
+        setTgFormChatId(conn.chatId);
+        setTgShowForm(true);
+      }
+    } else {
+      setTgEditId(null);
+      setTgFormLabel("");
+      setTgFormToken("");
+      setTgFormChatId("");
+      setTgShowForm(true);
+    }
+    setTgTestResult(null);
+  }
+
+  function handleCancelTgForm() {
+    setTgShowForm(false);
+    setTgEditId(null);
+    setTgFormLabel("");
+    setTgFormToken("");
+    setTgFormChatId("");
+    setTgTestResult(null);
+  }
+
+  async function handleSaveTgConnection() {
+    if (!tgFormToken.trim() || !tgFormChatId.trim()) {
+      toast.error("يرجى ملء جميع الحقول");
+      return;
+    }
     setTgSaving(true);
     try {
+      const conns = [...tgConnections];
+      if (tgEditId) {
+        const idx = conns.findIndex(c => c.id === tgEditId);
+        if (idx !== -1) {
+          conns[idx] = { ...conns[idx], label: tgFormLabel.trim() || "قناة تلجرام", botToken: tgFormToken.trim(), chatId: tgFormChatId.trim() };
+        }
+      } else {
+        conns.push({
+          id: crypto.randomUUID(),
+          label: tgFormLabel.trim() || "قناة تلجرام",
+          botToken: tgFormToken.trim(),
+          chatId: tgFormChatId.trim(),
+          isActive: true,
+          createdAt: new Date().toISOString(),
+        });
+      }
       const res = await fetch("/api/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          telegramBotToken: (appSettings as any).telegramBotToken || null,
-          telegramChatId: (appSettings as any).telegramChatId || null,
-        }),
+        body: JSON.stringify({ telegramConnections: conns }),
       });
       const data = await res.json();
       if (data.success) {
-        toast.success("تم حفظ إعدادات تلجرام", { description: "سيتم إرسال الإشارات تلقائياً إلى القناة" });
-        setTgTestResult(null);
+        setAppSettings(data.settings);
+        setTgConnections(data.settings.telegramConnections || []);
+        toast.success(tgEditId ? "تم تعديل الاتصال" : "تم إضافة الاتصال", { description: "تم حفظ بيانات البوت والقناة بنجاح" });
+        handleCancelTgForm();
       } else {
-        toast.error("فشل حفظ الإعدادات", { description: data.error || "خطأ غير معروف" });
+        toast.error("فشل الحفظ", { description: data.error || "خطأ غير معروف" });
       }
     } catch (e) {
-      console.error("Save telegram settings:", e);
-      toast.error("فشل الاتصال", { description: "تعذر الوصول إلى الخادم" });
+      console.error("Save telegram connection:", e);
+      toast.error("فشل الاتصال بالخادم");
     } finally {
       setTgSaving(false);
     }
   }
 
-  async function handleTestTelegram() {
+  async function handleDeleteTgConnection(id: string) {
+    const conns = tgConnections.filter(c => c.id !== id);
+    setTgSaving(true);
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ telegramConnections: conns }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAppSettings(data.settings);
+        setTgConnections(data.settings.telegramConnections || []);
+        toast.success("تم حذف الاتصال");
+      }
+    } catch (e) {
+      console.error("Delete telegram connection:", e);
+      toast.error("فشل الحذف");
+    } finally {
+      setTgSaving(false);
+    }
+  }
+
+  async function handleToggleTgConnection(id: string) {
+    const conns = tgConnections.map(c => c.id === id ? { ...c, isActive: !c.isActive } : c);
+    setTgSaving(true);
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ telegramConnections: conns }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAppSettings(data.settings);
+        setTgConnections(data.settings.telegramConnections || []);
+        toast.success("تم تحديث الحالة");
+      }
+    } catch (e) {
+      console.error("Toggle telegram connection:", e);
+      toast.error("فشل التحديث");
+    } finally {
+      setTgSaving(false);
+    }
+  }
+
+  async function handleTestTgConnection(connId?: string) {
+    let token = "";
+    let chatId = "";
+    if (connId) {
+      const conn = tgConnections.find(c => c.id === connId);
+      if (!conn) return;
+      token = conn.botToken;
+      chatId = conn.chatId;
+      setTgTestConnId(connId);
+    } else if (tgShowForm) {
+      token = tgFormToken;
+      chatId = tgFormChatId;
+      setTgTestConnId("form");
+    } else return;
+
     setTgTesting(true);
     setTgTestResult(null);
     try {
       const res = await fetch("/api/telegram/test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          token: (appSettings as any).telegramBotToken || "",
-          chatId: (appSettings as any).telegramChatId || "",
-        }),
+        body: JSON.stringify({ token, chatId }),
       });
       let data: any;
-      try {
-        data = await res.json();
-      } catch {
-        setTgTestResult({ success: false, message: `خطأ في الخادم (HTTP ${res.status}) — حاول مرة أخرى بعد قليل` });
-        toast.error("فشل الاتصال", { description: `الخادم أرجع حالة ${res.status}` });
+      try { data = await res.json(); } catch {
+        setTgTestResult({ success: false, message: `خطأ في الخادم (HTTP ${res.status})` });
+        toast.error("فشل الاتصال");
         return;
       }
-      const msg = data.message || data.error || (data.success ? "تم بنجاح" : "فشل غير معروف");
+      const msg = data.message || data.error || (data.success ? "تم بنجاح" : "فشل");
       setTgTestResult({ success: !!data.success, message: msg });
-      if (data.success) {
-        toast.success("تم اختبار الاتصال بنجاح!");
-      } else {
-        toast.error("فشل اختبار الاتصال", { description: msg });
-      }
+      if (data.success) toast.success("تم اختبار الاتصال بنجاح!");
+      else toast.error("فشل اختبار الاتصال", { description: msg });
     } catch (e: any) {
-      console.error("Test telegram:", e);
-      const errDesc = e?.message || e?.toString() || "خطأ غير معروف";
-      setTgTestResult({ success: false, message: `فشل الاتصال بالخادم: ${errDesc}` });
+      const errDesc = e?.message || "خطأ غير معروف";
+      setTgTestResult({ success: false, message: `فشل: ${errDesc}` });
       toast.error("فشل الاتصال", { description: errDesc });
     } finally {
       setTgTesting(false);
+      setTgTestConnId(null);
     }
   }
 
@@ -4809,7 +4922,7 @@ export default function HomePage() {
                   </button>
 
                   {/* App Settings */}
-                  <button onClick={() => { setAdminSubTab("settings"); }}
+                  <button onClick={() => { setAdminSubTab("settings"); fetchPackages(); }}
                     className="glass-card p-4 text-right space-y-3 hover:border-sky-500/25 transition-all active:scale-[0.98]">
                     <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500/20 to-cyan-500/10 border border-sky-500/15 flex items-center justify-center">
                       <Settings className="w-5 h-5 text-sky-400" />
@@ -5377,76 +5490,154 @@ export default function HomePage() {
             {/* ── Telegram Integration Card ── */}
             <div className="glass-card border-sky-500/15 overflow-hidden">
               <div className="p-4 space-y-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-lg bg-sky-500/15 flex items-center justify-center">
-                    <Send className="w-3.5 h-3.5 text-sky-400" />
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-lg bg-sky-500/15 flex items-center justify-center">
+                      <Send className="w-3.5 h-3.5 text-sky-400" />
+                    </div>
+                    <span className="text-xs font-bold text-sky-400">ربط تلجرام</span>
+                    {tgConnections.filter(c => c.isActive).length > 0 && (
+                      <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/20 text-emerald-400 font-bold">
+                        {tgConnections.filter(c => c.isActive).length} متصل
+                      </span>
+                    )}
                   </div>
-                  <span className="text-xs font-bold text-sky-400">ربط تلجرام</span>
-                  {appSettings.telegramBotToken && appSettings.telegramChatId && (
-                    <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/20 text-emerald-400 font-bold">متصل</span>
-                  )}
-                </div>
-
-                {/* Bot Token */}
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-semibold text-foreground/80 flex items-center gap-1">
-                    توكن البوت <span className="text-muted-foreground/40">(Bot Token)</span>
-                  </label>
-                  <div className="relative">
-                    <Input
-                      value={(appSettings as any).telegramBotToken || ""}
-                      onChange={e => setAppSettings(prev => ({ ...prev, telegramBotToken: e.target.value || null }))}
-                      placeholder="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
-                      className="glass-input text-xs font-mono pr-10"
-                      dir="ltr"
-                      type={tgShowToken ? "text" : "password"}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setTgShowToken(!tgShowToken)}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground transition-colors"
-                    >
-                      {tgShowToken ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Chat ID */}
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-semibold text-foreground/80 flex items-center gap-1">
-                    معرف القناة أو المجموعة <span className="text-muted-foreground/40">(Chat ID)</span>
-                  </label>
-                  <Input
-                    value={(appSettings as any).telegramChatId || ""}
-                    onChange={e => setAppSettings(prev => ({ ...prev, telegramChatId: e.target.value || null }))}
-                    placeholder="2463619819 أو @your_channel"
-                    className="glass-input text-xs font-mono"
-                    dir="ltr"
-                  />
-                  <p className="text-[8px] text-muted-foreground/50 leading-relaxed">
-                    أضف البوت كمدير في القناة أو المجموعة، ثم أدخل رقم المجموعة فقط (مثل 2463619819) أو اسم القناة (مثل @channel)
-                  </p>
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex gap-2 pt-1">
                   <button
-                    onClick={handleSaveTelegramSettings}
-                    disabled={tgSaving}
-                    className="flex-1 h-10 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 text-white text-[10px] font-bold flex items-center justify-center gap-1.5 active:scale-[0.98] disabled:opacity-40 shadow-lg shadow-sky-500/20"
+                    onClick={() => handleOpenTgForm()}
+                    className="h-8 px-3 rounded-lg bg-sky-500/15 border border-sky-500/20 text-sky-400 text-[10px] font-bold flex items-center gap-1 active:scale-95 hover:bg-sky-500/25 transition-colors"
                   >
-                    {tgSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                    حفظ الإعدادات
-                  </button>
-                  <button
-                    onClick={handleTestTelegram}
-                    disabled={tgTesting || !(appSettings as any).telegramBotToken || !(appSettings as any).telegramChatId}
-                    className="flex-1 h-10 rounded-xl border border-sky-500/25 text-sky-400 text-[10px] font-bold flex items-center justify-center gap-1.5 active:scale-[0.98] disabled:opacity-40 hover:bg-sky-500/[0.08] transition-colors"
-                  >
-                    {tgTesting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wifi className="w-3.5 h-3.5" />}
-                    اختبار الاتصال
+                    <Plus className="w-3 h-3" />
+                    إضافة بوت
                   </button>
                 </div>
+
+                <p className="text-[8px] text-muted-foreground/60 leading-relaxed">
+                  يمكنك ربط عدة بوتات وقنوات — يتم إرسال الإشارات تلقائياً إلى جميع القنوات النشطة
+                </p>
+
+                {/* ── Connections List ── */}
+                {tgConnections.length === 0 && !tgShowForm && (
+                  <div className="text-center py-6 space-y-2">
+                    <div className="w-10 h-10 rounded-full bg-sky-500/10 flex items-center justify-center mx-auto">
+                      <Send className="w-4 h-4 text-sky-400/50" />
+                    </div>
+                    <p className="text-[10px] text-muted-foreground/60">لم يتم ربط أي قناة بعد</p>
+                    <button onClick={() => handleOpenTgForm()} className="text-[10px] text-sky-400 font-bold underline underline-offset-2">أضف أول اتصال</button>
+                  </div>
+                )}
+
+                {tgConnections.map((conn, idx) => (
+                  <div key={conn.id} className={`rounded-xl p-3 border space-y-2 ${conn.isActive ? "bg-emerald-500/[0.04] border-emerald-500/15" : "bg-red-500/[0.03] border-red-500/10"}`}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold text-foreground">{conn.label || "قناة تلجرام"}</span>
+                        {conn.isActive ? (
+                          <span className="text-[7px] px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-bold">نشط</span>
+                        ) : (
+                          <span className="text-[7px] px-1.5 py-0.5 rounded-full bg-red-500/15 text-red-400 font-bold">معطل</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => handleTestTgConnection(conn.id)} disabled={tgTesting && tgTestConnId === conn.id}
+                          className="w-7 h-7 rounded-lg bg-sky-500/10 border border-sky-500/15 flex items-center justify-center text-sky-400 active:scale-90 disabled:opacity-40">
+                          {tgTesting && tgTestConnId === conn.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wifi className="w-3 h-3" />}
+                        </button>
+                        <button onClick={() => handleOpenTgForm(conn.id)}
+                          className="w-7 h-7 rounded-lg bg-amber-500/10 border border-amber-500/15 flex items-center justify-center text-amber-400 active:scale-90">
+                          <Pencil className="w-3 h-3" />
+                        </button>
+                        <button onClick={() => handleToggleTgConnection(conn.id)}
+                          className="w-7 h-7 rounded-lg bg-violet-500/10 border border-violet-500/15 flex items-center justify-center text-violet-400 active:scale-90">
+                          {conn.isActive ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
+                        </button>
+                        <button onClick={() => handleDeleteTgConnection(conn.id)}
+                          className="w-7 h-7 rounded-lg bg-red-500/10 border border-red-500/15 flex items-center justify-center text-red-400 active:scale-90">
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 text-[9px] text-muted-foreground/70">
+                      <span dir="ltr" className="font-mono truncate max-w-[140px]">{conn.botToken.slice(0, 10)}...{conn.botToken.slice(-6)}</span>
+                      <span className="text-muted-foreground/30">|</span>
+                      <span dir="ltr" className="font-mono">{conn.chatId}</span>
+                    </div>
+                  </div>
+                ))}
+
+                {/* ── Add/Edit Form ── */}
+                {tgShowForm && (
+                  <div className="rounded-xl border border-sky-500/20 bg-sky-500/[0.04] p-3 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-sky-400">{tgEditId ? "تعديل الاتصال" : "إضافة اتصال جديد"}</span>
+                      <button onClick={handleCancelTgForm} className="w-6 h-6 rounded-lg bg-white/5 flex items-center justify-center text-muted-foreground active:scale-90">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+
+                    {/* Label */}
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-semibold text-foreground/80">اسم الاتصال</label>
+                      <Input
+                        value={tgFormLabel}
+                        onChange={e => setTgFormLabel(e.target.value)}
+                        placeholder="مثال: قناة VIP، مجموعة مجانية"
+                        className="glass-input text-xs"
+                      />
+                    </div>
+
+                    {/* Bot Token */}
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-semibold text-foreground/80 flex items-center gap-1">
+                        توكن البوت <span className="text-muted-foreground/40">(Bot Token)</span>
+                      </label>
+                      <div className="relative">
+                        <Input
+                          value={tgFormToken}
+                          onChange={e => setTgFormToken(e.target.value)}
+                          placeholder="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
+                          className="glass-input text-xs font-mono pr-10"
+                          dir="ltr"
+                          type={tgShowToken ? "text" : "password"}
+                        />
+                        <button type="button" onClick={() => setTgShowToken(!tgShowToken)}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground transition-colors">
+                          {tgShowToken ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Chat ID */}
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-semibold text-foreground/80 flex items-center gap-1">
+                        معرف القناة أو المجموعة <span className="text-muted-foreground/40">(Chat ID)</span>
+                      </label>
+                      <Input
+                        value={tgFormChatId}
+                        onChange={e => setTgFormChatId(e.target.value)}
+                        placeholder="2463619819 أو @your_channel"
+                        className="glass-input text-xs font-mono"
+                        dir="ltr"
+                      />
+                      <p className="text-[8px] text-muted-foreground/50 leading-relaxed">
+                        أدخل رقم المجموعة فقط (مثل 2463619819) أو اسم القناة (مثل @channel)
+                      </p>
+                    </div>
+
+                    {/* Form Actions */}
+                    <div className="flex gap-2 pt-1">
+                      <button onClick={handleSaveTgConnection} disabled={tgSaving}
+                        className="flex-1 h-9 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 text-white text-[10px] font-bold flex items-center justify-center gap-1.5 active:scale-[0.98] disabled:opacity-40 shadow-lg shadow-sky-500/20">
+                        {tgSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                        {tgEditId ? "حفظ التعديلات" : "إضافة الاتصال"}
+                      </button>
+                      <button onClick={() => handleTestTgConnection()} disabled={tgTesting || !tgFormToken.trim() || !tgFormChatId.trim()}
+                        className="h-9 px-4 rounded-xl border border-sky-500/25 text-sky-400 text-[10px] font-bold flex items-center gap-1.5 active:scale-[0.98] disabled:opacity-40 hover:bg-sky-500/[0.08] transition-colors">
+                        {tgTesting && tgTestConnId === "form" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wifi className="w-3.5 h-3.5" />}
+                        اختبار
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Telegram Test Result */}
                 {tgTestResult && (
