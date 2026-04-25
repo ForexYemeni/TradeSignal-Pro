@@ -566,6 +566,7 @@ export default function HomePage() {
   const [tgFormToken, setTgFormToken] = useState("");
   const [tgFormChatId, setTgFormChatId] = useState("");
   const [tgTestConnId, setTgTestConnId] = useState<string | null>(null);
+  const [tgConfirmAction, setTgConfirmAction] = useState<{type: "delete" | "toggle"; connId: string; connLabel: string; newActive: boolean} | null>(null);
 
   /* ── Proof Image Modal ── */
   const [proofModalOpen, setProofModalOpen] = useState(false);
@@ -1706,33 +1707,26 @@ export default function HomePage() {
     }
   }
 
-  async function handleDeleteTgConnection(id: string) {
-    const conns = tgConnections.filter(c => c.id !== id);
-    setTgSaving(true);
-    try {
-      const res = await fetch("/api/settings", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ telegramConnections: conns }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setAppSettings(data.settings);
-        setTgConnections(data.settings.telegramConnections || []);
-        toast.success("تم حذف الاتصال");
-      }
-    } catch (e) {
-      console.error("Delete telegram connection:", e);
-      toast.error("فشل الحذف");
-    } finally {
-      setTgSaving(false);
-    }
+  function handleConfirmDeleteTg(id: string, label: string) {
+    setTgConfirmAction({ type: "delete", connId: id, connLabel: label, newActive: false });
   }
 
-  async function handleToggleTgConnection(id: string) {
-    const conns = tgConnections.map(c => c.id === id ? { ...c, isActive: !c.isActive } : c);
+  function handleConfirmToggleTg(id: string, label: string, newActive: boolean) {
+    setTgConfirmAction({ type: "toggle", connId: id, connLabel: label, newActive });
+  }
+
+  async function executeTgConfirmAction() {
+    if (!tgConfirmAction) return;
+    const { type, connId, newActive } = tgConfirmAction;
+    setTgConfirmAction(null);
     setTgSaving(true);
     try {
+      let conns: typeof tgConnections;
+      if (type === "delete") {
+        conns = tgConnections.filter(c => c.id !== connId);
+      } else {
+        conns = tgConnections.map(c => c.id === connId ? { ...c, isActive: newActive } : c);
+      }
       const res = await fetch("/api/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -1742,11 +1736,13 @@ export default function HomePage() {
       if (data.success) {
         setAppSettings(data.settings);
         setTgConnections(data.settings.telegramConnections || []);
-        toast.success("تم تحديث الحالة");
+        toast.success(type === "delete" ? "تم حذف الاتصال" : "تم تحديث الحالة");
+      } else {
+        toast.error("فشل العملية", { description: data.error || "خطأ غير معروف" });
       }
     } catch (e) {
-      console.error("Toggle telegram connection:", e);
-      toast.error("فشل التحديث");
+      console.error("Telegram confirm action:", e);
+      toast.error("فشل الاتصال بالخادم");
     } finally {
       setTgSaving(false);
     }
@@ -5546,11 +5542,11 @@ export default function HomePage() {
                           className="w-7 h-7 rounded-lg bg-amber-500/10 border border-amber-500/15 flex items-center justify-center text-amber-400 active:scale-90">
                           <Pencil className="w-3 h-3" />
                         </button>
-                        <button onClick={() => handleToggleTgConnection(conn.id)}
+                        <button onClick={() => handleConfirmToggleTg(conn.id, conn.label, !conn.isActive)}
                           className="w-7 h-7 rounded-lg bg-violet-500/10 border border-violet-500/15 flex items-center justify-center text-violet-400 active:scale-90">
                           {conn.isActive ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
                         </button>
-                        <button onClick={() => handleDeleteTgConnection(conn.id)}
+                        <button onClick={() => handleConfirmDeleteTg(conn.id, conn.label)}
                           className="w-7 h-7 rounded-lg bg-red-500/10 border border-red-500/15 flex items-center justify-center text-red-400 active:scale-90">
                           <Trash2 className="w-3 h-3" />
                         </button>
@@ -5652,6 +5648,40 @@ export default function HomePage() {
                 )}
               </div>
             </div>
+
+            {/* ── Telegram Confirm Dialog ── */}
+            <AlertDialog open={!!tgConfirmAction} onOpenChange={(open) => { if (!open) setTgConfirmAction(null); }}>
+              <AlertDialogContent dir="rtl" className="glass-panel border-border">
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="text-sm font-bold text-foreground">
+                    {tgConfirmAction?.type === "delete" ? "حذف اتصال تلجرام" : tgConfirmAction?.newActive ? "تفعيل اتصال تلجرام" : "تعطيل اتصال تلجرام"}
+                  </AlertDialogTitle>
+                  <AlertDialogDescription className="text-xs text-muted-foreground leading-relaxed">
+                    {tgConfirmAction?.type === "delete"
+                      ? `هل أنت متأكد من حذف الاتصال "${tgConfirmAction?.connLabel}"؟ لن يتم إرسال الإشارات إلى هذه القناة بعد الحذف.`
+                      : tgConfirmAction?.newActive
+                        ? `هل تريد تفعيل الاتصال "${tgConfirmAction?.connLabel}"؟ سيتم إرسال الإشارات تلقائياً إلى هذه القناة.`
+                        : `هل تريد تعطيل الاتصال "${tgConfirmAction?.connLabel}"؟ لن يتم إرسال الإشارات إلى هذه القناة حتى يتم تفعيلها مجدداً.`
+                    }
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter className="flex gap-2 sm:gap-0">
+                  <AlertDialogCancel className="flex-1 h-10 rounded-xl text-xs font-bold border border-border">إلغاء</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={executeTgConfirmAction}
+                    className={`flex-1 h-10 rounded-xl text-xs font-bold text-white ${
+                      tgConfirmAction?.type === "delete"
+                        ? "bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700"
+                        : tgConfirmAction?.newActive
+                          ? "bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700"
+                          : "bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700"
+                    }`}
+                  >
+                    {tgConfirmAction?.type === "delete" ? "نعم، حذف" : tgConfirmAction?.newActive ? "نعم، تفعيل" : "نعم، تعطيل"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
 
               </>
             )}
