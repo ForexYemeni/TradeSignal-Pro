@@ -440,7 +440,11 @@ function parsePyramidSLAlert(text: string): ParseResult {
 // ═══════════════════════════════════════════════════════════════
 function parseBasicSignal(text: string): ParseResult {
   const signalType = extractSignalType(text);
-  if (!signalType) return { success: false, error: "لم يتم التعرف على نوع الإشارة" };
+  if (!signalType) {
+    // Last resort: try generic format detection
+    // Supports: "Buy BTCUSDT @ 65000" / "Sell ETHUSDT 3000" / "BUY XAUUSD 2650"
+    return parseGenericAlert(text);
+  }
 
   const pair = extractPair(text) || "UNKNOWN";
   const entry = extractEntry(text);
@@ -452,7 +456,21 @@ function parseBasicSignal(text: string): ParseResult {
   const smcTrend = extractSMCTrend(text);
   const riskData = extractRiskData(text);
 
-  if (entry === null) return { success: false, error: "لم يتم العثور على سعر الدخول" };
+  if (entry === null) {
+    // Last resort: try extracting price from text patterns like "@ 65000" or "at 65000"
+    const fallbackEntry = extractFallbackPrice(text);
+    if (fallbackEntry !== null) {
+      return {
+        success: true,
+        signal: {
+          pair, type: signalType, entry: fallbackEntry, stopLoss: stopLoss || 0,
+          takeProfits, confidence, signalCategory: "ENTRY",
+          rawText: text, timeframe, htfTimeframe, htfTrend, smcTrend, riskData,
+        },
+      };
+    }
+    return { success: false, error: "لم يتم العثور على سعر الدخول" };
+  }
 
   return {
     success: true,
@@ -462,6 +480,94 @@ function parseBasicSignal(text: string): ParseResult {
       rawText: text, timeframe, htfTimeframe, htfTrend, smcTrend, riskData,
     },
   };
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Generic Alert Parser (for non-FOREXYEMENI formats)
+//  Handles: "Buy BTCUSDT @ 65000", "Sell signal on ETHUSDT",
+//  "Long BTCUSD at 85000", etc.
+// ═══════════════════════════════════════════════════════════════
+function parseGenericAlert(text: string): ParseResult {
+  const upper = text.toUpperCase();
+
+  // Detect direction
+  let type: "BUY" | "SELL" | null = null;
+  if (/\b(BUY|LONG|شراء|بايع)\b/i.test(text)) type = "BUY";
+  else if (/\b(SELL|SHORT|بيع|سال)\b/i.test(text)) type = "SELL";
+
+  if (!type) {
+    return { success: false, error: "لم يتم التعرف على نوع الإشارة — يجب أن يحتوي على Buy/Sell/شراء/بيع" };
+  }
+
+  // Extract pair (prefer this since we already know it's a generic format)
+  const pair = extractPair(text) || extractGenericPair(text) || "UNKNOWN";
+
+  // Extract price from various patterns
+  const entry = extractEntry(text) || extractFallbackPrice(text);
+  if (entry === null) {
+    // Even without a price, still create the signal (some alerts are just notifications)
+    return {
+      success: true,
+      signal: {
+        pair, type,
+        entry: 0,
+        stopLoss: 0,
+        takeProfits: [],
+        confidence: 0,
+        signalCategory: "ENTRY",
+        rawText: text,
+        timeframe: "", htfTimeframe: "", htfTrend: "", smcTrend: "",
+        riskData: emptyRiskData(),
+      },
+      warnings: ["لم يتم العثور على سعر الدخول — تم إنشاء إشارة بدون سعر"],
+    };
+  }
+
+  const stopLoss = extractStopLoss(text);
+
+  return {
+    success: true,
+    signal: {
+      pair, type, entry, stopLoss: stopLoss || 0,
+      takeProfits: [],
+      confidence: 0,
+      signalCategory: "ENTRY",
+      rawText: text,
+      timeframe: "", htfTimeframe: "", htfTrend: "", smcTrend: "",
+      riskData: emptyRiskData(),
+    },
+    warnings: ["إشارة بتنسيق عام — بعض البيانات غير متوفرة"],
+  };
+}
+
+// Extract pair from generic text: "BTCUSDT", "ETH/USD", "GOLD", etc.
+function extractGenericPair(text: string): string | null {
+  const patterns = [
+    /(?:on|for|ل)\s+([A-Z]{3,12}(?:\/[A-Z]{3})?)/i,
+    /([A-Z]{3,10}(?:USDT?|USD|EUR|GBP|JPY))/i,
+  ];
+  for (const p of patterns) {
+    const m = text.match(p);
+    if (m) return normalizePairName(m[1].replace(/\s/g, "").toUpperCase());
+  }
+  return null;
+}
+
+// Extract price from generic patterns: "@ 65000", "at $85,000", "price: 65000"
+function extractFallbackPrice(text: string): number | null {
+  const patterns = [
+    /[@\s]\s*[$€£¥]?\s*([\d,]+\.?\d*)\s*(?:USDT?|USD)?\s*$/im,
+    /(?:at|عند|على|سعر)\s*[:\-–]?\s*[$€£¥]?\s*([\d,]+\.?\d*)/i,
+    /(?:price|السعر)\s*[:\-–]?\s*[$€£¥]?\s*([\d,]+\.?\d*)/i,
+  ];
+  for (const p of patterns) {
+    const m = text.match(p);
+    if (m) {
+      const val = parseFloat(m[1].replace(/,/g, ""));
+      if (val > 0 && val < 1000000) return val;
+    }
+  }
+  return null;
 }
 
 // ═══════════════════════════════════════════════════════════════

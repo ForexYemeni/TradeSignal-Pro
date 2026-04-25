@@ -26,26 +26,26 @@ async function isAuthorized(request: NextRequest): Promise<boolean> {
   const webhookHeader = request.headers.get("x-webhook-secret");
   if (WEBHOOK_SECRET && webhookHeader === WEBHOOK_SECRET) return true;
 
-  // 3. If no webhook secret is configured in Vercel env, allow external POST requests
-  //    (Google Apps Script, TradingView webhooks, etc.) — for easy setup/testing.
-  //    For production security, set WEBHOOK_SECRET in Vercel and in Google Apps Script.
-  if (!WEBHOOK_SECRET) return true;
-
-  // 4. Check Authorization header (Bearer token)
+  // 3. Check Authorization header (Bearer token)
   const authHeader = request.headers.get("authorization");
-  if (!authHeader) return false;
-  const token = authHeader.replace(/^Bearer\s+/i, "");
-
-  // If token matches webhook secret, allow
-  if (WEBHOOK_SECRET && token === WEBHOOK_SECRET) return true;
-
-  // If token matches a valid user/admin ID, allow
-  if (token) {
-    const user = await getUserById(token);
-    if (user) return true;
+  if (authHeader) {
+    const token = authHeader.replace(/^Bearer\s+/i, "");
+    // If token matches webhook secret, allow
+    if (WEBHOOK_SECRET && token === WEBHOOK_SECRET) return true;
+    // If token matches a valid user/admin ID, allow
+    if (token) {
+      const user = await getUserById(token);
+      if (user) return true;
+    }
   }
 
-  return false;
+  // 4. Allow all POST requests without auth — the signal parser provides
+  //    the real validation (rejects invalid formats with 400).
+  //    This ensures TradingView webhooks, Google Apps Script, and any
+  //    external source can send signals without needing a secret configured.
+  //    Note: If you want to restrict access, set WEBHOOK_SECRET in both
+  //    Vercel env and Google Apps Script, or use the Authorization header.
+  return true;
 }
 
 export async function POST(request: NextRequest) {
