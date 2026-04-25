@@ -7029,17 +7029,17 @@ export default function HomePage() {
       </main>
 
       {/* ── Mobile Bottom Navigation ── */}
-      {/* ── Mobile Bottom Navigation ── */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 md:hidden glass-nav-premium glass-nav-border-animated safe-area-bottom h-16">
+      <nav className="fixed bottom-0 left-0 right-0 z-40 md:hidden glass-nav-premium glass-nav-border-animated safe-area-bottom h-16" style={{ touchAction: 'manipulation' }}>
         <div className="max-w-lg mx-auto flex items-stretch h-full">
           {tabs.map(t => (
             <button key={t.key} onClick={() => setTab(t.key)}
-              className={`flex-1 flex flex-col items-center justify-center gap-0.5 relative transition-all duration-300 ${tab === t.key ? "" : "text-muted-foreground/60"}`}>
-              {tab === t.key && <div className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-[2px] rounded-full bg-gradient-to-l from-amber-400 to-orange-500 transition-all duration-300 shadow-sm" style={{ boxShadow: "0 0 8px rgba(255, 215, 0, 0.4)" }} />}
-              <div className={`flex items-center justify-center w-8 h-8 rounded-xl transition-all duration-300 ${tab === t.key ? "bg-amber-400/[0.12]" : ""}`}>
-                <span className={`transition-all duration-300 ${tab === t.key ? "text-amber-400 drop-shadow-[0_0_8px_rgba(255,215,0,0.5)]" : ""}`}>{t.icon}</span>
+              className={`flex-1 flex flex-col items-center justify-center gap-0.5 relative select-none ${tab === t.key ? "" : "text-muted-foreground/60"}`}
+              style={{ touchAction: 'manipulation', WebkitTouchCallout: 'none', userSelect: 'none' }}>
+              {tab === t.key && <div className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-[2px] rounded-full bg-gradient-to-l from-amber-400 to-orange-500 shadow-sm" style={{ boxShadow: "0 0 8px rgba(255, 215, 0, 0.4)" }} />}
+              <div className={`flex items-center justify-center w-8 h-8 rounded-xl ${tab === t.key ? "bg-amber-400/[0.12]" : ""}`}>
+                <span className={tab === t.key ? "text-amber-400 drop-shadow-[0_0_8px_rgba(255,215,0,0.5)]" : ""}>{t.icon}</span>
               </div>
-              <span className={`text-[9px] font-semibold transition-colors duration-200 ${tab === t.key ? "text-amber-400" : ""}`}>{t.label}</span>
+              <span className={`text-[9px] font-semibold ${tab === t.key ? "text-amber-400" : ""}`}>{t.label}</span>
               {t.badge !== undefined && t.badge > 0 && (
                 <span className="absolute top-1.5 left-1/2 translate-x-5 min-w-[16px] h-[16px] rounded-full bg-gradient-to-l from-amber-400 to-orange-500 text-[8px] font-bold text-black flex items-center justify-center px-1 shadow-lg shadow-amber-500/30">
                   {t.badge > 99 ? "99+" : t.badge}
@@ -7055,9 +7055,9 @@ export default function HomePage() {
         <div className="max-w-lg mx-auto flex h-full">
           {tabs.map(t => (
             <button key={t.key} onClick={() => setTab(t.key)}
-              className={`flex-1 flex flex-col items-center justify-center gap-0.5 relative transition-all duration-200 ${tab === t.key ? "text-amber-400" : "text-muted-foreground/60 hover:text-muted-foreground"}`}>
-              {tab === t.key && <div className="absolute top-0 left-1/2 -translate-x-1/2 w-6 h-[2px] rounded-full bg-gradient-to-l from-amber-400 to-orange-500 transition-all duration-300" />}
-              <span className="transition-all duration-200">{t.icon}</span>
+              className={`flex-1 flex flex-col items-center justify-center gap-0.5 relative select-none ${tab === t.key ? "text-amber-400" : "text-muted-foreground/60 hover:text-muted-foreground"}`}>
+              {tab === t.key && <div className="absolute top-0 left-1/2 -translate-x-1/2 w-6 h-[2px] rounded-full bg-gradient-to-l from-amber-400 to-orange-500" />}
+              <span>{t.icon}</span>
               <span className="text-[10px] font-medium">{t.label}</span>
               {t.badge !== undefined && t.badge > 0 && (
                 <span className="absolute top-1 right-1/2 translate-x-4 min-w-[16px] h-[16px] rounded-full bg-gradient-to-l from-amber-400 to-orange-500 text-[8px] font-bold text-black flex items-center justify-center px-1 shadow-lg shadow-amber-500/30">

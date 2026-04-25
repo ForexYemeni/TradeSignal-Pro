@@ -152,6 +152,19 @@
     -webkit-tap-highlight-color: transparent;
   }
 
+  /* Prevent text selection and movement on touch for nav and buttons */
+  @supports (touch-action: manipulation) {
+    nav button,
+    nav a,
+    [role="tab"] {
+      touch-action: manipulation;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+  }
+
   /* RTL direction for Arabic layout */
   [dir="rtl"] {
     text-align: right;
