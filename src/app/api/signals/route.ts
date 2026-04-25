@@ -4,6 +4,7 @@ import { parseTradingViewSignal, validateSignal } from "@/lib/signal-parser";
 import { notifyNewSignal, notifyTpHit, notifySlHit } from "@/lib/push";
 import { notifySignalEvent } from "./stream/route";
 import { broadcastSignalToSubscribers } from "@/lib/email";
+import { sendSignalToTelegram, sendSignalUpdateToTelegram } from "@/lib/telegram";
 
 // ─── Auth Guard ───────────────────────────────────────
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || "";
@@ -76,9 +77,23 @@ export async function POST(request: NextRequest) {
         // Send push notification for the update
         if (cat === "TP_HIT" || cat === "REENTRY_TP" || cat === "PYRAMID_TP") {
           notifyTpHit(parseResult.signal.pair, parseResult.signal.hitTpIndex ?? 0, undefined, cat).catch(() => {});
+          // Telegram: TP hit notification
+          sendSignalUpdateToTelegram({
+            pair: updated.pair,
+            updateType: cat as "TP_HIT" | "REENTRY_TP" | "PYRAMID_TP",
+            tpIndex: updated.hitTpIndex ?? undefined,
+            hitPrice: updated.hitPrice ?? undefined,
+            pnlDollars: updated.pnlDollars ?? undefined,
+            pnlPoints: updated.pnlPoints ?? undefined,
+            partialWin: updated.partialWin ?? false,
+          }).catch(() => {});
         } else if (cat === "BREAKEVEN") {
-          // BE is informational — SL was moved to entry, no P&L change
           notifySignalEvent({ type: "breakeven", pair: parseResult.signal.pair, signalType: cat, timestamp: Date.now() });
+          // Telegram: Breakeven notification
+          sendSignalUpdateToTelegram({
+            pair: updated.pair,
+            updateType: "BREAKEVEN",
+          }).catch(() => {});
         } else if (cat === "SL_HIT" || cat === "REENTRY_SL" || cat === "PYRAMID_SL") {
           // If it was a partial win (TPs hit before SL), send TP notification instead
           if (updated.partialWin && updated.status === "HIT_TP") {
@@ -86,6 +101,15 @@ export async function POST(request: NextRequest) {
           } else {
             notifySlHit(parseResult.signal.pair).catch(() => {});
           }
+          // Telegram: SL hit notification
+          sendSignalUpdateToTelegram({
+            pair: updated.pair,
+            updateType: cat as "SL_HIT" | "REENTRY_SL" | "PYRAMID_SL",
+            hitPrice: updated.hitPrice ?? undefined,
+            pnlDollars: updated.pnlDollars ?? undefined,
+            pnlPoints: updated.pnlPoints ?? undefined,
+            partialWin: updated.partialWin ?? false,
+          }).catch(() => {});
         }
         return NextResponse.json({ success: true, signal: updated, updated: true, warnings: parseResult.warnings });
       }
@@ -169,6 +193,25 @@ export async function POST(request: NextRequest) {
     // Push notification for new entries
     if (isEntry(cat)) {
       notifyNewSignal(parseResult.signal.pair, parseResult.signal.type, parseResult.signal.entry, parseResult.signal.timeframe).catch(() => {});
+    }
+
+    // ── Telegram notification: send signal to Telegram channel ──
+    if (isEntry(cat)) {
+      let parsedTps: { tp: number; rr: number }[] = [];
+      try { parsedTps = JSON.parse(String(signal.takeProfits || "[]")); } catch { parsedTps = []; }
+      sendSignalToTelegram({
+        pair: String(signal.pair),
+        type: parseResult.signal.type,
+        entry: Number(signal.entry),
+        stopLoss: Number(signal.stopLoss),
+        takeProfits: parsedTps,
+        confidence: Number(signal.confidence),
+        timeframe: signal.timeframe,
+        htfTimeframe: signal.htfTimeframe,
+        htfTrend: signal.htfTrend,
+        smcTrend: signal.smcTrend,
+        signalCategory: cat,
+      }).catch(() => {}); // Fire-and-forget
     }
 
     // ── Email notification: broadcast signal to all active subscribers ──

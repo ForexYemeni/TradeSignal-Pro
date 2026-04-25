@@ -51,6 +51,9 @@ export interface AppSettingsData {
   referralEnabled: boolean;
   referralRewardDays: number;
   referralInviteeRewardDays: number;
+  /* Telegram integration */
+  telegramBotToken: string | null;
+  telegramChatId: string | null;
 }
 
 export interface LocalPaymentMethodData {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSignalById, updateSignal, deleteSignal, getUserById } from "@/lib/store";
 import { notifyTpHit, notifySlHit } from "@/lib/push";
 import { notifySignalEvent } from "../stream/route";
+import { sendSignalUpdateToTelegram } from "@/lib/telegram";
 
 // ─── Auth Guard ───────────────────────────────────────
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || "";
@@ -244,6 +245,25 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         tpIndex: updateData.hitTpIndex as number | undefined,
         timestamp: Date.now(),
       });
+    }
+
+    // ── Telegram notification: send status update to Telegram channel ──
+    if (status === "HIT_TP" || status === "HIT_SL") {
+      const isPartialWin = updateData.partialWin && updateData.status === "HIT_TP";
+      const signalCat = existing.signalCategory === "REENTRY"
+        ? (status === "HIT_TP" ? "REENTRY_TP" : "REENTRY_SL")
+        : existing.signalCategory === "PYRAMID"
+          ? (status === "HIT_TP" ? "PYRAMID_TP" : "PYRAMID_SL")
+          : status;
+      sendSignalUpdateToTelegram({
+        pair: existing.pair,
+        updateType: signalCat as "TP_HIT" | "SL_HIT" | "REENTRY_TP" | "REENTRY_SL" | "PYRAMID_TP" | "PYRAMID_SL",
+        tpIndex: updateData.hitTpIndex as number | undefined,
+        hitPrice: updateData.hitPrice as number | undefined,
+        pnlDollars: updateData.pnlDollars as number | undefined,
+        pnlPoints: updateData.pnlPoints as number | undefined,
+        partialWin: isPartialWin ? true : false,
+      }).catch(() => {}); // Fire-and-forget
     }
 
     let parsedTps: { tp: number; rr: number }[] = [];

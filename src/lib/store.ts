@@ -542,11 +542,14 @@ export interface AppSettings {
   referralEnabled: boolean;
   referralRewardDays: number;         // extra days given to referrer
   referralInviteeRewardDays: number;  // extra days given to invitee
+  /* Telegram integration */
+  telegramBotToken: string | null;    // e.g. "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
+  telegramChatId: string | null;      // e.g. "@channel" or "-100123456789"
 }
 
 export async function getAppSettings(): Promise<AppSettings> {
   const data = await kv.get<AppSettings>('app_settings');
-  return data || { freeTrialPackageId: null, autoApproveOnRegister: true, usdtWalletAddress: null, usdtNetwork: null, localCurrencyName: null, localCurrencyCode: null, usdtToLocalRate: null, referralEnabled: false, referralRewardDays: 7, referralInviteeRewardDays: 3 };
+  return data || { freeTrialPackageId: null, autoApproveOnRegister: true, usdtWalletAddress: null, usdtNetwork: null, localCurrencyName: null, localCurrencyCode: null, usdtToLocalRate: null, referralEnabled: false, referralRewardDays: 7, referralInviteeRewardDays: 3, telegramBotToken: null, telegramChatId: null };
 }
 
 export async function updateAppSettings(updates: Partial<AppSettings>): Promise<AppSettings> {

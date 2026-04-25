@@ -21,7 +21,7 @@ import {
   Home, Flame, Trophy, ArrowUpRight, ArrowDownRight, Hash, Globe, PieChart, Sparkles, Timer, Wallet,
   MoreHorizontal, CreditCard, Upload, CheckCircle2, XCircle, Image, Copy, Plus, Banknote,
   ShieldCheck, ShieldX, ShieldBan, WifiOff, Gift, Ticket,
-  Search, Unlock, ArrowLeft, X, Check,
+  Search, Unlock, ArrowLeft, X, Check, Save, Wifi,
 } from "lucide-react";
 
 // ═══ EXTRACTED MODULES ═══
@@ -491,7 +491,7 @@ export default function HomePage() {
 
   /* ── Packages & Settings ── */
   const [packages, setPackages] = useState<SubPackage[]>([]);
-  const [appSettings, setAppSettings] = useState<AppSettingsData>({ freeTrialPackageId: null, autoApproveOnRegister: true, usdtWalletAddress: null, usdtNetwork: null, referralEnabled: false, referralRewardDays: 7, referralInviteeRewardDays: 3 });
+  const [appSettings, setAppSettings] = useState<AppSettingsData>({ freeTrialPackageId: null, autoApproveOnRegister: true, usdtWalletAddress: null, usdtNetwork: null, referralEnabled: false, referralRewardDays: 7, referralInviteeRewardDays: 3, telegramBotToken: null, telegramChatId: null });
   const [showPkgForm, setShowPkgForm] = useState(false);
   const [editingPkgId, setEditingPkgId] = useState<string | null>(null);
   const [pkgFormName, setPkgFormName] = useState("");
@@ -553,6 +553,12 @@ export default function HomePage() {
   const [couponInput, setCouponInput] = useState("");
   const [couponApplying, setCouponApplying] = useState(false);
   const [confirmDeleteCoupon, setConfirmDeleteCoupon] = useState<string | null>(null); // coupon code to confirm
+
+  /* ── Telegram Integration ── */
+  const [tgShowToken, setTgShowToken] = useState(false);
+  const [tgSaving, setTgSaving] = useState(false);
+  const [tgTesting, setTgTesting] = useState(false);
+  const [tgTestResult, setTgTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
   /* ── Proof Image Modal ── */
   const [proofModalOpen, setProofModalOpen] = useState(false);
@@ -1610,6 +1616,61 @@ export default function HomePage() {
       await fetch("/api/settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ referralInviteeRewardDays: days }) });
       setAppSettings(s => ({ ...s, referralInviteeRewardDays: days }));
     } catch (e) { console.error("Set referral invitee days:", e); }
+  }
+
+  /* ── Telegram Settings Handlers ── */
+  async function handleSaveTelegramSettings() {
+    setTgSaving(true);
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          telegramBotToken: (appSettings as any).telegramBotToken || null,
+          telegramChatId: (appSettings as any).telegramChatId || null,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success("تم حفظ إعدادات تلجرام", { description: "سيتم إرسال الإشارات تلقائياً إلى القناة" });
+        setTgTestResult(null);
+      } else {
+        toast.error("فشل حفظ الإعدادات", { description: data.error || "خطأ غير معروف" });
+      }
+    } catch (e) {
+      console.error("Save telegram settings:", e);
+      toast.error("فشل الاتصال", { description: "تعذر الوصول إلى الخادم" });
+    } finally {
+      setTgSaving(false);
+    }
+  }
+
+  async function handleTestTelegram() {
+    setTgTesting(true);
+    setTgTestResult(null);
+    try {
+      const res = await fetch("/api/telegram/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          token: (appSettings as any).telegramBotToken || "",
+          chatId: (appSettings as any).telegramChatId || "",
+        }),
+      });
+      const data = await res.json();
+      setTgTestResult({ success: data.success, message: data.message || (data.success ? "تم بنجاح" : "فشل") });
+      if (data.success) {
+        toast.success("تم اختبار الاتصال بنجاح!");
+      } else {
+        toast.error("فشل اختبار الاتصال", { description: data.message });
+      }
+    } catch (e) {
+      console.error("Test telegram:", e);
+      setTgTestResult({ success: false, message: "فشل الاتصال بالخادم" });
+      toast.error("فشل الاتصال", { description: "تعذر الوصول إلى الخادم" });
+    } finally {
+      setTgTesting(false);
+    }
   }
 
   /* ── Payment Settings Handlers ── */
@@ -5299,6 +5360,94 @@ export default function HomePage() {
                         </div>
                       </div>
                     </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* ── Telegram Integration Card ── */}
+            <div className="glass-card border-sky-500/15 overflow-hidden">
+              <div className="p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-lg bg-sky-500/15 flex items-center justify-center">
+                    <Send className="w-3.5 h-3.5 text-sky-400" />
+                  </div>
+                  <span className="text-xs font-bold text-sky-400">ربط تلجرام</span>
+                  {appSettings.telegramBotToken && appSettings.telegramChatId && (
+                    <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/20 text-emerald-400 font-bold">متصل</span>
+                  )}
+                </div>
+
+                {/* Bot Token */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-semibold text-foreground/80 flex items-center gap-1">
+                    توكن البوت <span className="text-muted-foreground/40">(Bot Token)</span>
+                  </label>
+                  <div className="relative">
+                    <Input
+                      value={(appSettings as any).telegramBotToken || ""}
+                      onChange={e => setAppSettings(prev => ({ ...prev, telegramBotToken: e.target.value || null }))}
+                      placeholder="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
+                      className="glass-input text-xs font-mono pr-10"
+                      dir="ltr"
+                      type={tgShowToken ? "text" : "password"}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setTgShowToken(!tgShowToken)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground transition-colors"
+                    >
+                      {tgShowToken ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Chat ID */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-semibold text-foreground/80 flex items-center gap-1">
+                    معرف القناة أو المجموعة <span className="text-muted-foreground/40">(Chat ID)</span>
+                  </label>
+                  <Input
+                    value={(appSettings as any).telegramChatId || ""}
+                    onChange={e => setAppSettings(prev => ({ ...prev, telegramChatId: e.target.value || null }))}
+                    placeholder="@your_channel أو -1001234567890"
+                    className="glass-input text-xs font-mono"
+                    dir="ltr"
+                  />
+                  <p className="text-[8px] text-muted-foreground/50 leading-relaxed">
+                    أضف البوت كمدير في القناة أو المجموعة، ثم أدخل معرف القناة (مثل @channel) أو معرف المجموعة الرقمي (مثل -1001234567890)
+                  </p>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-2 pt-1">
+                  <button
+                    onClick={handleSaveTelegramSettings}
+                    disabled={tgSaving}
+                    className="flex-1 h-10 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 text-white text-[10px] font-bold flex items-center justify-center gap-1.5 active:scale-[0.98] disabled:opacity-40 shadow-lg shadow-sky-500/20"
+                  >
+                    {tgSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                    حفظ الإعدادات
+                  </button>
+                  <button
+                    onClick={handleTestTelegram}
+                    disabled={tgTesting || !(appSettings as any).telegramBotToken || !(appSettings as any).telegramChatId}
+                    className="flex-1 h-10 rounded-xl border border-sky-500/25 text-sky-400 text-[10px] font-bold flex items-center justify-center gap-1.5 active:scale-[0.98] disabled:opacity-40 hover:bg-sky-500/[0.08] transition-colors"
+                  >
+                    {tgTesting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wifi className="w-3.5 h-3.5" />}
+                    اختبار الاتصال
+                  </button>
+                </div>
+
+                {/* Telegram Test Result */}
+                {tgTestResult && (
+                  <div className={`rounded-xl p-3 flex items-start gap-2 ${tgTestResult.success ? "bg-emerald-500/[0.08] border border-emerald-500/15" : "bg-red-500/[0.08] border border-red-500/15"}`}>
+                    {tgTestResult.success
+                      ? <CheckCircle2 className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
+                      : <XCircle className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />}
+                    <p className={`text-[10px] leading-relaxed ${tgTestResult.success ? "text-emerald-400/90" : "text-red-400/90"}`}>
+                      {tgTestResult.message}
+                    </p>
                   </div>
                 )}
               </div>
