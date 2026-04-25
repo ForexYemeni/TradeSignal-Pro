@@ -718,6 +718,13 @@ export default function HomePage() {
             toast.warning("⚠️ اشتراكك ينتهي خلال أقل من 3 أيام! قم بتجديد باقتك لتجنب انقطاع الإشارات");
           }
         }
+      } else if (data.forceLogout) {
+        // ── Force logout by admin: immediately kick user out ──
+        toast.error("تم تسجيل خروجك بواسطة الإدارة", { description: data.error || "تم حذف حسابك أو إيقاف صلاحياتك" });
+        localStorage.removeItem("adminSession");
+        document.cookie = "fy_session=; path=/; max-age=0";
+        setSession(null);
+        setView("login");
       }
     } catch { /* ignore — will retry on next interval */ }
   }, [session?.id]);

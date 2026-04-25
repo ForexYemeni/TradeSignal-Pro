@@ -291,11 +291,40 @@ export async function updateUser(id: string, updates: Partial<StoredUser>): Prom
 export async function deleteUser(id: string): Promise<boolean> {
   return withLock('users', async () => {
     const users = await getUsers();
+    const userToDelete = users.find(u => u.id === id);
     const filtered = users.filter(u => u.id !== id);
     if (filtered.length === users.length) return false;
     await kv.set('users', filtered);
+
+    // ── Force logout: mark user as deleted so session refresh kicks them out ──
+    await kv.set(`force_logout:${id}`, "1", { ex: 86400 }); // 24h TTL
+
+    // ── Track free trial devices: prevent re-registering for free trial ──
+    if (userToDelete) {
+      if (userToDelete.hadFreeTrial && userToDelete.deviceId) {
+        const key = `used_trial_device:${userToDelete.deviceId}`;
+        const existing = await kv.smembers(key);
+        // Store email so we can show which accounts used free trial on this device
+        await kv.sadd(key, userToDelete.email);
+        await kv.expire(key, 365 * 24 * 3600); // 1 year
+      }
+      // Also save by email for reference
+      if (userToDelete.hadFreeTrial) {
+        const emailKey = `used_trial_email:${userToDelete.email}`;
+        await kv.set(emailKey, userToDelete.deviceId || "unknown", { ex: 365 * 24 * 3600 });
+      }
+    }
+
     return true;
   });
+}
+
+// ── Check if a device already used a free trial ──
+export async function hasDeviceUsedFreeTrial(deviceId: string): Promise<boolean> {
+  if (!deviceId) return false;
+  const key = `used_trial_device:${deviceId}`;
+  const members = await kv.smembers(key);
+  return members.length > 0;
 }
 
 // ─── Migrate Admin to Users ─────────────────────────────

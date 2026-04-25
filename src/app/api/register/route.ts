@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { kv } from "@vercel/kv";
-import { getUserByEmail, getUserByDeviceId, addUser, updateUser, migrateAdminToUsers, getAppSettings, getPackageById, getUsers, hashPassword } from "@/lib/store";
+import { getUserByEmail, getUserByDeviceId, addUser, updateUser, migrateAdminToUsers, getAppSettings, getPackageById, getUsers, hashPassword, hasDeviceUsedFreeTrial } from "@/lib/store";
 import { sendPushToAdmins } from "@/lib/push";
 import { addAdminNotification } from "@/lib/store";
 import { validateText, validateEmail, validatePassword } from "@/lib/validation";
@@ -128,8 +128,18 @@ export async function POST(request: NextRequest) {
     let trialExpiry: string | null = null;
     let trialPkgId: string | null = null;
     let trialPkgName: string | null = null;
+    let skipFreeTrial = false;
 
-    if (settings.freeTrialPackageId) {
+    // ── Check if this device previously used a free trial (deleted user re-registering) ──
+    if (deviceId && deviceId.trim()) {
+      const deviceUsedTrial = await hasDeviceUsedFreeTrial(deviceId.trim());
+      if (deviceUsedTrial) {
+        skipFreeTrial = true;
+        console.log(`[Register] Skipping free trial for device ${deviceId.slice(0, 8)}... — previously used free trial on a deleted account`);
+      }
+    }
+
+    if (!skipFreeTrial && settings.freeTrialPackageId) {
       const trialPkg = await getPackageById(settings.freeTrialPackageId);
       if (trialPkg && trialPkg.isActive) {
         trialPkgId = trialPkg.id;

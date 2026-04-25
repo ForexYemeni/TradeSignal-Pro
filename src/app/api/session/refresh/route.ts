@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserById, enforceSubscriptions } from "@/lib/store";
+import { kv } from "@vercel/kv";
 
 /**
  * GET /api/session/refresh?userId=xxx
@@ -12,6 +13,14 @@ export async function GET(request: NextRequest) {
     const userId = request.nextUrl.searchParams.get("userId");
     if (!userId) {
       return NextResponse.json({ success: false, error: "معرف المستخدم مطلوب" }, { status: 400 });
+    }
+
+    // ── Check if user was deleted (force logout) ──
+    const forceLogout = await kv.get(`force_logout:${userId}`);
+    if (forceLogout) {
+      // Clean up the key
+      await kv.del(`force_logout:${userId}`);
+      return NextResponse.json({ success: false, forceLogout: true, error: "تم تسجيل خروجك بواسطة الإدارة" });
     }
 
     // Enforce subscriptions (expire any that are past due)
