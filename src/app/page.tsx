@@ -5410,12 +5410,12 @@ export default function HomePage() {
                   <Input
                     value={(appSettings as any).telegramChatId || ""}
                     onChange={e => setAppSettings(prev => ({ ...prev, telegramChatId: e.target.value || null }))}
-                    placeholder="@your_channel أو -1001234567890"
+                    placeholder="2463619819 أو @your_channel"
                     className="glass-input text-xs font-mono"
                     dir="ltr"
                   />
                   <p className="text-[8px] text-muted-foreground/50 leading-relaxed">
-                    أضف البوت كمدير في القناة أو المجموعة، ثم أدخل معرف القناة (مثل @channel) أو معرف المجموعة الرقمي (مثل -1001234567890)
+                    أضف البوت كمدير في القناة أو المجموعة، ثم أدخل رقم المجموعة فقط (مثل 2463619819) أو اسم القناة (مثل @channel)
                   </p>
                 </div>
 

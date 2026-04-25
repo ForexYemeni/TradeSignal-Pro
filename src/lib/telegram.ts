@@ -68,7 +68,7 @@ export interface TelegramConfig {
 async function getTelegramConfig(): Promise<TelegramConfig> {
   const settings = await getAppSettings();
   const token = settings.telegramBotToken?.trim() || "";
-  const chatId = settings.telegramChatId?.trim() || "";
+  const chatId = normalizeTelegramChatId(settings.telegramChatId || "");
   return {
     enabled: token.length > 0 && chatId.length > 0,
     botToken: token,
@@ -80,12 +80,28 @@ async function getTelegramConfig(): Promise<TelegramConfig> {
 //  Test Connection
 // ═══════════════════════════════════════════════════════════════
 
+/**
+ * Normalize a Telegram chat ID:
+ *  - If it starts with @ (channel username), keep as-is.
+ *  - If it's a plain numeric string (e.g. "2463619819"), prepend "-100" so it becomes a supergroup ID.
+ *  - If it already starts with "-" (e.g. "-1002463619819"), keep as-is.
+ */
+export function normalizeTelegramChatId(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+  if (trimmed.startsWith("@")) return trimmed;
+  if (trimmed.startsWith("-")) return trimmed;
+  // Plain number — treat as supergroup ID and prepend -100
+  if (/^\d+$/.test(trimmed)) return `-100${trimmed}`;
+  return trimmed;
+}
+
 export async function testTelegramConnection(
   token: string,
   chatId: string
 ): Promise<{ success: boolean; message: string; botName?: string }> {
   const trimmedToken = token.trim();
-  const trimmedChatId = chatId.trim();
+  const trimmedChatId = normalizeTelegramChatId(chatId);
 
   if (!trimmedToken || !trimmedChatId) {
     return { success: false, message: "يرجى إدخال توكن البوت ومعرف القناة" };
