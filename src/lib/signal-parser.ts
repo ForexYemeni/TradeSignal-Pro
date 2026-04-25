@@ -845,15 +845,46 @@ function extractSMCTrend(text: string): string {
 }
 
 function extractTPNumber(text: string): number {
-  // For "تحقق الهدف X" or "الهدف X"
+  // For "تحقق الهدف X إلى Y" or "الهدف X - Y" or "الهدف X → Y" (range pattern)
+  // e.g. "تحقق الهدف 6 إلى 7" → return 7 (last hit target)
+  const rangeMatch = text.match(/(?:تحقق\s+)?(?:هدف)\s*(?:التعويض|التعزيز)?\s*(\d+)\s*(?:إلى|الى|[-–—→>|])\s*(\d+)/);
+  if (rangeMatch) return parseInt(rangeMatch[2]); // Return the LAST number in range
+
+  // For "تحقق الهدف X" or "الهدف X" (single target)
   const explicitMatch = text.match(/(?:تحقق\s+)?(?:هدف)\s*(?:التعويض|التعزيز)?\s*(\d+)/);
   if (explicitMatch) return parseInt(explicitMatch[1]);
 
-  // For full close "إغلاق كامل بالربح" or jump "قفزة سعرية" — find the HIGHEST TP number
-  if (/إغلاق كامل بالربح/.test(text) || /قفزة سعرية/.test(text)) {
+  // For full close "إغلاق كامل بالربح" — find the HIGHEST TP number (all hit)
+  if (/إغلاق كامل بالربح/.test(text)) {
     let maxTP = -1;
     const tpRegex = /TP\s*(\d+)/gi;
     let m;
+    while ((m = tpRegex.exec(text)) !== null) {
+      const n = parseInt(m[1]);
+      if (n > maxTP) maxTP = n;
+    }
+    return maxTP;
+  }
+
+  // For "قفزة سعرية" (price jump) — count ONLY the HIT (✅) TPs, not pending (⏳)
+  // This is CRITICAL: the signal lists ALL TPs (1-10), but only some are hit
+  // We must return the LAST HIT TP, not the highest TP number in the text
+  if (/قفزة سعرية/.test(text)) {
+    let maxHitTP = -1;
+    const hitRegex = /✅\s*TP\s*(\d+)/gi;
+    let m;
+    while ((m = hitRegex.exec(text)) !== null) {
+      const n = parseInt(m[1]);
+      if (n > maxHitTP) maxHitTP = n;
+    }
+    if (maxHitTP > 0) return maxHitTP;
+    // Fallback: look for ← الآن marker on any TP
+    const nowRegex = /TP\s*(\d+)[^\n]*←\s*الآن/gi;
+    const nowMatch = nowRegex.exec(text);
+    if (nowMatch) return parseInt(nowMatch[1]);
+    // Last fallback for jump: highest TP number (old behavior)
+    let maxTP = -1;
+    const tpRegex = /TP\s*(\d+)/gi;
     while ((m = tpRegex.exec(text)) !== null) {
       const n = parseInt(m[1]);
       if (n > maxTP) maxTP = n;

@@ -364,7 +364,10 @@ async function handleUpdateSignal(parsed: any) {
     const tpArrayIdx = tpNum > 0 ? tpNum - 1 : -1;
     const totalTPsCount = parsed.totalTPs || tps.length;
     const isFullClose = /إغلاق كامل بالربح/.test(String(parsed.rawText || ""));
-    const isLastTP = isFullClose || tpNum >= totalTPsCount;
+    const isPriceJump = /قفزة سعرية/.test(String(parsed.rawText || ""));
+    // Price jump (قفزة سعرية) is NEVER a full close — it means some TPs were skipped
+    // Only "إغلاق كامل بالربح" or reaching the actual last TP should close the trade
+    const isLastTP = isFullClose || (!isPriceJump && tpNum >= totalTPsCount);
 
     // Keep ACTIVE for partial TP hits, only set HIT_TP on last/full close
     updateData.status = isLastTP ? "HIT_TP" : "ACTIVE";
