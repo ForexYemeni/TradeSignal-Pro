@@ -983,6 +983,11 @@ export default function HomePage() {
           }
         }
         setSignals(newSignals);
+        // Clear animation tracking sets after 5s to prevent memory leak
+        setTimeout(() => {
+          newSignalIdsRef.current.clear();
+          statusChangeIdsRef.current.clear();
+        }, 5000);
       }
     } catch (e) { console.error("Fetch signals:", e); }
   }, [audioMuted, audioVol, signalsPage]);

@@ -82,6 +82,17 @@ export async function POST(request: NextRequest) {
     //  TP/SL/REENTRY/PYRAMID/BREAKEVEN updates → find parent & update in-place
     // ═══════════════════════════════════════════════════════════════
     if (!isEntry(cat)) {
+      // ── Deduplication: skip if same update already applied ──
+      const recentForDup = await getSignals(20);
+      const isDupUpdate = recentForDup.some(s => {
+        if (String(s.pair).toUpperCase() !== String(parseResult.signal!.pair || "").toUpperCase()) return false;
+        if (s.rawText.trim() === (parseResult.signal!.rawText || "").trim()) return true;
+        return false;
+      });
+      if (isDupUpdate) {
+        return NextResponse.json({ success: true, duplicate: true, message: "تحديث مكرر - تم التجاهل", warnings: parseResult.warnings });
+      }
+
       const updated = await handleUpdateSignal(parseResult.signal);
       if (updated) {
         // Send push notification for the update
@@ -155,18 +166,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Non-entry deduplication: skip if same update already applied
-    if (!isEntry(cat)) {
-      const recent = await getSignals(20);
-      const isDup = recent.some(s => {
-        if (String(s.pair).toUpperCase() !== String(parseResult.signal!.pair || "").toUpperCase()) return false;
-        if (s.rawText.trim() === (parseResult.signal!.rawText || "").trim()) return true;
-        return false;
-      });
-      if (isDup) {
-        return NextResponse.json({ success: true, duplicate: true, message: "تحديث مكرر - تم التجاهل", warnings: parseResult.warnings });
-      }
-    }
+    // Non-entry dedup moved above to before handleUpdateSignal
 
     const signal = {
       id: crypto.randomUUID(),
@@ -297,8 +297,13 @@ async function handleUpdateSignal(parsed: any) {
     const aliases: Record<string, string> = {
       "GOLD": "XAUUSD", "XAUUSDUSD": "XAUUSD", "XAU": "XAUUSD",
       "SILVER": "XAGUSD", "XAG": "XAGUSD",
-      "BTCUSDT": "BTCUSD", "BTCUSD": "BTCUSDT",
-      "ETHUSDT": "ETHUSD", "ETHUSD": "ETHUSDT",
+      "BTCUSDT": "BTCUSDT", "BTCUSD": "BTCUSDT",
+      "ETHUSDT": "ETHUSDT", "ETHUSD": "ETHUSDT",
+      "USOIL": "USOIL", "CRUDE": "USOIL", "OIL": "USOIL", "CL": "USOIL",
+      "NASDAQ": "NAS100", "NAS100": "NAS100",
+      "SPX500": "US500", "US500": "US500",
+      "DAX": "DAX40", "DAX40": "DAX40", "GER40": "DAX40",
+      "UK100": "UK100",
     };
     return aliases[p] || p;
   }
@@ -362,6 +367,17 @@ async function handleUpdateSignal(parsed: any) {
   } else if (parsed.signalCategory === "TP_HIT" || parsed.signalCategory === "REENTRY_TP" || parsed.signalCategory === "PYRAMID_TP") {
     const tpNum = parsed.hitTpIndex ?? 0; // 1-indexed from parser
     const tpArrayIdx = tpNum > 0 ? tpNum - 1 : -1;
+
+    // ── Guard: Ignore TP hits that would REGRESS the signal state ──
+    // If TP5 was already recorded, ignore a late-arriving TP3
+    const prevHitTp = Number(parent.hitTpIndex) || 0;
+    if (tpNum > 0 && tpNum <= prevHitTp && parent.status !== "ACTIVE") {
+      return null; // Already past this TP — ignore stale update
+    }
+    if (tpNum > 0 && tpNum <= prevHitTp && parent.status === "ACTIVE") {
+      // Even if ACTIVE, don't regress hitTpIndex (but allow re-processing same TP for P&L update)
+      if (tpNum < prevHitTp) return null;
+    };
     const totalTPsCount = parsed.totalTPs || tps.length;
     const isFullClose = /إغلاق كامل بالربح/.test(String(parsed.rawText || ""));
     const isPriceJump = /قفزة سعرية/.test(String(parsed.rawText || ""));

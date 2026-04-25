@@ -61,7 +61,7 @@ export function TpMiniCard({ tp, index, isHit, isLastHit, entry, type }: {
   const [expanded, setExpanded] = useState(false);
   const diff = Math.abs(tp.tp - entry).toFixed(1);
   const direction = (type === "BUY" && tp.tp > entry) || (type === "SELL" && tp.tp < entry) ? "+" : "";
-  const pctFromEntry = ((Math.abs(tp.tp - entry) / entry) * 100).toFixed(3);
+  const pctFromEntry = entry > 0 ? ((Math.abs(tp.tp - entry) / entry) * 100).toFixed(3) : "—";
 
   return (
     <div>
@@ -794,7 +794,7 @@ export function ClosedSignalCard({ s, idx, isAdmin, onDelete, statusChanged, isF
                 <div className="grid grid-cols-3 gap-2">
                   <div className="bg-white/[0.02] rounded-lg p-2.5 border border-white/[0.06]">
                     <div className="text-[10px] text-muted-foreground/50 mb-1">الدخول</div>
-                    <div className="text-[11px] font-bold font-mono text-foreground tabular-nums" dir="ltr">{s.entry}</div>
+                    <div className="text-[11px] font-bold font-mono text-foreground tabular-nums" dir="ltr">{s.entry || "—"}</div>
                   </div>
                   <div className="bg-red-500/[0.03] rounded-lg p-2.5 border border-red-500/10">
                     <div className="text-[10px] text-red-400/40 mb-1">الوقف</div>
