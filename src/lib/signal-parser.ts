@@ -490,10 +490,10 @@ function parseBasicSignal(text: string): ParseResult {
 function parseGenericAlert(text: string): ParseResult {
   const upper = text.toUpperCase();
 
-  // Detect direction
+  // Detect direction — no \b for Arabic (word boundary doesn't work with Arabic chars)
   let type: "BUY" | "SELL" | null = null;
-  if (/\b(BUY|LONG|شراء|بايع)\b/i.test(text)) type = "BUY";
-  else if (/\b(SELL|SHORT|بيع|سال)\b/i.test(text)) type = "SELL";
+  if (/\b(?:BUY|LONG)\b/i.test(text) || /(?:شراء|بايع)/.test(text)) type = "BUY";
+  else if (/\b(?:SELL|SHORT)\b/i.test(text) || /(?:بيع|سال)/.test(text)) type = "SELL";
 
   if (!type) {
     return { success: false, error: "لم يتم التعرف على نوع الإشارة — يجب أن يحتوي على Buy/Sell/شراء/بيع" };
@@ -902,7 +902,9 @@ function emptyRiskData(): RiskData {
 
 export function validateSignal(signal: ParsedSignal): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
-  if (signal.entry <= 0) errors.push("سعر الدخول غير صالح");
-  if (signal.stopLoss <= 0 && signal.signalCategory === "ENTRY") errors.push("وقف الخسارة غير صالح");
+  // Only require entry > 0 for signals that have a price
+  // Generic alerts (without price) set entry=0, which is acceptable
+  if (signal.entry > 0 && signal.entry < 0.00001) errors.push("سعر الدخول غير صالح");
+  // Stop loss is optional — many signals don't include it
   return { valid: errors.length === 0, errors };
 }
