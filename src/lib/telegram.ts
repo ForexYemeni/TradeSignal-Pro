@@ -339,7 +339,7 @@ export async function sendSignalToTelegram(signal: {
 
 export async function sendSignalUpdateToTelegram(params: {
   pair: string;
-  updateType: "TP_HIT" | "SL_HIT" | "BREAKEVEN" | "REENTRY_TP" | "REENTRY_SL" | "PYRAMID_TP" | "PYRAMID_SL";
+  updateType: "TP_HIT" | "HIT_TP" | "SL_HIT" | "HIT_SL" | "BREAKEVEN" | "REENTRY_TP" | "REENTRY_SL" | "PYRAMID_TP" | "PYRAMID_SL";
   tpIndex?: number;
   totalTPs?: number;
   hitPrice?: number;
@@ -367,6 +367,7 @@ export async function sendSignalUpdateToTelegram(params: {
 
   switch (updateType) {
     case "TP_HIT":
+    case "HIT_TP": // fallback — some routes use status values
     case "REENTRY_TP":
     case "PYRAMID_TP": {
       const tpNum = (tpIndex ?? 0);
@@ -427,6 +428,7 @@ export async function sendSignalUpdateToTelegram(params: {
     }
 
     case "SL_HIT":
+    case "HIT_SL": // fallback — some routes use status values
     case "REENTRY_SL":
     case "PYRAMID_SL": {
       if (partialWin) {

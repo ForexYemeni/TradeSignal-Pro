@@ -250,11 +250,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     // ── Telegram notification: send status update to Telegram channel ──
     if (status === "HIT_TP" || status === "HIT_SL") {
       const isPartialWin = updateData.partialWin && updateData.status === "HIT_TP";
+      // Map status (HIT_TP/HIT_SL) to update types (TP_HIT/SL_HIT) for Telegram
       const signalCat = existing.signalCategory === "REENTRY"
         ? (status === "HIT_TP" ? "REENTRY_TP" : "REENTRY_SL")
         : existing.signalCategory === "PYRAMID"
           ? (status === "HIT_TP" ? "PYRAMID_TP" : "PYRAMID_SL")
-          : status;
+          : (status === "HIT_TP" ? "TP_HIT" : "SL_HIT");
 
       // Parse TPs from existing signal for totalTPs count
       let existingTps: { tp: number; rr: number }[] = [];
@@ -271,7 +272,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         partialWin: isPartialWin ? true : false,
         entry: Number(existing.entry) || undefined,
         stopLoss: Number(existing.stopLoss) || undefined,
-      }).catch(() => {}); // Fire-and-forget
+      }).catch((e) => { console.error("[Telegram] Update send failed:", e); }); // Fire-and-forget
     }
 
     let parsedTps: { tp: number; rr: number }[] = [];
