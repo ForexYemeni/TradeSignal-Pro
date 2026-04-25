@@ -27,11 +27,17 @@ export async function validateAdmin(request: NextRequest): Promise<AdminAuthResu
   // 1. Check session cookie
   const sessionCookie = request.cookies.get("fy_session")?.value;
   if (sessionCookie) {
+    // Cookie value may be either:
+    //   a) A plain userId (UUID string) — set by /api/admin and /api/auth
+    //   b) A base64-encoded JSON — legacy format
+    const trimmed = sessionCookie.trim();
+    // Try base64 JSON first
     try {
-      const sessionData = JSON.parse(atob(sessionCookie));
+      const sessionData = JSON.parse(atob(trimmed));
       userId = sessionData.id || sessionData.userId || "";
     } catch {
-      // Invalid cookie format
+      // Not base64 JSON — treat the raw value as a userId
+      if (trimmed.length > 0) userId = trimmed;
     }
   }
 
@@ -68,12 +74,15 @@ export function getSessionUserId(request: NextRequest): string | null {
   // 1. Check session cookie
   const sessionCookie = request.cookies.get("fy_session")?.value;
   if (sessionCookie) {
+    const trimmed = sessionCookie.trim();
+    // Try base64 JSON first
     try {
-      const sessionData = JSON.parse(atob(sessionCookie));
+      const sessionData = JSON.parse(atob(trimmed));
       const userId = sessionData.id || sessionData.userId || "";
       if (userId) return userId;
     } catch {
-      // Invalid cookie format
+      // Not base64 JSON — treat raw value as userId
+      if (trimmed.length > 0) return trimmed;
     }
   }
 

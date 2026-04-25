@@ -3449,7 +3449,7 @@ export default function HomePage() {
   ];
 
   const mainContent = (
-    <div className="h-[100dvh] flex flex-col overflow-hidden" style={{ background: "linear-gradient(135deg, #080d1a 0%, #0f172a 50%, #080d1a 100%)" }}>
+    <div className="h-[100dvh] flex flex-col" style={{ background: "linear-gradient(135deg, #080d1a 0%, #0f172a 50%, #080d1a 100%)" }}>
       {/* ── Confetti ── */}
       <Confetti show={showConfetti} />
       {showConfetti && (
@@ -3539,7 +3539,8 @@ export default function HomePage() {
                 {showAdminNotif && <div className="fixed inset-0 z-40" onClick={() => setShowAdminNotif(false)} />}
               </div>
             )}
-            {/* Notification Bell (signal-based in-browser) */}
+            {/* Notification Bell (signal-based in-browser) — hidden for admin since they have admin notification bell */}
+            {session?.role !== "admin" && (
             <div className="relative">
               <button onClick={() => { setShowNotifications(!showNotifications); setNotifications(prev => prev.map(n => ({ ...n, read: true }))); }}
                 className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-all duration-300 hover:shadow-sm active:scale-90">
@@ -3575,6 +3576,7 @@ export default function HomePage() {
               )}
               {showNotifications && <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)} />}
             </div>
+            )}
             {/* Audio Controls */}
             <button onClick={() => setAudioMuted(!audioMuted)} className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-all duration-300 hover:shadow-sm active:scale-90">
               {audioMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
@@ -3590,16 +3592,17 @@ export default function HomePage() {
             <button onClick={() => setRefreshKey(k => k + 1)} className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-amber-400 hover:bg-white/[0.06] transition-all duration-300 hover:shadow-sm active:scale-90">
               <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
             </button>
-            {/* Logout */}
-            <button onClick={handleLogout} className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-red-400 hover:bg-red-400/[0.08] transition-all duration-300 hover:shadow-sm active:scale-90">
+            {/* Logout — prominent red button */}
+            <button onClick={handleLogout} className="h-8 px-2.5 rounded-lg flex items-center justify-center gap-1.5 text-red-400 hover:text-red-300 hover:bg-red-500/[0.12] active:scale-90" style={{ transition: 'all 0.2s ease' }}>
               <LogOut className="w-4 h-4" />
+              <span className="text-[10px] font-bold">خروج</span>
             </button>
           </div>
         </div>
       </header>
 
       {/* ── Content ── */}
-      <main className="flex-1 overflow-y-auto overflow-x-hidden px-4 pb-20 md:pb-24 pt-3 max-w-lg mx-auto w-full" style={{ WebkitOverflowScrolling: 'touch' }}>
+      <main className="flex-1 overflow-y-auto overflow-x-hidden px-4 pb-4 pt-3 max-w-lg mx-auto w-full" style={{ WebkitOverflowScrolling: 'touch' }}>
 
         {/* ══════ TAB: HOME — PROFESSIONAL DASHBOARD ══════ */}
         {tab === "home" && (<motion.div key="home" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>{(() => {
@@ -7029,7 +7032,7 @@ export default function HomePage() {
       </main>
 
       {/* ── Mobile Bottom Navigation ── */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 md:hidden glass-nav-premium glass-nav-border-animated safe-area-bottom h-16" style={{ touchAction: 'manipulation' }}>
+      <nav className="flex-shrink-0 md:hidden glass-nav-premium glass-nav-border-animated safe-area-bottom h-16 border-t border-white/[0.04]" style={{ touchAction: 'manipulation' }}>
         <div className="max-w-lg mx-auto flex items-stretch h-full">
           {tabs.map(t => (
             <button key={t.key} onClick={() => setTab(t.key)}
@@ -7051,7 +7054,7 @@ export default function HomePage() {
       </nav>
 
       {/* ── Desktop Bottom Navigation ── */}
-      <nav className="hidden md:block fixed bottom-0 left-0 right-0 z-40 glass-nav-premium glass-nav-border-animated border-t border-white/[0.04] safe-area-bottom h-14">
+      <nav className="hidden md:flex flex-shrink-0 glass-nav-premium glass-nav-border-animated border-t border-white/[0.04] safe-area-bottom h-14">
         <div className="max-w-lg mx-auto flex h-full">
           {tabs.map(t => (
             <button key={t.key} onClick={() => setTab(t.key)}
