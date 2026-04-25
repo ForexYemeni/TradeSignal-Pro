@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { addSignal, getSignals, updateSignal, getUserById, getPackageById } from "@/lib/store";
+import { addSignal, getSignals, updateSignal, getUserById, getPackageById, addAdminNotification } from "@/lib/store";
 import { parseTradingViewSignal, validateSignal } from "@/lib/signal-parser";
 import { notifyNewSignal, notifyTpHit, notifySlHit } from "@/lib/push";
 import { notifySignalEvent } from "./stream/route";
@@ -22,11 +22,16 @@ async function isAuthorized(request: NextRequest): Promise<boolean> {
     if (user) return true;
   }
 
-  // 2. Check webhook secret (for Google Apps Script)
+  // 2. Check webhook secret (for Google Apps Script / TradingView webhooks)
   const webhookHeader = request.headers.get("x-webhook-secret");
   if (WEBHOOK_SECRET && webhookHeader === WEBHOOK_SECRET) return true;
 
-  // 3. Check Authorization header
+  // 3. If no webhook secret is configured in Vercel env, allow external POST requests
+  //    (Google Apps Script, TradingView webhooks, etc.) — for easy setup/testing.
+  //    For production security, set WEBHOOK_SECRET in Vercel and in Google Apps Script.
+  if (!WEBHOOK_SECRET) return true;
+
+  // 4. Check Authorization header (Bearer token)
   const authHeader = request.headers.get("authorization");
   if (!authHeader) return false;
   const token = authHeader.replace(/^Bearer\s+/i, "");
@@ -58,13 +63,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "النص مطلوب" }, { status: 400 });
     }
 
+    console.log("[Webhook] Incoming signal text:", text.substring(0, 200));
+
     const parseResult = parseTradingViewSignal(text);
     if (!parseResult.success || !parseResult.signal) {
+      console.error("[Webhook] Parse failed:", parseResult.error, "| Warnings:", parseResult.warnings);
       return NextResponse.json(
         { success: false, error: parseResult.error || "فشل تحليل الإشارة", warnings: parseResult.warnings },
         { status: 400 }
       );
     }
+
+    console.log("[Webhook] Parsed:", parseResult.signal.signalCategory, "| Pair:", parseResult.signal.pair, "| Type:", parseResult.signal.type);
 
     const cat = parseResult.signal.signalCategory;
 
@@ -195,8 +205,20 @@ export async function POST(request: NextRequest) {
 
     await addSignal(signal);
 
+    console.log("[Webhook] Signal stored:", signal.id, "| Pair:", signal.pair, "| Cat:", cat);
+
     // Notify SSE subscribers about new signal (include type for instant sound)
     notifySignalEvent({ type: "signal", pair: parseResult.signal.pair, signalType: cat, signalDirection: parseResult.signal.type, timestamp: Date.now() });
+
+    // Admin notification for new entry signals
+    if (isEntry(cat)) {
+      const directionLabel = parseResult.signal.type === "BUY" ? "شراء" : "بيع";
+      addAdminNotification({
+        type: "system",
+        title: `إشارة ${directionLabel}: ${parseResult.signal.pair}`,
+        message: `تم استلام إشارة ${directionLabel} جديدة لزوج ${parseResult.signal.pair} | الدخول: ${parseResult.signal.entry} | الإطار: ${parseResult.signal.timeframe || "—"}`,
+      }).catch(() => {});
+    }
 
     // Push notification for new entries
     if (isEntry(cat)) {
