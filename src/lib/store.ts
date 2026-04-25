@@ -347,6 +347,23 @@ export async function getUserUpdateFlag(userId: string): Promise<{ type: string;
   }
 }
 
+// ── Global data version (for real-time refresh of packages, methods, coupons, settings) ──
+// Incremented by ANY admin change to shared data → ALL clients detect and refresh
+const GLOBAL_VERSION_KEY = "global_data_version";
+
+export async function incrementGlobalVersion(category: string): Promise<number> {
+  const newVersion = await kv.incr(GLOBAL_VERSION_KEY);
+  // Also store the last update category for context
+  await kv.set("global_data_last_update", JSON.stringify({ category, ts: Date.now(), version: newVersion }), { ex: 300 });
+  return newVersion;
+}
+
+export async function getGlobalVersion(): Promise<{ version: number; lastUpdate: { category: string; ts: number; version: number } | null }> {
+  const version = (await kv.get<number>(GLOBAL_VERSION_KEY)) || 0;
+  const lastUpdate = await kv.get<{ category: string; ts: number; version: number }>("global_data_last_update");
+  return { version, lastUpdate };
+}
+
 // ─── Migrate Admin to Users ─────────────────────────────
 export async function migrateAdminToUsers(): Promise<void> {
   const admin = await getAdmin();

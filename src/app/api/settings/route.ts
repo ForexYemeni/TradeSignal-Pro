@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAppSettings, updateAppSettings } from "@/lib/store";
+import { getAppSettings, updateAppSettings, incrementGlobalVersion } from "@/lib/store";
 import { requireAdmin } from "@/lib/admin-auth";
 
 export async function GET(request: NextRequest) {
@@ -24,5 +24,8 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ success: true, settings });
   } catch (error) {
     return NextResponse.json({ success: false, error: "خطأ في تحديث الإعدادات" }, { status: 500 });
+  }
+  finally {
+    await incrementGlobalVersion("settings").catch(() => {});
   }
 }

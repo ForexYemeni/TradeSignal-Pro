@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { kv } from "@vercel/kv";
 import { requireAdmin } from "@/lib/admin-auth";
+import { incrementGlobalVersion } from "@/lib/store";
 
 // ─── Types ───────────────────────────────────────────────
 interface Coupon {
@@ -105,6 +106,9 @@ export async function POST(request: NextRequest) {
     console.error("POST coupon error:", error);
     return NextResponse.json({ success: false, error: "خطأ في إنشاء الكوبون" }, { status: 500 });
   }
+  finally {
+    await incrementGlobalVersion("coupons").catch(() => {});
+  }
 }
 
 // ─── PUT: Update coupon (admin) ────────────────────────
@@ -141,6 +145,9 @@ export async function PUT(request: NextRequest) {
     console.error("PUT coupon error:", error);
     return NextResponse.json({ success: false, error: "خطأ في تحديث الكوبون" }, { status: 500 });
   }
+  finally {
+    await incrementGlobalVersion("coupons").catch(() => {});
+  }
 }
 
 // ─── DELETE: Delete coupon (admin) ─────────────────────
@@ -165,6 +172,9 @@ export async function DELETE(request: NextRequest) {
   } catch (error) {
     console.error("DELETE coupon error:", error);
     return NextResponse.json({ success: false, error: "خطأ في حذف الكوبون" }, { status: 500 });
+  }
+  finally {
+    await incrementGlobalVersion("coupons").catch(() => {});
   }
 }
 

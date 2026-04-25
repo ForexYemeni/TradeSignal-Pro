@@ -5,6 +5,7 @@ import {
   addLocalPaymentMethod,
   updateLocalPaymentMethod,
   deleteLocalPaymentMethod,
+  incrementGlobalVersion,
 } from "@/lib/store";
 import { requireAdmin } from "@/lib/admin-auth";
 
@@ -68,6 +69,9 @@ export async function POST(request: NextRequest) {
     console.error("POST payment-methods error:", error);
     return NextResponse.json({ success: false, error: "خطأ في إضافة طريقة الدفع" }, { status: 500 });
   }
+  finally {
+    await incrementGlobalVersion("payment_methods").catch(() => {});
+  }
 }
 
 /**
@@ -110,6 +114,9 @@ export async function PUT(request: NextRequest) {
     console.error("PUT payment-methods error:", error);
     return NextResponse.json({ success: false, error: "خطأ في تحديث طريقة الدفع" }, { status: 500 });
   }
+  finally {
+    await incrementGlobalVersion("payment_methods").catch(() => {});
+  }
 }
 
 /**
@@ -138,5 +145,8 @@ export async function DELETE(request: NextRequest) {
   } catch (error) {
     console.error("DELETE payment-methods error:", error);
     return NextResponse.json({ success: false, error: "خطأ في حذف طريقة الدفع" }, { status: 500 });
+  }
+  finally {
+    await incrementGlobalVersion("payment_methods").catch(() => {});
   }
 }

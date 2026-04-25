@@ -1,26 +1,41 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getUserUpdateFlag } from "@/lib/store";
+import { getUserUpdateFlag, getGlobalVersion } from "@/lib/store";
 
 /**
- * GET /api/user-events?userId=xxx
+ * GET /api/user-events?userId=xxx&clientVersion=<number>
  *
  * Lightweight polling endpoint (call every 5s from client).
- * Returns any pending update event for the user (package change, block, etc.)
- * Events are consumed (deleted) after being read.
+ * Returns TWO types of events:
+ *   1. User-specific events (package change, block, approve, etc.) — consumed after read
+ *   2. Global data changes (packages, payment methods, coupons, settings) — version-based
  */
 export async function GET(request: NextRequest) {
   try {
     const userId = request.nextUrl.searchParams.get("userId");
-    if (!userId) {
-      return NextResponse.json({ dirty: false }, { status: 400 });
+    const clientVersion = Number(request.nextUrl.searchParams.get("clientVersion") || "0");
+
+    // ── Check user-specific event ──
+    let userEvent: { type: string; ts: number; [key: string]: unknown } | null = null;
+    if (userId) {
+      userEvent = await getUserUpdateFlag(userId);
     }
 
-    const event = await getUserUpdateFlag(userId);
-    if (event) {
-      return NextResponse.json({ dirty: true, event });
+    // ── Check global data version ──
+    const { version: serverVersion, lastUpdate } = await getGlobalVersion();
+    const globalChanged = clientVersion > 0 && serverVersion > clientVersion;
+
+    // If either user-specific or global event exists, return dirty
+    if (userEvent || globalChanged) {
+      return NextResponse.json({
+        dirty: true,
+        event: userEvent,
+        globalChanged,
+        serverVersion,
+        lastUpdate: globalChanged ? lastUpdate : null,
+      });
     }
 
-    return NextResponse.json({ dirty: false });
+    return NextResponse.json({ dirty: false, serverVersion });
   } catch {
     return NextResponse.json({ dirty: false });
   }

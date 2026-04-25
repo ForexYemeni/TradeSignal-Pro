@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getPackages, addPackage, updatePackage, deletePackage } from "@/lib/store";
+import { getPackages, addPackage, updatePackage, deletePackage, incrementGlobalVersion } from "@/lib/store";
 import { requireAdmin } from "@/lib/admin-auth";
 
 export async function GET() {
@@ -40,6 +40,9 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     return NextResponse.json({ success: false, error: "خطأ في إنشاء الباقة" }, { status: 500 });
   }
+  finally {
+    await incrementGlobalVersion("packages").catch(() => {});
+  }
 }
 
 export async function PUT(request: NextRequest) {
@@ -59,6 +62,9 @@ export async function PUT(request: NextRequest) {
   } catch (error) {
     return NextResponse.json({ success: false, error: "خطأ في تحديث الباقة" }, { status: 500 });
   }
+  finally {
+    await incrementGlobalVersion("packages").catch(() => {});
+  }
 }
 
 export async function DELETE(request: NextRequest) {
@@ -73,5 +79,8 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error) {
     return NextResponse.json({ success: false, error: "خطأ في حذف الباقة" }, { status: 500 });
+  }
+  finally {
+    await incrementGlobalVersion("packages").catch(() => {});
   }
 }

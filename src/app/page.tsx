@@ -643,6 +643,15 @@ export default function HomePage() {
   const prevSessionHashRef = useRef<string>("");
   const expiryWarningShownRef = useRef<{ threeDay: boolean; oneDay: boolean }>({ threeDay: false, oneDay: false });
 
+  /* ── Global Data Version (for real-time refresh of packages, methods, coupons, settings) ── */
+  const globalVersionRef = useRef<number>(0);
+  // Refs to fetch functions — updated on each render so the polling interval always uses the latest version
+  const fetchPackagesRef = useRef<() => Promise<void>>(async () => {});
+  const fetchLocalPaymentMethodsRef = useRef<() => Promise<void>>(async () => {});
+  const fetchUserPaymentMethodsRef = useRef<() => Promise<void>>(async () => {});
+  const fetchCouponsRef = useRef<() => Promise<void>>(async () => {});
+  const fetchSignalsRef = useRef<() => Promise<void>>(async () => {});
+
   const refreshSessionFromServer = useCallback(async () => {
     if (!session?.id) return;
     try {
@@ -743,10 +752,16 @@ export default function HomePage() {
     // ── Fast lightweight poll for real-time admin updates (every 5 seconds) ──
     const userEventsInterval = setInterval(async () => {
       try {
-        const res = await fetch(`/api/user-events?userId=${session.id}`);
+        const res = await fetch(`/api/user-events?userId=${session.id}&clientVersion=${globalVersionRef.current}`);
         const data = await res.json();
+
+        // Update global version tracking
+        if (data.serverVersion !== undefined) {
+          globalVersionRef.current = data.serverVersion;
+        }
+
         if (data.dirty && data.event) {
-          // Admin changed something — refresh immediately
+          // Admin changed something for THIS user — refresh session immediately
           refreshSessionFromServer();
           // Show contextual toast
           const evt = data.event;
@@ -764,6 +779,36 @@ export default function HomePage() {
             toast.info("تم إزالة صلاحية الإدارة", { description: "تم تغيير صلاحياتك" });
           } else if (evt.type === "subscription_cancelled") {
             toast.info("تم إلغاء الاشتراك");
+          }
+        }
+
+        // ── Global data changed (packages, payment methods, coupons, settings) ──
+        if (data.globalChanged) {
+          const category = data.lastUpdate?.category || "";
+          console.log(`[Real-time] Global data updated: ${category}`);
+
+          // Refresh ALL relevant data instantly based on what changed
+          // Always refresh packages + settings since they affect everything
+          fetchPackagesRef.current().catch(() => {});
+          fetchLocalPaymentMethodsRef.current().catch(() => {});
+          fetchUserPaymentMethodsRef.current().catch(() => {});
+          fetchCouponsRef.current().catch(() => {});
+
+          // If signals-related data changed or packages changed (which may affect signal access)
+          if (category === "packages" || category === "settings") {
+            fetchSignalsRef.current().catch(() => {});
+            refreshSessionFromServer();
+          }
+
+          // Show subtle toast for global updates
+          if (category === "packages") {
+            toast.info("تم تحديث الباقات", { description: "تم تحديث قائمة الباقات المتاحة" });
+          } else if (category === "payment_methods") {
+            toast.info("تم تحديث طرق الدفع", { description: "تم تحديث طرق الدفع المتاحة" });
+          } else if (category === "coupons") {
+            toast.info("تم تحديث الكوبونات", { description: "تم تحديث قائمة الكوبونات" });
+          } else if (category === "settings") {
+            toast.info("تم تحديث الإعدادات", { description: "تم تحديث إعدادات التطبيق" });
           }
         }
       } catch { /* ignore */ }
@@ -949,6 +994,18 @@ export default function HomePage() {
       if (data.success) setStats(data.stats);
     } catch (e) { console.error("Fetch stats:", e); }
   }, []);
+
+  /* ── Keep fetch refs in sync with latest function versions ── */
+  // These refs are used by the real-time polling interval to avoid stale closures
+  useEffect(() => { fetchSignalsRef.current = fetchSignals; }, [fetchSignals]);
+
+  /* ── Sync fetch function refs (plain functions, synced on every render) ── */
+  useEffect(() => {
+    fetchPackagesRef.current = fetchPackages;
+    fetchLocalPaymentMethodsRef.current = fetchLocalPaymentMethods;
+    fetchUserPaymentMethodsRef.current = fetchUserPaymentMethods;
+    fetchCouponsRef.current = fetchCoupons;
+  });
 
   /* ── Admin Notification Functions ── */
   const fetchAdminNotifications = useCallback(async () => {
