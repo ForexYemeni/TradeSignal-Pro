@@ -42,6 +42,29 @@ async function sendTelegramMessage(opts: TelegramSendOptions): Promise<boolean> 
     if (!res.ok) {
       const err = await res.text();
       console.error("[Telegram] API error:", res.status, err);
+      // Try sending as plain text if HTML fails
+      if (parseMode === "HTML") {
+        console.log("[Telegram] Retrying without HTML parse mode...");
+        const plainText = text
+          .replace(/<b>/g, "").replace(/<\/b>/g, "")
+          .replace(/<i>/g, "").replace(/<\/i>/g, "")
+          .replace(/<code>/g, "").replace(/<\/code>/g, "")
+          .replace(/<pre>/g, "").replace(/<\/pre>/g, "");
+        const retryRes = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text: plainText,
+            disable_web_page_preview: disableWebPagePreview,
+          }),
+          signal: AbortSignal.timeout(15000),
+        });
+        if (retryRes.ok) {
+          const retryData = await retryRes.json();
+          return retryData.ok === true;
+        }
+      }
       return false;
     }
     const data = await res.json();
@@ -143,7 +166,15 @@ export async function testTelegramConnection(
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  Send Signal to Telegram (all active channels)
+//  Helper: Format number with commas
+// ═══════════════════════════════════════════════════════════════
+
+function fmtNum(n: number, decimals = 2): string {
+  return n.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Send Signal to Telegram (all active channels) — PROFESSIONAL FORMAT
 // ═══════════════════════════════════════════════════════════════
 
 export async function sendSignalToTelegram(signal: {
@@ -161,6 +192,12 @@ export async function sendSignalToTelegram(signal: {
   instrument?: string;
   slDistance?: number;
   maxRR?: number;
+  balance?: number;
+  lotSize?: string;
+  riskPercent?: number;
+  riskTarget?: number;
+  actualRisk?: number;
+  actualRiskPct?: number;
 }): Promise<void> {
   const configs = await getAllTelegramConfigs();
   if (configs.length === 0) {
@@ -170,54 +207,120 @@ export async function sendSignalToTelegram(signal: {
 
   const isBuy = signal.type.toUpperCase() === "BUY";
   const dirEmoji = isBuy ? "🟢" : "🔴";
-  const dirText = isBuy ? "شراء BUY ▲" : "بيع SELL ▼";
-  const catLabel = signal.signalCategory === "REENTRY" ? "🔄 إعادة دخول" : signal.signalCategory === "PYRAMID" ? "📈 إضافة صفقة" : "";
+  const dirText = isBuy ? "شراء BUY" : "بيع SELL";
+  const dirArrow = isBuy ? "▲" : "▼";
+
+  // Category label
+  let catLabel = "";
+  if (signal.signalCategory === "REENTRY") catLabel = "  🔄 إعادة دخول";
+  else if (signal.signalCategory === "PYRAMID") catLabel = "  📈 إضافة صفقة";
 
   // Confidence as visual bar
   const conf = signal.confidence || 0;
-  const filledBlocks = Math.round(conf / 20);
-  const emptyBlocks = 5 - filledBlocks;
-  const confBar = "█".repeat(filledBlocks) + "░".repeat(emptyBlocks);
+  const totalBars = 10;
+  const filledBars = Math.round((conf / 100) * totalBars);
+  const emptyBars = totalBars - filledBars;
+  const confBar = "█".repeat(filledBars) + "░".repeat(emptyBars);
 
-  // TPs list
-  const tpsList = signal.takeProfits && signal.takeProfits.length > 0
-    ? signal.takeProfits.map((tp, i) => `  🎯 TP${i + 1}: <code>${tp.tp}</code>  │  R:R <code>${tp.rr.toFixed(2)}</code>`).join("\n")
-    : "  — لا توجد أهداف محددة";
-
-  // Additional info
-  const slDist = signal.slDistance ? `\n📏 مسافة الوقف: <code>${signal.slDistance}</code>` : "";
-  const maxRR = signal.maxRR ? `\n📊 R:R الأقصى: <code>1:${signal.maxRR}</code>` : "";
-  const instrument = signal.instrument ? `\n🏦 الأداة: ${signal.instrument}` : "";
-
-  // Trend info
-  let trendInfo = "";
-  if (signal.htfTimeframe || signal.htfTrend || signal.smcTrend) {
-    const htf = signal.htfTimeframe ? `${signal.htfTimeframe}` : "";
-    const htfTrend = signal.htfTrend || "—";
-    const smc = signal.smcTrend || "—";
-    trendInfo = `\n\n━━━━━━━━━━━━━━━━━━━━\n📈 <b>التحليل</b>\n━━━━━━━━━━━━━━━━━━━━\n📊 ${htf}: ${htfTrend}\n🏆 SMC: ${smc}`;
+  // ── Section: Trade Details ──
+  const tradeDetails = [
+    `🔵 الدخول:  <code>${fmtNum(signal.entry, signal.entry > 100 ? 2 : 5)}</code>`,
+    `🔴 الوقف:  <code>${fmtNum(signal.stopLoss, signal.stopLoss > 100 ? 2 : 5)}</code>`,
+  ];
+  if (signal.slDistance && signal.slDistance > 0) {
+    tradeDetails.push(`📏 المسافة:  <code>${fmtNum(signal.slDistance, 1)} نقطة</code>`);
+  }
+  if (signal.instrument) {
+    tradeDetails.push(`🏦 الأداة:  ${signal.instrument}`);
   }
 
+  // ── Section: Targets ──
+  let targetsSection = "";
+  if (signal.takeProfits && signal.takeProfits.length > 0) {
+    const tpLines = signal.takeProfits.map((tp, i) => {
+      const tpPrice = fmtNum(tp.tp, tp.tp > 100 ? 2 : 5);
+      const rrLabel = tp.rr > 0 ? `R:R 1:${tp.rr.toFixed(2)}` : "";
+      return `  🎯 TP${i + 1}:  <code>${tpPrice}</code>   ${rrLabel}`;
+    });
+    targetsSection =
+      `\n━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `🎯 <b>الأهداف</b> (${signal.takeProfits.length})\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+      tpLines.join("\n");
+
+    // Add max R:R at bottom of targets
+    if (signal.maxRR && signal.maxRR > 0) {
+      targetsSection += `\n  📊 R:R الأقصى:  <code>1:${signal.maxRR.toFixed(2)}</code>`;
+    }
+  }
+
+  // ── Section: Risk Management ──
+  let riskSection = "";
+  const hasRisk = signal.balance || signal.lotSize || signal.riskPercent || signal.riskTarget;
+  if (hasRisk) {
+    const riskLines: string[] = [];
+    if (signal.balance && signal.balance > 0) {
+      riskLines.push(`💰 الرصيد:  <code>$${fmtNum(signal.balance, 0)}</code>`);
+    }
+    if (signal.lotSize) {
+      riskLines.push(`📊 حجم اللوت:  <code>${signal.lotSize}</code>`);
+    }
+    if (signal.riskPercent && signal.riskPercent > 0) {
+      riskLines.push(`⚠️ المخاطرة:  <code>${signal.riskPercent.toFixed(1)}%</code>`);
+    }
+    if (signal.riskTarget && signal.riskTarget > 0) {
+      riskLines.push(`🎯 هدف المخاطرة:  <code>$${fmtNum(signal.riskTarget, 0)}</code>`);
+    }
+    if (signal.actualRisk && signal.actualRisk > 0) {
+      riskLines.push(`📉 المخاطرة الفعلية:  <code>$${fmtNum(signal.actualRisk, 0)}</code>`);
+    }
+    if (riskLines.length > 0) {
+      riskSection =
+        `\n━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `🛡️ <b>إدارة المخاطر</b>\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        riskLines.join("\n");
+    }
+  }
+
+  // ── Section: Trend Analysis ──
+  let trendSection = "";
+  if (signal.htfTimeframe || signal.htfTrend || signal.smcTrend) {
+    const trendLines: string[] = [];
+    if (signal.htfTimeframe && signal.htfTrend) {
+      trendLines.push(`📊 ${signal.htfTimeframe}:  ${signal.htfTrend}`);
+    }
+    if (signal.smcTrend) {
+      trendLines.push(`🏆 SMC:  ${signal.smcTrend}`);
+    }
+    if (trendLines.length > 0) {
+      trendSection =
+        `\n━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `📈 <b>التحليل</b>\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        trendLines.join("\n");
+    }
+  }
+
+  // ── Build final message ──
   const text =
-    `╔════════════════════════════════╗\n` +
-    `║ ${dirEmoji} ${dirText} ${catLabel} ║\n` +
-    `╚════════════════════════════════╝\n\n` +
-    `📌 <b>${signal.pair}</b> │ ${signal.timeframe || "—"}\n` +
-    `${confBar} ${conf}%\n\n` +
-    `━━━━━━━━━━━━━━━━━━━━\n` +
-    `📊 <b>الصفقة</b>\n` +
-    `━━━━━━━━━━━━━━━━━━━━\n` +
-    `🔵 الدخول: <code>${signal.entry}</code>\n` +
-    `🔴 الوقف: <code>${signal.stopLoss}</code>${slDist}${maxRR}${instrument}\n\n` +
-    `━━━━━━━━━━━━━━━━━━━━\n` +
-    `🎯 <b>الأهداف</b>\n` +
-    `━━━━━━━━━━━━━━━━━━━━\n` +
-    `${tpsList}` +
-    `${trendInfo}\n\n` +
-    `<i>ForexYemeni Signals</i>`;
+    `╔══════════════════════════════════╗\n` +
+    `║  ${dirEmoji} ${dirText} ${dirArrow}${catLabel}  ║\n` +
+    `║  ${signal.pair}  │  ${signal.timeframe || "—"}  ║\n` +
+    `╚══════════════════════════════════╝\n\n` +
+    `المصداقية  ${confBar}  ${conf}%\n\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+    `📊 <b>تفاصيل الصفقة</b>\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+    tradeDetails.join("\n") +
+    `${targetsSection}` +
+    `${riskSection}` +
+    `${trendSection}\n\n` +
+    `<i>— ForexYemeni Signals —</i>`;
 
   // Send to ALL active channels in parallel + log
   console.log(`[Telegram] Sending signal ${signal.pair} ${signal.type} to ${configs.length} channel(s)`);
+  console.log(`[Telegram] Message length: ${text.length} chars`);
   const results = await Promise.allSettled(
     configs.map(async (cfg) => {
       const ok = await sendTelegramMessage({ token: cfg.botToken, chatId: cfg.chatId, text });
@@ -231,7 +334,7 @@ export async function sendSignalToTelegram(signal: {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  Send Signal Update to Telegram (all active channels)
+//  Send Signal Update to Telegram (all active channels) — PROFESSIONAL FORMAT
 // ═══════════════════════════════════════════════════════════════
 
 export async function sendSignalUpdateToTelegram(params: {
@@ -254,83 +357,168 @@ export async function sendSignalUpdateToTelegram(params: {
 
   const { pair, updateType, tpIndex, totalTPs, hitPrice, pnlDollars, pnlPoints, partialWin, entry, stopLoss } = params;
 
-  let emoji = "";
-  let title = "";
-  let detailsLines: string[] = [];
+  // Helper to safely format price
+  const fmtPrice = (n: number | undefined | null) => {
+    if (n == null || !isFinite(n) || n <= 0) return null;
+    return fmtNum(n, n > 100 ? 2 : 5);
+  };
+
+  let text = "";
 
   switch (updateType) {
     case "TP_HIT":
     case "REENTRY_TP":
     case "PYRAMID_TP": {
-      const tpNum = tpIndex ?? 0;
-      const total = totalTPs ?? 0;
-      emoji = "🎯";
-      title = partialWin ? "ربح جزئي + إيقاف خسارة" : "تحقق هدف الربح!";
-      detailsLines = [
-        `📌 <b>${pair}</b>`,
-        ``,
-        `📍 تم تحقق <b>TP${tpNum}</b>${total > 0 ? ` من ${total}` : ""}`,
-        hitPrice != null && hitPrice > 0 ? `💰 عند السعر: <code>${hitPrice}</code>` : "",
-        entry != null && entry > 0 ? `🔵 سعر الدخول: <code>${entry}</code>` : "",
-        stopLoss != null && stopLoss > 0 ? `🔴 وقف الخسارة: <code>${stopLoss}</code>` : "",
-        ``,
-        pnlDollars != null && pnlDollars !== 0 ? (pnlDollars > 0
-          ? `💵 الربح: <code>+$${pnlDollars.toFixed(2)}</code>`
-          : `💵 الخسارة: <code>-$${Math.abs(pnlDollars).toFixed(2)}</code>`)
-          : "",
-        pnlPoints != null && pnlPoints !== 0 ? `📊 النقاط: <code>${pnlPoints > 0 ? "+" : ""}${pnlPoints.toFixed(1)}</code>` : "",
-      ].filter(Boolean);
+      const tpNum = (tpIndex ?? 0);
+      const total = (totalTPs ?? 0);
+      const remaining = total > tpNum ? total - tpNum : 0;
+      const isFullClose = remaining === 0;
+
+      const titleEmoji = isFullClose ? "🏆" : "🎯";
+      const titleText = partialWin
+        ? "ربح جزئي + وقف خسارة"
+        : isFullClose
+          ? "إغلاق كامل بالربح!"
+          : "تحقق هدف الربح!";
+
+      // Build details
+      const lines: string[] = [];
+      lines.push(`📌 <b>${pair}</b>`);
+      lines.push("");
+      lines.push(`📍 تم تحقق <b>TP${tpNum}</b>${total > 0 ? ` من ${total}` : ""}`);
+
+      // Price info
+      const hp = fmtPrice(hitPrice);
+      if (hp) lines.push(`💰 عند السعر:  <code>${hp}</code>`);
+      const ep = fmtPrice(entry);
+      if (ep) lines.push(`🔵 الدخول:  <code>${ep}</code>`);
+      const sp = fmtPrice(stopLoss);
+      if (sp) lines.push(`🔴 الوقف:  <code>${sp}</code>`);
+
+      lines.push("");
+
+      // P&L info
+      if (pnlDollars != null && isFinite(pnlDollars) && pnlDollars !== 0) {
+        if (pnlDollars > 0) {
+          lines.push(`💵 الربح:  <code>+$${fmtNum(pnlDollars)}</code>`);
+        } else {
+          lines.push(`💵 الخسارة:  <code>-$${fmtNum(Math.abs(pnlDollars))}</code>`);
+        }
+      }
+      if (pnlPoints != null && isFinite(pnlPoints) && pnlPoints !== 0) {
+        const sign = pnlPoints > 0 ? "+" : "";
+        lines.push(`📊 النقاط:  <code>${sign}${fmtNum(pnlPoints, 1)}</code>`);
+      }
+
+      // Remaining targets
+      if (remaining > 0) {
+        lines.push("");
+        lines.push(`🟢 ${remaining} أهداف متبقية`);
+      }
+
+      text =
+        `╔══════════════════════════════════╗\n` +
+        `║  ${titleEmoji} ${titleText}  ║\n` +
+        `║  ${pair}  │  TP${tpNum}${total > 0 ? "/" + total : ""}  ║\n` +
+        `╚══════════════════════════════════╝\n\n` +
+        lines.join("\n") +
+        `\n\n<i>— ForexYemeni Signals —</i>`;
       break;
     }
 
     case "SL_HIT":
     case "REENTRY_SL":
     case "PYRAMID_SL": {
-      emoji = "🛑";
       if (partialWin) {
-        title = "إشارة مغلقة — ربح جزئي ثم خسارة";
-        detailsLines = [
-          `📌 <b>${pair}</b>`,
-          ``,
-          `⚠️ تم ضرب وقف الخسارة بعد تحقيق أرباح جزئية`,
-          pnlDollars != null ? `💵 النتيجة النهائية: <code>${pnlDollars >= 0 ? "+" : "-"}$${Math.abs(pnlDollars).toFixed(2)}</code>` : "",
-          pnlPoints != null ? `📊 النقاط: <code>${pnlPoints.toFixed(1)}</code>` : "",
-          hitPrice != null && hitPrice > 0 ? `💰 عند السعر: <code>${hitPrice}</code>` : "",
-        ].filter(Boolean);
+        const tpNum = tpIndex ?? 0;
+        const lines: string[] = [];
+        lines.push(`📌 <b>${pair}</b>`);
+        lines.push("");
+        lines.push(`⚠️ تم ضرب وقف الخسارة بعد تحقيق أرباح جزئية`);
+        if (tpNum > 0) lines.push(`📍 تم تحقق <b>${tpNum}</b> أهداف سابقاً`);
+
+        const hp = fmtPrice(hitPrice);
+        if (hp) lines.push(`💰 عند السعر:  <code>${hp}</code>`);
+
+        lines.push("");
+
+        if (pnlDollars != null && isFinite(pnlDollars)) {
+          const sign = pnlDollars >= 0 ? "+" : "-";
+          lines.push(`💵 النتيجة النهائية:  <code>${sign}$${fmtNum(Math.abs(pnlDollars))}</code>`);
+        }
+        if (pnlPoints != null && isFinite(pnlPoints)) {
+          const sign = pnlPoints >= 0 ? "+" : "";
+          lines.push(`📊 النقاط:  <code>${sign}${fmtNum(pnlPoints, 1)}</code>`);
+        }
+
+        text =
+          `╔══════════════════════════════════╗\n` +
+          `║  ⚠️ إشارة مغلقة  ║\n` +
+          `║  ربح جزئي + وقف خسارة  ║\n` +
+          `║  ${pair}  ║\n` +
+          `╚══════════════════════════════════╝\n\n` +
+          lines.join("\n") +
+          `\n\n<i>— ForexYemeni Signals —</i>`;
       } else {
-        title = "ضرب وقف الخسارة!";
-        detailsLines = [
-          `📌 <b>${pair}</b>`,
-          ``,
-          hitPrice != null && hitPrice > 0 ? `💰 عند السعر: <code>${hitPrice}</code>` : "",
-          entry != null && entry > 0 ? `🔵 سعر الدخول: <code>${entry}</code>` : "",
-          pnlDollars != null && pnlDollars !== 0 ? `💵 الخسارة: <code>-$${Math.abs(pnlDollars).toFixed(2)}</code>` : "",
-          pnlPoints != null && pnlPoints !== 0 ? `📊 النقاط: <code>${pnlPoints.toFixed(1)}</code>` : "",
-        ].filter(Boolean);
+        const lines: string[] = [];
+        lines.push(`📌 <b>${pair}</b>`);
+        lines.push("");
+        lines.push(`🛑 تم ضرب وقف الخسارة`);
+
+        const hp = fmtPrice(hitPrice);
+        if (hp) lines.push(`💰 عند السعر:  <code>${hp}</code>`);
+        const ep = fmtPrice(entry);
+        if (ep) lines.push(`🔵 الدخول:  <code>${ep}</code>`);
+
+        lines.push("");
+
+        if (pnlDollars != null && isFinite(pnlDollars) && pnlDollars !== 0) {
+          lines.push(`💵 الخسارة:  <code>-$${fmtNum(Math.abs(pnlDollars))}</code>`);
+        }
+        if (pnlPoints != null && isFinite(pnlPoints) && pnlPoints !== 0) {
+          lines.push(`📊 النقاط:  <code>${fmtNum(pnlPoints, 1)}</code>`);
+        }
+
+        text =
+          `╔══════════════════════════════════╗\n` +
+          `║  🛑 ضرب وقف الخسارة!  ║\n` +
+          `║  ${pair}  ║\n` +
+          `╚══════════════════════════════════╝\n\n` +
+          lines.join("\n") +
+          `\n\n<i>— ForexYemeni Signals —</i>`;
       }
       break;
     }
 
-    case "BREAKEVEN":
-      emoji = "🔄";
-      title = "نقل الوقف إلى نقطة الدخول";
-      detailsLines = [
-        `📌 <b>${pair}</b>`,
-        ``,
-        `✅ تم تعديل وقف الخسارة إلى سعر الدخول لتأمين الصفقة`,
-        entry != null && entry > 0 ? `🔵 نقطة الدخول: <code>${entry}</code>` : "",
-      ].filter(Boolean);
+    case "BREAKEVEN": {
+      const ep = fmtPrice(entry);
+      text =
+        `╔══════════════════════════════════╗\n` +
+        `║  🔄 نقل الوقف للتعادل  ║\n` +
+        `║  ${pair}  ║\n` +
+        `╚══════════════════════════════════╝\n\n` +
+        `📌 <b>${pair}</b>\n\n` +
+        `✅ تم تعديل وقف الخسارة إلى سعر الدخول لتأمين الصفقة` +
+        (ep ? `\n🔵 نقطة الدخول:  <code>${ep}</code>` : "") +
+        `\n\n<i>— ForexYemeni Signals —</i>`;
       break;
+    }
   }
 
-  const text =
-    `${emoji} <b>${title}</b>\n\n` +
-    detailsLines.join("\n") +
-    `\n\n<i>ForexYemeni Signals</i>`;
+  if (!text.trim()) {
+    console.warn(`[Telegram] Empty message generated for ${updateType} ${pair} — skipping`);
+    return;
+  }
 
   console.log(`[Telegram] Sending update ${updateType} for ${pair} to ${configs.length} channel(s)`);
+  console.log(`[Telegram] Update message length: ${text.length} chars`);
   await Promise.allSettled(
-    configs.map(cfg => sendTelegramMessage({ token: cfg.botToken, chatId: cfg.chatId, text }))
+    configs.map(async (cfg) => {
+      const ok = await sendTelegramMessage({ token: cfg.botToken, chatId: cfg.chatId, text });
+      if (ok) console.log(`[Telegram] ✅ Update sent to ${cfg.label || cfg.chatId}`);
+      else console.error(`[Telegram] ❌ Update failed for ${cfg.label || cfg.chatId}`);
+      return ok;
+    })
   );
 }
 

@@ -255,14 +255,22 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         : existing.signalCategory === "PYRAMID"
           ? (status === "HIT_TP" ? "PYRAMID_TP" : "PYRAMID_SL")
           : status;
+
+      // Parse TPs from existing signal for totalTPs count
+      let existingTps: { tp: number; rr: number }[] = [];
+      try { existingTps = JSON.parse(String(existing.takeProfits || "[]")); } catch { existingTps = []; }
+
       sendSignalUpdateToTelegram({
         pair: existing.pair,
         updateType: signalCat as "TP_HIT" | "SL_HIT" | "REENTRY_TP" | "REENTRY_SL" | "PYRAMID_TP" | "PYRAMID_SL",
         tpIndex: updateData.hitTpIndex as number | undefined,
+        totalTPs: (updateData.totalTPs as number | undefined) || (existingTps.length > 0 ? existingTps.length : undefined),
         hitPrice: updateData.hitPrice as number | undefined,
         pnlDollars: updateData.pnlDollars as number | undefined,
         pnlPoints: updateData.pnlPoints as number | undefined,
         partialWin: isPartialWin ? true : false,
+        entry: Number(existing.entry) || undefined,
+        stopLoss: Number(existing.stopLoss) || undefined,
       }).catch(() => {}); // Fire-and-forget
     }
 

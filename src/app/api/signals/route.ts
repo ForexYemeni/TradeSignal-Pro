@@ -222,6 +222,12 @@ export async function POST(request: NextRequest) {
         instrument: signal.instrument || undefined,
         slDistance: signal.slDistance || undefined,
         maxRR: signal.maxRR || undefined,
+        balance: signal.balance || undefined,
+        lotSize: signal.lotSize || undefined,
+        riskPercent: signal.riskPercent || undefined,
+        riskTarget: signal.riskTarget || undefined,
+        actualRisk: signal.actualRisk || undefined,
+        actualRiskPct: signal.actualRiskPct || undefined,
       }).catch((e) => { console.error("[Telegram] Signal send failed:", e); }); // Fire-and-forget
     }
 
