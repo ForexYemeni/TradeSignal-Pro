@@ -121,17 +121,16 @@ export async function testTelegramConnection(
       return { success: false, message: `توكن البوت غير صالح: ${meData.description || "خطأ غير معروف"}` };
     }
     const botName = meData.result?.username || meData.result?.first_name || "البوت";
-    const botId = meData.result?.id;
 
     // 2. Try sending a test message to the chat
     const sendResult = await sendTelegramMessage({
       token: trimmedToken,
       chatId: trimmedChatId,
-      text: `✅ <b>تم ربط البوت بنجاح</b>\n\n🤖 البوت: @${botName}\n🆔 معرف: <code>${botId}</code>\n📡 القناة: <code>${trimmedChatId}</code>\n\n<i>TradeSignal-Pro - ForexYemeni</i>`,
+      text: `✅ <b>تم ربط القناة بنجاح</b>\n\n🔍 تم التحقق من الاتصال بنجاح\nسيتم إرسال الإشارات تلقائياً إلى هذه القناة\n\n<i>ForexYemeni Signals</i>`,
     });
 
     if (sendResult) {
-      return { success: true, message: `تم الاتصال بنجاح! البوت @${botName}`, botName };
+      return { success: true, message: `تم الاتصال بنجاح!`, botName };
     } else {
       return { success: false, message: "تم التحقق من البوت لكن فشل إرسال الرسالة — تأكد من إضافة البوت كمدير في القناة مع صلاحية الإرسال" };
     }
@@ -193,7 +192,7 @@ export async function sendSignalToTelegram(signal: {
     `🛑 <b>وقف الخسارة (SL)</b>: <code>${signal.stopLoss}</code>\n\n` +
     `🎯 <b>جمع الأرباح (TP)</b>:\n${tpsHtml}\n\n` +
     `💪 <b>الثقة</b>: ${stars} ${signal.confidence}%\n\n` +
-    `<i>ForexYemeni VIP Signals</i>`;
+    `<i>ForexYemeni Signals</i>`;
 
   await sendTelegramMessage({
     token: config.botToken,
@@ -270,7 +269,7 @@ export async function sendSignalUpdateToTelegram(params: {
     `${emoji} <b>${title}</b>\n\n` +
     `<b>${pair}</b>\n\n` +
     `${details}\n\n` +
-    `<i>ForexYemeni VIP Signals</i>`;
+    `<i>ForexYemeni Signals</i>`;
 
   await sendTelegramMessage({
     token: config.botToken,
