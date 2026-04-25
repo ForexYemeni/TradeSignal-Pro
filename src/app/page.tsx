@@ -7232,7 +7232,7 @@ export default function HomePage() {
                               <div className="flex items-center gap-2">
                                 <Input type="number" value={extendDays} onChange={e => setExtendDays(e.target.value)} placeholder="عدد الأيام" min="1" max="3650"
                                   className="glass-input flex-1 h-9 text-[10px]" dir="ltr" />
-                                <button onClick={() => handleExtendDays(u.id)} disabled={extendDaysLoad || !extendDays || (u.subscriptionExpiry && new Date(u.subscriptionExpiry) <= new Date())}
+                                <button onClick={() => handleExtendDays(u.id)} disabled={extendDaysLoad || !extendDays || Boolean(u.subscriptionExpiry && new Date(u.subscriptionExpiry) <= new Date())}
                                   className="px-3 h-9 rounded-lg bg-emerald-500/15 text-emerald-400 text-[9px] font-medium border border-emerald-500/20 hover:bg-emerald-500/25 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
                                   {extendDaysLoad ? "جارٍ..." : "إضافة"}
                                 </button>
