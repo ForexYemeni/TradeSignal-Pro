@@ -1,7 +1,8 @@
 /**
  * FOREXYEMENI-PRO Signal Parser
- * Parses signals from the FOREXYEMENI-PRO-v1.10 TradingView indicator
- * Handles full format including risk management, HTF, SMC, and all alert types
+ * Parses signals from the FOREXYEMENI-PRO TradingView indicator
+ * IMPORTANT: NEVER rejects a signal — always stores it with best-effort parsing
+ * Supports ALL pairs: forex, crypto, gold, silver, oil, indices
  */
 
 export interface TakeProfitDetail {
@@ -56,10 +57,9 @@ export interface ParseResult {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  Main Parser
+//  Main Parser — NEVER rejects a signal from the indicator
 // ═══════════════════════════════════════════════════════════════
 export function parseTradingViewSignal(rawText: string): ParseResult {
-  const warnings: string[] = [];
   const text = rawText.trim();
 
   if (!text) {
@@ -70,31 +70,55 @@ export function parseTradingViewSignal(rawText: string): ParseResult {
   const category = detectSignalCategory(text);
 
   // 2. Parse based on category
+  let result: ParseResult;
   switch (category) {
     case "ENTRY":
-      return parseEntrySignal(text);
+      result = parseEntrySignal(text); break;
     case "TP_HIT":
-      return parseTPHitAlert(text);
+      result = parseTPHitAlert(text); break;
     case "SL_HIT":
-      return parseSLHitAlert(text);
+      result = parseSLHitAlert(text); break;
     case "BREAKEVEN":
-      return parseBreakevenAlert(text);
+      result = parseBreakevenAlert(text); break;
     case "REENTRY":
-      return parseReentrySignal(text);
+      result = parseReentrySignal(text); break;
     case "REENTRY_TP":
-      return parseReentryTPAlert(text);
+      result = parseReentryTPAlert(text); break;
     case "REENTRY_SL":
-      return parseReentrySLAlert(text);
+      result = parseReentrySLAlert(text); break;
     case "PYRAMID":
-      return parsePyramidSignal(text);
+      result = parsePyramidSignal(text); break;
     case "PYRAMID_TP":
-      return parsePyramidTPAlert(text);
+      result = parsePyramidTPAlert(text); break;
     case "PYRAMID_SL":
-      return parsePyramidSLAlert(text);
+      result = parsePyramidSLAlert(text); break;
     default:
-      // Fallback to basic parser
-      return parseBasicSignal(text);
+      result = parseBasicSignal(text); break;
   }
+
+  // ═══ CRITICAL CATCH-ALL: If ANY parser fails, create raw fallback signal ═══
+  // The indicator is the single source of truth — never discard its output
+  if (!result.success || !result.signal) {
+    console.warn("[Parser] All parsers failed, creating raw fallback:", text.substring(0, 120));
+    return {
+      success: true,
+      signal: {
+        pair: extractPair(text) || "UNKNOWN",
+        type: /🔴|SELL|بيع|Short|🔻/i.test(text) ? "SELL" : "BUY",
+        entry: extractEntry(text) ?? 0,
+        stopLoss: extractStopLoss(text) ?? 0,
+        takeProfits: [],
+        confidence: extractConfidence(text),
+        signalCategory: "ENTRY",
+        rawText: text,
+        timeframe: "", htfTimeframe: "", htfTrend: "", smcTrend: "",
+        riskData: emptyRiskData(),
+      },
+      warnings: ["تنسيق غير معروف — تم تخزين الإشارة كبيانات أساسية"],
+    };
+  }
+
+  return result;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -127,30 +151,31 @@ function detectSignalCategory(text: string): string {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  Parse ENTRY Signal (Full FOREXYEMENI Format)
+//  Parse ENTRY Signal — NEVER fails
 // ═══════════════════════════════════════════════════════════════
 function parseEntrySignal(text: string): ParseResult {
   const warnings: string[] = [];
 
-  // Signal type
-  const signalType = extractSignalType(text);
+  // Signal type — NEVER fail, default to BUY
+  let signalType = extractSignalType(text);
   if (!signalType) {
-    return { success: false, error: "لم يتم التعرف على نوع الإشارة" };
+    signalType = /🔴|SELL|بيع|Short|🔻/i.test(text) ? "SELL" : "BUY";
+    warnings.push("لم يتم التعرف على نوع الإشارة — تم افتراض شراء");
   }
 
   // Pair
   const pair = extractPair(text);
   if (!pair) warnings.push("لم يتم التعرف على الزوج");
 
-  // Timeframes: "📌 XAUUSD │ 15 │ 1س"
+  // Timeframes: "📌 XAUUSD │ 15 │ 1س" or "📌 GOLD │ 1 │ 15د"
   const { timeframe, htfTimeframe } = extractTimeframes(text);
 
   // Stars
   const confidence = extractConfidence(text);
 
-  // Entry price
-  const entry = extractEntry(text);
-  if (entry === null) return { success: false, error: "لم يتم العثور على سعر الدخول" };
+  // Entry price — NEVER fail, use 0 if not found
+  const entry = extractEntry(text) ?? 0;
+  if (entry === 0) warnings.push("لم يتم العثور على سعر الدخول — تم التعيين 0");
 
   // Stop loss
   const stopLoss = extractStopLoss(text);
@@ -436,13 +461,12 @@ function parsePyramidSLAlert(text: string): ParseResult {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  Fallback Basic Parser
+//  Fallback Basic Parser — NEVER fails
 // ═══════════════════════════════════════════════════════════════
 function parseBasicSignal(text: string): ParseResult {
   const signalType = extractSignalType(text);
   if (!signalType) {
     // Last resort: try generic format detection
-    // Supports: "Buy BTCUSDT @ 65000" / "Sell ETHUSDT 3000" / "BUY XAUUSD 2650"
     return parseGenericAlert(text);
   }
 
@@ -456,72 +480,42 @@ function parseBasicSignal(text: string): ParseResult {
   const smcTrend = extractSMCTrend(text);
   const riskData = extractRiskData(text);
 
-  if (entry === null) {
-    // Last resort: try extracting price from text patterns like "@ 65000" or "at 65000"
-    const fallbackEntry = extractFallbackPrice(text);
-    if (fallbackEntry !== null) {
-      return {
-        success: true,
-        signal: {
-          pair, type: signalType, entry: fallbackEntry, stopLoss: stopLoss || 0,
-          takeProfits, confidence, signalCategory: "ENTRY",
-          rawText: text, timeframe, htfTimeframe, htfTrend, smcTrend, riskData,
-        },
-      };
-    }
-    return { success: false, error: "لم يتم العثور على سعر الدخول" };
-  }
+  // NEVER fail — use 0 if no entry price found
+  const finalEntry = entry ?? extractFallbackPrice(text) ?? 0;
+  const hasWarnings = finalEntry === 0 ? ["لم يتم العثور على سعر الدخول"] : undefined;
 
   return {
     success: true,
     signal: {
-      pair, type: signalType, entry, stopLoss: stopLoss || 0,
+      pair, type: signalType, entry: finalEntry, stopLoss: stopLoss || 0,
       takeProfits, confidence, signalCategory: "ENTRY",
       rawText: text, timeframe, htfTimeframe, htfTrend, smcTrend, riskData,
     },
+    ...(hasWarnings ? { warnings: hasWarnings } : {}),
   };
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  Generic Alert Parser (for non-FOREXYEMENI formats)
+//  Generic Alert Parser — NEVER fails
 //  Handles: "Buy BTCUSDT @ 65000", "Sell signal on ETHUSDT",
-//  "Long BTCUSD at 85000", etc.
+//  "Long BTCUSD at 85000", or any unknown format
 // ═══════════════════════════════════════════════════════════════
 function parseGenericAlert(text: string): ParseResult {
-  const upper = text.toUpperCase();
+  const warnings: string[] = [];
 
-  // Detect direction — no \b for Arabic (word boundary doesn't work with Arabic chars)
-  let type: "BUY" | "SELL" | null = null;
+  // Detect direction — NEVER fail, default to BUY
+  let type: "BUY" | "SELL" = "BUY";
   if (/\b(?:BUY|LONG)\b/i.test(text) || /(?:شراء|بايع)/.test(text)) type = "BUY";
   else if (/\b(?:SELL|SHORT)\b/i.test(text) || /(?:بيع|سال)/.test(text)) type = "SELL";
+  else if (/🔴|🔻/.test(text)) type = "SELL";
+  else warnings.push("لم يتم التعرف على نوع الإشارة — تم افتراض شراء");
 
-  if (!type) {
-    return { success: false, error: "لم يتم التعرف على نوع الإشارة — يجب أن يحتوي على Buy/Sell/شراء/بيع" };
-  }
-
-  // Extract pair (prefer this since we already know it's a generic format)
+  // Extract pair
   const pair = extractPair(text) || extractGenericPair(text) || "UNKNOWN";
 
-  // Extract price from various patterns
-  const entry = extractEntry(text) || extractFallbackPrice(text);
-  if (entry === null) {
-    // Even without a price, still create the signal (some alerts are just notifications)
-    return {
-      success: true,
-      signal: {
-        pair, type,
-        entry: 0,
-        stopLoss: 0,
-        takeProfits: [],
-        confidence: 0,
-        signalCategory: "ENTRY",
-        rawText: text,
-        timeframe: "", htfTimeframe: "", htfTrend: "", smcTrend: "",
-        riskData: emptyRiskData(),
-      },
-      warnings: ["لم يتم العثور على سعر الدخول — تم إنشاء إشارة بدون سعر"],
-    };
-  }
+  // Extract price — NEVER fail
+  const entry = extractEntry(text) ?? extractFallbackPrice(text) ?? 0;
+  if (entry === 0) warnings.push("لم يتم العثور على سعر الدخول");
 
   const stopLoss = extractStopLoss(text);
 
@@ -536,7 +530,7 @@ function parseGenericAlert(text: string): ParseResult {
       timeframe: "", htfTimeframe: "", htfTrend: "", smcTrend: "",
       riskData: emptyRiskData(),
     },
-    warnings: ["إشارة بتنسيق عام — بعض البيانات غير متوفرة"],
+    warnings: warnings.length > 0 ? warnings : undefined,
   };
 }
 
@@ -595,26 +589,43 @@ function normalizePairName(pair: string): string {
     "SILVER": "XAGUSD", "XAG": "XAGUSD",
     "BTCUSDT": "BTCUSDT", "BTCUSD": "BTCUSDT",
     "ETHUSDT": "ETHUSDT", "ETHUSD": "ETHUSDT",
-    "US30": "US30", "NAS100": "NAS100",
+    "US30": "US30", "NAS100": "NAS100", "NASDAQ": "NAS100",
+    "US500": "US500", "SPX500": "US500",
+    "DAX": "DAX40", "DAX40": "DAX40",
+    "UK100": "UK100", "GER40": "GER40", "JPN225": "JPN225",
   };
   return aliases[pair] || pair;
 }
 
 function extractPair(text: string): string | null {
-  // الأولوية 1: بعد 📌 (الأكثر دقة - من تنسيق FOREXYEMENI)
-  const pinMatch = text.match(/📌\s*([A-Za-z]{3,12}(?:\/[A-Za-z]{3})?)/i);
+  // Priority 1: After 📌 (most accurate — from FOREXYEMENI format)
+  // Supports: GOLD, XAUUSD, BTCUSDT, SOLUSDT, NAS100, EUR/USD, etc.
+  const pinMatch = text.match(/📌\s*([A-Za-z]{2,15}(?:\/[A-Za-z]{3})?)/i);
   if (pinMatch) return normalizePairName(pinMatch[1].replace(/\s/g, "").toUpperCase());
 
-  // الأولوية 2: أنماط محددة (نبحث في النص ما عدا الروابط)
-  // نزيل الروابط أولاً لمنع تطابق كلمة GOLD من رابط تليجرام
+  // Remove links first to prevent matching words from URLs
   let cleanText = text.replace(/t\.me\/[^\s]*/gi, "").replace(/http[^\s]*/gi, "");
 
+  // Priority 2: Any crypto pair ending in USDT (catches ALL crypto pairs automatically)
+  const cryptoMatch = cleanText.match(/\b([A-Z]{2,12}USDT?)\b/);
+  if (cryptoMatch) return normalizePairName(cryptoMatch[1]);
+
+  // Priority 3: Known specific patterns
   const patterns = [
     /(?:XAU|GOLD)(?:USD)?/i,
     /(?:XAG|SILVER)(?:USD)?/i,
+    /(?:USOIL|CRUDE|OIL|CL)/i,
+    /(?:NAS|US30|DAX|US500|SPX|NDX|UK100|GER40|JPN225)\d*/i,
     /EUR\s*\/?\s*USD/i,
     /GBP\s*\/?\s*USD/i,
     /USD\s*\/?\s*JPY/i,
+    /AUD\s*\/?\s*USD/i,
+    /NZD\s*\/?\s*USD/i,
+    /USD\s*\/?\s*CAD/i,
+    /USD\s*\/?\s*CHF/i,
+    /EUR\s*\/?\s*GBP/i,
+    /EUR\s*\/?\s*JPY/i,
+    /GBP\s*\/?\s*JPY/i,
     /BTC\s*\/?\s*USDT?/i,
     /ETH\s*\/?\s*USDT?/i,
   ];
@@ -623,8 +634,8 @@ function extractPair(text: string): string | null {
     if (m) return normalizePairName(m[0].replace(/\s/g, "").toUpperCase());
   }
 
-  // الأولوية 3: أي رمز أزواج
-  const anyMatch = cleanText.match(/\b([A-Z]{3,10}(?:\/[A-Z]{3})?)\b/);
+  // Priority 4: Any uppercase symbol (3-12 chars)
+  const anyMatch = cleanText.match(/\b([A-Z]{3,12}(?:\/[A-Z]{3})?)\b/);
   if (anyMatch) return anyMatch[1];
   return null;
 }
@@ -633,21 +644,38 @@ function extractTimeframes(text: string): { timeframe: string; htfTimeframe: str
   let timeframe = "";
   let htfTimeframe = "";
 
-  // Pattern: "📌 XAUUSD │ 15 │ 1س"
-  // Pattern: "📌 XAUUSD │ 15 │ 1س" (2 separators, not 3)
-  const tfMatch = text.match(/│\s*(\d+[sdmHWM]?)\s*│\s*(\d+\s*[سدشم]?)/);
+  // Pattern: "📌 XAUUSD │ 15 │ 1س" (old) or "📌 GOLD │ 1 │ 15د" (new)
+  // The new format has the timeframe with Arabic suffix in the THIRD position
+  const tfMatch = text.match(/│\s*(\d+\s*[سدشمdmhHWMwD]?)\s*│\s*(\d+\s*[سدشمdmhHWMwD]?)/);
   if (tfMatch) {
-    timeframe = tfMatch[1].trim();
-    htfTimeframe = tfMatch[2].trim();
+    const val1 = tfMatch[1].trim();
+    const val2 = tfMatch[2].trim();
+    // Check which value has a time suffix — that one is the timeframe
+    const suffixOnly = (v: string) => v.replace(/[\d\s]/g, "");
+    const hasSuffix1 = /[سدشمdmhHWMwD]/i.test(suffixOnly(val1));
+    const hasSuffix2 = /[سدشمdmhHWMwD]/i.test(suffixOnly(val2));
+    if (hasSuffix2 && !hasSuffix1) {
+      // New format: "│ 1 │ 15د" -> TF=15د, HTF=1
+      timeframe = val2;
+      htfTimeframe = val1;
+    } else {
+      // Old format: "│ 15 │ 1س" -> TF=15, HTF=1س
+      timeframe = val1;
+      htfTimeframe = val2;
+    }
   }
 
-  // Fallback HTF from trend line (supports Arabic names: يومي, أسبوعي, شهري)
-  if (!htfTimeframe) {
-    const htfMatch = text.match(/📈\s*(\d+\s*[سدشم]?|[a-zA-Z]+|يومي|أسبوعي|شهري|شهري)\s*:/);
-    if (htfMatch) htfTimeframe = htfMatch[1].trim();
+  // Also check trend line for actual timeframe: "📈 15د: هابط"
+  const trendTfMatch = text.match(/📈\s*(\d+\s*[سدشم]?|[a-zA-Z]+|يومي|أسبوعي|شهري)\s*:/);
+  if (trendTfMatch) {
+    const trendTf = trendTfMatch[1].trim();
+    // If trend line has a clear timeframe suffix, use it as the primary TF
+    if (/[سدشم]/.test(trendTf) || /[mhdwMHDW]/i.test(trendTf)) {
+      timeframe = trendTf;
+    }
   }
 
-  // Fallback: extract HTF from text containing Arabic timeframe names
+  // Fallback: extract HTF from Arabic names
   if (!htfTimeframe) {
     if (/يومي/.test(text)) htfTimeframe = "يومي";
     else if (/أسبوعي/.test(text)) htfTimeframe = "أسبوعي";
@@ -676,7 +704,6 @@ function extractEntry(text: string): number | null {
 
 function extractStopLoss(text: string): number | null {
   // Remove "مسافة الوقف: X نقطة" lines FIRST to avoid matching the distance as SL price
-  // Also remove "مسافة الوقف: X" without "نقطة" (some formats omit it)
   const cleanText = text.replace(/مسافة الوقف\s*[:\-–]?\s*[\d,.]+(?:\s*نقطة)?/gi, "");
 
   const patterns = [
@@ -785,9 +812,10 @@ function extractRiskData(text: string): RiskData {
     const upperPair = text.toUpperCase();
     if (/XAU|GOLD/.test(upperPair)) data.instrument = "الذهب (XAUUSD)";
     else if (/XAG|SILVER/.test(upperPair)) data.instrument = "الفضة (XAGUSD)";
-    else if (/BTC|ETH|SOL|BNB|XRP|ADA|DOGE/.test(upperPair)) data.instrument = "عملات رقمية";
-    else if (/NAS|US30|DAX|US500|SPX|NDX/.test(upperPair)) data.instrument = "مؤشرات (NAS/DOW)";
-    else if (/USOIL|CRUDE|OIL/.test(upperPair)) data.instrument = "نفط";
+    else if (/USDT/.test(upperPair)) data.instrument = "عملات رقمية";
+    else if (/BTC|ETH|SOL|BNB|XRP|ADA|DOGE|DOT|MATIC|AVAX|LINK/.test(upperPair)) data.instrument = "عملات رقمية";
+    else if (/NAS|US30|DAX|US500|SPX|NDX|UK100|GER40|JPN225/.test(upperPair)) data.instrument = "مؤشرات (NAS/DOW)";
+    else if (/USOIL|CRUDE|OIL|CL/.test(upperPair)) data.instrument = "نفط";
     else data.instrument = "فوركس";
   }
 
@@ -846,12 +874,10 @@ function extractPnLPoints(text: string): number | null {
 
 function extractPnLDollar(text: string): number | null {
   // Try matching specific patterns - require $ sign to avoid matching prices
-  // v4.0 format: "ربح تقريبي: +$20.00" or "الخسارة: $5.00"
   const patterns = [
     /(?:ربح تقريبي|ربح)\s*[:\s\-–]*[+\-]?\$\s*([\d,.]+)/,
     /(?:الخسارة|خسارة)\s*[:\s\-–]*[+\-]?\$\s*([\d,.]+)/,
     /\$\s*[+\-]?([\d,.]+)\s*(?:ربح|خسارة|نقطة)/,
-    // Extra patterns for various TP hit alert formats
     /(?:إجمالي الربح|الربح الإجمالي|إجمالي ربح)\s*[:\s\-–]*[+\-]?\$\s*([\d,.]+)/,
     /(?:الربح|ربح)\s*[:\s]*[+\-]?\$\s*([\d,.]+)/,
     /(?:Profit|P&L|PnL)\s*[:\s\-–]*[+\-]?\$\s*([\d,.]+)/i,
@@ -862,7 +888,6 @@ function extractPnLDollar(text: string): number | null {
       const val = parseFloat(match[1].replace(/,/g, ""));
       if (!isFinite(val) || val === 0) continue;
       if (Math.abs(val) > 50000) continue;
-      // Loss patterns return negative, profit patterns return positive
       const isLoss = /الخسارة|خسارة|Loss/i.test(match[0]);
       const hasPlusSign = /\+/.test(match[0]);
       if (isLoss && !hasPlusSign) return -val;
@@ -902,9 +927,7 @@ function emptyRiskData(): RiskData {
 
 export function validateSignal(signal: ParsedSignal): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
-  // Only require entry > 0 for signals that have a price
-  // Generic alerts (without price) set entry=0, which is acceptable
+  // Only check for clearly invalid prices — entry=0 is acceptable (generic alerts)
   if (signal.entry > 0 && signal.entry < 0.00001) errors.push("سعر الدخول غير صالح");
-  // Stop loss is optional — many signals don't include it
   return { valid: errors.length === 0, errors };
 }

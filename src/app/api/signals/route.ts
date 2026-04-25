@@ -535,9 +535,11 @@ function getInstrumentCategory(pair: string): string {
   const p = (pair || "").toUpperCase();
   if (/XAU|GOLD/.test(p)) return "gold";
   if (/XAG|SILVER/.test(p)) return "metals";
-  if (/USOIL|CRUDE|OIL/.test(p)) return "oil";
-  if (/BTC|ETH|SOL|BNB|XRP|ADA|DOGE/.test(p)) return "crypto";
-  if (/NAS|US30|DAX|US500|SPX|NDX/.test(p)) return "indices";
+  if (/USOIL|CRUDE|OIL|CL/.test(p)) return "oil";
+  // Auto-detect ANY pair ending in USDT as crypto (catches ALL crypto pairs automatically)
+  if (/USDT$/.test(p)) return "crypto";
+  if (/BTC|ETH|SOL|BNB|XRP|ADA|DOGE|DOT|MATIC|AVAX|LINK|UNI|ATOM|LTC|ETC|FIL|APT|ARB|OP|NEAR|SAND|MANA|SHIB|PEPE|WIF/.test(p)) return "crypto";
+  if (/NAS|US30|DAX|US500|SPX|NDX|UK100|GER40|JPN225/.test(p)) return "indices";
   if (/[A-Z]{3,6}(USD|EUR|GBP|JPY|AUD|NZD|CAD|CHF)/.test(p)) return "currencies";
   return "other";
 }
