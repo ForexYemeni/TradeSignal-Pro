@@ -24,6 +24,12 @@ export const metadata: Metadata = {
     apple: "/icon-512x512.png",
   },
   manifest: "/manifest.json",
+  viewport: {
+    width: "device-width",
+    initialScale: 1,
+    maximumScale: 1,
+    userScalable: false,
+  },
   other: {
     theme_color: "#FFD700",
     background_color: "#070b14",
