@@ -3449,7 +3449,7 @@ export default function HomePage() {
   ];
 
   const mainContent = (
-    <div className="min-h-screen flex flex-col" style={{ background: "linear-gradient(135deg, #080d1a 0%, #0f172a 50%, #080d1a 100%)" }}>
+    <div className="h-[100dvh] flex flex-col overflow-hidden" style={{ background: "linear-gradient(135deg, #080d1a 0%, #0f172a 50%, #080d1a 100%)" }}>
       {/* ── Confetti ── */}
       <Confetti show={showConfetti} />
       {showConfetti && (
@@ -3599,7 +3599,7 @@ export default function HomePage() {
       </header>
 
       {/* ── Content ── */}
-      <main className="flex-1 px-4 pb-20 md:pb-24 pt-3 max-w-lg mx-auto w-full">
+      <main className="flex-1 overflow-y-auto overflow-x-hidden px-4 pb-20 md:pb-24 pt-3 max-w-lg mx-auto w-full" style={{ WebkitOverflowScrolling: 'touch' }}>
 
         {/* ══════ TAB: HOME — PROFESSIONAL DASHBOARD ══════ */}
         {tab === "home" && (<motion.div key="home" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>{(() => {
