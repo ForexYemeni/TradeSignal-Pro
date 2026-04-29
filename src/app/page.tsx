@@ -8233,7 +8233,9 @@ export default function HomePage() {
                     </div>
                     <div className="space-y-2">
                     {users.filter(u => u.status === "pending").map(u => (
-                      <div key={u.id} className="rounded-xl border border-amber-500/15 bg-amber-500/[0.03] p-3 transition-all hover:bg-amber-500/[0.05]">
+                      <div key={u.id} className="rounded-xl border border-amber-500/15 bg-amber-500/[0.03] p-3 transition-all hover:bg-amber-500/[0.05] relative overflow-hidden">
+                        {/* Left color stripe */}
+                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-amber-400/50 to-amber-500/20 rounded-l-xl" />
                         <div className="flex items-center gap-3">
                           {/* Avatar */}
                           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-500/25 to-orange-500/15 border border-amber-500/20 flex items-center justify-center flex-shrink-0">
@@ -8300,24 +8302,62 @@ export default function HomePage() {
                       const expDays = u.subscriptionExpiry ? Math.ceil((new Date(u.subscriptionExpiry).getTime() - Date.now()) / 86400000) : null;
                       const isPromotedAdmin = u.role === "admin";
                       const isSuperAdmin = isPromotedAdmin && u.id === session?.id;
+                      const isFreeTrial = isSubActive && appSettings.freeTrialPackageId && u.packageId === appSettings.freeTrialPackageId;
+                      const isPaidSub = isSubActive && !isFreeTrial;
+
+                      // ── Card-level color theming by subscription type ──
+                      const cardBorder = isPromotedAdmin
+                        ? "border-amber-500/25"
+                        : isAgency
+                          ? "border-purple-500/20"
+                          : isFreeTrial
+                            ? "border-emerald-500/20"
+                            : isPaidSub
+                              ? "border-sky-500/20"
+                              : "border-border/40";
+                      const cardBg = isPromotedAdmin
+                        ? "bg-amber-500/[0.04]"
+                        : isAgency
+                          ? "bg-purple-500/[0.03]"
+                          : isFreeTrial
+                            ? "bg-emerald-500/[0.04]"
+                            : isPaidSub
+                              ? "bg-sky-500/[0.04]"
+                              : "bg-white/[0.01]";
+                      const cardHoverBg = isPromotedAdmin
+                        ? "hover:bg-amber-500/[0.07]"
+                        : isAgency
+                          ? "hover:bg-purple-500/[0.06]"
+                          : isFreeTrial
+                            ? "hover:bg-emerald-500/[0.07]"
+                            : isPaidSub
+                              ? "hover:bg-sky-500/[0.07]"
+                              : "hover:bg-white/[0.02]";
+
                       const avatarGradient = isPromotedAdmin
                           ? "from-amber-500/30 to-amber-600/15"
                           : isAgency
                             ? "from-purple-500/25 to-violet-500/15"
-                            : isSubActive
-                              ? "from-sky-500/25 to-cyan-500/15"
-                              : "from-emerald-500/20 to-green-500/10";
+                            : isFreeTrial
+                              ? "from-emerald-500/30 to-green-500/15"
+                              : isPaidSub
+                                ? "from-sky-500/25 to-cyan-500/15"
+                                : "from-gray-500/20 to-gray-600/10";
                       const avatarBorder = isPromotedAdmin
                           ? "border-amber-500/20"
                           : isAgency
                             ? "border-purple-500/20"
-                            : isSubActive
-                              ? "border-sky-500/20"
-                              : "border-emerald-500/15";
-                      const textColor = isPromotedAdmin ? "text-amber-400" : isAgency ? "text-purple-300" : isSubActive ? "text-sky-300" : "text-emerald-300";
+                            : isFreeTrial
+                              ? "border-emerald-500/20"
+                              : isPaidSub
+                                ? "border-sky-500/20"
+                                : "border-gray-500/15";
+                      const textColor = isPromotedAdmin ? "text-amber-400" : isAgency ? "text-purple-300" : isFreeTrial ? "text-emerald-300" : isPaidSub ? "text-sky-300" : "text-gray-400";
 
                       return (
-                        <div key={u.id} className={`rounded-xl border transition-all border-border/40 bg-white/[0.01] ${expandedUserId === u.id ? "hover:bg-white/[0.02]" : "hover:bg-white/[0.02] hover:border-border/60"}`}>
+                        <div key={u.id} className={`rounded-xl border transition-all relative overflow-hidden ${cardBorder} ${cardBg} ${cardHoverBg}`}>
+                          {/* Left color stripe */}
+                          <div className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-xl ${isPromotedAdmin ? "bg-gradient-to-b from-amber-500/50 to-amber-600/20" : isAgency ? "bg-gradient-to-b from-purple-500/50 to-purple-600/20" : isFreeTrial ? "bg-gradient-to-b from-emerald-500/50 to-emerald-600/20" : isPaidSub ? "bg-gradient-to-b from-sky-500/50 to-sky-600/20" : "bg-gradient-to-b from-gray-500/30 to-gray-600/15"}`} />
                           {/* Compact Header — Always Visible */}
                           <div
                             className="flex items-center gap-3 p-3 cursor-pointer select-none active:scale-[0.995] transition-transform"
@@ -8331,7 +8371,8 @@ export default function HomePage() {
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-1.5">
                                 <span className="text-[11px] font-bold text-foreground truncate">{u.name}</span>
-                                {isSubActive && <span className="text-[7px] bg-sky-500/15 text-sky-400 px-1.5 py-0.5 rounded-full font-bold border border-sky-500/10 flex-shrink-0">مشترك</span>}
+                                {isFreeTrial && <span className="text-[7px] bg-emerald-500/15 text-emerald-400 px-1.5 py-0.5 rounded-full font-bold border border-emerald-500/15 flex-shrink-0">تجربة مجانية</span>}
+                                {isPaidSub && <span className="text-[7px] bg-sky-500/15 text-sky-400 px-1.5 py-0.5 rounded-full font-bold border border-sky-500/15 flex-shrink-0">مشترك مدفوع</span>}
                                 {isSubExpired && <span className="text-[7px] bg-red-500/10 text-red-400 px-1.5 py-0.5 rounded-full font-bold border border-red-500/10 flex-shrink-0">منتهي</span>}
                                 {isAgency && <span className="text-[7px] bg-purple-500/15 text-purple-400 px-1.5 py-0.5 rounded-full font-bold border border-purple-500/10 flex-shrink-0">وكالة</span>}
                                 {isPromotedAdmin && <span className="text-[7px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded-full font-bold border border-amber-500/10 flex-shrink-0">مدير</span>}
@@ -8339,7 +8380,7 @@ export default function HomePage() {
                               <div className="flex items-center gap-2 mt-0.5">
                                 <span className="text-[9px] text-muted-foreground font-mono truncate" dir="ltr">{u.email}</span>
                                 {u.packageName && (
-                                  <span className="inline-flex items-center gap-0.5 px-1.5 py-px rounded-md text-[7px] font-semibold bg-amber-500/10 text-amber-400/80 border border-amber-500/10 flex-shrink-0">
+                                  <span className={`inline-flex items-center gap-0.5 px-1.5 py-px rounded-md text-[7px] font-semibold flex-shrink-0 ${isFreeTrial ? "bg-emerald-500/10 text-emerald-400/80 border border-emerald-500/10" : isPaidSub ? "bg-sky-500/10 text-sky-400/80 border border-sky-500/10" : "bg-amber-500/10 text-amber-400/80 border border-amber-500/10"}`}>
                                     <Package className="w-2 h-2" /> {u.packageName}
                                   </span>
                                 )}
@@ -8578,7 +8619,9 @@ export default function HomePage() {
                     </div>
                     <div className="space-y-2">
                     {users.filter(u => u.status === "expired").map(u => (
-                      <div key={u.id} className="rounded-xl border border-orange-500/10 bg-orange-500/[0.02] hover:bg-orange-500/[0.04] transition-colors overflow-hidden">
+                      <div key={u.id} className="rounded-xl border border-orange-500/15 bg-orange-500/[0.03] hover:bg-orange-500/[0.06] transition-colors overflow-hidden relative">
+                        {/* Left color stripe */}
+                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-orange-500/40 to-orange-600/20 rounded-l-xl" />
                         {/* Compact Header — clickable to expand */}
                         <div
                           className="flex items-center gap-3 p-3 cursor-pointer select-none active:scale-[0.995] transition-transform"
@@ -8695,7 +8738,9 @@ export default function HomePage() {
                     </div>
                     <div className="space-y-2">
                     {users.filter(u => u.status === "blocked").map(u => (
-                      <div key={u.id} className="rounded-xl border border-red-500/10 bg-red-500/[0.02] p-3 opacity-70">
+                      <div key={u.id} className="rounded-xl border border-red-500/15 bg-red-500/[0.03] p-3 opacity-75 relative overflow-hidden">
+                        {/* Left color stripe */}
+                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-red-500/50 to-red-600/25 rounded-l-xl" />
                         <div className="flex items-center gap-3">
                           {/* Avatar */}
                           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-red-500/20 to-red-600/10 border border-red-500/20 flex items-center justify-center flex-shrink-0">
