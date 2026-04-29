@@ -406,7 +406,7 @@ export default function HomePage() {
   const [showAdminNotif, setShowAdminNotif] = useState(false);
 
   /* ── User Announcements (from KV) ── */
-  const [userAnnouncements, setUserAnnouncements] = useState<{ id: string; title: string; message: string; type: string; priority: string; read: boolean; createdAt: string }[]>([]);
+  const [userAnnouncements, setUserAnnouncements] = useState<{ id: string; title: string; message: string; type: string; priority: string; link?: string; linkText?: string; read: boolean; createdAt: string }[]>([]);
   const [unreadAnnouncCount, setUnreadAnnouncCount] = useState(0);
   const [showUserAnnounc, setShowUserAnnounc] = useState(false);
 
@@ -4248,44 +4248,89 @@ export default function HomePage() {
                   {unreadAnnouncCount > 99 ? "99+" : unreadAnnouncCount}
                 </span>
               )}
-              {/* User Announcement Panel */}
+              {/* User Announcement Panel — Professional Cards */}
               {showUserAnnounc && (
-                <div className="fixed top-[60px] left-1/2 -translate-x-1/2 bg-[#0f172a]/95 backdrop-blur-xl border border-white/[0.08] rounded-xl shadow-2xl z-[200] max-h-80 overflow-hidden w-[calc(100vw-2rem)] max-w-[340px]">
-                  <div className="px-3 py-2 border-b border-white/[0.06] flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-foreground">الإشعارات</span>
+                <div className="fixed top-[60px] left-1/2 -translate-x-1/2 bg-[#0a0f1e]/[0.98] backdrop-blur-2xl border border-white/[0.08] rounded-2xl shadow-2xl shadow-black/50 z-[200] max-h-[85vh] overflow-hidden w-[calc(100vw-1.5rem)] max-w-[360px]">
+                  {/* Header */}
+                  <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between bg-gradient-to-l from-white/[0.02] to-transparent">
                     <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-500/20 to-orange-500/10 border border-amber-500/15 flex items-center justify-center">
+                        <Bell className="w-3.5 h-3.5 text-amber-400" />
+                      </div>
+                      <div>
+                        <span className="text-[11px] font-bold text-foreground">الإشعارات</span>
+                        {userAnnouncements.length > 0 && <span className="text-[9px] text-muted-foreground mr-1.5">({userAnnouncements.length})</span>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2.5">
                       {unreadAnnouncCount > 0 && (
-                        <button onClick={handleMarkAllAnnouncRead} className="text-[10px] text-amber-400/70 hover:text-amber-400">تحديد الكل كمقروء</button>
+                        <button onClick={handleMarkAllAnnouncRead} className="text-[9px] text-amber-400/70 hover:text-amber-400 transition-colors">تحديد الكل كمقروء</button>
                       )}
                       {userAnnouncements.length > 0 && (
-                        <button onClick={handleClearAnnounc} className="text-[10px] text-red-400/70 hover:text-red-400">مسح الكل</button>
+                        <button onClick={handleClearAnnounc} className="text-[9px] text-red-400/70 hover:text-red-400 transition-colors">مسح الكل</button>
                       )}
                     </div>
                   </div>
-                  <div className="max-h-60 overflow-y-auto scrollbar-thin">
+                  {/* Cards List */}
+                  <div className="max-h-[calc(85vh-52px)] overflow-y-auto scrollbar-thin p-3 space-y-2.5">
                     {userAnnouncements.length === 0 ? (
-                      <div className="px-3 py-6 text-center">
-                        <Bell className="w-5 h-5 text-muted-foreground/30 mx-auto mb-1.5" />
-                        <div className="text-[10px] text-muted-foreground/50">لا توجد إشعارات</div>
+                      <div className="py-10 text-center">
+                        <div className="w-12 h-12 rounded-2xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center mx-auto mb-2">
+                          <Bell className="w-5 h-5 text-muted-foreground/20" />
+                        </div>
+                        <div className="text-[10px] text-muted-foreground/40">لا توجد إشعارات</div>
                       </div>
                     ) : (
                       userAnnouncements.map(n => {
-                        const typeIcon: Record<string, string> = { info: "ℹ️", warning: "⚠️", urgent: "🔴", maintenance: "🔧", promo: "🎁" };
-                        const typeTint: Record<string, string> = { info: "bg-blue-500/[0.06]", warning: "bg-amber-500/[0.06]", urgent: "bg-red-500/[0.06]", maintenance: "bg-purple-500/[0.06]", promo: "bg-emerald-500/[0.06]" };
+                        const typeConfig: Record<string, { icon: string; gradient: string; border: string; badge: string; badgeBg: string }> = {
+                          info: { icon: "ℹ️", gradient: "from-blue-500/[0.08] to-blue-500/[0.02]", border: "border-blue-500/[0.12]", badge: "معلومة", badgeBg: "bg-blue-500/10 text-blue-400" },
+                          warning: { icon: "⚠️", gradient: "from-amber-500/[0.08] to-amber-500/[0.02]", border: "border-amber-500/[0.12]", badge: "تحذير", badgeBg: "bg-amber-500/10 text-amber-400" },
+                          urgent: { icon: "🔴", gradient: "from-red-500/[0.10] to-red-500/[0.03]", border: "border-red-500/[0.15]", badge: "عاجل", badgeBg: "bg-red-500/10 text-red-400" },
+                          maintenance: { icon: "🔧", gradient: "from-purple-500/[0.08] to-purple-500/[0.02]", border: "border-purple-500/[0.12]", badge: "صيانة", badgeBg: "bg-purple-500/10 text-purple-400" },
+                          promo: { icon: "🎁", gradient: "from-emerald-500/[0.08] to-emerald-500/[0.02]", border: "border-emerald-500/[0.12]", badge: "عرض", badgeBg: "bg-emerald-500/10 text-emerald-400" },
+                        };
+                        const cfg = typeConfig[n.type] || typeConfig.info;
+                        const priorityColors: Record<string, string> = { high: "text-red-400", medium: "text-amber-400", low: "text-muted-foreground/50" };
+                        const priorityLabels: Record<string, string> = { high: "عالية", medium: "متوسطة", low: "منخفضة" };
                         return (
-                          <button key={n.id}
+                          <div key={n.id}
                             onClick={() => { if (!n.read) handleMarkAnnouncRead(n.id); }}
-                            className={`w-full text-right px-3 py-2.5 border-b border-white/[0.04] last:border-0 hover:bg-white/[0.03] transition-colors ${!n.read ? "bg-amber-500/[0.04]" : ""}`}>
-                            <div className="flex items-start gap-2">
-                              <span className="text-sm mt-0.5 shrink-0">{typeIcon[n.type] || "📢"}</span>
-                              <div className="flex-1 min-w-0">
-                                <div className={`text-[10px] font-bold ${!n.read ? "text-foreground" : "text-muted-foreground"}`}>{n.title}</div>
-                                <div className="text-[9px] text-muted-foreground/70 mt-0.5 leading-relaxed line-clamp-2">{n.message}</div>
-                                <div className="text-[8px] text-muted-foreground/40 mt-1">{new Date(n.createdAt).toLocaleString("ar-SA", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</div>
+                            className={`relative rounded-xl border overflow-hidden cursor-pointer transition-all duration-300 hover:scale-[0.99] ${!n.read ? cfg.border + " bg-gradient-to-b " + cfg.gradient : "border-white/[0.05] bg-white/[0.02] hover:bg-white/[0.04]"}`}>
+                            {/* Unread dot */}
+                            {!n.read && (
+                              <div className="absolute top-3 left-3 w-2 h-2 rounded-full bg-amber-400 shadow-sm shadow-amber-400/50" />
+                            )}
+                            {/* Card content */}
+                            <div className="p-3.5">
+                              {/* Top row: icon + type badge */}
+                              <div className="flex items-center gap-2 mb-2.5">
+                                <div className="w-8 h-8 rounded-lg bg-white/[0.05] border border-white/[0.08] flex items-center justify-center shrink-0">
+                                  <span className="text-base">{cfg.icon}</span>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className={`text-[11px] font-bold ${!n.read ? "text-foreground" : "text-muted-foreground"} leading-snug line-clamp-1`}>{n.title}</div>
+                                </div>
                               </div>
-                              {!n.read && <div className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-1.5 shrink-0" />}
+                              {/* Type + Priority badges */}
+                              <div className="flex items-center gap-1.5 mb-2">
+                                <span className={`text-[7px] px-1.5 py-0.5 rounded-md font-bold ${cfg.badgeBg}`}>{cfg.badge}</span>
+                                {n.priority === "high" && (
+                                  <span className="text-[7px] px-1.5 py-0.5 rounded-md font-bold bg-red-500/10 text-red-400">عاجل</span>
+                                )}
+                                <span className="text-[7px] text-muted-foreground/30 mr-auto">{new Date(n.createdAt).toLocaleString("ar-SA", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+                              </div>
+                              {/* Message */}
+                              <div className={`text-[10px] leading-relaxed whitespace-pre-line ${!n.read ? "text-muted-foreground" : "text-muted-foreground/60"} line-clamp-4`}>{n.message}</div>
+                              {/* CTA Button */}
+                              {n.link && (
+                                <a href={n.link} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
+                                  className="mt-3 w-full flex items-center justify-center gap-1.5 h-9 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 text-[10px] font-bold text-black/80 shadow-md shadow-amber-500/15 hover:shadow-lg hover:shadow-amber-500/25 active:scale-[0.97] transition-all">
+                                  <span>{n.linkText || "اضغط هنا"}</span>
+                                  <svg className="w-3 h-3 rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                                </a>
+                              )}
                             </div>
-                          </button>
+                          </div>
                         );
                       })
                     )}

@@ -59,6 +59,8 @@ export async function POST(request: NextRequest) {
       targetUserName: targetUserName || undefined,
       sendPush: !!sendPush,
       sendEmail: !!sendEmail,
+      link: link?.trim() || undefined,
+      linkText: linkText?.trim() || undefined,
       createdBy,
       expiresAt: expiresAt || undefined,
     });

@@ -869,6 +869,8 @@ export interface Announcement {
   targetUserName?: string;
   sendPush: boolean;
   sendEmail: boolean;
+  link?: string;
+  linkText?: string;
   createdBy: string;
   createdAt: string;
   expiresAt?: string;
@@ -882,6 +884,8 @@ export interface UserNotification {
   message: string;
   type: "info" | "warning" | "urgent" | "maintenance" | "promo";
   priority: "high" | "medium" | "low";
+  link?: string;
+  linkText?: string;
   read: boolean;
   createdAt: string;
 }
@@ -963,6 +967,8 @@ export async function addNotificationForUsers(announcement: Announcement, userId
       message: announcement.message,
       type: announcement.type,
       priority: announcement.priority,
+      link: announcement.link,
+      linkText: announcement.linkText,
     });
     created++;
   }
