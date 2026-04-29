@@ -640,10 +640,17 @@ export async function enforceSubscriptions(): Promise<string[]> {
   const users = await getUsers();
   const expiredIds: string[] = [];
   const now = new Date().toISOString();
+  const oneHourAgo = new Date(Date.now() - 3600000).toISOString(); // 1 hour grace period
   let changed = false;
   for (const u of users) {
     if (u.role === "admin") continue;
     if (u.subscriptionExpiry && u.subscriptionType !== "none" && u.subscriptionExpiry < now) {
+      // Grace period: don't expire users created less than 1 hour ago
+      // (prevents immediate expiration if trial package has 0 or very short duration)
+      if (u.createdAt && u.createdAt > oneHourAgo) {
+        console.log(`[EnforceSubscriptions] Grace period active for ${u.name} (${u.email}) — created ${u.createdAt}, skipping expiry`);
+        continue;
+      }
       u.status = "expired";
       u.subscriptionType = "none";
       u.packageId = null;

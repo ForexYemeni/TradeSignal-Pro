@@ -8563,8 +8563,12 @@ export default function HomePage() {
                     </div>
                     <div className="space-y-2">
                     {users.filter(u => u.status === "expired").map(u => (
-                      <div key={u.id} className="rounded-xl border border-orange-500/10 bg-orange-500/[0.02] p-3 hover:bg-orange-500/[0.04] transition-colors">
-                        <div className="flex items-center gap-3">
+                      <div key={u.id} className="rounded-xl border border-orange-500/10 bg-orange-500/[0.02] hover:bg-orange-500/[0.04] transition-colors overflow-hidden">
+                        {/* Compact Header — clickable to expand */}
+                        <div
+                          className="flex items-center gap-3 p-3 cursor-pointer select-none active:scale-[0.995] transition-transform"
+                          onClick={() => setExpandedUserId(prev => prev === u.id ? null : u.id)}
+                        >
                           {/* Avatar */}
                           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500/20 to-orange-600/10 border border-orange-500/20 flex items-center justify-center flex-shrink-0">
                             <span className="text-sm font-black text-orange-400">{u.name?.charAt(0)?.toUpperCase() || "?"}</span>
@@ -8581,8 +8585,8 @@ export default function HomePage() {
                               {u.packageName ? `آخر باقة: ${u.packageName}` : "لا يوجد اشتراك"} · تاريخ التسجيل: {new Date(u.createdAt).toLocaleDateString("ar-SA", { year: "numeric", month: "short", day: "numeric" })}
                             </div>
                           </div>
-                          {/* Actions */}
-                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                          {/* Quick actions */}
+                          <div className="flex items-center gap-1.5 flex-shrink-0" onClick={e => e.stopPropagation()}>
                             <button onClick={() => setShowAssignPkg(u.id)} className="px-2.5 py-1.5 rounded-lg text-[9px] font-medium bg-sky-500/10 text-sky-400 border border-sky-500/15 active:scale-95 transition-transform flex items-center gap-1 hover:bg-sky-500/20">
                               <Package className="w-3 h-3" /> تجديد
                             </button>
@@ -8590,7 +8594,72 @@ export default function HomePage() {
                               <Trash2 className="w-3 h-3" /> حذف
                             </button>
                           </div>
+                          {/* Expand Arrow */}
+                          <ChevronDown className={`w-4 h-4 text-muted-foreground/40 flex-shrink-0 transition-transform duration-200 ${expandedUserId === u.id ? "rotate-180" : ""}`} />
                         </div>
+
+                        {/* Expanded Details — Package Assignment */}
+                        {expandedUserId === u.id && (
+                          <div className="px-3 pb-3 space-y-2.5 animate-[fadeIn_0.15s_ease-out] border-t border-border/30">
+                            {/* Show Assign Package Dropdown when triggered */}
+                            {showAssignPkg === u.id && packages.filter(p => p.isActive).length > 0 && (
+                              <div className="mt-2.5 glass-card p-3.5 space-y-3 animate-[fadeIn_0.2s_ease-out] border-sky-500/20">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-1.5">
+                                    <Package className="w-3.5 h-3.5 text-sky-400" />
+                                    <span className="text-[10px] font-bold text-sky-400">تعيين / تجديد باقة</span>
+                                  </div>
+                                  <button onClick={() => { setShowAssignPkg(null); setAssignDays(""); }} className="w-6 h-6 rounded-lg bg-muted/40 flex items-center justify-center hover:bg-muted/60 transition-colors">
+                                    <X className="w-3 h-3 text-muted-foreground" />
+                                  </button>
+                                </div>
+                                {u.hadFreeTrial && (
+                                  <div className="flex items-center gap-1.5 bg-amber-500/10 rounded-lg px-2.5 py-2 border border-amber-500/15">
+                                    <AlertTriangle className="w-3 h-3 text-amber-400 flex-shrink-0" />
+                                    <span className="text-[9px] text-amber-300/80 leading-relaxed">
+                                      هذا المستخدم سبق له أخذ تجربة مجانية. لا يمكن تفعيل الباقة المجانية مرة أخرى.
+                                    </span>
+                                  </div>
+                                )}
+                                <div className="grid grid-cols-2 gap-2">
+                                  {packages.filter(p => p.isActive).map(pkg => {
+                                    const isTrial = appSettings.freeTrialPackageId === pkg.id;
+                                    const disabled = isTrial && u.hadFreeTrial;
+                                    return (
+                                      <button key={pkg.id}
+                                        onClick={() => !disabled && handleAssignPackage(u.id, pkg.id)}
+                                        className={`px-2.5 py-2.5 rounded-xl text-[9px] font-semibold border text-right transition-all ${
+                                          disabled
+                                            ? "bg-white/[0.02] text-muted-foreground/30 border-border/50 cursor-not-allowed line-through opacity-40"
+                                            : "bg-sky-500/[0.06] text-sky-400 border-sky-500/15 active:scale-95 hover:bg-sky-500/15 hover:border-sky-500/30"
+                                        }`}
+                                        disabled={disabled}>
+                                        <div className="flex items-center justify-between">
+                                          <span className="truncate font-bold">{pkg.name}</span>
+                                          <span className="text-[7px] text-muted-foreground flex-shrink-0 mr-1">{pkg.durationDays}ي{pkg.price > 0 ? ` · $${pkg.price}` : ""}</span>
+                                        </div>
+                                        {isTrial && !disabled && <div className="text-[7px] text-emerald-400 mt-0.5 font-bold">مجاني</div>}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Input type="number" value={assignDays} onChange={e => setAssignDays(e.target.value)} placeholder="أيام مخصصة (اختياري)"
+                                    className="glass-input flex-1 h-9 text-[10px]" dir="ltr" />
+                                  <button onClick={() => { setShowAssignPkg(null); setAssignDays(""); }} className="px-3 h-9 rounded-lg bg-muted/40 text-muted-foreground text-[9px] font-medium border border-border/50 hover:bg-muted/60 transition-colors">إلغاء</button>
+                                </div>
+                              </div>
+                            )}
+                            {/* Default expanded info if no dropdown open */}
+                            {showAssignPkg !== u.id && (
+                              <div className="pt-2.5 space-y-1.5">
+                                <div className="text-[9px] text-muted-foreground/50">
+                                  يمكنك تعيين باقة جديدة أو تجديد الاشتراك بالضغط على زر "تجديد"
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     ))}
                     </div>

@@ -144,9 +144,13 @@ export async function POST(request: NextRequest) {
       if (trialPkg && trialPkg.isActive) {
         trialPkgId = trialPkg.id;
         trialPkgName = trialPkg.name;
+        const duration = Math.max(1, trialPkg.durationDays || 1); // minimum 1 day
         const expiry = new Date();
-        expiry.setDate(expiry.getDate() + trialPkg.durationDays);
+        expiry.setDate(expiry.getDate() + duration);
         trialExpiry = expiry.toISOString();
+        console.log(`[Register] Assigned trial: ${trialPkg.name} (${duration} days) to ${emailVal.sanitized}, expires: ${trialExpiry}`);
+      } else {
+        console.log(`[Register] Trial package not found or inactive. ID: ${settings.freeTrialPackageId}`);
       }
     }
 
