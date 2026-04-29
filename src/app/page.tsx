@@ -22,7 +22,7 @@ import {
   MoreHorizontal, CreditCard, Upload, CheckCircle2, XCircle, Image, Copy, Plus, Banknote,
   ShieldCheck, ShieldX, ShieldBan, WifiOff, Gift, Ticket,
   Search, Unlock, ArrowLeft, X, Check, Save, Wifi, Pencil, Pause, Play,
-  ChevronDown, Megaphone,
+  ChevronDown, Megaphone, Tag, MessageSquare, Link2 as Link2Icon, MousePointerClick,
 } from "lucide-react";
 
 // ═══ EXTRACTED MODULES ═══
@@ -409,6 +409,10 @@ export default function HomePage() {
   const [userAnnouncements, setUserAnnouncements] = useState<{ id: string; title: string; message: string; type: string; priority: string; link?: string; linkText?: string; read: boolean; createdAt: string }[]>([]);
   const [unreadAnnouncCount, setUnreadAnnouncCount] = useState(0);
   const [showUserAnnounc, setShowUserAnnounc] = useState(false);
+  const [showAnnouncModal, setShowAnnouncModal] = useState(false);
+  const [modalAnnouncIdx, setModalAnnouncIdx] = useState(0);
+  const prevUnreadAnnouncRef = useRef(0);
+  const announcModalShownRef = useRef(new Set<string>());
 
   /* ── Admin Announcements (creation) ── */
   const [announcements, setAnnouncements] = useState<{ id: string; title: string; message: string; type: string; priority: string; target: string; targetUserName?: string; sendPush: boolean; sendEmail: boolean; createdAt: string }[]>([]);
@@ -1341,6 +1345,44 @@ export default function HomePage() {
       return () => clearInterval(interval);
     }
   }, [session?.id, session?.role, checkUserAnnouncCount]);
+
+  // Auto-popup announcement modal when new unread arrives
+  useEffect(() => {
+    if (unreadAnnouncCount > prevUnreadAnnouncRef.current && unreadAnnouncCount > 0) {
+      // New unread announcement(s) detected — fetch and show modal
+      fetchUserAnnouncements().then(() => {
+        // Modal will be triggered via the separate effect below
+      });
+    }
+    prevUnreadAnnouncRef.current = unreadAnnouncCount;
+  }, [unreadAnnouncCount, fetchUserAnnouncements]);
+
+  // Show modal when unread announcements exist and modal not yet shown
+  useEffect(() => {
+    const unread = userAnnouncements.filter(n => !n.read && !announcModalShownRef.current.has(n.id));
+    if (unread.length > 0) {
+      // Find the latest unread that hasn't been shown
+      setModalAnnouncIdx(0);
+      setShowAnnouncModal(true);
+    }
+  }, [userAnnouncements]);
+
+  const dismissAnnouncModal = useCallback(() => {
+    // Mark current modal announcement as read
+    const unread = userAnnouncements.filter(n => !n.read && !announcModalShownRef.current.has(n.id));
+    if (unread.length > 0) {
+      announcModalShownRef.current.add(unread[0].id);
+      if (!unread[0].read) handleMarkAnnouncRead(unread[0].id);
+    }
+    setShowAnnouncModal(false);
+  }, [userAnnouncements, handleMarkAnnouncRead]);
+
+  const dismissAllAnnouncModal = useCallback(() => {
+    const unread = userAnnouncements.filter(n => !n.read && !announcModalShownRef.current.has(n.id));
+    unread.forEach(n => announcModalShownRef.current.add(n.id));
+    handleMarkAllAnnouncRead();
+    setShowAnnouncModal(false);
+  }, [userAnnouncements, handleMarkAllAnnouncRead]);
 
   /* ── Pull to refresh (for signals tab) ── */
   const handlePullRefresh = useCallback(async () => {
@@ -4248,7 +4290,7 @@ export default function HomePage() {
                   {unreadAnnouncCount > 99 ? "99+" : unreadAnnouncCount}
                 </span>
               )}
-              {/* User Announcement Panel — Professional Cards */}
+              {/* User Announcement Panel — History List (Bell) */}
               {showUserAnnounc && (
                 <div className="fixed top-[60px] left-1/2 -translate-x-1/2 bg-[#0a0f1e]/[0.98] backdrop-blur-2xl border border-white/[0.08] rounded-2xl shadow-2xl shadow-black/50 z-[200] max-h-[85vh] overflow-hidden w-[calc(100vw-1.5rem)] max-w-[360px]">
                   {/* Header */}
@@ -4290,19 +4332,14 @@ export default function HomePage() {
                           promo: { icon: "🎁", gradient: "from-emerald-500/[0.08] to-emerald-500/[0.02]", border: "border-emerald-500/[0.12]", badge: "عرض", badgeBg: "bg-emerald-500/10 text-emerald-400" },
                         };
                         const cfg = typeConfig[n.type] || typeConfig.info;
-                        const priorityColors: Record<string, string> = { high: "text-red-400", medium: "text-amber-400", low: "text-muted-foreground/50" };
-                        const priorityLabels: Record<string, string> = { high: "عالية", medium: "متوسطة", low: "منخفضة" };
                         return (
                           <div key={n.id}
                             onClick={() => { if (!n.read) handleMarkAnnouncRead(n.id); }}
                             className={`relative rounded-xl border overflow-hidden cursor-pointer transition-all duration-300 hover:scale-[0.99] ${!n.read ? cfg.border + " bg-gradient-to-b " + cfg.gradient : "border-white/[0.05] bg-white/[0.02] hover:bg-white/[0.04]"}`}>
-                            {/* Unread dot */}
                             {!n.read && (
                               <div className="absolute top-3 left-3 w-2 h-2 rounded-full bg-amber-400 shadow-sm shadow-amber-400/50" />
                             )}
-                            {/* Card content */}
                             <div className="p-3.5">
-                              {/* Top row: icon + type badge */}
                               <div className="flex items-center gap-2 mb-2.5">
                                 <div className="w-8 h-8 rounded-lg bg-white/[0.05] border border-white/[0.08] flex items-center justify-center shrink-0">
                                   <span className="text-base">{cfg.icon}</span>
@@ -4311,7 +4348,6 @@ export default function HomePage() {
                                   <div className={`text-[11px] font-bold ${!n.read ? "text-foreground" : "text-muted-foreground"} leading-snug line-clamp-1`}>{n.title}</div>
                                 </div>
                               </div>
-                              {/* Type + Priority badges */}
                               <div className="flex items-center gap-1.5 mb-2">
                                 <span className={`text-[7px] px-1.5 py-0.5 rounded-md font-bold ${cfg.badgeBg}`}>{cfg.badge}</span>
                                 {n.priority === "high" && (
@@ -4319,9 +4355,7 @@ export default function HomePage() {
                                 )}
                                 <span className="text-[7px] text-muted-foreground/30 mr-auto">{new Date(n.createdAt).toLocaleString("ar-SA", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
                               </div>
-                              {/* Message */}
                               <div className={`text-[10px] leading-relaxed whitespace-pre-line ${!n.read ? "text-muted-foreground" : "text-muted-foreground/60"} line-clamp-4`}>{n.message}</div>
-                              {/* CTA Button */}
                               {n.link && (
                                 <a href={n.link} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
                                   className="mt-3 w-full flex items-center justify-center gap-1.5 h-9 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 text-[10px] font-bold text-black/80 shadow-md shadow-amber-500/15 hover:shadow-lg hover:shadow-amber-500/25 active:scale-[0.97] transition-all">
@@ -4340,6 +4374,131 @@ export default function HomePage() {
               {showUserAnnounc && <div className="fixed inset-0 z-40" onClick={() => setShowUserAnnounc(false)} />}
             </div>
             )}
+
+            {/* ══════ Centered Announcement Modal (Auto-popup for new announcements) ══════ */}
+            <AnimatePresence>
+              {showAnnouncModal && (() => {
+                const unreadUnshown = userAnnouncements.filter(n => !n.read && !announcModalShownRef.current.has(n.id));
+                const current = unreadUnshown[modalAnnouncIdx];
+                if (!current) return null;
+                const typeFullConfig: Record<string, { icon: string; gradient: string; border: string; badge: string; badgeBg: string; glow: string; headerGrad: string }> = {
+                  info: { icon: "ℹ️", gradient: "from-blue-500/[0.06] to-blue-600/[0.02]", border: "border-blue-500/20", badge: "معلومة", badgeBg: "bg-blue-500/15 text-blue-300", glow: "shadow-blue-500/10", headerGrad: "from-blue-500/20 via-blue-600/10 to-transparent" },
+                  warning: { icon: "⚠️", gradient: "from-amber-500/[0.08] to-amber-600/[0.02]", border: "border-amber-500/20", badge: "تحذير", badgeBg: "bg-amber-500/15 text-amber-300", glow: "shadow-amber-500/10", headerGrad: "from-amber-500/20 via-amber-600/10 to-transparent" },
+                  urgent: { icon: "🔴", gradient: "from-red-500/[0.10] to-red-600/[0.03]", border: "border-red-500/25", badge: "عاجل", badgeBg: "bg-red-500/15 text-red-300", glow: "shadow-red-500/15", headerGrad: "from-red-500/20 via-red-600/10 to-transparent" },
+                  maintenance: { icon: "🔧", gradient: "from-purple-500/[0.08] to-purple-600/[0.02]", border: "border-purple-500/20", badge: "صيانة", badgeBg: "bg-purple-500/15 text-purple-300", glow: "shadow-purple-500/10", headerGrad: "from-purple-500/20 via-purple-600/10 to-transparent" },
+                  promo: { icon: "🎁", gradient: "from-emerald-500/[0.08] to-emerald-600/[0.02]", border: "border-emerald-500/20", badge: "عرض خاص", badgeBg: "bg-emerald-500/15 text-emerald-300", glow: "shadow-emerald-500/10", headerGrad: "from-emerald-500/20 via-emerald-600/10 to-transparent" },
+                };
+                const cfg = typeFullConfig[current.type] || typeFullConfig.info;
+                const remaining = unreadUnshown.length - modalAnnouncIdx - 1;
+                return (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+                  >
+                    {/* Backdrop */}
+                    <motion.div
+                      initial={{ opacity: 0, backdropFilter: "blur(0px)" }}
+                      animate={{ opacity: 1, backdropFilter: "blur(12px)" }}
+                      exit={{ opacity: 0, backdropFilter: "blur(0px)" }}
+                      transition={{ duration: 0.4 }}
+                      className="absolute inset-0 bg-black/60"
+                      onClick={dismissAllAnnouncModal}
+                    />
+                    {/* Card */}
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.85, y: 30 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.9, y: -20 }}
+                      transition={{ duration: 0.45, ease: [0.34, 1.56, 0.64, 1] }}
+                      className={`relative w-full max-w-[420px] rounded-3xl border ${cfg.border} bg-[#0d1117]/95 backdrop-blur-3xl shadow-2xl ${cfg.glow} overflow-hidden`}
+                    >
+                      {/* Decorative top gradient bar */}
+                      <div className={`h-1.5 w-full bg-gradient-to-l ${cfg.headerGrad.replace('to-transparent', 'to-transparent')}`} style={{ background: `linear-gradient(to left, var(--tw-gradient-stops))` }}>
+                        <div className={`h-full bg-gradient-to-l ${cfg.headerGrad}`} />
+                      </div>
+                      {/* Close button */}
+                      <button
+                        onClick={dismissAnnouncModal}
+                        className="absolute top-4 left-4 z-10 w-8 h-8 rounded-xl bg-white/[0.06] border border-white/[0.1] flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-white/[0.12] transition-all active:scale-90"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                      {/* Content */}
+                      <div className="p-6 pt-5">
+                        {/* Icon & badges row */}
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${cfg.gradient} border ${cfg.border} flex items-center justify-center shrink-0 shadow-lg ${cfg.glow}`}>
+                            <span className="text-2xl">{cfg.icon}</span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className={`text-[9px] px-2 py-1 rounded-lg font-bold ${cfg.badgeBg}`}>{cfg.badge}</span>
+                              {current.priority === "high" && (
+                                <span className="text-[9px] px-2 py-1 rounded-lg font-bold bg-red-500/15 text-red-300 flex items-center gap-1">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
+                                  عاجل
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[10px] text-muted-foreground/50 mt-1.5">
+                              {new Date(current.createdAt).toLocaleString("ar-SA", { weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                            </div>
+                          </div>
+                        </div>
+                        {/* Title */}
+                        <h2 className="text-base font-black text-foreground mb-3 leading-snug">{current.title}</h2>
+                        {/* Message */}
+                        <div className="text-[13px] leading-[1.8] text-muted-foreground whitespace-pre-line mb-5 max-h-[200px] overflow-y-auto scrollbar-thin">
+                          {current.message}
+                        </div>
+                        {/* CTA Button */}
+                        {current.link && (
+                          <a
+                            href={current.link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => { e.stopPropagation(); dismissAnnouncModal(); }}
+                            className={`block w-full h-12 rounded-2xl text-sm font-bold text-white flex items-center justify-center gap-2 transition-all active:scale-[0.97] shadow-lg hover:shadow-xl ${
+                              current.type === "promo" ? "bg-gradient-to-l from-emerald-500 to-teal-600 shadow-emerald-500/20 hover:shadow-emerald-500/30" :
+                              current.type === "urgent" ? "bg-gradient-to-l from-red-500 to-rose-600 shadow-red-500/20 hover:shadow-red-500/30" :
+                              current.type === "warning" ? "bg-gradient-to-l from-amber-500 to-orange-600 shadow-amber-500/20 hover:shadow-amber-500/30" :
+                              "bg-gradient-to-l from-blue-500 to-indigo-600 shadow-blue-500/20 hover:shadow-blue-500/30"
+                            }`}
+                          >
+                            <span>{current.linkText || "اضغط هنا"}</span>
+                            <ArrowUpRight className="w-4 h-4" />
+                          </a>
+                        )}
+                        {/* Footer actions */}
+                        <div className="flex items-center justify-between mt-4 pt-3 border-t border-white/[0.06]">
+                          <button
+                            onClick={dismissAllAnnouncModal}
+                            className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                          >
+                            إغلاق الكل
+                          </button>
+                          {remaining > 0 && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] text-muted-foreground/50">{remaining + 1}/{unreadUnshown.length}</span>
+                              <button
+                                onClick={dismissAnnouncModal}
+                                className="text-[10px] px-3 py-1.5 rounded-lg bg-white/[0.06] border border-white/[0.08] text-foreground hover:bg-white/[0.1] transition-all flex items-center gap-1"
+                              >
+                                <span>التالي</span>
+                                <ChevronDown className="w-3 h-3 rotate-[-90deg]" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </motion.div>
+                  </motion.div>
+                );
+              })()}
+            </AnimatePresence>
             {/* Audio Controls */}
             <button onClick={() => setAudioMuted(!audioMuted)} className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-all duration-300 hover:shadow-sm active:scale-90">
               {audioMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
@@ -6461,125 +6620,252 @@ export default function HomePage() {
                ══════════════════════════════════════════════════ */}
             {adminSubTab === "announcements" && (
               <>
-            {/* ── Create Announcement Form ── */}
+            {/* ── Create Announcement Form — Redesigned ── */}
             <div className="glass-card overflow-hidden">
-              <div className="px-4 py-3.5 border-b border-white/[0.05] flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-rose-500/20 to-pink-500/10 border border-rose-500/15 flex items-center justify-center">
-                  <Megaphone className="w-4 h-4 text-rose-400" />
-                </div>
-                <div>
-                  <h3 className="text-xs font-bold text-foreground">إرسال إعلان جديد</h3>
-                  <p className="text-[8px] text-muted-foreground">إرسال إشعار احترافي للمستخدمين</p>
+              {/* Form Header */}
+              <div className="relative px-5 py-4 border-b border-white/[0.05]">
+                <div className="absolute inset-0 bg-gradient-to-l from-rose-500/[0.04] via-pink-500/[0.02] to-transparent" />
+                <div className="relative flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-rose-500/20 to-pink-500/10 border border-rose-500/20 flex items-center justify-center shadow-lg shadow-rose-500/10">
+                    <Megaphone className="w-5 h-5 text-rose-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-foreground">إنشاء إعلان جديد</h3>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">صمم إعلانك بشكل احترافي وأرسله للمستخدمين</p>
+                  </div>
                 </div>
               </div>
-              <div className="p-4 space-y-3">
-                {/* Quick Templates */}
+
+              <div className="p-5 space-y-5">
+                {/* Quick Templates — Pill-style */}
                 <div>
-                  <label className="text-[10px] font-semibold text-muted-foreground block mb-1.5">قوالب سريعة</label>
-                  <div className="flex flex-wrap gap-1.5">
+                  <label className="text-[11px] font-bold text-foreground block mb-2.5 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                    قوالب سريعة
+                  </label>
+                  <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
                     {[
-                      { label: "ترويج بروكر", icon: "🎁", type: "promo", title: "عرض خاص: سجل عبر بروكر شريكنا واحصل على باقة مجانية!", msg: "عروض حصرية لأعضائنا!\n\nسجل الآن عبر رابط بروكر شريكنا واحصل على باقة وكالة مجانية كهدية منا.\n\n✅ باقة وكالة كاملة بدون أي تكلفة\n✅ جميع الإشارات والمزايا الحصرية\n✅ دعم فني على مدار الساعة\n\n⏰ العرض لفترة محدودة - سارع الآن!", link: "", linkText: "سجل الآن واحصل على الباقة مجاناً" },
-                      { label: "تحديث نظام", icon: "🔧", type: "maintenance", title: "تحديث جديد للمنصة", msg: "تم تحديث المنصة بإضافات جديدة:\n\n✅ تحسين سرعة الأداء\n✅ إصلاح بعض المشاكل التقنية\n✅ ميزات جديدة قادمة قريباً\n\nشكراً لصبركم ودعمكم المتواصل." },
-                      { label: "تحذير", icon: "⚠️", type: "warning", title: "تنبيه مهم", msg: "يرجى الانتباه للاحتيال:\n\nلا نرسل رسائل خاصة لأي مستخدم نطلب فيها بيانات الحساب أو كلمة المرور. احرص على حماية حسابك ولا تشارك بياناتك مع أي شخص.\n\nلأي استفسار تواصل مع الدعم الفني." },
-                      { label: "عرض خاص", icon: "🔥", type: "promo", title: "عرض محدود!", msg: "عرض حصري لفترة محدودة!\n\n🎁 خصم [XX]% على جميع الباقات\n⏰ ينتهي العرض في: [التاريخ]\n\nسارع بالاشتراك قبل فوات الأوان!" },
-                      { label: "إعلان عام", icon: "📢", type: "info", title: "إعلان جديد", msg: "إعلان جديد من فريق TradeSignal Pro:\n\n[اكتب محتوى الإعلان هنا]" },
+                      { label: "ترويج بروكر", icon: "🎁", type: "promo" as const, title: "عرض خاص: سجل عبر بروكر شريكنا واحصل على باقة مجانية!", msg: "عروض حصرية لأعضائنا!\n\nسجل الآن عبر رابط بروكر شريكنا واحصل على باقة وكالة مجانية كهدية منا.\n\n✅ باقة وكالة كاملة بدون أي تكلفة\n✅ جميع الإشارات والمزايا الحصرية\n✅ دعم فني على مدار الساعة\n\n⏰ العرض لفترة محدودة - سارع الآن!", link: "", linkText: "سجل الآن واحصل على الباقة مجاناً" },
+                      { label: "تحديث نظام", icon: "🔧", type: "maintenance" as const, title: "تحديث جديد للمنصة", msg: "تم تحديث المنصة بإضافات جديدة:\n\n✅ تحسين سرعة الأداء\n✅ إصلاح بعض المشاكل التقنية\n✅ ميزات جديدة قادمة قريباً\n\nشكراً لصبركم ودعمكم المتواصل." },
+                      { label: "تحذير أمني", icon: "⚠️", type: "warning" as const, title: "تنبيه مهم", msg: "يرجى الانتباه للاحتيال:\n\nلا نرسل رسائل خاصة لأي مستخدم نطلب فيها بيانات الحساب أو كلمة المرور. احرص على حماية حسابك ولا تشارك بياناتك مع أي شخص.\n\nلأي استفسار تواصل مع الدعم الفني." },
+                      { label: "عرض خاص", icon: "🔥", type: "promo" as const, title: "عرض محدود!", msg: "عرض حصري لفترة محدودة!\n\n🎁 خصم [XX]% على جميع الباقات\n⏰ ينتهي العرض في: [التاريخ]\n\nسارع بالاشتراك قبل فوات الأوان!" },
+                      { label: "إعلان عام", icon: "📢", type: "info" as const, title: "إعلان جديد", msg: "إعلان جديد من فريق TradeSignal Pro:\n\n[اكتب محتوى الإعلان هنا]" },
                     ].map(tpl => (
-                      <button key={tpl.label} onClick={() => { setAnnouncTitle(tpl.title); setAnnouncMessage(tpl.msg); setAnnouncType(tpl.type as typeof announcType); setAnnouncLink(tpl.link || ""); setAnnouncLinkText(tpl.linkText || ""); }}
-                        className="text-[9px] px-2.5 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-muted-foreground hover:bg-white/[0.08] hover:text-foreground transition-all flex items-center gap-1">
-                        <span>{tpl.icon}</span> {tpl.label}
+                      <button key={tpl.label} onClick={() => { setAnnouncTitle(tpl.title); setAnnouncMessage(tpl.msg); setAnnouncType(tpl.type); setAnnouncLink(tpl.link || ""); setAnnouncLinkText(tpl.linkText || ""); }}
+                        className={`group relative flex flex-col items-center gap-1.5 py-2.5 px-2 rounded-xl border transition-all duration-200 ${
+                          announcType === tpl.type && announcTitle === tpl.title
+                            ? "bg-rose-500/10 border-rose-500/25 shadow-md shadow-rose-500/10"
+                            : "bg-white/[0.03] border-white/[0.06] hover:bg-white/[0.07] hover:border-white/[0.12]"
+                        }`}>
+                        <span className="text-lg group-hover:scale-110 transition-transform">{tpl.icon}</span>
+                        <span className="text-[9px] font-semibold text-muted-foreground group-hover:text-foreground transition-colors">{tpl.label}</span>
                       </button>
                     ))}
                   </div>
                 </div>
-                <div>
-                  <label className="text-[10px] font-semibold text-muted-foreground block mb-1">عنوان الإعلان *</label>
-                  <Input value={announcTitle} onChange={e => setAnnouncTitle(e.target.value)} placeholder="مثال: تحديث مهم للنظام" className="glass-input text-xs" />
+
+                {/* Divider */}
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 h-px bg-white/[0.06]" />
+                  <span className="text-[8px] text-muted-foreground/40 font-bold uppercase tracking-wider">تفاصيل الإعلان</span>
+                  <div className="flex-1 h-px bg-white/[0.06]" />
                 </div>
+
+                {/* Title — with icon and character counter */}
                 <div>
-                  <label className="text-[10px] font-semibold text-muted-foreground block mb-1">محتوى الرسالة *</label>
-                  <Textarea value={announcMessage} onChange={e => setAnnouncMessage(e.target.value)} placeholder="اكتب رسالتك هنا..." rows={3} className="glass-input text-xs resize-none" />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[10px] font-semibold text-muted-foreground block mb-1">النوع</label>
-                    <div className="relative">
-                      <select value={announcType} onChange={e => setAnnouncType(e.target.value as typeof announcType)}
-                        className="w-full h-9 rounded-xl bg-white/[0.04] border border-white/[0.08] text-[11px] text-foreground px-3 appearance-none cursor-pointer focus:outline-none focus:border-rose-500/30">
-                        <option value="info">معلومة</option>
-                        <option value="warning">تحذير</option>
-                        <option value="urgent">عاجل</option>
-                        <option value="maintenance">صيانة</option>
-                        <option value="promo">ترويج</option>
-                      </select>
-                      <ChevronDown className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-semibold text-muted-foreground block mb-1">الأولوية</label>
-                    <div className="relative">
-                      <select value={announcPriority} onChange={e => setAnnouncPriority(e.target.value as typeof announcPriority)}
-                        className="w-full h-9 rounded-xl bg-white/[0.04] border border-white/[0.08] text-[11px] text-foreground px-3 appearance-none cursor-pointer focus:outline-none focus:border-rose-500/30">
-                        <option value="high">عالية</option>
-                        <option value="medium">متوسطة</option>
-                        <option value="low">منخفضة</option>
-                      </select>
-                      <ChevronDown className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
-                    </div>
-                  </div>
-                </div>
-                <div>
-                  <label className="text-[10px] font-semibold text-muted-foreground block mb-1">الاستهداف</label>
+                  <label className="text-[11px] font-bold text-foreground block mb-2 flex items-center gap-1.5">
+                    <Pencil className="w-3.5 h-3.5 text-rose-400" />
+                    عنوان الإعلان
+                    <span className="text-red-400 text-[10px]">*</span>
+                  </label>
                   <div className="relative">
-                    <select value={announcTarget} onChange={e => setAnnouncTarget(e.target.value as typeof announcTarget)}
-                      className="w-full h-9 rounded-xl bg-white/[0.04] border border-white/[0.08] text-[11px] text-foreground px-3 appearance-none cursor-pointer focus:outline-none focus:border-rose-500/30">
-                      <option value="all">جميع المستخدمين النشطين</option>
-                      <option value="specific">مستخدم محدد</option>
-                    </select>
-                    <ChevronDown className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+                    <Input value={announcTitle} onChange={e => { if (e.target.value.length <= 120) setAnnouncTitle(e.target.value); }} placeholder="مثال: تحديث مهم للنظام" className="glass-input text-xs pr-10 h-11 rounded-xl" />
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                      <span className={`text-[9px] font-mono ${announcTitle.length > 100 ? "text-red-400" : announcTitle.length > 80 ? "text-amber-400" : "text-muted-foreground/40"}`}>{announcTitle.length}</span>
+                      <span className="text-[8px] text-muted-foreground/30">/120</span>
+                    </div>
                   </div>
                 </div>
-                {announcTarget === "specific" && (
+
+                {/* Message — with character counter and live preview toggle */}
+                <div>
+                  <label className="text-[11px] font-bold text-foreground block mb-2 flex items-center gap-1.5">
+                    <MessageSquare className="w-3.5 h-3.5 text-rose-400" />
+                    محتوى الرسالة
+                    <span className="text-red-400 text-[10px]">*</span>
+                  </label>
+                  <div className="relative">
+                    <Textarea value={announcMessage} onChange={e => { if (e.target.value.length <= 1000) setAnnouncMessage(e.target.value); }} placeholder="اكتب رسالتك هنا... يدعم سطور متعددة" rows={5} className="glass-input text-xs resize-none rounded-xl leading-relaxed" />
+                    <div className="absolute left-3 bottom-3 flex items-center gap-1">
+                      <span className={`text-[9px] font-mono ${announcMessage.length > 800 ? "text-red-400" : announcMessage.length > 600 ? "text-amber-400" : "text-muted-foreground/40"}`}>{announcMessage.length}</span>
+                      <span className="text-[8px] text-muted-foreground/30">/1000</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Type + Priority — Side by side with visual cards */}
+                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-[10px] font-semibold text-muted-foreground block mb-1">اختر المستخدم *</label>
+                    <label className="text-[11px] font-bold text-foreground block mb-2 flex items-center gap-1.5">
+                      <Tag className="w-3.5 h-3.5 text-rose-400" />
+                      نوع الإعلان
+                    </label>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {[
+                        { val: "info" as const, label: "معلومة", icon: "ℹ️", color: "blue" },
+                        { val: "warning" as const, label: "تحذير", icon: "⚠️", color: "amber" },
+                        { val: "urgent" as const, label: "عاجل", icon: "🔴", color: "red" },
+                        { val: "maintenance" as const, label: "صيانة", icon: "🔧", color: "purple" },
+                        { val: "promo" as const, label: "ترويج", icon: "🎁", color: "emerald" },
+                      ].map(opt => (
+                        <button key={opt.val} onClick={() => setAnnouncType(opt.val)}
+                          className={`flex items-center gap-1.5 px-2.5 py-2 rounded-xl border text-[10px] font-semibold transition-all duration-200 ${
+                            announcType === opt.val
+                              ? `bg-${opt.color}-500/15 border-${opt.color}-500/30 text-${opt.color}-300 shadow-sm shadow-${opt.color}-500/10`
+                              : "bg-white/[0.03] border-white/[0.06] text-muted-foreground hover:bg-white/[0.06] hover:text-foreground"
+                          }`}>
+                          <span className="text-sm">{opt.icon}</span>
+                          <span>{opt.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-foreground block mb-2 flex items-center gap-1.5">
+                      <Zap className="w-3.5 h-3.5 text-rose-400" />
+                      الأولوية
+                    </label>
+                    <div className="space-y-1.5">
+                      {[
+                        { val: "high" as const, label: "عالية", desc: "يظهر أولاً مع تنبيه مميز", color: "red", icon: "🔥" },
+                        { val: "medium" as const, label: "متوسطة", desc: "ترتيب عادي بين الإعلانات", color: "amber", icon: "⚡" },
+                        { val: "low" as const, label: "منخفضة", desc: "إعلان عادي بدون تمييز", color: "slate", icon: "📝" },
+                      ].map(opt => (
+                        <button key={opt.val} onClick={() => setAnnouncPriority(opt.val)}
+                          className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl border text-right transition-all duration-200 ${
+                            announcPriority === opt.val
+                              ? `bg-${opt.color}-500/10 border-${opt.color}-500/25`
+                              : "bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.05]"
+                          }`}>
+                          <span className="text-sm">{opt.icon}</span>
+                          <div className="flex-1 min-w-0">
+                            <div className={`text-[10px] font-bold ${announcPriority === opt.val ? `text-${opt.color}-400` : "text-foreground"}`}>{opt.label}</div>
+                            <div className="text-[8px] text-muted-foreground/50">{opt.desc}</div>
+                          </div>
+                          {announcPriority === opt.val && (
+                            <div className={`w-4 h-4 rounded-full bg-${opt.color}-500/20 border border-${opt.color}-500/30 flex items-center justify-center`}>
+                              <Check className={`w-2.5 h-2.5 text-${opt.color}-400`} />
+                            </div>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Targeting */}
+                <div>
+                  <label className="text-[11px] font-bold text-foreground block mb-2 flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5 text-rose-400" />
+                    الاستهداف
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button onClick={() => setAnnouncTarget("all")}
+                      className={`flex items-center gap-2.5 px-3 py-3 rounded-xl border transition-all duration-200 ${
+                        announcTarget === "all"
+                          ? "bg-emerald-500/10 border-emerald-500/25"
+                          : "bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.05]"
+                      }`}>
+                      <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0">
+                        <Globe className="w-4 h-4 text-emerald-400" />
+                      </div>
+                      <div className="text-right">
+                        <div className={`text-[10px] font-bold ${announcTarget === "all" ? "text-emerald-400" : "text-foreground"}`}>جميع المستخدمين</div>
+                        <div className="text-[8px] text-muted-foreground/50">يُرسل لكل الأعضاء النشطين</div>
+                      </div>
+                    </button>
+                    <button onClick={() => setAnnouncTarget("specific")}
+                      className={`flex items-center gap-2.5 px-3 py-3 rounded-xl border transition-all duration-200 ${
+                        announcTarget === "specific"
+                          ? "bg-violet-500/10 border-violet-500/25"
+                          : "bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.05]"
+                      }`}>
+                      <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center shrink-0">
+                        <User className="w-4 h-4 text-violet-400" />
+                      </div>
+                      <div className="text-right">
+                        <div className={`text-[10px] font-bold ${announcTarget === "specific" ? "text-violet-400" : "text-foreground"}`}>مستخدم محدد</div>
+                        <div className="text-[8px] text-muted-foreground/50">اختر مستخدم واحد فقط</div>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Specific user search */}
+                {announcTarget === "specific" && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <label className="text-[11px] font-bold text-foreground block mb-2 flex items-center gap-1.5">
+                      <Search className="w-3.5 h-3.5 text-violet-400" />
+                      اختر المستخدم
+                      <span className="text-red-400 text-[10px]">*</span>
+                    </label>
                     <div className="relative">
-                      {/* Selected user display / search input */}
                       <div
                         onClick={() => setAnnouncUserDropdownOpen(!announcUserDropdownOpen)}
-                        className="w-full min-h-[36px] rounded-xl bg-white/[0.04] border border-white/[0.08] text-[11px] text-foreground px-3 py-2 cursor-pointer flex items-center justify-between hover:border-white/[0.15] transition-colors"
+                        className={`w-full min-h-[44px] rounded-xl border px-4 py-2.5 cursor-pointer flex items-center justify-between transition-all duration-200 ${
+                          announcTargetUserId
+                            ? "bg-violet-500/[0.06] border-violet-500/20"
+                            : announcUserDropdownOpen
+                              ? "bg-white/[0.04] border-white/[0.15]"
+                              : "bg-white/[0.03] border-white/[0.08] hover:border-white/[0.12]"
+                        }`}
                       >
-                        <span className={announcTargetUserId ? "text-foreground" : "text-muted-foreground"}>
-                          {announcTargetUserId
-                            ? (() => {
-                                const u = users.find(x => x.id === announcTargetUserId);
-                                return u ? `${u.name} (${u.email})` : "مستخدم";
-                              })()
-                            : "اختر مستخدم من القائمة..."
-                          }
-                        </span>
-                        <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground shrink-0 transition-transform ${announcUserDropdownOpen ? "rotate-180" : ""}`} />
+                        <div className="flex items-center gap-2.5">
+                          {announcTargetUserId ? (
+                            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-500/20 to-indigo-500/10 border border-white/[0.08] flex items-center justify-center">
+                              <span className="text-[10px] font-bold text-violet-300">{users.find(x => x.id === announcTargetUserId)?.name.charAt(0) || "?"}</span>
+                            </div>
+                          ) : (
+                            <div className="w-7 h-7 rounded-full bg-white/[0.04] border border-white/[0.06] flex items-center justify-center">
+                              <Search className="w-3.5 h-3.5 text-muted-foreground/40" />
+                            </div>
+                          )}
+                          <span className={announcTargetUserId ? "text-[11px] text-foreground font-semibold" : "text-[11px] text-muted-foreground/50"}>
+                            {announcTargetUserId
+                              ? (() => { const u = users.find(x => x.id === announcTargetUserId); return u ? `${u.name} (${u.email})` : "مستخدم"; })()
+                              : "ابحث بالاسم أو البريد..."
+                            }
+                          </span>
+                        </div>
+                        {announcTargetUserId && (
+                          <button onClick={e => { e.stopPropagation(); setAnnouncTargetUserId(""); }} className="w-5 h-5 rounded-md bg-white/[0.06] hover:bg-white/[0.1] flex items-center justify-center transition-colors">
+                            <X className="w-3 h-3 text-muted-foreground" />
+                          </button>
+                        )}
                       </div>
-                      {/* Click-outside overlay */}
                       {announcUserDropdownOpen && (
                         <div className="fixed inset-0 z-40" onClick={() => setAnnouncUserDropdownOpen(false)} />
                       )}
-                      {/* Dropdown */}
                       {announcUserDropdownOpen && (
-                        <div className="absolute top-full left-0 right-0 mt-1 z-50 rounded-xl bg-[#1a1a2e]/[0.98] border border-white/[0.1] backdrop-blur-xl shadow-2xl shadow-black/40 overflow-hidden">
-                          {/* Search */}
-                          <div className="p-2 border-b border-white/[0.06]">
+                        <div className="absolute top-full left-0 right-0 mt-1.5 z-50 rounded-2xl bg-[#0d1117]/[0.99] border border-white/[0.1] backdrop-blur-2xl shadow-2xl shadow-black/50 overflow-hidden">
+                          <div className="p-2.5 border-b border-white/[0.06]">
                             <div className="relative">
-                              <Search className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                              <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                               <input
                                 autoFocus
                                 value={announcUserSearch}
                                 onChange={e => setAnnouncUserSearch(e.target.value)}
                                 placeholder="ابحث بالاسم أو البريد..."
-                                className="w-full h-8 rounded-lg bg-white/[0.06] border border-white/[0.08] text-[10px] text-foreground pr-8 pl-3 placeholder:text-muted-foreground/50 focus:outline-none focus:border-rose-500/30"
+                                className="w-full h-9 rounded-xl bg-white/[0.05] border border-white/[0.08] text-[11px] text-foreground pr-9 pl-3 placeholder:text-muted-foreground/40 focus:outline-none focus:border-rose-500/30 transition-colors"
                               />
                             </div>
                           </div>
-                          {/* Users list */}
-                          <div className="max-h-48 overflow-y-auto">
+                          <div className="max-h-52 overflow-y-auto">
                             {users
                               .filter(u => u.role !== "admin")
                               .filter(u =>
@@ -6588,7 +6874,12 @@ export default function HomePage() {
                                 u.email.toLowerCase().includes(announcUserSearch.toLowerCase())
                               )
                               .length === 0 ? (
-                              <div className="px-3 py-4 text-center text-[10px] text-muted-foreground">لا يوجد مستخدمون</div>
+                              <div className="px-4 py-6 text-center">
+                                <div className="w-10 h-10 rounded-xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center mx-auto mb-2">
+                                  <Search className="w-4 h-4 text-muted-foreground/30" />
+                                </div>
+                                <div className="text-[10px] text-muted-foreground/50">لا يوجد مستخدمون مطابقون</div>
+                              </div>
                             ) : (
                               users
                                 .filter(u => u.role !== "admin")
@@ -6600,21 +6891,22 @@ export default function HomePage() {
                                 .map(u => (
                                   <button
                                     key={u.id}
-                                    onClick={() => {
-                                      setAnnouncTargetUserId(u.id);
-                                      setAnnouncUserDropdownOpen(false);
-                                      setAnnouncUserSearch("");
-                                    }}
-                                    className={`w-full px-3 py-2.5 text-right flex items-center gap-2.5 hover:bg-white/[0.06] transition-colors border-b border-white/[0.03] last:border-0 ${announcTargetUserId === u.id ? "bg-rose-500/10" : ""}`}
+                                    onClick={() => { setAnnouncTargetUserId(u.id); setAnnouncUserDropdownOpen(false); setAnnouncUserSearch(""); }}
+                                    className={`w-full px-4 py-3 text-right flex items-center gap-3 hover:bg-white/[0.05] transition-all border-b border-white/[0.03] last:border-0 ${announcTargetUserId === u.id ? "bg-violet-500/8" : ""}`}
                                   >
-                                    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-500/20 to-indigo-500/10 border border-white/[0.08] flex items-center justify-center shrink-0">
-                                      <span className="text-[10px] font-bold text-violet-300">{u.name.charAt(0)}</span>
+                                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-violet-500/20 to-indigo-500/10 border border-white/[0.08] flex items-center justify-center shrink-0">
+                                      <span className="text-[11px] font-bold text-violet-300">{u.name.charAt(0)}</span>
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                      <div className="text-[10px] font-semibold text-foreground truncate">{u.name}</div>
-                                      <div className="text-[8px] text-muted-foreground/70 truncate" dir="ltr">{u.email}</div>
+                                      <div className="text-[11px] font-semibold text-foreground truncate">{u.name}</div>
+                                      <div className="text-[9px] text-muted-foreground/60 truncate" dir="ltr">{u.email}</div>
                                     </div>
-                                    <span className={`text-[7px] px-1.5 py-0.5 rounded-md shrink-0 ${u.status === "active" ? "bg-emerald-500/10 text-emerald-400" : u.status === "blocked" ? "bg-red-500/10 text-red-400" : "bg-amber-500/10 text-amber-400"}`}>
+                                    <span className={`text-[8px] px-2 py-0.5 rounded-lg font-semibold shrink-0 ${
+                                      u.status === "active" ? "bg-emerald-500/10 text-emerald-400" :
+                                      u.status === "blocked" ? "bg-red-500/10 text-red-400" :
+                                      u.status === "pending" ? "bg-amber-500/10 text-amber-400" :
+                                      "bg-slate-500/10 text-slate-400"
+                                    }`}>
                                       {u.status === "active" ? "نشط" : u.status === "blocked" ? "محظور" : u.status === "pending" ? "معلق" : "منتهي"}
                                     </span>
                                   </button>
@@ -6624,44 +6916,90 @@ export default function HomePage() {
                         </div>
                       )}
                     </div>
-                  </div>
+                  </motion.div>
                 )}
-                <div>
-                  <label className="text-[10px] font-semibold text-muted-foreground block mb-1">رابط (اختياري)</label>
-                  <Input value={announcLink} onChange={e => setAnnouncLink(e.target.value)} placeholder="https://example.com/register" className="glass-input text-xs font-mono" dir="ltr" />
+
+                {/* Divider */}
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 h-px bg-white/[0.06]" />
+                  <span className="text-[8px] text-muted-foreground/40 font-bold uppercase tracking-wider">خيارات متقدمة</span>
+                  <div className="flex-1 h-px bg-white/[0.06]" />
                 </div>
-                {announcLink.trim() && (
+
+                {/* Link + CTA */}
+                <div className="grid grid-cols-1 gap-3">
                   <div>
-                    <label className="text-[10px] font-semibold text-muted-foreground block mb-1">نص الزر</label>
-                    <Input value={announcLinkText} onChange={e => setAnnouncLinkText(e.target.value)} placeholder="سجل الآن" className="glass-input text-xs" />
+                    <label className="text-[11px] font-bold text-foreground block mb-2 flex items-center gap-1.5">
+                      <Globe className="w-3.5 h-3.5 text-rose-400" />
+                      رابط (اختياري)
+                    </label>
+                    <div className="relative">
+                      <Input value={announcLink} onChange={e => setAnnouncLink(e.target.value)} placeholder="https://example.com/register" className="glass-input text-xs font-mono h-11 rounded-xl pr-10" dir="ltr" />
+                      <Link2Icon className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/40" />
+                    </div>
                   </div>
-                )}
-                <div className="space-y-2.5">
-                  <div className="flex items-center justify-between bg-muted/50 rounded-xl p-3 border border-border">
-                    <div>
-                      <div className="text-[11px] font-semibold text-foreground">إرسال Push</div>
-                      <div className="text-[9px] text-muted-foreground mt-0.5">إشعار مباشر للمتصفح والتطبيق</div>
+                  {announcLink.trim() && (
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} transition={{ duration: 0.2 }}>
+                      <label className="text-[11px] font-bold text-foreground block mb-2 flex items-center gap-1.5">
+                        <MousePointerClick className="w-3.5 h-3.5 text-rose-400" />
+                        نص زر الإجراء
+                      </label>
+                      <Input value={announcLinkText} onChange={e => setAnnouncLinkText(e.target.value)} placeholder="مثال: سجل الآن" className="glass-input text-xs h-11 rounded-xl" />
+                    </motion.div>
+                  )}
+                </div>
+
+                {/* Toggle switches */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className={`flex items-center justify-between rounded-xl p-3.5 border transition-all duration-200 ${announcSendPush ? "bg-rose-500/[0.06] border-rose-500/20" : "bg-white/[0.02] border-white/[0.06]"}`}>
+                    <div className="flex items-center gap-2.5">
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${announcSendPush ? "bg-rose-500/15" : "bg-white/[0.04]"}`}>
+                        <Radio className={`w-4 h-4 ${announcSendPush ? "text-rose-400" : "text-muted-foreground/40"}`} />
+                      </div>
+                      <div>
+                        <div className="text-[11px] font-bold text-foreground">إرسال Push</div>
+                        <div className="text-[9px] text-muted-foreground/50">إشعار مباشر على المتصفح</div>
+                      </div>
                     </div>
                     <button onClick={() => setAnnouncSendPush(!announcSendPush)}
-                      className={`w-11 h-6 rounded-full transition-all duration-300 relative ${announcSendPush ? "bg-rose-500" : "bg-white/10"}`}>
+                      className={`w-11 h-6 rounded-full transition-all duration-300 relative shrink-0 ${announcSendPush ? "bg-rose-500 shadow-md shadow-rose-500/30" : "bg-white/10"}`}>
                       <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-md transition-all duration-300 ${announcSendPush ? "left-[22px]" : "left-0.5"}`} />
                     </button>
                   </div>
-                  <div className="flex items-center justify-between bg-muted/50 rounded-xl p-3 border border-border">
-                    <div>
-                      <div className="text-[11px] font-semibold text-foreground">إرسال بريد إلكتروني</div>
-                      <div className="text-[9px] text-muted-foreground mt-0.5">بطاقة إعلان بتصميم احترافي</div>
+                  <div className={`flex items-center justify-between rounded-xl p-3.5 border transition-all duration-200 ${announcSendEmail ? "bg-sky-500/[0.06] border-sky-500/20" : "bg-white/[0.02] border-white/[0.06]"}`}>
+                    <div className="flex items-center gap-2.5">
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${announcSendEmail ? "bg-sky-500/15" : "bg-white/[0.04]"}`}>
+                        <Mail className={`w-4 h-4 ${announcSendEmail ? "text-sky-400" : "text-muted-foreground/40"}`} />
+                      </div>
+                      <div>
+                        <div className="text-[11px] font-bold text-foreground">إرسال بريد إلكتروني</div>
+                        <div className="text-[9px] text-muted-foreground/50">بطاقة إعلان احترافية</div>
+                      </div>
                     </div>
                     <button onClick={() => setAnnouncSendEmail(!announcSendEmail)}
-                      className={`w-11 h-6 rounded-full transition-all duration-300 relative ${announcSendEmail ? "bg-rose-500" : "bg-white/10"}`}>
+                      className={`w-11 h-6 rounded-full transition-all duration-300 relative shrink-0 ${announcSendEmail ? "bg-sky-500 shadow-md shadow-sky-500/30" : "bg-white/10"}`}>
                       <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-md transition-all duration-300 ${announcSendEmail ? "left-[22px]" : "left-0.5"}`} />
                     </button>
                   </div>
                 </div>
-                <button onClick={handleSendAnnouncement} disabled={!announcTitle.trim() || !announcMessage.trim() || (announcTarget === "specific" && !announcTargetUserId) || announcSending}
-                  className="w-full h-10 rounded-xl bg-gradient-to-r from-rose-500 to-pink-600 text-white text-[11px] font-bold flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-40 shadow-lg shadow-rose-500/20">
-                  {announcSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Megaphone className="w-4 h-4" />}
-                  {announcSending ? "جاري الإرسال..." : "إرسال الإعلان"}
+
+                {/* Submit Button */}
+                <button
+                  onClick={handleSendAnnouncement}
+                  disabled={!announcTitle.trim() || !announcMessage.trim() || (announcTarget === "specific" && !announcTargetUserId) || announcSending}
+                  className="w-full h-12 rounded-2xl bg-gradient-to-l from-rose-500 to-pink-600 text-white text-[13px] font-black flex items-center justify-center gap-2.5 active:scale-[0.97] disabled:opacity-30 disabled:cursor-not-allowed shadow-xl shadow-rose-500/20 hover:shadow-2xl hover:shadow-rose-500/30 transition-all duration-300 border border-rose-500/20"
+                >
+                  {announcSending ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      <span>جاري الإرسال...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-5 h-5" />
+                      <span>إرسال الإعلان</span>
+                    </>
+                  )}
                 </button>
               </div>
             </div>
