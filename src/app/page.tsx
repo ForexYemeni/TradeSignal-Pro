@@ -1337,6 +1337,30 @@ export default function HomePage() {
     }
   }, [session?.role, checkAdminNotifications]);
 
+  // Auto-refresh users list every 30s when on users tab (keep list up-to-date)
+  const fetchUsersRef = useRef(fetchUsers);
+  useEffect(() => { fetchUsersRef.current = fetchUsers; }, [fetchUsers]);
+  useEffect(() => {
+    if (session?.role === "admin" && (tab === "users" || (tab === "more" && adminSubTab === "users"))) {
+      fetchUsersRef.current();
+      const interval = setInterval(fetchUsersRef.current, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [session?.role, tab, adminSubTab]);
+
+  // Instant user list refresh when a new user notification arrives
+  const prevAdminNotifCountRef2 = useRef(-1);
+  useEffect(() => {
+    if (session?.role !== "admin") return;
+    if (prevAdminNotifCountRef2.current >= 0 && unreadNotifCount > prevAdminNotifCountRef2.current && adminNotifications.length > 0) {
+      const latest = adminNotifications[0];
+      if (latest?.type === "new_user" && (tab === "users" || (tab === "more" && adminSubTab === "users"))) {
+        fetchUsersRef.current();
+      }
+    }
+    prevAdminNotifCountRef2.current = unreadNotifCount;
+  }, [unreadNotifCount, adminNotifications, session?.role, tab, adminSubTab]);
+
   // Poll user announcement count every 30 seconds for non-admin users
   useEffect(() => {
     if (session?.id && session?.role !== "admin") {
@@ -5753,7 +5777,7 @@ export default function HomePage() {
                     </div>
                     <div>
                       <h3 className="text-xs font-bold text-foreground">إدارة المستخدمين</h3>
-                      <p className="text-[9px] text-muted-foreground mt-0.5">{users.length} مستخدم مسجل</p>
+                      <p className="text-[9px] text-muted-foreground mt-0.5">{users.filter(u => u.role !== "admin").length} مستخدم مسجل</p>
                     </div>
                   </button>
 
@@ -8110,7 +8134,7 @@ export default function HomePage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <h2 className="text-sm font-extrabold text-foreground">إدارة المستخدمين</h2>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">{users.length} مستخدم مسجل</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">{users.filter(u => u.role !== "admin").length} مستخدم مسجل</p>
                 </div>
                 <button onClick={fetchUsers} disabled={usersLoad} className="w-9 h-9 rounded-xl glass-subtle border border-border/50 flex items-center justify-center active:scale-95 transition-transform hover:bg-white/[0.06]">
                   <RefreshCw className={`w-4 h-4 text-muted-foreground ${usersLoad ? "animate-spin" : ""}`} />
