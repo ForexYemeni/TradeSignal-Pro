@@ -4134,7 +4134,7 @@ export default function HomePage() {
       />
 
       {/* ── Content ── */}
-      <main className="flex-1 overflow-y-auto overflow-x-hidden px-4 pb-4 pt-3 max-w-app mx-auto md:max-w-tablet lg:max-w-desktop md:mr-64" style={{ WebkitOverflowScrolling: 'touch' }}>
+      <main className="flex-1 overflow-y-auto overflow-x-hidden px-4 pb-4 pt-3 w-full md:mx-auto md:max-w-3xl lg:max-w-5xl md:mr-64" style={{ WebkitOverflowScrolling: 'touch' }}>
 
         {/* ══════ TAB: HOME — PROFESSIONAL DASHBOARD ══════ */}
         {tab === "home" && (<motion.div key="home" initial={{ opacity: 0, y: 8, filter: "blur(4px)" }} animate={{ opacity: 1, y: 0, filter: "blur(0px)" }} exit={{ opacity: 0, y: -8, filter: "blur(4px)" }} transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}>{(() => {
@@ -7919,7 +7919,7 @@ export default function HomePage() {
 
       {/* ── Mobile Bottom Navigation ── */}
       <nav className="flex-shrink-0 md:hidden glass-nav-premium glass-nav-border-animated safe-area-bottom h-16 border-t border-white/[0.04]" style={{ touchAction: 'manipulation' }}>
-        <div className="max-w-app mx-auto md:max-w-tablet lg:max-w-desktop flex items-stretch h-full">
+        <div className="w-full flex items-stretch h-full">
           {tabs.map(t => (
             <button key={t.key} onClick={() => setTab(t.key)}
               className={`flex-1 flex flex-col items-center justify-center gap-0.5 relative select-none ${tab === t.key ? "" : "text-muted-foreground/60"}`}
@@ -7941,7 +7941,7 @@ export default function HomePage() {
 
       {/* ── Desktop Bottom Navigation ── */}
       <nav className="hidden md:flex flex-shrink-0 glass-nav-premium glass-nav-border-animated border-t border-white/[0.04] safe-area-bottom h-14">
-        <div className="max-w-app mx-auto md:max-w-tablet lg:max-w-desktop flex h-full">
+        <div className="w-full flex h-full">
           {tabs.map(t => (
             <button key={t.key} onClick={() => setTab(t.key)}
               className={`flex-1 flex flex-col items-center justify-center gap-0.5 relative select-none ${tab === t.key ? "text-amber-400" : "text-muted-foreground/60 hover:text-muted-foreground"}`}>
@@ -8045,7 +8045,7 @@ export default function HomePage() {
       {proofModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={() => setProofModalOpen(false)}>
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
-          <div className="relative z-10 w-full max-w-app md:max-w-tablet lg:max-w-desktop" onClick={e => e.stopPropagation()}>
+          <div className="relative z-10 w-full max-w-lg" onClick={e => e.stopPropagation()}>
             {/* Close button */}
             <button onClick={() => setProofModalOpen(false)} className="absolute -top-12 left-0 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors z-20">
               <XCircle className="w-5 h-5" />
