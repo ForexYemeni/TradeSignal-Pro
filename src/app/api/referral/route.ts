@@ -105,13 +105,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "المستخدم غير موجود" }, { status: 404 });
     }
 
-    // User already has a referral code applied
+    // User already has a referral code applied — allow change only if no reward was claimed
     if (user.referredBy) {
-      return NextResponse.json({
-        success: false,
-        error: `لقد تم تطبيق كود احالة مسبقاً. لا يمكن استخدام أكثر من كود واحد.`,
-        alreadyApplied: true,
-      }, { status: 409 });
+      if (user.referralRewardClaimed) {
+        return NextResponse.json({
+          success: false,
+          error: `لقد تم تطبيق كود احالة مسبقاً وتم صرف المكافأة. لا يمكن تغيير الكود.`,
+          alreadyApplied: true,
+        }, { status: 409 });
+      }
+      // No reward was claimed (e.g., old buggy system applied a code but gave no paid reward)
+      // Allow the user to change their referral code
+      console.log(`[Referral] User ${user.email} replacing unrewarded referral code "${user.referredBy}" with "${referralCode.trim().toUpperCase()}"`);
     }
 
     // Validate the referral code

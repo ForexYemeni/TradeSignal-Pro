@@ -119,7 +119,6 @@ function ReferralSection({ session, appSettings }: { session: any; appSettings: 
   const [loading, setLoading] = useState(true);
   const [referralInput, setReferralInput] = useState("");
   const [applyingCode, setApplyingCode] = useState(false);
-  const [codeApplied, setCodeApplied] = useState(false);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -133,10 +132,24 @@ function ReferralSection({ session, appSettings }: { session: any; appSettings: 
       .finally(() => setLoading(false));
   }, [session?.id]);
 
-  // Check if user already has a referral applied
+  // Check if user already has a referral applied AND reward was claimed (permanent lock)
+  // Users with unrewarded referrals can still change their code
+  const [codePermanentlyApplied, setCodePermanentlyApplied] = useState(false);
+
   useEffect(() => {
-    if (session?.referredBy) setCodeApplied(true);
-  }, [session?.referredBy]);
+    if (!session?.referredBy) return;
+    // Fetch user data to check if reward was claimed
+    fetch(`/api/referral?userId=${session.id}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.success && data.enabled) {
+          // Check if any referred user has claimed reward (means reward was given)
+          const rewardClaimed = data.referrals.some((r: any) => r.referralRewardClaimed);
+          if (rewardClaimed) setCodePermanentlyApplied(true);
+        }
+      })
+      .catch(() => {});
+  }, [session?.id, session?.referredBy]);
 
   async function handleApplyCode() {
     if (!referralInput.trim() || !session?.id) return;
@@ -150,8 +163,13 @@ function ReferralSection({ session, appSettings }: { session: any; appSettings: 
       const data = await res.json();
       if (data.success) {
         toast.success(data.message);
-        setCodeApplied(true);
+        setCodePermanentlyApplied(false);
         setReferralInput("");
+        // Refresh referral data to reflect the new code
+        fetch(`/api/referral?userId=${session.id}`)
+          .then(r => r.json())
+          .then(d => { if (d.success) setReferralData(d); })
+          .catch(() => {});
       } else {
         toast.error(data.error || "فشل تطبيق الكود");
       }
@@ -222,8 +240,8 @@ function ReferralSection({ session, appSettings }: { session: any; appSettings: 
         </div>
       </div>
 
-      {/* ── Apply Referral Code ── */}
-      {!codeApplied && (
+      {/* ── Apply Referral Code (hidden only if reward was permanently claimed) ── */}
+      {!codePermanentlyApplied && (
         <div className="rounded-2xl border border-sky-500/15 overflow-hidden" style={{ background: "linear-gradient(135deg, rgba(14,165,233,0.05) 0%, rgba(2,132,199,0.02) 100%)" }}>
           <div className="p-4 space-y-3">
             <div className="flex items-center gap-2">
@@ -255,8 +273,8 @@ function ReferralSection({ session, appSettings }: { session: any; appSettings: 
         </div>
       )}
 
-      {/* ── Code Already Applied ── */}
-      {codeApplied && (
+      {/* ── Code Already Applied (permanently — reward was claimed) ── */}
+      {codePermanentlyApplied && (
         <div className="rounded-xl bg-emerald-500/[0.06] border border-emerald-500/15 px-3 py-2 flex items-center gap-2">
           <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
           <span className="text-[10px] text-emerald-400">تم تطبيق كود الدعوة بنجاح</span>
