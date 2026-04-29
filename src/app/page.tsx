@@ -4666,13 +4666,6 @@ export default function HomePage() {
           // Helper: format date as Arabic label
           const formatDateLabel = (isoStr: string) => {
             const d = new Date(isoStr);
-            const now = new Date();
-            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-            const sigDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-            const diffDays = Math.round((today.getTime() - sigDate.getTime()) / 86400000);
-            if (diffDays === 0) return "اليوم";
-            if (diffDays === 1) return "أمس";
-            if (diffDays < 7) return `منذ ${diffDays} أيام`;
             const days = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
             const months = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
             return `${days[d.getDay()]}، ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
