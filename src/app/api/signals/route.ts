@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { addSignal, getSignals, updateSignal, getUserById, getPackageById, addAdminNotification } from "@/lib/store";
+import { addSignal, getSignals, updateSignal, getUserById, getPackageById, addAdminNotification, addPendingUpdate, getAndClearPendingUpdates } from "@/lib/store";
 import { parseTradingViewSignal, validateSignal } from "@/lib/signal-parser";
 import { notifyNewSignal, notifyTpHit, notifySlHit } from "@/lib/push";
 import { notifySignalEvent } from "./stream/route";
@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
           sendSignalUpdateToTelegram({
             pair: updated.pair,
             updateType: cat as "TP_HIT" | "REENTRY_TP" | "PYRAMID_TP",
-            tpIndex: updated.hitTpIndex != null && updated.hitTpIndex >= 0 ? updated.hitTpIndex + 1 : undefined,
+            tpIndex: updated.hitTpIndex != null && updated.hitTpIndex >= 0 ? updated.hitTpIndex : undefined,
             totalTPs: parsedParentTps.length || updated.totalTPs || undefined,
             hitPrice: updated.hitPrice ?? undefined,
             pnlDollars: updated.pnlDollars ?? undefined,
@@ -132,6 +132,8 @@ export async function POST(request: NextRequest) {
           sendSignalUpdateToTelegram({
             pair: updated.pair,
             updateType: cat as "SL_HIT" | "REENTRY_SL" | "PYRAMID_SL",
+            tpIndex: updated.hitTpIndex != null && updated.hitTpIndex >= 0 ? updated.hitTpIndex : undefined,
+            totalTPs: parsedParentTps.length || updated.totalTPs || undefined,
             hitPrice: updated.hitPrice ?? undefined,
             pnlDollars: updated.pnlDollars ?? undefined,
             pnlPoints: updated.pnlPoints ?? undefined,
@@ -142,8 +144,20 @@ export async function POST(request: NextRequest) {
         }
         return NextResponse.json({ success: true, signal: updated, updated: true, warnings: parseResult.warnings });
       }
-      // No parent found — reject orphan TP/SL update to avoid creating stray signals
-      return NextResponse.json({ success: false, error: "لم يتم العثور على الإشارة الأصلية لتحديثها", details: parseResult.warnings }, { status: 404 });
+      // No parent found — queue the update for later processing
+      console.warn(`[Webhook] No parent found for ${cat} update on ${parseResult.signal.pair} — queuing as pending`);
+      await addPendingUpdate(String(parseResult.signal.pair || ""), {
+        signalCategory: cat,
+        rawText: parseResult.signal.rawText || "",
+        hitTpIndex: parseResult.signal.hitTpIndex,
+        hitPrice: parseResult.signal.hitPrice,
+        pnlPoints: parseResult.signal.pnlPoints,
+        pnlDollar: parseResult.signal.pnlDollar,
+        tpStatusList: parseResult.signal.tpStatusList,
+        totalTPs: parseResult.signal.totalTPs,
+        partialWin: parseResult.signal.partialWin,
+      });
+      return NextResponse.json({ success: true, queued: true, message: "لم يتم العثور على الإشارة الأصلية — تم تخزين التحديث للمعالجة اللاحقة", warnings: parseResult.warnings });
     }
 
     // ── Deduplication: skip if same signal already exists ──
@@ -267,6 +281,43 @@ export async function POST(request: NextRequest) {
         timeframe: String(signal.timeframe || ""),
         signalId: signal.id,
       }).catch(() => {}); // Fire-and-forget — don't block signal creation
+    }
+
+    // ── Process any pending updates that arrived before this ENTRY signal ──
+    if (isEntry(cat)) {
+      getAndClearPendingUpdates(String(signal.pair)).then(async (pendingUpdates) => {
+        if (pendingUpdates.length === 0) return;
+        console.log(`[Webhook] Processing ${pendingUpdates.length} pending updates for ${signal.pair}`);
+        // Process updates sequentially, oldest first
+        for (const pending of pendingUpdates) {
+          try {
+            const fakeParsed = {
+              ...pending,
+              pair: signal.pair,
+              type: signal.type as "BUY" | "SELL",
+              entry: signal.entry,
+              stopLoss: signal.stopLoss,
+              takeProfits: [],
+              confidence: signal.confidence,
+              signalCategory: pending.signalCategory,
+              rawText: pending.rawText,
+              timeframe: "",
+              htfTimeframe: "",
+              htfTrend: "",
+              smcTrend: "",
+              riskData: { balance: 0, lotSize: "", riskTarget: 0, riskPercent: 0, actualRisk: 0, actualRiskPct: 0, slDistance: 0, maxRR: 0, instrument: "" },
+            };
+            const updated = await handleUpdateSignal(fakeParsed);
+            if (updated) {
+              console.log(`[Webhook] ✅ Processed pending ${pending.signalCategory} for ${signal.pair}`);
+            } else {
+              console.warn(`[Webhook] ⚠️ Failed to process pending ${pending.signalCategory} for ${signal.pair}`);
+            }
+          } catch (e) {
+            console.error(`[Webhook] Error processing pending update:`, e);
+          }
+        }
+      }).catch(() => {});
     }
 
     return NextResponse.json({ success: true, signal: { ...signal, takeProfits: (() => { try { return JSON.parse(signal.takeProfits); } catch { return []; } })() }, warnings: parseResult.warnings });

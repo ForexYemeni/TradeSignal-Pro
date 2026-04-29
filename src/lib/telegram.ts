@@ -5,15 +5,23 @@
  * Signals are sent to ALL active connections simultaneously.
  * Uses the connections stored in app_settings.telegramConnections (KV store).
  * Also supports legacy single bot/channel (backward compatible).
+ *
+ * v2 Improvements:
+ * - Retry logic with exponential backoff (3 attempts)
+ * - Message splitting for messages > 4000 chars (Telegram limit)
+ * - Better logging for debugging
  */
 
 import { getAppSettings } from "@/lib/store";
 import type { TelegramConnection } from "@/lib/store";
 
 const TELEGRAM_API = "https://api.telegram.org";
+const MAX_TELEGRAM_MSG_LENGTH = 4000; // Telegram limit is 4096, leave some margin
+const MAX_RETRY_ATTEMPTS = 3;
+const RETRY_DELAYS = [1000, 3000, 5000]; // 1s, 3s, 5s
 
 // ═══════════════════════════════════════════════════════════════
-//  Core: Send a message via Telegram Bot API
+//  Core: Send a message via Telegram Bot API (with retry)
 // ═══════════════════════════════════════════════════════════════
 
 interface TelegramSendOptions {
@@ -22,57 +30,137 @@ interface TelegramSendOptions {
   text: string;
   parseMode?: "HTML" | "Markdown" | "MarkdownV2";
   disableWebPagePreview?: boolean;
+  retryAttempts?: number;
 }
 
 async function sendTelegramMessage(opts: TelegramSendOptions): Promise<boolean> {
-  const { token, chatId, text, parseMode = "HTML", disableWebPagePreview = true } = opts;
-  try {
-    const url = `${TELEGRAM_API}/bot${token}/sendMessage`;
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text,
-        parse_mode: parseMode,
-        disable_web_page_preview: disableWebPagePreview,
-      }),
-      signal: AbortSignal.timeout(15000),
-    });
-    if (!res.ok) {
-      const err = await res.text();
-      console.error("[Telegram] API error:", res.status, err);
-      // Try sending as plain text if HTML fails
-      if (parseMode === "HTML") {
-        console.log("[Telegram] Retrying without HTML parse mode...");
-        const plainText = text
-          .replace(/<b>/g, "").replace(/<\/b>/g, "")
-          .replace(/<i>/g, "").replace(/<\/i>/g, "")
-          .replace(/<code>/g, "").replace(/<\/code>/g, "")
-          .replace(/<pre>/g, "").replace(/<\/pre>/g, "");
-        const retryRes = await fetch(url, {
+  const { token, chatId, text, parseMode = "HTML", disableWebPagePreview = true, retryAttempts = MAX_RETRY_ATTEMPTS } = opts;
+  const url = `${TELEGRAM_API}/bot${token}/sendMessage`;
+
+  for (let attempt = 0; attempt < retryAttempts; attempt++) {
+    try {
+      // Split message if too long
+      const messages = splitTelegramMessage(text);
+      
+      for (let i = 0; i < messages.length; i++) {
+        const msgText = messages[i];
+        const isLast = i === messages.length - 1;
+        const isFirst = i === 0;
+
+        // Only use parse_mode on the first part (subsequent parts are plain text)
+        const currentParseMode = isFirst ? parseMode : undefined;
+        
+        const res = await fetch(url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             chat_id: chatId,
-            text: plainText,
+            text: msgText,
+            ...(currentParseMode ? { parse_mode: currentParseMode } : {}),
             disable_web_page_preview: disableWebPagePreview,
           }),
-          signal: AbortSignal.timeout(15000),
+          signal: AbortSignal.timeout(20000), // Increased to 20s
         });
-        if (retryRes.ok) {
-          const retryData = await retryRes.json();
-          return retryData.ok === true;
+
+        if (!res.ok) {
+          const errText = await res.text().catch(() => "unknown");
+          const errJson = (() => { try { return JSON.parse(errText); } catch { return null; } })();
+          const errDesc = errJson?.description || errText;
+          
+          console.error(`[Telegram] API error (attempt ${attempt + 1}/${retryAttempts}):`, res.status, errDesc);
+
+          // If HTML parse error, retry without parse_mode immediately
+          if (parseMode === "HTML" && (errDesc?.includes("can't parse entities") || errDesc?.includes("Bad Request"))) {
+            console.log("[Telegram] Parse error detected, retrying without HTML...");
+            const plainText = msgText
+              .replace(/<b>/g, "").replace(/<\/b>/g, "")
+              .replace(/<i>/g, "").replace(/<\/i>/g, "")
+              .replace(/<code>/g, "").replace(/<\/code>/g, "")
+              .replace(/<pre>/g, "").replace(/<\/pre>/g, "");
+            const retryRes = await fetch(url, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                chat_id: chatId,
+                text: plainText,
+                disable_web_page_preview: disableWebPagePreview,
+              }),
+              signal: AbortSignal.timeout(20000),
+            });
+            if (retryRes.ok) {
+              const retryData = await retryRes.json();
+              if (retryData.ok === true) continue; // Success for this part
+            }
+          }
+
+          // If 429 (rate limit) or 5xx (server error), wait and retry
+          if ((res.status === 429 || res.status >= 500) && attempt < retryAttempts - 1) {
+            const delay = RETRY_DELAYS[attempt] || 5000;
+            // Extract retry_after from 429 response if available
+            const retryAfter = errJson?.parameters?.retry_after;
+            const waitTime = retryAfter ? Math.max(retryAfter * 1000, delay) : delay;
+            console.log(`[Telegram] Rate limit / server error, waiting ${waitTime}ms before retry...`);
+            await sleep(waitTime);
+            break; // Break inner loop to restart all parts
+          }
+
+          return false; // Non-retryable error
         }
+
+        const data = await res.json();
+        if (!data.ok) {
+          console.error(`[Telegram] Response not ok (attempt ${attempt + 1}):`, data.description);
+          if (attempt < retryAttempts - 1) {
+            await sleep(RETRY_DELAYS[attempt] || 5000);
+            break;
+          }
+          return false;
+        }
+
+        // Small delay between message parts to avoid rate limiting
+        if (!isLast) await sleep(500);
+      }
+
+      return true; // All parts sent successfully
+    } catch (err) {
+      console.error(`[Telegram] Send failed (attempt ${attempt + 1}/${retryAttempts}):`, err);
+      if (attempt < retryAttempts - 1) {
+        await sleep(RETRY_DELAYS[attempt] || 5000);
+        continue;
       }
       return false;
     }
-    const data = await res.json();
-    return data.ok === true;
-  } catch (err) {
-    console.error("[Telegram] Send failed:", err);
-    return false;
   }
+  return false;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Split long messages for Telegram
+// ═══════════════════════════════════════════════════════════════
+
+function splitTelegramMessage(text: string): string[] {
+  if (text.length <= MAX_TELEGRAM_MSG_LENGTH) return [text];
+  
+  const parts: string[] = [];
+  const lines = text.split("\n");
+  let currentPart = "";
+  
+  for (const line of lines) {
+    // If adding this line would exceed the limit, start a new part
+    if (currentPart.length + line.length + 1 > MAX_TELEGRAM_MSG_LENGTH && currentPart.length > 0) {
+      parts.push(currentPart.trim());
+      currentPart = line + "\n";
+    } else {
+      currentPart += line + "\n";
+    }
+  }
+  
+  if (currentPart.trim()) parts.push(currentPart.trim());
+  return parts;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -117,7 +205,10 @@ async function getAllTelegramConfigs(): Promise<TelegramConfig[]> {
   }
 
   // Legacy: single bot/channel (backward compat)
-  if (configs.length === 0) {
+  // CRITICAL: Only use legacy if NO connections were ever configured (not just all disabled).
+  // When admin explicitly disables all connections, we must NOT fall back to legacy settings.
+  const hasAnyConnection = settings.telegramConnections && settings.telegramConnections.length > 0;
+  if (!hasAnyConnection) {
     const token = settings.telegramBotToken?.trim() || "";
     const chatId = normalizeTelegramChatId(settings.telegramChatId || "");
     if (token && chatId) {
@@ -153,6 +244,7 @@ export async function testTelegramConnection(
       token: trimmedToken,
       chatId: trimmedChatId,
       text: `✅ <b>تم ربط القناة بنجاح</b>\n\n🔍 تم التحقق من الاتصال بنجاح\nسيتم إرسال الإشارات تلقائياً إلى هذه القناة\n\n<i>ForexYemeni Signals</i>`,
+      retryAttempts: 1,
     });
 
     if (sendResult) {
@@ -363,6 +455,18 @@ export async function sendSignalUpdateToTelegram(params: {
     return fmtNum(n, n > 100 ? 2 : 5);
   };
 
+  // Validate tpIndex: ensure it's within totalTPs range
+  // FIX: Cap tpIndex to never exceed totalTPs to prevent showing wrong target numbers
+  const validatedTpIndex = (() => {
+    const tp = tpIndex ?? 0;
+    const total = totalTPs ?? 0;
+    if (total > 0 && tp > total) {
+      console.warn(`[Telegram] tpIndex ${tp} exceeds totalTPs ${total} — capping to ${total}`);
+      return total;
+    }
+    return tp;
+  })();
+
   let text = "";
 
   switch (updateType) {
@@ -370,7 +474,7 @@ export async function sendSignalUpdateToTelegram(params: {
     case "HIT_TP": // fallback — some routes use status values
     case "REENTRY_TP":
     case "PYRAMID_TP": {
-      const tpNum = (tpIndex ?? 0);
+      const tpNum = validatedTpIndex;
       const total = (totalTPs ?? 0);
       const remaining = total > tpNum ? total - tpNum : 0;
       const isFullClose = remaining === 0;
@@ -432,7 +536,7 @@ export async function sendSignalUpdateToTelegram(params: {
     case "REENTRY_SL":
     case "PYRAMID_SL": {
       if (partialWin) {
-        const tpNum = tpIndex ?? 0;
+        const tpNum = validatedTpIndex;
         const lines: string[] = [];
         lines.push(`📌 <b>${pair}</b>`);
         lines.push("");

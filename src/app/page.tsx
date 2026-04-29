@@ -22,6 +22,7 @@ import {
   MoreHorizontal, CreditCard, Upload, CheckCircle2, XCircle, Image, Copy, Plus, Banknote,
   ShieldCheck, ShieldX, ShieldBan, WifiOff, Gift, Ticket,
   Search, Unlock, ArrowLeft, X, Check, Save, Wifi, Pencil, Pause, Play,
+  ChevronDown,
 } from "lucide-react";
 
 // ═══ EXTRACTED MODULES ═══
@@ -357,6 +358,8 @@ export default function HomePage() {
   const [audioVol, setAudioVol] = useState(0.7);
   const prevIdsRef = useRef<Set<string>>(new Set());
   const prevStateRef = useRef<Map<string, { hitTpIndex: number; status: string }>>(new Map());
+  const prevPageRef = useRef<number>(0);
+  const allKnownSignalIdsRef = useRef<Set<string>>(new Set());
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -511,6 +514,7 @@ export default function HomePage() {
   const [showExtendDays, setShowExtendDays] = useState<string | null>(null);
   const [extendDays, setExtendDays] = useState("");
   const [extendDaysLoad, setExtendDaysLoad] = useState(false);
+  const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [adminSubTab, setAdminSubTab] = useState<AdminSubTab | null>(null);
   // Super admin identification is now handled by the backend (users API hides super admin from the list)
 
@@ -912,7 +916,11 @@ export default function HomePage() {
   /* ── Fetch Signals ── */
   const fetchSignals = useCallback(async () => {
     try {
-      const res = await fetch(`/api/signals?limit=${SIGNALS_PER_PAGE}&offset=${signalsPage * SIGNALS_PER_PAGE}`);
+      const currentPage = signalsPage;
+      const isPageChange = currentPage !== prevPageRef.current;
+      prevPageRef.current = currentPage;
+
+      const res = await fetch(`/api/signals?limit=${SIGNALS_PER_PAGE}&offset=${currentPage * SIGNALS_PER_PAGE}`);
       const data = await res.json();
       if (data.success) {
         const newSignals: Signal[] = data.signals;
@@ -920,11 +928,14 @@ export default function HomePage() {
         const newIds = new Set(newSignals.map((s: Signal) => s.id));
         const oldIds = prevIdsRef.current;
         const oldStates = prevStateRef.current;
+        const knownIds = allKnownSignalIdsRef.current;
+
         // Detect new signals AND state changes (TP hits, SL hits)
-        if (oldIds.size > 0) {
+        // IMPORTANT: Skip notification checks on page change to avoid false alerts
+        if (oldIds.size > 0 && !isPageChange) {
           for (const s of newSignals) {
-            if (!oldIds.has(s.id)) {
-              // Brand new signal — add notification
+            if (!oldIds.has(s.id) && !knownIds.has(s.id)) {
+              // Truly brand new signal — not seen in any previous page
               setNotifications(prev => [{
                 id: Date.now().toString(),
                 text: `إشارة ${s.type === "BUY" ? "شراء" : "بيع"} جديدة: ${s.pair}`,
@@ -944,7 +955,7 @@ export default function HomePage() {
                   playSound("message", audioVol);
                 }
               }
-            } else {
+            } else if (oldIds.has(s.id)) {
               // Existing signal — detect TP/SL state changes
               const prev = oldStates.get(s.id);
               if (prev) {
@@ -964,6 +975,13 @@ export default function HomePage() {
             }
           }
         }
+
+        // Track ALL signal IDs ever seen across all pages
+        for (const s of newSignals) {
+          knownIds.add(s.id);
+        }
+        allKnownSignalIdsRef.current = knownIds;
+
         // Save current state for next comparison
         prevIdsRef.current = newIds;
         const stateMap = new Map<string, { hitTpIndex: number; status: string }>();
@@ -971,14 +989,16 @@ export default function HomePage() {
           stateMap.set(s.id, { hitTpIndex: s.hitTpIndex, status: s.status });
         }
         prevStateRef.current = stateMap;
-        // Track new signal IDs for slide-in animation
-        for (const s of newSignals) {
-          if (!oldIds.has(s.id)) {
-            newSignalIdsRef.current.add(s.id);
-          } else {
-            const prev = oldStates.get(s.id);
-            if (prev && (prev.status !== s.status || prev.hitTpIndex !== s.hitTpIndex)) {
-              statusChangeIdsRef.current.add(s.id);
+        // Track new signal IDs for slide-in animation (only on same page, not page change)
+        if (!isPageChange) {
+          for (const s of newSignals) {
+            if (!oldIds.has(s.id) && !knownIds.has(s.id)) {
+              newSignalIdsRef.current.add(s.id);
+            } else {
+              const prev = oldStates.get(s.id);
+              if (prev && (prev.status !== s.status || prev.hitTpIndex !== s.hitTpIndex)) {
+                statusChangeIdsRef.current.add(s.id);
+              }
             }
           }
         }
@@ -1434,6 +1454,8 @@ export default function HomePage() {
     setView("login");
     setTab("signals");
     prevIdsRef.current = new Set();
+    allKnownSignalIdsRef.current = new Set();
+    prevPageRef.current = 0;
     toast("تم تسجيل الخروج");
   }
 
@@ -1702,6 +1724,8 @@ export default function HomePage() {
     setView("main");
     prevIdsRef.current = new Set();
     prevStateRef.current = new Map();
+    allKnownSignalIdsRef.current = new Set();
+    prevPageRef.current = 0;
     resetOtp();
     toast.success("تم تسجيل الدخول بنجاح", { description: "مرحباً بك في ForexYemeni" });
   }
@@ -4045,7 +4069,14 @@ export default function HomePage() {
           const todayPnl = parseFloat(todaySignals.reduce((acc, s) => acc + (s.pnlDollars ?? 0), 0).toFixed(2));
           const subDaysLeft = session?.subscriptionExpiry ? Math.max(0, Math.ceil((new Date(session.subscriptionExpiry).getTime() - Date.now()) / 86400000)) : null;
           const totalActiveUsers = users.filter(u => u.status === "active" && u.role === "user").length;
-          const totalSubscribers = users.filter(u => u.subscriptionType === "subscriber").length;
+          const totalSubscribers = users.filter(u =>
+            u.subscriptionType === "subscriber" &&
+            u.status === "active" &&
+            u.role === "user" &&
+            u.packageId &&
+            u.subscriptionExpiry &&
+            new Date(u.subscriptionExpiry) > new Date()
+          ).length;
           const weeklySignals = statsSource.filter(s => {
             const d = new Date(s.createdAt);
             const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
@@ -4741,52 +4772,139 @@ export default function HomePage() {
               />
             ) : (
               <>
-                {/* ── Active Signals Section ── */}
-                {activeSignals.length > 0 && (
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2 px-1">
-                      <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                      <span className="text-[11px] font-bold text-emerald-400">الإشارات النشطة</span>
-                      <span className="text-[9px] bg-emerald-500/15 text-emerald-400 px-1.5 py-0.5 rounded-md font-bold">{activeSignals.length}</span>
-                    </div>
-                    <div className="space-y-3">
-                      {activeSignals.map((s, i) => (
-                        <div key={s.id} className={newSignalIdsRef.current.has(s.id) ? "animate-slide-in-right animate-new-signal-glow" : ""}>
-                          <SignalCard s={s} idx={i} isAdmin={isAdmin} onUpdate={handleUpdate} onDelete={handleDelete} isNew={newSignalIdsRef.current.has(s.id)} statusChanged={statusChangeIdsRef.current.has(s.id)} isFavorite={favorites.has(s.id)} onToggleFavorite={toggleFavorite} />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                {/* ── Active Signals Section — Grouped by Instrument ── */}
+                {activeSignals.length > 0 && (() => {
+                  // Group active signals by instrument category
+                  const groupedByInstrument = new Map<string, typeof activeSignals>();
+                  for (const s of activeSignals) {
+                    const cat = getPairCategory(s.pair);
+                    if (!groupedByInstrument.has(cat)) groupedByInstrument.set(cat, []);
+                    groupedByInstrument.get(cat)!.push(s);
+                  }
+                  // Sort categories by order in INST_CATS
+                  const sortedCats = Array.from(groupedByInstrument.keys()).sort((a, b) => {
+                    const aIdx = INST_CATS.findIndex(c => c.id === a);
+                    const bIdx = INST_CATS.findIndex(c => c.id === b);
+                    return (aIdx === -1 ? 99 : aIdx) - (bIdx === -1 ? 99 : bIdx);
+                  });
 
-                {/* ── Closed Signals Section ── */}
-                {closedSignals.length > 0 && (
-                  <div className="space-y-2.5">
-                    <div className="flex items-center gap-2 px-1">
-                      <div className="w-2 h-2 rounded-full bg-slate-500" />
-                      <span className="text-[11px] font-bold text-muted-foreground">الإشارات المغلقة</span>
-                      <span className="text-[9px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded-md font-bold">{closedSignals.length}</span>
-                      {totalClosed > 0 && (
-                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${closedWinRate >= 60 ? "bg-emerald-500/15 text-emerald-400" : closedWinRate >= 40 ? "bg-amber-500/15 text-amber-400" : "bg-red-500/15 text-red-400"}`}>
-                          {closedWinRate}%
-                        </span>
+                  return (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 px-1">
+                        <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                        <span className="text-[11px] font-bold text-emerald-400">الإشارات النشطة</span>
+                        <span className="text-[9px] bg-emerald-500/15 text-emerald-400 px-1.5 py-0.5 rounded-md font-bold">{activeSignals.length}</span>
+                        {sortedCats.length > 1 && (
+                          <span className="text-[8px] text-muted-foreground/40">{sortedCats.length} أدوات</span>
+                        )}
+                      </div>
+                      {/* Show grouped by instrument only when multiple categories exist AND no category filter */}
+                      {sortedCats.length > 1 && !categoryFilter ? (
+                        sortedCats.map(cat => {
+                          const catInfo = INST_CATS.find(c => c.id === cat);
+                          const catSignals = groupedByInstrument.get(cat) || [];
+                          return (
+                            <div key={cat} className="space-y-1.5">
+                              <div className="flex items-center gap-2 px-1 pt-1">
+                                <span className="text-[10px]">{catInfo?.icon || "📋"}</span>
+                                <span className="text-[9px] font-semibold text-muted-foreground/70">{catInfo?.label || cat}</span>
+                                <span className="text-[8px] text-muted-foreground/30 bg-white/[0.03] px-1.5 py-px rounded-md">{catSignals.length}</span>
+                              </div>
+                              <div className="space-y-3">
+                                {catSignals.map((s, i) => (
+                                  <div key={s.id} className={newSignalIdsRef.current.has(s.id) ? "animate-slide-in-right animate-new-signal-glow" : ""}>
+                                    <SignalCard s={s} idx={i} isAdmin={isAdmin} onUpdate={handleUpdate} onDelete={handleDelete} isNew={newSignalIdsRef.current.has(s.id)} statusChanged={statusChangeIdsRef.current.has(s.id)} isFavorite={favorites.has(s.id)} onToggleFavorite={toggleFavorite} />
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        /* Single category or filter active — show flat list */
+                        <div className="space-y-3">
+                          {activeSignals.map((s, i) => (
+                            <div key={s.id} className={newSignalIdsRef.current.has(s.id) ? "animate-slide-in-right animate-new-signal-glow" : ""}>
+                              <SignalCard s={s} idx={i} isAdmin={isAdmin} onUpdate={handleUpdate} onDelete={handleDelete} isNew={newSignalIdsRef.current.has(s.id)} statusChanged={statusChangeIdsRef.current.has(s.id)} isFavorite={favorites.has(s.id)} onToggleFavorite={toggleFavorite} />
+                            </div>
+                          ))}
+                        </div>
                       )}
                     </div>
-                    <div className="space-y-2">
-                      {closedSignals.map((s, i) => {
-                        const isNew = newSignalIdsRef.current.has(s.id);
-                        const isStatusChange = statusChangeIdsRef.current.has(s.id);
-                        const isTpHit = s.status === "HIT_TP";
-                        const isSlHit = s.status === "HIT_SL";
-                        return (
-                          <div key={s.id} className={`${isNew ? "animate-slide-in-right" : ""} ${isStatusChange ? (isTpHit ? "animate-tp-hit-pulse" : isSlHit ? "animate-sl-hit-pulse" : "animate-status-pulse") : ""}`}>
-                            <SignalCard s={s} idx={i + (activeSignals.length || 0)} isAdmin={isAdmin} onUpdate={handleUpdate} onDelete={handleDelete} isNew={isNew} statusChanged={isStatusChange} isFavorite={favorites.has(s.id)} onToggleFavorite={toggleFavorite} />
-                          </div>
-                        );
-                      })}
+                  );
+                })()}
+
+                {/* ── Closed Signals Section — Grouped by Instrument ── */}
+                {closedSignals.length > 0 && (() => {
+                  const groupedClosed = new Map<string, typeof closedSignals>();
+                  for (const s of closedSignals) {
+                    const cat = getPairCategory(s.pair);
+                    if (!groupedClosed.has(cat)) groupedClosed.set(cat, []);
+                    groupedClosed.get(cat)!.push(s);
+                  }
+                  const sortedClosedCats = Array.from(groupedClosed.keys()).sort((a, b) => {
+                    const aIdx = INST_CATS.findIndex(c => c.id === a);
+                    const bIdx = INST_CATS.findIndex(c => c.id === b);
+                    return (aIdx === -1 ? 99 : aIdx) - (bIdx === -1 ? 99 : bIdx);
+                  });
+
+                  return (
+                    <div className="space-y-2.5">
+                      <div className="flex items-center gap-2 px-1">
+                        <div className="w-2 h-2 rounded-full bg-slate-500" />
+                        <span className="text-[11px] font-bold text-muted-foreground">الإشارات المغلقة</span>
+                        <span className="text-[9px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded-md font-bold">{closedSignals.length}</span>
+                        {totalClosed > 0 && (
+                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${closedWinRate >= 60 ? "bg-emerald-500/15 text-emerald-400" : closedWinRate >= 40 ? "bg-amber-500/15 text-amber-400" : "bg-red-500/15 text-red-400"}`}>
+                            {closedWinRate}%
+                          </span>
+                        )}
+                      </div>
+                      {sortedClosedCats.length > 1 && !categoryFilter ? (
+                        sortedClosedCats.map(cat => {
+                          const catInfo = INST_CATS.find(c => c.id === cat);
+                          const catClosed = groupedClosed.get(cat) || [];
+                          return (
+                            <div key={cat} className="space-y-1.5">
+                              <div className="flex items-center gap-2 px-1 pt-1">
+                                <span className="text-[10px]">{catInfo?.icon || "📋"}</span>
+                                <span className="text-[9px] font-semibold text-muted-foreground/70">{catInfo?.label || cat}</span>
+                                <span className="text-[8px] text-muted-foreground/30 bg-white/[0.03] px-1.5 py-px rounded-md">{catClosed.length}</span>
+                              </div>
+                              <div className="space-y-2">
+                                {catClosed.map((s, i) => {
+                                  const isNew = newSignalIdsRef.current.has(s.id);
+                                  const isStatusChange = statusChangeIdsRef.current.has(s.id);
+                                  const isTpHit = s.status === "HIT_TP";
+                                  const isSlHit = s.status === "HIT_SL";
+                                  return (
+                                    <div key={s.id} className={`${isNew ? "animate-slide-in-right" : ""} ${isStatusChange ? (isTpHit ? "animate-tp-hit-pulse" : isSlHit ? "animate-sl-hit-pulse" : "animate-status-pulse") : ""}`}>
+                                      <SignalCard s={s} idx={i + (activeSignals.length || 0)} isAdmin={isAdmin} onUpdate={handleUpdate} onDelete={handleDelete} isNew={isNew} statusChanged={isStatusChange} isFavorite={favorites.has(s.id)} onToggleFavorite={toggleFavorite} />
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <div className="space-y-2">
+                          {closedSignals.map((s, i) => {
+                            const isNew = newSignalIdsRef.current.has(s.id);
+                            const isStatusChange = statusChangeIdsRef.current.has(s.id);
+                            const isTpHit = s.status === "HIT_TP";
+                            const isSlHit = s.status === "HIT_SL";
+                            return (
+                              <div key={s.id} className={`${isNew ? "animate-slide-in-right" : ""} ${isStatusChange ? (isTpHit ? "animate-tp-hit-pulse" : isSlHit ? "animate-sl-hit-pulse" : "animate-status-pulse") : ""}`}>
+                                <SignalCard s={s} idx={i + (activeSignals.length || 0)} isAdmin={isAdmin} onUpdate={handleUpdate} onDelete={handleDelete} isNew={isNew} statusChanged={isStatusChange} isFavorite={favorites.has(s.id)} onToggleFavorite={toggleFavorite} />
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
               </>
             )}
 
@@ -7074,9 +7192,9 @@ export default function HomePage() {
                 {users.filter(u => u.status === "active").length > 0 && (() => {
                   const actives = users.filter(u => u.status === "active");
                   const admins = actives.filter(u => u.role === "admin");
-                  const subscribers = actives.filter(u => u.subscriptionType === "subscriber" && u.role !== "admin");
+                  const subscribers = actives.filter(u => u.subscriptionType === "subscriber" && u.role !== "admin" && u.packageId && u.subscriptionExpiry && new Date(u.subscriptionExpiry) > new Date());
                   const agency = actives.filter(u => u.subscriptionType === "agency" && u.role !== "admin");
-                  const regular = actives.filter(u => !u.subscriptionType || u.subscriptionType === "none");
+                  const regular = actives.filter(u => !u.subscriptionType || u.subscriptionType === "none" || (u.subscriptionType === "subscriber" && (!u.packageId || !u.subscriptionExpiry || new Date(u.subscriptionExpiry) <= new Date())));
 
                   return (
                   <div className="glass-card p-4">
@@ -7094,7 +7212,8 @@ export default function HomePage() {
                     <div className="space-y-2">
                     {actives.map(u => {
                       const isAgency = u.subscriptionType === "agency";
-                      const isSub = u.subscriptionType === "subscriber";
+                      const isSubActive = u.subscriptionType === "subscriber" && u.packageId && u.subscriptionExpiry && new Date(u.subscriptionExpiry) > new Date();
+                      const isSubExpired = u.subscriptionType === "subscriber" && (!u.packageId || !u.subscriptionExpiry || new Date(u.subscriptionExpiry) <= new Date());
                       const expDays = u.subscriptionExpiry ? Math.ceil((new Date(u.subscriptionExpiry).getTime() - Date.now()) / 86400000) : null;
                       const isPromotedAdmin = u.role === "admin";
                       const isSuperAdmin = isPromotedAdmin && u.id === session?.id;
@@ -7102,43 +7221,68 @@ export default function HomePage() {
                           ? "from-amber-500/30 to-amber-600/15"
                           : isAgency
                             ? "from-purple-500/25 to-violet-500/15"
-                            : isSub
+                            : isSubActive
                               ? "from-sky-500/25 to-cyan-500/15"
                               : "from-emerald-500/20 to-green-500/10";
                       const avatarBorder = isPromotedAdmin
                           ? "border-amber-500/20"
                           : isAgency
                             ? "border-purple-500/20"
-                            : isSub
+                            : isSubActive
                               ? "border-sky-500/20"
                               : "border-emerald-500/15";
-                      const textColor = isPromotedAdmin ? "text-amber-400" : isAgency ? "text-purple-300" : isSub ? "text-sky-300" : "text-emerald-300";
+                      const textColor = isPromotedAdmin ? "text-amber-400" : isAgency ? "text-purple-300" : isSubActive ? "text-sky-300" : "text-emerald-300";
 
                       return (
-                        <div key={u.id} className="rounded-xl border p-3 transition-all hover:bg-white/[0.02] border-border/40 bg-white/[0.01]">
-                          {/* Main Row */}
-                          <div className="flex items-center gap-3">
+                        <div key={u.id} className={`rounded-xl border transition-all border-border/40 bg-white/[0.01] ${expandedUserId === u.id ? "hover:bg-white/[0.02]" : "hover:bg-white/[0.02] hover:border-border/60"}`}>
+                          {/* Compact Header — Always Visible */}
+                          <div
+                            className="flex items-center gap-3 p-3 cursor-pointer select-none active:scale-[0.995] transition-transform"
+                            onClick={() => setExpandedUserId(prev => prev === u.id ? null : u.id)}
+                          >
                             {/* Avatar */}
                             <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${avatarGradient} border ${avatarBorder} flex items-center justify-center flex-shrink-0`}>
                               {isPromotedAdmin ? <Crown className={`w-4 h-4 ${textColor}`} /> : <span className={`text-sm font-black ${textColor}`}>{u.name?.charAt(0)?.toUpperCase() || "?"}</span>}
                             </div>
-                            {/* Info */}
+                            {/* Basic Info */}
                             <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className="text-[11px] font-bold text-foreground">{u.name}</span>
-                                <span className="badge-active">نشط</span>
-                                {isSuperAdmin && <span className="text-[7px] bg-gradient-to-r from-amber-500/30 to-orange-500/20 text-amber-300 px-1.5 py-0.5 rounded-full font-bold border border-amber-500/15">المدير الأعلى</span>}
-                                {isPromotedAdmin && <span className="text-[7px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded-full font-bold border border-amber-500/10">مدير</span>}
-                                {isAgency && <span className="text-[7px] bg-purple-500/15 text-purple-400 px-1.5 py-0.5 rounded-full font-bold border border-purple-500/10">وكالة</span>}
-                                {isSub && <span className="text-[7px] bg-sky-500/15 text-sky-400 px-1.5 py-0.5 rounded-full font-bold border border-sky-500/10">مشترك</span>}
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[11px] font-bold text-foreground truncate">{u.name}</span>
+                                {isSubActive && <span className="text-[7px] bg-sky-500/15 text-sky-400 px-1.5 py-0.5 rounded-full font-bold border border-sky-500/10 flex-shrink-0">مشترك</span>}
+                                {isSubExpired && <span className="text-[7px] bg-red-500/10 text-red-400 px-1.5 py-0.5 rounded-full font-bold border border-red-500/10 flex-shrink-0">منتهي</span>}
+                                {isAgency && <span className="text-[7px] bg-purple-500/15 text-purple-400 px-1.5 py-0.5 rounded-full font-bold border border-purple-500/10 flex-shrink-0">وكالة</span>}
+                                {isPromotedAdmin && <span className="text-[7px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded-full font-bold border border-amber-500/10 flex-shrink-0">مدير</span>}
                               </div>
-                              <div className="text-[9px] text-muted-foreground font-mono truncate mt-0.5" dir="ltr">{u.email}</div>
-                              {/* Package Badge & Subscription Info */}
-                              {u.packageName && (
-                                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[8px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/15">
-                                    <Package className="w-2.5 h-2.5" /> {u.packageName}
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <span className="text-[9px] text-muted-foreground font-mono truncate" dir="ltr">{u.email}</span>
+                                {u.packageName && (
+                                  <span className="inline-flex items-center gap-0.5 px-1.5 py-px rounded-md text-[7px] font-semibold bg-amber-500/10 text-amber-400/80 border border-amber-500/10 flex-shrink-0">
+                                    <Package className="w-2 h-2" /> {u.packageName}
                                   </span>
+                                )}
+                                {expDays !== null && expDays > 0 && (
+                                  <span className={`text-[7px] font-bold px-1 py-px rounded-md flex-shrink-0 ${
+                                    expDays > 7 ? "bg-emerald-500/10 text-emerald-400" :
+                                    expDays > 3 ? "bg-sky-500/10 text-sky-400" :
+                                    "bg-amber-500/10 text-amber-400"
+                                  }`}>
+                                    {expDays}ي
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            {/* Expand Arrow */}
+                            <ChevronDown className={`w-4 h-4 text-muted-foreground/40 flex-shrink-0 transition-transform duration-200 ${expandedUserId === u.id ? "rotate-180" : ""}`} />
+                          </div>
+
+                          {/* Expanded Details — Only when selected */}
+                          {expandedUserId === u.id && (
+                            <div className="px-3 pb-3 space-y-2.5 animate-[fadeIn_0.15s_ease-out]">
+                              {/* Subscription Details */}
+                              <div className="pt-2.5 border-t border-border/30">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="badge-active">نشط</span>
+                                  {isSuperAdmin && <span className="text-[7px] bg-gradient-to-r from-amber-500/30 to-orange-500/20 text-amber-300 px-1.5 py-0.5 rounded-full font-bold border border-amber-500/15">المدير الأعلى</span>}
                                   {u.hadFreeTrial && <span className="text-[7px] bg-amber-500/10 text-amber-400/60 px-1.5 py-0.5 rounded-md font-medium">سبق تجربة</span>}
                                   {expDays !== null && (
                                     <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-md ${
@@ -7147,18 +7291,12 @@ export default function HomePage() {
                                       expDays > 0 ? "bg-amber-500/10 text-amber-400 border border-amber-500/15" :
                                       "bg-red-500/10 text-red-400 border border-red-500/15"
                                     }`}>
-                                      {expDays > 0 ? `${expDays}ي متبقي` : "منتهي!"}
+                                      {expDays > 0 ? `${expDays} يوم متبقي` : "منتهي!"}
                                     </span>
                                   )}
+                                  <span className="text-[8px] text-muted-foreground/40">{new Date(u.createdAt).toLocaleDateString("ar-SA", { year: "numeric", month: "short", day: "numeric" })}</span>
                                 </div>
-                              )}
-                            </div>
-                            {/* Date */}
-                            <div className="text-[8px] text-muted-foreground/50 text-left flex-shrink-0 hidden sm:block">
-                              {new Date(u.createdAt).toLocaleDateString("ar-SA", { year: "numeric", month: "short", day: "numeric" })}
-                            </div>
-                          </div>
-
+                              </div>
                           {/* Per-User Package Stats */}
                           {u.packageId && (() => {
                             const uPkg = packages.find(p => p.id === u.packageId);
@@ -7330,6 +7468,9 @@ export default function HomePage() {
                                   {extendDaysLoad ? "جارٍ..." : "إضافة"}
                                 </button>
                               </div>
+                            </div>
+                          )}
+                          {/* Close expanded section */}
                             </div>
                           )}
                         </div>

@@ -855,3 +855,49 @@ export async function getUnreadNotificationCount(): Promise<number> {
 export async function clearNotifications(): Promise<void> {
   await kv.set('admin_notifications', []);
 }
+
+// ═══════════════════════════════════════════════════════════════
+//  Pending Signal Updates Queue
+//  When TP/SL/BREAKEVEN arrives before the parent ENTRY signal,
+//  it gets queued here and processed when the parent signal arrives.
+// ═══════════════════════════════════════════════════════════════
+
+export interface PendingSignalUpdate {
+  pair: string;
+  signalCategory: string;
+  rawText: string;
+  hitTpIndex?: number;
+  hitPrice?: number;
+  pnlPoints?: number;
+  pnlDollar?: number;
+  tpStatusList?: string;
+  totalTPs?: number;
+  partialWin?: boolean;
+  createdAt: string;
+}
+
+/**
+ * Add a pending update to the queue for a specific pair.
+ * TTL: 10 minutes (updates older than that are discarded)
+ */
+export async function addPendingUpdate(pair: string, update: Omit<PendingSignalUpdate, "pair" | "createdAt">): Promise<void> {
+  const key = `pending_updates:${pair.toUpperCase()}`;
+  const existing: PendingSignalUpdate[] = (await kv.get(key)) || [];
+  // Keep max 5 pending updates per pair to prevent memory bloat
+  existing.push({ ...update, pair: pair.toUpperCase(), createdAt: new Date().toISOString() });
+  await kv.set(key, existing.slice(-5), { ex: 600 }); // 10min TTL
+  console.log(`[PendingUpdates] Queued update for ${pair}: ${update.signalCategory}, queue size: ${Math.min(existing.length, 5)}`);
+}
+
+/**
+ * Get and clear pending updates for a specific pair.
+ */
+export async function getAndClearPendingUpdates(pair: string): Promise<PendingSignalUpdate[]> {
+  const key = `pending_updates:${pair.toUpperCase()}`;
+  const updates: PendingSignalUpdate[] = (await kv.get(key)) || [];
+  if (updates.length > 0) {
+    await kv.del(key);
+    console.log(`[PendingUpdates] Processing ${updates.length} queued updates for ${pair}`);
+  }
+  return updates;
+}
