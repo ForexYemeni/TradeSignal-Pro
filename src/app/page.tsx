@@ -4659,6 +4659,21 @@ export default function HomePage() {
         {tab === "signals" && (<motion.div key="signals" initial={{ opacity: 0, y: 8, filter: "blur(4px)" }} animate={{ opacity: 1, y: 0, filter: "blur(0px)" }} exit={{ opacity: 0, y: -8, filter: "blur(4px)" }} transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}>{(() => {
           const activeSignals = filtered.filter(s => isEntry(s.signalCategory) && s.status === "ACTIVE");
           const closedSignals = filtered.filter(s => !isEntry(s.signalCategory) || s.status !== "ACTIVE");
+          // Helper: format date as Arabic label
+          const formatDateLabel = (isoStr: string) => {
+            const d = new Date(isoStr);
+            const now = new Date();
+            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const sigDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+            const diffDays = Math.round((today.getTime() - sigDate.getTime()) / 86400000);
+            if (diffDays === 0) return "اليوم";
+            if (diffDays === 1) return "أمس";
+            if (diffDays < 7) return `منذ ${diffDays} أيام`;
+            const days = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
+            const months = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+            return `${days[d.getDay()]}، ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+          };
+          const getDateKey = (isoStr: string) => new Date(isoStr).toDateString();
           const winClosed = closedSignals.filter(s => s.status === "HIT_TP");
           const lossClosed = closedSignals.filter(s => s.status === "HIT_SL");
           const totalClosed = closedSignals.length;
@@ -4919,11 +4934,23 @@ export default function HomePage() {
                                 <span className="text-[8px] text-muted-foreground/30 bg-white/[0.03] px-1.5 py-px rounded-md">{catSignals.length}</span>
                               </div>
                               <div className="space-y-3">
-                                {catSignals.map((s, i) => (
-                                  <div key={s.id} className={newSignalIdsRef.current.has(s.id) ? "animate-slide-in-right animate-new-signal-glow" : ""}>
-                                    <SignalCard s={s} idx={i} isAdmin={isAdmin} onUpdate={handleUpdate} onDelete={handleDelete} isNew={newSignalIdsRef.current.has(s.id)} statusChanged={statusChangeIdsRef.current.has(s.id)} isFavorite={favorites.has(s.id)} onToggleFavorite={toggleFavorite} />
-                                  </div>
-                                ))}
+                                {catSignals.map((s, i) => {
+                                  const showDateSep = i === 0 || getDateKey(catSignals[i - 1].createdAt) !== getDateKey(s.createdAt);
+                                  return (
+                                    <React.Fragment key={s.id}>
+                                      {showDateSep && (
+                                        <div className="flex items-center gap-3 pt-2 pb-1">
+                                          <div className="flex-1 h-px bg-gradient-to-l from-white/[0.08] to-transparent" />
+                                          <span className="text-[9px] font-semibold text-muted-foreground/50 whitespace-nowrap">{formatDateLabel(s.createdAt)}</span>
+                                          <div className="flex-1 h-px bg-gradient-to-r from-white/[0.08] to-transparent" />
+                                        </div>
+                                      )}
+                                      <div className={newSignalIdsRef.current.has(s.id) ? "animate-slide-in-right animate-new-signal-glow" : ""}>
+                                        <SignalCard s={s} idx={i} isAdmin={isAdmin} onUpdate={handleUpdate} onDelete={handleDelete} isNew={newSignalIdsRef.current.has(s.id)} statusChanged={statusChangeIdsRef.current.has(s.id)} isFavorite={favorites.has(s.id)} onToggleFavorite={toggleFavorite} />
+                                      </div>
+                                    </React.Fragment>
+                                  );
+                                })}
                               </div>
                             </div>
                           );
@@ -4931,11 +4958,23 @@ export default function HomePage() {
                       ) : (
                         /* Single category or filter active — show flat list */
                         <div className="space-y-3">
-                          {activeSignals.map((s, i) => (
-                            <div key={s.id} className={newSignalIdsRef.current.has(s.id) ? "animate-slide-in-right animate-new-signal-glow" : ""}>
-                              <SignalCard s={s} idx={i} isAdmin={isAdmin} onUpdate={handleUpdate} onDelete={handleDelete} isNew={newSignalIdsRef.current.has(s.id)} statusChanged={statusChangeIdsRef.current.has(s.id)} isFavorite={favorites.has(s.id)} onToggleFavorite={toggleFavorite} />
-                            </div>
-                          ))}
+                          {activeSignals.map((s, i) => {
+                            const showDateSep = i === 0 || getDateKey(activeSignals[i - 1].createdAt) !== getDateKey(s.createdAt);
+                            return (
+                              <React.Fragment key={s.id}>
+                                {showDateSep && (
+                                  <div className="flex items-center gap-3 pt-2 pb-1">
+                                    <div className="flex-1 h-px bg-gradient-to-l from-white/[0.08] to-transparent" />
+                                    <span className="text-[9px] font-semibold text-muted-foreground/50 whitespace-nowrap">{formatDateLabel(s.createdAt)}</span>
+                                    <div className="flex-1 h-px bg-gradient-to-r from-white/[0.08] to-transparent" />
+                                  </div>
+                                )}
+                                <div className={newSignalIdsRef.current.has(s.id) ? "animate-slide-in-right animate-new-signal-glow" : ""}>
+                                  <SignalCard s={s} idx={i} isAdmin={isAdmin} onUpdate={handleUpdate} onDelete={handleDelete} isNew={newSignalIdsRef.current.has(s.id)} statusChanged={statusChangeIdsRef.current.has(s.id)} isFavorite={favorites.has(s.id)} onToggleFavorite={toggleFavorite} />
+                                </div>
+                              </React.Fragment>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
@@ -4985,10 +5024,20 @@ export default function HomePage() {
                                   const isStatusChange = statusChangeIdsRef.current.has(s.id);
                                   const isTpHit = s.status === "HIT_TP";
                                   const isSlHit = s.status === "HIT_SL";
+                                  const showDateSep = i === 0 || getDateKey(catClosed[i - 1].createdAt) !== getDateKey(s.createdAt);
                                   return (
-                                    <div key={s.id} className={`${isNew ? "animate-slide-in-right" : ""} ${isStatusChange ? (isTpHit ? "animate-tp-hit-pulse" : isSlHit ? "animate-sl-hit-pulse" : "animate-status-pulse") : ""}`}>
-                                      <SignalCard s={s} idx={i + (activeSignals.length || 0)} isAdmin={isAdmin} onUpdate={handleUpdate} onDelete={handleDelete} isNew={isNew} statusChanged={isStatusChange} isFavorite={favorites.has(s.id)} onToggleFavorite={toggleFavorite} />
-                                    </div>
+                                    <React.Fragment key={s.id}>
+                                      {showDateSep && (
+                                        <div className="flex items-center gap-3 pt-2 pb-1">
+                                          <div className="flex-1 h-px bg-gradient-to-l from-white/[0.08] to-transparent" />
+                                          <span className="text-[9px] font-semibold text-muted-foreground/50 whitespace-nowrap">{formatDateLabel(s.createdAt)}</span>
+                                          <div className="flex-1 h-px bg-gradient-to-r from-white/[0.08] to-transparent" />
+                                        </div>
+                                      )}
+                                      <div className={`${isNew ? "animate-slide-in-right" : ""} ${isStatusChange ? (isTpHit ? "animate-tp-hit-pulse" : isSlHit ? "animate-sl-hit-pulse" : "animate-status-pulse") : ""}`}>
+                                        <SignalCard s={s} idx={i + (activeSignals.length || 0)} isAdmin={isAdmin} onUpdate={handleUpdate} onDelete={handleDelete} isNew={isNew} statusChanged={isStatusChange} isFavorite={favorites.has(s.id)} onToggleFavorite={toggleFavorite} />
+                                      </div>
+                                    </React.Fragment>
                                   );
                                 })}
                               </div>
@@ -5002,10 +5051,20 @@ export default function HomePage() {
                             const isStatusChange = statusChangeIdsRef.current.has(s.id);
                             const isTpHit = s.status === "HIT_TP";
                             const isSlHit = s.status === "HIT_SL";
+                            const showDateSep = i === 0 || getDateKey(closedSignals[i - 1].createdAt) !== getDateKey(s.createdAt);
                             return (
-                              <div key={s.id} className={`${isNew ? "animate-slide-in-right" : ""} ${isStatusChange ? (isTpHit ? "animate-tp-hit-pulse" : isSlHit ? "animate-sl-hit-pulse" : "animate-status-pulse") : ""}`}>
-                                <SignalCard s={s} idx={i + (activeSignals.length || 0)} isAdmin={isAdmin} onUpdate={handleUpdate} onDelete={handleDelete} isNew={isNew} statusChanged={isStatusChange} isFavorite={favorites.has(s.id)} onToggleFavorite={toggleFavorite} />
-                              </div>
+                              <React.Fragment key={s.id}>
+                                {showDateSep && (
+                                  <div className="flex items-center gap-3 pt-2 pb-1">
+                                    <div className="flex-1 h-px bg-gradient-to-l from-white/[0.08] to-transparent" />
+                                    <span className="text-[9px] font-semibold text-muted-foreground/50 whitespace-nowrap">{formatDateLabel(s.createdAt)}</span>
+                                    <div className="flex-1 h-px bg-gradient-to-r from-white/[0.08] to-transparent" />
+                                  </div>
+                                )}
+                                <div className={`${isNew ? "animate-slide-in-right" : ""} ${isStatusChange ? (isTpHit ? "animate-tp-hit-pulse" : isSlHit ? "animate-sl-hit-pulse" : "animate-status-pulse") : ""}`}>
+                                  <SignalCard s={s} idx={i + (activeSignals.length || 0)} isAdmin={isAdmin} onUpdate={handleUpdate} onDelete={handleDelete} isNew={isNew} statusChanged={isStatusChange} isFavorite={favorites.has(s.id)} onToggleFavorite={toggleFavorite} />
+                                </div>
+                              </React.Fragment>
                             );
                           })}
                         </div>
