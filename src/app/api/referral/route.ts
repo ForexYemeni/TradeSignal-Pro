@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getUserById, getAppSettings, getReferrals, generateReferralCode, getUserByReferralCode, updateUser, getUsers } from "@/lib/store";
+import { getUserById, getAppSettings, getReferrals, generateReferralCode, getUserByReferralCode, updateUser, getUsers, getPackageById } from "@/lib/store";
 
 /**
  * GET /api/referral?userId=xxx
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     const settings = await getAppSettings();
 
     if (!settings.referralEnabled) {
-      return NextResponse.json({ success: true, enabled: false, referralCode: null, referrals: [], stats: { total: 0, active: 0, rewardDays: 0 } });
+      return NextResponse.json({ success: true, enabled: false, referralCode: null, referrals: [], stats: { total: 0, active: 0, rewardDays: 0, inviteeRewardDays: 0 } });
     }
 
     const user = await getUserById(userId);
@@ -82,6 +82,10 @@ export async function GET(request: NextRequest) {
  * POST /api/referral
  * - Apply a referral code during registration or from account page
  * Body: { userId, referralCode }
+ *
+ * IMPORTANT: The invitee reward is NOT given here. It is granted when the
+ * invitee's first PAID subscription is approved (see payments API).
+ * This prevents free-trial users from exploiting the referral system.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -128,25 +132,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "لا يمكن الاحالة المتبادلة" }, { status: 400 });
     }
 
-    // Apply referral code
+    // Apply referral code (save it — reward will be given on first paid subscription)
     await updateUser(userId, { referredBy: trimmedCode });
-
-    // Give invitee reward if user has active subscription
-    let inviteeRewardGiven = false;
-    if (user.subscriptionType === "subscriber" && user.subscriptionExpiry && new Date(user.subscriptionExpiry) > new Date()) {
-      const newExpiry = new Date(user.subscriptionExpiry);
-      newExpiry.setDate(newExpiry.getDate() + settings.referralInviteeRewardDays);
-      await updateUser(userId, { subscriptionExpiry: newExpiry.toISOString() });
-      inviteeRewardGiven = true;
-    }
 
     return NextResponse.json({
       success: true,
-      message: inviteeRewardGiven
-        ? `تم تطبيق كود الاحالة بنجاح! حصلت على ${settings.referralInviteeRewardDays} أيام إضافية.`
-        : "تم تطبيق كود الاحالة بنجاح! ستحصل على مكافأة عند تفعيل اشتراك مدفوع.",
-      inviteeRewardGiven,
-      inviteeRewardDays: inviteeRewardGiven ? settings.referralInviteeRewardDays : 0,
+      message: "تم تطبيق كود الاحالة بنجاح! ستحصل على مكافأة عند أول اشتراك مدفوع.",
       referrerName: referrer.name,
     });
   } catch (error) {

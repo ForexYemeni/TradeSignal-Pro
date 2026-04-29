@@ -8,11 +8,11 @@ import { addAdminNotification } from "@/lib/store";
 import { requireAdmin, getSessionUserId, validateAdmin } from "@/lib/admin-auth";
 import { kvRateLimit } from "@/lib/rate-limit";
 
-// ── Referral reward: grant referrer bonus days when referred user activates paid plan ──
+// ── Referral reward: grant referrer + invitee bonus days when referred user activates paid plan ──
 async function grantReferralReward(
   userId: string,
   packageType: "free" | "trial" | "paid"
-): Promise<{ granted: boolean; days: number; referrerName?: string }> {
+): Promise<{ granted: boolean; days: number; referrerName?: string; inviteeRewardDays?: number }> {
   try {
     const settings = await getAppSettings();
     if (!settings.referralEnabled || !settings.referralRewardDays) return { granted: false, days: 0 };
@@ -29,15 +29,27 @@ async function grantReferralReward(
 
     const rewardDays = settings.referralRewardDays;
 
-    // If referrer has active subscription, extend it immediately
+    // ── Reward 1: Referrer gets bonus days ──
     if (referrer.subscriptionType === "subscriber" && referrer.subscriptionExpiry && new Date(referrer.subscriptionExpiry) > new Date()) {
       const newExpiry = new Date(referrer.subscriptionExpiry);
       newExpiry.setDate(newExpiry.getDate() + rewardDays);
       await updateUser(referrer.id, { subscriptionExpiry: newExpiry.toISOString() });
-      console.log(`[Referral Reward] Extended ${referrer.email} by ${rewardDays} days (referred by ${user.email})`);
+      console.log(`[Referral Reward] Extended referrer ${referrer.email} by ${rewardDays} days`);
     }
 
-    return { granted: true, days: rewardDays, referrerName: referrer.name };
+    // ── Reward 2: Invitee (this user) gets bonus days on their paid subscription ──
+    let inviteeRewardDays = 0;
+    if (settings.referralInviteeRewardDays > 0) {
+      inviteeRewardDays = settings.referralInviteeRewardDays;
+      if (user.subscriptionType === "subscriber" && user.subscriptionExpiry && new Date(user.subscriptionExpiry) > new Date()) {
+        const newExpiry = new Date(user.subscriptionExpiry);
+        newExpiry.setDate(newExpiry.getDate() + inviteeRewardDays);
+        await updateUser(userId, { subscriptionExpiry: newExpiry.toISOString() });
+        console.log(`[Referral Reward] Extended invitee ${user.email} by ${inviteeRewardDays} days`);
+      }
+    }
+
+    return { granted: true, days: rewardDays, referrerName: referrer.name, inviteeRewardDays };
   } catch (error) {
     console.error("[Referral Reward] Error:", error);
     return { granted: false, days: 0 };
@@ -362,6 +374,9 @@ export async function POST(request: NextRequest) {
         let rewardMsg = "";
         if (referralReward.granted) {
           rewardMsg = ` 🎁 حصلت صاحب الدعوة على ${referralReward.days} أيام إضافية!`;
+          if (referralReward.inviteeRewardDays && referralReward.inviteeRewardDays > 0) {
+            rewardMsg += ` وحصلت أنت على ${referralReward.inviteeRewardDays} أيام مجانية كمكافأة احالة!`;
+          }
         }
 
         return NextResponse.json({
