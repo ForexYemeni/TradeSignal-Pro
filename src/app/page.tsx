@@ -126,8 +126,11 @@ function ReferralSection({ session, appSettings }: { session: any; appSettings: 
     if (!session?.id) return;
     fetch(`/api/referral?userId=${session.id}`)
       .then(r => r.json())
-      .then(data => { if (data.success) setReferralData(data); })
+      .then(data => {
+        if (data.success) setReferralData(data);
+      })
       .catch(() => toast.error("فشل في جلب بيانات الاحالة"))
+      .finally(() => setLoading(false));
   }, [session?.id]);
 
   // Check if user already has a referral applied
@@ -7778,6 +7781,9 @@ export default function HomePage() {
                 )}
               </div>
             )}
+
+            {/* ── Referral Section ── */}
+            <ReferralSection session={session} appSettings={appSettings} />
 
             {/* ── USER: Request Email Change ── */}
             {!isAdmin && (
