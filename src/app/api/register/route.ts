@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { kv } from "@vercel/kv";
-import { getUserByEmail, getUserByDeviceId, addUser, updateUser, migrateAdminToUsers, getAppSettings, getPackageById, getUsers, hashPassword, hasDeviceUsedFreeTrial } from "@/lib/store";
+import { getUserByEmail, getUserByDeviceId, addUser, updateUser, migrateAdminToUsers, getAppSettings, getPackageById, getUsers, hashPassword, hasDeviceUsedFreeTrial, generateReferralCode } from "@/lib/store";
 import { sendPushToAdmins } from "@/lib/push";
 import { addAdminNotification } from "@/lib/store";
 import { validateText, validateEmail, validatePassword } from "@/lib/validation";
@@ -167,7 +167,7 @@ export async function POST(request: NextRequest) {
       packageId: trialPkgId,
       packageName: trialPkgName,
       deviceId: deviceId?.trim() || null,
-      referralCode: crypto.randomUUID().slice(0, 8).toUpperCase(),
+      referralCode: generateReferralCode(),
       referredBy: null,
       referralRewardClaimed: false,
     });
