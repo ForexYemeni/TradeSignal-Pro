@@ -418,7 +418,8 @@ export default function HomePage() {
   const [announcPriority, setAnnouncPriority] = useState<"high" | "medium" | "low">("medium");
   const [announcTarget, setAnnouncTarget] = useState<"all" | "specific">("all");
   const [announcTargetUserId, setAnnouncTargetUserId] = useState("");
-  const [announcTargetUserName, setAnnouncTargetUserName] = useState("");
+  const [announcUserSearch, setAnnouncUserSearch] = useState("");
+  const [announcUserDropdownOpen, setAnnouncUserDropdownOpen] = useState(false);
   const [announcSendPush, setAnnouncSendPush] = useState(true);
   const [announcSendEmail, setAnnouncSendEmail] = useState(false);
   const [announcSending, setAnnouncSending] = useState(false);
@@ -1135,6 +1136,7 @@ export default function HomePage() {
 
   const handleSendAnnouncement = async () => {
     if (!announcTitle.trim() || !announcMessage.trim()) return;
+    if (announcTarget === "specific" && !announcTargetUserId) return;
     setAnnouncSending(true);
     try {
       const res = await fetch("/api/announcements", {
@@ -1147,7 +1149,7 @@ export default function HomePage() {
           priority: announcPriority,
           target: announcTarget,
           targetUserId: announcTarget === "specific" ? announcTargetUserId : undefined,
-          targetUserName: announcTarget === "specific" ? announcTargetUserName : undefined,
+          targetUserName: announcTarget === "specific" ? (users.find(u => u.id === announcTargetUserId)?.name || "مستخدم") : undefined,
           sendPush: announcSendPush,
           sendEmail: announcSendEmail,
         }),
@@ -1157,7 +1159,8 @@ export default function HomePage() {
         setAnnouncTitle("");
         setAnnouncMessage("");
         setAnnouncTargetUserId("");
-        setAnnouncTargetUserName("");
+        setAnnouncUserSearch("");
+        setAnnouncUserDropdownOpen(false);
         setAnnouncSendPush(true);
         setAnnouncSendEmail(false);
         fetchAnnouncements();
@@ -6419,6 +6422,24 @@ export default function HomePage() {
                 </div>
               </div>
               <div className="p-4 space-y-3">
+                {/* Quick Templates */}
+                <div>
+                  <label className="text-[10px] font-semibold text-muted-foreground block mb-1.5">قوالب سريعة</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      { label: "ترويج بروكر", icon: "🎁", type: "promo", title: "عرض خاص: سجل عبر بروكر شريكنا واحصل على باقة مجانية!", msg: "عروض حصرية لأعضائنا!\n\nسجل الآن عبر رابط بروكر شريكنا واحصل على باقة وكالة مجانية كهدية منا.\n\n✅ باقة وكالة كاملة بدون أي تكلفة\n✅ جميع الإشارات والمزايا الحصرية\n✅ دعم فني على مدار الساعة\n\n🔗 رابط التسجيل: [ضع الرابط هنا]\n⏰ العرض لفترة محدودة - سارع الآن!" },
+                      { label: "تحديث نظام", icon: "🔧", type: "maintenance", title: "تحديث جديد للمنصة", msg: "تم تحديث المنصة بإضافات جديدة:\n\n✅ تحسين سرعة الأداء\n✅ إصلاح بعض المشاكل التقنية\n✅ ميزات جديدة قادمة قريباً\n\nشكراً لصبركم ودعمكم المتواصل." },
+                      { label: "تحذير", icon: "⚠️", type: "warning", title: "تنبيه مهم", msg: "يرجى الانتباه للاحتيال:\n\nلا نرسل رسائل خاصة لأي مستخدم نطلب فيها بيانات الحساب أو كلمة المرور. احرص على حماية حسابك ولا تشارك بياناتك مع أي شخص.\n\nلأي استفسار تواصل مع الدعم الفني." },
+                      { label: "عرض خاص", icon: "🔥", type: "promo", title: "عرض محدود!", msg: "عرض حصري لفترة محدودة!\n\n🎁 خصم [XX]% على جميع الباقات\n⏰ ينتهي العرض في: [التاريخ]\n\nسارع بالاشتراك قبل فوات الأوان!" },
+                      { label: "إعلان عام", icon: "📢", type: "info", title: "إعلان جديد", msg: "إعلان جديد من فريق TradeSignal Pro:\n\n[اكتب محتوى الإعلان هنا]" },
+                    ].map(tpl => (
+                      <button key={tpl.label} onClick={() => { setAnnouncTitle(tpl.title); setAnnouncMessage(tpl.msg); setAnnouncType(tpl.type as typeof announcType); }}
+                        className="text-[9px] px-2.5 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-muted-foreground hover:bg-white/[0.08] hover:text-foreground transition-all flex items-center gap-1">
+                        <span>{tpl.icon}</span> {tpl.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <div>
                   <label className="text-[10px] font-semibold text-muted-foreground block mb-1">عنوان الإعلان *</label>
                   <Input value={announcTitle} onChange={e => setAnnouncTitle(e.target.value)} placeholder="مثال: تحديث مهم للنظام" className="glass-input text-xs" />
@@ -6467,14 +6488,90 @@ export default function HomePage() {
                   </div>
                 </div>
                 {announcTarget === "specific" && (
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-[10px] font-semibold text-muted-foreground block mb-1">معرف المستخدم</label>
-                      <Input value={announcTargetUserId} onChange={e => setAnnouncTargetUserId(e.target.value)} placeholder="UUID" className="glass-input text-xs font-mono" dir="ltr" />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-semibold text-muted-foreground block mb-1">اسم المستخدم (اختياري)</label>
-                      <Input value={announcTargetUserName} onChange={e => setAnnouncTargetUserName(e.target.value)} placeholder="اسم المستخدم" className="glass-input text-xs" />
+                  <div>
+                    <label className="text-[10px] font-semibold text-muted-foreground block mb-1">اختر المستخدم *</label>
+                    <div className="relative">
+                      {/* Selected user display / search input */}
+                      <div
+                        onClick={() => setAnnouncUserDropdownOpen(!announcUserDropdownOpen)}
+                        className="w-full min-h-[36px] rounded-xl bg-white/[0.04] border border-white/[0.08] text-[11px] text-foreground px-3 py-2 cursor-pointer flex items-center justify-between hover:border-white/[0.15] transition-colors"
+                      >
+                        <span className={announcTargetUserId ? "text-foreground" : "text-muted-foreground"}>
+                          {announcTargetUserId
+                            ? (() => {
+                                const u = users.find(x => x.id === announcTargetUserId);
+                                return u ? `${u.name} (${u.email})` : "مستخدم";
+                              })()
+                            : "اختر مستخدم من القائمة..."
+                          }
+                        </span>
+                        <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground shrink-0 transition-transform ${announcUserDropdownOpen ? "rotate-180" : ""}`} />
+                      </div>
+                      {/* Click-outside overlay */}
+                      {announcUserDropdownOpen && (
+                        <div className="fixed inset-0 z-40" onClick={() => setAnnouncUserDropdownOpen(false)} />
+                      )}
+                      {/* Dropdown */}
+                      {announcUserDropdownOpen && (
+                        <div className="absolute top-full left-0 right-0 mt-1 z-50 rounded-xl bg-[#1a1a2e]/[0.98] border border-white/[0.1] backdrop-blur-xl shadow-2xl shadow-black/40 overflow-hidden">
+                          {/* Search */}
+                          <div className="p-2 border-b border-white/[0.06]">
+                            <div className="relative">
+                              <Search className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                              <input
+                                autoFocus
+                                value={announcUserSearch}
+                                onChange={e => setAnnouncUserSearch(e.target.value)}
+                                placeholder="ابحث بالاسم أو البريد..."
+                                className="w-full h-8 rounded-lg bg-white/[0.06] border border-white/[0.08] text-[10px] text-foreground pr-8 pl-3 placeholder:text-muted-foreground/50 focus:outline-none focus:border-rose-500/30"
+                              />
+                            </div>
+                          </div>
+                          {/* Users list */}
+                          <div className="max-h-48 overflow-y-auto">
+                            {users
+                              .filter(u => u.role !== "admin")
+                              .filter(u =>
+                                !announcUserSearch.trim() ||
+                                u.name.toLowerCase().includes(announcUserSearch.toLowerCase()) ||
+                                u.email.toLowerCase().includes(announcUserSearch.toLowerCase())
+                              )
+                              .length === 0 ? (
+                              <div className="px-3 py-4 text-center text-[10px] text-muted-foreground">لا يوجد مستخدمون</div>
+                            ) : (
+                              users
+                                .filter(u => u.role !== "admin")
+                                .filter(u =>
+                                  !announcUserSearch.trim() ||
+                                  u.name.toLowerCase().includes(announcUserSearch.toLowerCase()) ||
+                                  u.email.toLowerCase().includes(announcUserSearch.toLowerCase())
+                                )
+                                .map(u => (
+                                  <button
+                                    key={u.id}
+                                    onClick={() => {
+                                      setAnnouncTargetUserId(u.id);
+                                      setAnnouncUserDropdownOpen(false);
+                                      setAnnouncUserSearch("");
+                                    }}
+                                    className={`w-full px-3 py-2.5 text-right flex items-center gap-2.5 hover:bg-white/[0.06] transition-colors border-b border-white/[0.03] last:border-0 ${announcTargetUserId === u.id ? "bg-rose-500/10" : ""}`}
+                                  >
+                                    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-500/20 to-indigo-500/10 border border-white/[0.08] flex items-center justify-center shrink-0">
+                                      <span className="text-[10px] font-bold text-violet-300">{u.name.charAt(0)}</span>
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="text-[10px] font-semibold text-foreground truncate">{u.name}</div>
+                                      <div className="text-[8px] text-muted-foreground/70 truncate" dir="ltr">{u.email}</div>
+                                    </div>
+                                    <span className={`text-[7px] px-1.5 py-0.5 rounded-md shrink-0 ${u.status === "active" ? "bg-emerald-500/10 text-emerald-400" : u.status === "blocked" ? "bg-red-500/10 text-red-400" : "bg-amber-500/10 text-amber-400"}`}>
+                                      {u.status === "active" ? "نشط" : u.status === "blocked" ? "محظور" : u.status === "pending" ? "معلق" : "منتهي"}
+                                    </span>
+                                  </button>
+                                ))
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -6500,7 +6597,7 @@ export default function HomePage() {
                     </button>
                   </div>
                 </div>
-                <button onClick={handleSendAnnouncement} disabled={!announcTitle.trim() || !announcMessage.trim() || announcSending}
+                <button onClick={handleSendAnnouncement} disabled={!announcTitle.trim() || !announcMessage.trim() || (announcTarget === "specific" && !announcTargetUserId) || announcSending}
                   className="w-full h-10 rounded-xl bg-gradient-to-r from-rose-500 to-pink-600 text-white text-[11px] font-bold flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-40 shadow-lg shadow-rose-500/20">
                   {announcSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Megaphone className="w-4 h-4" />}
                   {announcSending ? "جاري الإرسال..." : "إرسال الإعلان"}
