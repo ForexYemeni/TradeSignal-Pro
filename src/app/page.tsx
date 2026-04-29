@@ -259,7 +259,7 @@ function ReferralSection({ session, appSettings }: { session: any; appSettings: 
                 onChange={e => setReferralInput(e.target.value.toUpperCase())}
                 placeholder="أدخل كود الدعوة..."
                 className="flex-1 bg-muted/50 border-border text-xs font-mono uppercase tracking-wider text-center"
-                maxLength={6}
+                maxLength={12}
               />
               <button
                 onClick={handleApplyCode}
