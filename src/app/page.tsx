@@ -423,6 +423,8 @@ export default function HomePage() {
   const [announcSendPush, setAnnouncSendPush] = useState(true);
   const [announcSendEmail, setAnnouncSendEmail] = useState(false);
   const [announcSending, setAnnouncSending] = useState(false);
+  const [announcLink, setAnnouncLink] = useState("");
+  const [announcLinkText, setAnnouncLinkText] = useState("");
 
   /* ── Favorites ── */
   const [favorites, setFavorites] = useState<Set<string>>(() => {
@@ -1152,6 +1154,8 @@ export default function HomePage() {
           targetUserName: announcTarget === "specific" ? (users.find(u => u.id === announcTargetUserId)?.name || "مستخدم") : undefined,
           sendPush: announcSendPush,
           sendEmail: announcSendEmail,
+          link: announcLink.trim() || undefined,
+          linkText: announcLinkText.trim() || undefined,
         }),
       });
       const data = await res.json();
@@ -1163,6 +1167,8 @@ export default function HomePage() {
         setAnnouncUserDropdownOpen(false);
         setAnnouncSendPush(true);
         setAnnouncSendEmail(false);
+        setAnnouncLink("");
+        setAnnouncLinkText("");
         fetchAnnouncements();
       }
     } catch {}
@@ -6427,13 +6433,13 @@ export default function HomePage() {
                   <label className="text-[10px] font-semibold text-muted-foreground block mb-1.5">قوالب سريعة</label>
                   <div className="flex flex-wrap gap-1.5">
                     {[
-                      { label: "ترويج بروكر", icon: "🎁", type: "promo", title: "عرض خاص: سجل عبر بروكر شريكنا واحصل على باقة مجانية!", msg: "عروض حصرية لأعضائنا!\n\nسجل الآن عبر رابط بروكر شريكنا واحصل على باقة وكالة مجانية كهدية منا.\n\n✅ باقة وكالة كاملة بدون أي تكلفة\n✅ جميع الإشارات والمزايا الحصرية\n✅ دعم فني على مدار الساعة\n\n🔗 رابط التسجيل: [ضع الرابط هنا]\n⏰ العرض لفترة محدودة - سارع الآن!" },
+                      { label: "ترويج بروكر", icon: "🎁", type: "promo", title: "عرض خاص: سجل عبر بروكر شريكنا واحصل على باقة مجانية!", msg: "عروض حصرية لأعضائنا!\n\nسجل الآن عبر رابط بروكر شريكنا واحصل على باقة وكالة مجانية كهدية منا.\n\n✅ باقة وكالة كاملة بدون أي تكلفة\n✅ جميع الإشارات والمزايا الحصرية\n✅ دعم فني على مدار الساعة\n\n⏰ العرض لفترة محدودة - سارع الآن!", link: "", linkText: "سجل الآن واحصل على الباقة مجاناً" },
                       { label: "تحديث نظام", icon: "🔧", type: "maintenance", title: "تحديث جديد للمنصة", msg: "تم تحديث المنصة بإضافات جديدة:\n\n✅ تحسين سرعة الأداء\n✅ إصلاح بعض المشاكل التقنية\n✅ ميزات جديدة قادمة قريباً\n\nشكراً لصبركم ودعمكم المتواصل." },
                       { label: "تحذير", icon: "⚠️", type: "warning", title: "تنبيه مهم", msg: "يرجى الانتباه للاحتيال:\n\nلا نرسل رسائل خاصة لأي مستخدم نطلب فيها بيانات الحساب أو كلمة المرور. احرص على حماية حسابك ولا تشارك بياناتك مع أي شخص.\n\nلأي استفسار تواصل مع الدعم الفني." },
                       { label: "عرض خاص", icon: "🔥", type: "promo", title: "عرض محدود!", msg: "عرض حصري لفترة محدودة!\n\n🎁 خصم [XX]% على جميع الباقات\n⏰ ينتهي العرض في: [التاريخ]\n\nسارع بالاشتراك قبل فوات الأوان!" },
                       { label: "إعلان عام", icon: "📢", type: "info", title: "إعلان جديد", msg: "إعلان جديد من فريق TradeSignal Pro:\n\n[اكتب محتوى الإعلان هنا]" },
                     ].map(tpl => (
-                      <button key={tpl.label} onClick={() => { setAnnouncTitle(tpl.title); setAnnouncMessage(tpl.msg); setAnnouncType(tpl.type as typeof announcType); }}
+                      <button key={tpl.label} onClick={() => { setAnnouncTitle(tpl.title); setAnnouncMessage(tpl.msg); setAnnouncType(tpl.type as typeof announcType); setAnnouncLink(tpl.link || ""); setAnnouncLinkText(tpl.linkText || ""); }}
                         className="text-[9px] px-2.5 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-muted-foreground hover:bg-white/[0.08] hover:text-foreground transition-all flex items-center gap-1">
                         <span>{tpl.icon}</span> {tpl.label}
                       </button>
@@ -6573,6 +6579,16 @@ export default function HomePage() {
                         </div>
                       )}
                     </div>
+                  </div>
+                )}
+                <div>
+                  <label className="text-[10px] font-semibold text-muted-foreground block mb-1">رابط (اختياري)</label>
+                  <Input value={announcLink} onChange={e => setAnnouncLink(e.target.value)} placeholder="https://example.com/register" className="glass-input text-xs font-mono" dir="ltr" />
+                </div>
+                {announcLink.trim() && (
+                  <div>
+                    <label className="text-[10px] font-semibold text-muted-foreground block mb-1">نص الزر</label>
+                    <Input value={announcLinkText} onChange={e => setAnnouncLinkText(e.target.value)} placeholder="سجل الآن" className="glass-input text-xs" />
                   </div>
                 )}
                 <div className="space-y-2.5">

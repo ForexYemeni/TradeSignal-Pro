@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { title, message, type, priority, target, targetUserId, targetUserName, sendPush, sendEmail, expiresAt } = body;
+    const { title, message, type, priority, target, targetUserId, targetUserName, sendPush, sendEmail, expiresAt, link, linkText } = body;
 
     if (!title?.trim() || !message?.trim()) {
       return NextResponse.json({ success: false, error: "العنوان والرسالة مطلوبان" }, { status: 400 });
@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
               .map(u => u.email);
 
         await broadcastAnnouncementEmail(
-          { title, message, type, priority },
+          { title, message, type: type || "info", priority: priority || "medium", link: link || undefined, linkText: linkText || undefined },
           emailRecipients
         );
       } catch (emailError) {

@@ -819,11 +819,13 @@ export function buildAnnouncementEmail(announcement: {
   message: string;
   type: AnnouncementType;
   priority: AnnouncementPriority;
+  link?: string;
+  linkText?: string;
 }): {
   subject: string;
   html: string;
 } {
-  const { title, message, type, priority } = announcement;
+  const { title, message, type, priority, link, linkText } = announcement;
   const badge = announcementTypeBadge(type);
   const priorityLabel = announcementPriorityLabel(priority);
   const priorityColor = announcementPriorityColor(priority);
@@ -831,69 +833,141 @@ export function buildAnnouncementEmail(announcement: {
 
   return {
     subject: `[ForexYemeni] ${title}`,
-    html: `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>${escapeHtml(title)}</title></head>
-<body style="margin:0;padding:0;background:#070b14;font-family:'Segoe UI',Tahoma,Arial,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#070b14;min-height:100vh;"><tr><td align="center" style="padding:40px 16px;">
-<table width="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;">
+    html: `<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${escapeHtml(title)}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#050a15;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#050a15;min-height:100vh;">
+    <tr>
+      <td align="center" style="padding:32px 12px;">
+        <table role="presentation" width="520" cellpadding="0" cellspacing="0" style="max-width:520px;width:100%;">
 
-<!-- Top accent line -->
-<tr><td style="height:3px;background:linear-gradient(90deg,transparent,${badge.color},transparent);border-radius:8px 8px 0 0;"></td></tr>
+          <!-- Header: Logo + Badge -->
+          <tr>
+            <td style="padding-bottom:20px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="right" style="vertical-align:middle;">
+                    <div style="width:50px;height:50px;border-radius:14px;background:linear-gradient(135deg,#FFD700,#FFA500);display:inline-flex;align-items:center;justify-content:center;">
+                      <span style="font-size:20px;font-weight:900;color:#050a15;">FY</span>
+                    </div>
+                  </td>
+                  <td align="left" style="vertical-align:middle;">
+                    <table role="presentation" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td align="left">
+                          <span style="display:inline-block;padding:5px 14px;border-radius:20px;font-size:10px;font-weight:700;color:#FFD700;background:rgba(255,215,0,0.08);border:1px solid rgba(255,215,0,0.15);letter-spacing:1px;">
+                            FOREXYEMENI VIP
+                          </span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td align="left" style="padding-top:6px;">
+                          <span style="display:inline-block;padding:3px 10px;border-radius:6px;font-size:9px;font-weight:700;color:${badge.color};background:${badge.bg};border:1px solid ${badge.color}25;">
+                            ${badge.label}
+                          </span>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
 
-<!-- Card -->
-<tr><td style="background:#111827;border:1px solid #1f2937;border-top:none;border-radius:0 0 16px 16px;overflow:hidden;">
+          <!-- Announcement Card -->
+          <tr>
+            <td>
+              <div style="background:linear-gradient(180deg,rgba(255,255,255,0.04) 0%,rgba(255,255,255,0.01) 100%);border:1px solid rgba(255,255,255,0.07);border-radius:20px;overflow:hidden;">
 
-<!-- Header -->
-<tr><td style="padding:24px 24px 0;">
-<table width="100%" cellpadding="0" cellspacing="0"><tr>
-<td style="vertical-align:middle;">
-<div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#f59e0b,#d97706);display:inline-block;text-align:center;line-height:40px;">
-<span style="font-size:15px;font-weight:900;color:#111827;">FY</span>
-</div>
-</td>
-<td style="text-align:left;vertical-align:middle;">
-<span style="display:inline-block;padding:4px 12px;border-radius:6px;font-size:10px;font-weight:700;color:${badge.color};background:${badge.bg};border:1px solid ${badge.color}30;letter-spacing:0.5px;">${badge.label}</span>
-</td>
-</tr></table>
-</td></tr>
+                <!-- Top gradient accent bar -->
+                <div style="height:4px;background:linear-gradient(90deg,${badge.color},${badge.color}80,transparent);"></div>
 
-<!-- Priority indicator -->
-<tr><td style="padding:16px 24px 0;">
-<div style="display:inline-block;padding:3px 10px;border-radius:4px;font-size:9px;font-weight:600;color:${priorityColor};background:${priorityColor}12;border:1px solid ${priorityColor}25;">${priorityLabel}</div>
-</td></tr>
+                <!-- Title Section -->
+                <div style="padding:24px 24px 0;">
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                      <td style="vertical-align:top;">
+                        <h1 style="margin:0;font-size:22px;font-weight:800;color:#ffffff;letter-spacing:0.3px;line-height:1.5;">${escapeHtml(title)}</h1>
+                        <div style="margin-top:8px;display:inline-block;padding:3px 10px;border-radius:6px;background:${priorityColor}12;border:1px solid ${priorityColor}25;">
+                          <span style="font-size:9px;font-weight:700;color:${priorityColor};letter-spacing:0.3px;">${priorityLabel}</span>
+                        </div>
+                      </td>
+                    </tr>
+                  </table>
+                </div>
 
-<!-- Title -->
-<tr><td style="padding:12px 24px 0;">
-<h1 style="margin:0;font-size:18px;font-weight:800;color:#ffffff;line-height:1.5;">${escapeHtml(title)}</h1>
-</td></tr>
+                <!-- Divider -->
+                <div style="padding:16px 24px 0;">
+                  <div style="height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.08),transparent);"></div>
+                </div>
 
-<!-- Message -->
-<tr><td style="padding:12px 24px 0;">
-<div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:16px 18px;">
-<p style="margin:0;font-size:13px;color:rgba(255,255,255,0.75);line-height:1.9;white-space:pre-wrap;">${escapeHtml(message)}</p>
-</div>
-</td></tr>
+                <!-- Message Body -->
+                <div style="padding:16px 24px 24px;">
+                  <div style="font-size:14px;color:rgba(255,255,255,0.7);line-height:2;text-align:right;">
+                    ${message.replace(/\n/g, '<br>')}
+                  </div>
+                </div>
 
-<!-- Footer -->
-<tr><td style="padding:20px 24px 0;">
-<table width="100%" cellpadding="0" cellspacing="0"><tr>
-<td style="vertical-align:middle;">
-<span style="font-size:10px;color:rgba(255,255,255,0.3);">${dateFormatted}</span>
-</td>
-<td style="text-align:left;vertical-align:middle;">
-<span style="font-size:10px;color:rgba(255,255,255,0.2);">ForexYemeni Signals</span>
-</td>
-</tr></table>
-</td></tr>
+                ${link ? `
+                <!-- CTA Button -->
+                <div style="padding:0 24px 24px;">
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                      <td align="center">
+                        <a href="${escapeHtml(link)}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:14px 40px;background:linear-gradient(135deg,#FFD700,#FFA500);border-radius:14px;text-decoration:none;mso-padding-alt:0;text-align:center;">
+                          <!--[if mso]><i style="mso-font-width:300%;mso-text-raise:21pt" hidden>&nbsp;</i><![endif]-->
+                          <span style="font-size:14px;font-weight:800;color:#050a15;letter-spacing:0.5px;mso-text-raise:10pt;">
+                            ${escapeHtml(linkText || 'اضغط هنا')}
+                          </span>
+                          <!--[if mso]><i style="mso-font-width:300%;" hidden>&nbsp;&#8203;</i><![endif]-->
+                        </a>
+                      </td>
+                    </tr>
+                  </table>
+                </div>` : ''}
 
-</td></tr>
-</table>
-</td></tr></table>
-</body></html>`,
+                <!-- Footer inside card -->
+                <div style="padding:14px 24px;border-top:1px solid rgba(255,255,255,0.04);background:rgba(255,255,255,0.01);">
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                      <td style="font-size:10px;color:rgba(255,255,255,0.2);">
+                        ${dateFormatted}
+                      </td>
+                      <td style="font-size:10px;color:rgba(255,255,255,0.2);text-align:left;">
+                        ForexYemeni VIP
+                      </td>
+                    </tr>
+                  </table>
+                </div>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Bottom Footer -->
+          <tr>
+            <td align="center" style="padding-top:20px;">
+              <p style="margin:0;font-size:10px;color:rgba(255,255,255,0.12);">
+                ForexYemeni Signals &copy; ${new Date().getFullYear()}
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
   };
 }
 
 export async function broadcastAnnouncementEmail(
-  announcement: { title: string; message: string; type: AnnouncementType; priority: AnnouncementPriority },
+  announcement: { title: string; message: string; type: AnnouncementType; priority: AnnouncementPriority; link?: string; linkText?: string },
   userEmails: string[]
 ): Promise<{ sent: number; failed: number }> {
   if (userEmails.length === 0) return { sent: 0, failed: 0 };
