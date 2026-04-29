@@ -857,6 +857,118 @@ export async function clearNotifications(): Promise<void> {
   await kv.set('admin_notifications', []);
 }
 
+// ─── Announcements (Admin → Users) ──────────────────────
+export interface Announcement {
+  id: string;
+  title: string;
+  message: string;
+  type: "info" | "warning" | "urgent" | "maintenance" | "promo";
+  priority: "high" | "medium" | "low";
+  target: "all" | "specific";
+  targetUserId?: string;
+  targetUserName?: string;
+  sendPush: boolean;
+  sendEmail: boolean;
+  createdBy: string;
+  createdAt: string;
+  expiresAt?: string;
+}
+
+export interface UserNotification {
+  id: string;
+  announcementId: string;
+  userId: string;
+  title: string;
+  message: string;
+  type: "info" | "warning" | "urgent" | "maintenance" | "promo";
+  priority: "high" | "medium" | "low";
+  read: boolean;
+  createdAt: string;
+}
+
+export async function getAnnouncements(limit = 200): Promise<Announcement[]> {
+  const data = await kv.get<Announcement[]>('announcements');
+  return (data || []).slice(0, limit);
+}
+
+export async function addAnnouncement(data: Omit<Announcement, 'id' | 'createdAt'>): Promise<Announcement> {
+  const announcement: Announcement = {
+    ...data,
+    id: crypto.randomUUID(),
+    createdAt: new Date().toISOString(),
+  };
+  const announcements = await getAnnouncements(200);
+  announcements.unshift(announcement);
+  await kv.set('announcements', announcements.slice(0, 200));
+  return announcement;
+}
+
+export async function deleteAnnouncement(id: string): Promise<boolean> {
+  const announcements = await getAnnouncements(200);
+  const filtered = announcements.filter(a => a.id !== id);
+  if (filtered.length === announcements.length) return false;
+  await kv.set('announcements', filtered);
+  return true;
+}
+
+export async function getUserNotifications(userId: string, limit = 50): Promise<UserNotification[]> {
+  const data = await kv.get<UserNotification[]>(`user_notifications:${userId}`);
+  return (data || []).slice(0, limit);
+}
+
+export async function addUserNotification(data: Omit<UserNotification, 'id' | 'read' | 'createdAt'>): Promise<UserNotification> {
+  const notification: UserNotification = {
+    ...data,
+    id: crypto.randomUUID(),
+    read: false,
+    createdAt: new Date().toISOString(),
+  };
+  const notifications = await getUserNotifications(data.userId, 100);
+  notifications.unshift(notification);
+  await kv.set(`user_notifications:${data.userId}`, notifications.slice(0, 100), { ex: 86400 * 30 }); // 30-day TTL
+  return notification;
+}
+
+export async function markUserNotificationRead(userId: string, notifId: string): Promise<void> {
+  const notifications = await getUserNotifications(userId, 100);
+  const idx = notifications.findIndex(n => n.id === notifId);
+  if (idx !== -1) {
+    notifications[idx].read = true;
+    await kv.set(`user_notifications:${userId}`, notifications, { ex: 86400 * 30 });
+  }
+}
+
+export async function markAllUserNotificationsRead(userId: string): Promise<void> {
+  const notifications = await getUserNotifications(userId, 100);
+  for (const n of notifications) n.read = true;
+  await kv.set(`user_notifications:${userId}`, notifications, { ex: 86400 * 30 });
+}
+
+export async function getUnreadUserNotificationCount(userId: string): Promise<number> {
+  const notifications = await getUserNotifications(userId, 100);
+  return notifications.filter(n => !n.read).length;
+}
+
+export async function clearUserNotifications(userId: string): Promise<void> {
+  await kv.del(`user_notifications:${userId}`);
+}
+
+export async function addNotificationForUsers(announcement: Announcement, userIds: string[]): Promise<number> {
+  let created = 0;
+  for (const userId of userIds) {
+    await addUserNotification({
+      announcementId: announcement.id,
+      userId,
+      title: announcement.title,
+      message: announcement.message,
+      type: announcement.type,
+      priority: announcement.priority,
+    });
+    created++;
+  }
+  return created;
+}
+
 // ═══════════════════════════════════════════════════════════════
 //  Pending Signal Updates Queue
 //  When TP/SL/BREAKEVEN arrives before the parent ENTRY signal,

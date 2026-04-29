@@ -22,7 +22,7 @@ import {
   MoreHorizontal, CreditCard, Upload, CheckCircle2, XCircle, Image, Copy, Plus, Banknote,
   ShieldCheck, ShieldX, ShieldBan, WifiOff, Gift, Ticket,
   Search, Unlock, ArrowLeft, X, Check, Save, Wifi, Pencil, Pause, Play,
-  ChevronDown,
+  ChevronDown, Megaphone,
 } from "lucide-react";
 
 // ═══ EXTRACTED MODULES ═══
@@ -404,6 +404,24 @@ export default function HomePage() {
   const [adminNotifications, setAdminNotifications] = useState<{ id: string; type: string; title: string; message: string; read: boolean; createdAt: string }[]>([]);
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   const [showAdminNotif, setShowAdminNotif] = useState(false);
+
+  /* ── User Announcements (from KV) ── */
+  const [userAnnouncements, setUserAnnouncements] = useState<{ id: string; title: string; message: string; type: string; priority: string; read: boolean; createdAt: string }[]>([]);
+  const [unreadAnnouncCount, setUnreadAnnouncCount] = useState(0);
+  const [showUserAnnounc, setShowUserAnnounc] = useState(false);
+
+  /* ── Admin Announcements (creation) ── */
+  const [announcements, setAnnouncements] = useState<{ id: string; title: string; message: string; type: string; priority: string; target: string; targetUserName?: string; sendPush: boolean; sendEmail: boolean; createdAt: string }[]>([]);
+  const [announcTitle, setAnnouncTitle] = useState("");
+  const [announcMessage, setAnnouncMessage] = useState("");
+  const [announcType, setAnnouncType] = useState<"info" | "warning" | "urgent" | "maintenance" | "promo">("info");
+  const [announcPriority, setAnnouncPriority] = useState<"high" | "medium" | "low">("medium");
+  const [announcTarget, setAnnouncTarget] = useState<"all" | "specific">("all");
+  const [announcTargetUserId, setAnnouncTargetUserId] = useState("");
+  const [announcTargetUserName, setAnnouncTargetUserName] = useState("");
+  const [announcSendPush, setAnnouncSendPush] = useState(true);
+  const [announcSendEmail, setAnnouncSendEmail] = useState(false);
+  const [announcSending, setAnnouncSending] = useState(false);
 
   /* ── Favorites ── */
   const [favorites, setFavorites] = useState<Set<string>>(() => {
@@ -1087,6 +1105,116 @@ export default function HomePage() {
     } catch {}
   }, [session?.id, session?.role]);
 
+  /* ── User Announcement Fetching ── */
+  const fetchUserAnnouncements = useCallback(async () => {
+    if (!session?.id || session.role === "admin") return;
+    try {
+      const res = await fetch("/api/user-notifications");
+      const data = await res.json();
+      if (data.success) setUserAnnouncements(data.notifications || []);
+    } catch {}
+  }, [session?.id, session?.role]);
+
+  const checkUserAnnouncCount = useCallback(async () => {
+    if (!session?.id || session.role === "admin") return;
+    try {
+      const res = await fetch("/api/user-notifications?action=count");
+      const data = await res.json();
+      if (data.success) setUnreadAnnouncCount(data.count || 0);
+    } catch {}
+  }, [session?.id, session?.role]);
+
+  /* ── Admin Announcement CRUD ── */
+  const fetchAnnouncements = useCallback(async () => {
+    try {
+      const res = await fetch("/api/announcements");
+      const data = await res.json();
+      if (data.success) setAnnouncements(data.announcements || []);
+    } catch {}
+  }, []);
+
+  const handleSendAnnouncement = async () => {
+    if (!announcTitle.trim() || !announcMessage.trim()) return;
+    setAnnouncSending(true);
+    try {
+      const res = await fetch("/api/announcements", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: announcTitle.trim(),
+          message: announcMessage.trim(),
+          type: announcType,
+          priority: announcPriority,
+          target: announcTarget,
+          targetUserId: announcTarget === "specific" ? announcTargetUserId : undefined,
+          targetUserName: announcTarget === "specific" ? announcTargetUserName : undefined,
+          sendPush: announcSendPush,
+          sendEmail: announcSendEmail,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAnnouncTitle("");
+        setAnnouncMessage("");
+        setAnnouncTargetUserId("");
+        setAnnouncTargetUserName("");
+        setAnnouncSendPush(true);
+        setAnnouncSendEmail(false);
+        fetchAnnouncements();
+      }
+    } catch {}
+    setAnnouncSending(false);
+  };
+
+  const handleDeleteAnnouncement = async (id: string) => {
+    try {
+      await fetch("/api/announcements", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      fetchAnnouncements();
+    } catch {}
+  };
+
+  /* ── User Announcement Handlers ── */
+  const handleMarkAnnouncRead = async (id: string) => {
+    try {
+      await fetch("/api/user-notifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "mark_read", notificationId: id }),
+      });
+      setUserAnnouncements(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+      setUnreadAnnouncCount(prev => Math.max(0, prev - 1));
+    } catch {}
+  };
+
+  const handleMarkAllAnnouncRead = async () => {
+    try {
+      await fetch("/api/user-notifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "mark_all_read" }),
+      });
+      setUserAnnouncements(prev => prev.map(n => ({ ...n, read: true })));
+      setUnreadAnnouncCount(0);
+    } catch {}
+  };
+
+  const handleClearAnnounc = async () => {
+    try {
+      await fetch("/api/user-notifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "clear" }),
+      });
+      setUserAnnouncements([]);
+      setUnreadAnnouncCount(0);
+      setShowUserAnnounc(false);
+    } catch {}
+  };
+
   /* ── Admin Notification Sound Alert ── */
   const prevUnreadCountRef = useRef<number>(-1); // -1 = not initialized yet (skip first load sound)
   const adminNotifFetchLockRef = useRef<boolean>(false);
@@ -1195,6 +1323,15 @@ export default function HomePage() {
       return () => clearInterval(interval);
     }
   }, [session?.role, checkAdminNotifications]);
+
+  // Poll user announcement count every 30 seconds for non-admin users
+  useEffect(() => {
+    if (session?.id && session?.role !== "admin") {
+      checkUserAnnouncCount(); // Initial check
+      const interval = setInterval(checkUserAnnouncCount, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [session?.id, session?.role, checkUserAnnouncCount]);
 
   /* ── Pull to refresh (for signals tab) ── */
   const handlePullRefresh = useCallback(async () => {
@@ -4090,42 +4227,63 @@ export default function HomePage() {
                 {showAdminNotif && <div className="fixed inset-0 z-40" onClick={() => setShowAdminNotif(false)} />}
               </div>
             )}
-            {/* Notification Bell (signal-based in-browser) — hidden for admin since they have admin notification bell */}
+            {/* User Announcement Bell (from KV — persisted) */}
             {session?.role !== "admin" && (
             <div className="relative">
-              <button onClick={() => { setShowNotifications(!showNotifications); setNotifications(prev => prev.map(n => ({ ...n, read: true }))); }}
+              <button onClick={() => { setShowUserAnnounc(!showUserAnnounc); if (!showUserAnnounc) fetchUserAnnouncements(); }}
                 className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-all duration-300 hover:shadow-sm active:scale-90">
                 <Bell className="w-4 h-4" />
               </button>
-              {notifications.filter(n => !n.read).length > 0 && (
-                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 rounded-full bg-red-500 text-[8px] font-bold text-white flex items-center justify-center px-1">
-                  {notifications.filter(n => !n.read).length > 9 ? "9+" : notifications.filter(n => !n.read).length}
+              {unreadAnnouncCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 rounded-full bg-red-500 text-[8px] font-bold text-white flex items-center justify-center px-1 animate-pulse">
+                  {unreadAnnouncCount > 99 ? "99+" : unreadAnnouncCount}
                 </span>
               )}
-              {/* Notification Panel */}
-              {showNotifications && (
-                <div className="fixed top-[60px] left-1/2 -translate-x-1/2 bg-[#0f172a]/95 backdrop-blur-xl border border-white/[0.08] rounded-xl shadow-2xl z-[200] max-h-64 overflow-hidden w-[calc(100vw-2rem)] max-w-[280px]">
+              {/* User Announcement Panel */}
+              {showUserAnnounc && (
+                <div className="fixed top-[60px] left-1/2 -translate-x-1/2 bg-[#0f172a]/95 backdrop-blur-xl border border-white/[0.08] rounded-xl shadow-2xl z-[200] max-h-80 overflow-hidden w-[calc(100vw-2rem)] max-w-[340px]">
                   <div className="px-3 py-2 border-b border-white/[0.06] flex items-center justify-between">
                     <span className="text-[11px] font-bold text-foreground">الإشعارات</span>
-                    {notifications.length > 0 && (
-                      <button onClick={() => setNotifications([])} className="text-[10px] text-red-400/70 hover:text-red-400">مسح الكل</button>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {unreadAnnouncCount > 0 && (
+                        <button onClick={handleMarkAllAnnouncRead} className="text-[10px] text-amber-400/70 hover:text-amber-400">تحديد الكل كمقروء</button>
+                      )}
+                      {userAnnouncements.length > 0 && (
+                        <button onClick={handleClearAnnounc} className="text-[10px] text-red-400/70 hover:text-red-400">مسح الكل</button>
+                      )}
+                    </div>
                   </div>
-                  <div className="max-h-52 overflow-y-auto scrollbar-thin">
-                    {notifications.length === 0 ? (
-                      <div className="px-3 py-4 text-center text-[10px] text-muted-foreground/50">لا توجد إشعارات</div>
+                  <div className="max-h-60 overflow-y-auto scrollbar-thin">
+                    {userAnnouncements.length === 0 ? (
+                      <div className="px-3 py-6 text-center">
+                        <Bell className="w-5 h-5 text-muted-foreground/30 mx-auto mb-1.5" />
+                        <div className="text-[10px] text-muted-foreground/50">لا توجد إشعارات</div>
+                      </div>
                     ) : (
-                      notifications.map(n => (
-                        <div key={n.id} className={`px-3 py-2.5 border-b border-white/[0.04] last:border-0 ${n.read ? "opacity-60" : ""}`}>
-                          <div className="text-[10px] text-foreground">{n.text}</div>
-                          <div className="text-[9px] text-muted-foreground/50 mt-0.5">{n.time}</div>
-                        </div>
-                      ))
+                      userAnnouncements.map(n => {
+                        const typeIcon: Record<string, string> = { info: "ℹ️", warning: "⚠️", urgent: "🔴", maintenance: "🔧", promo: "🎁" };
+                        const typeTint: Record<string, string> = { info: "bg-blue-500/[0.06]", warning: "bg-amber-500/[0.06]", urgent: "bg-red-500/[0.06]", maintenance: "bg-purple-500/[0.06]", promo: "bg-emerald-500/[0.06]" };
+                        return (
+                          <button key={n.id}
+                            onClick={() => { if (!n.read) handleMarkAnnouncRead(n.id); }}
+                            className={`w-full text-right px-3 py-2.5 border-b border-white/[0.04] last:border-0 hover:bg-white/[0.03] transition-colors ${!n.read ? "bg-amber-500/[0.04]" : ""}`}>
+                            <div className="flex items-start gap-2">
+                              <span className="text-sm mt-0.5 shrink-0">{typeIcon[n.type] || "📢"}</span>
+                              <div className="flex-1 min-w-0">
+                                <div className={`text-[10px] font-bold ${!n.read ? "text-foreground" : "text-muted-foreground"}`}>{n.title}</div>
+                                <div className="text-[9px] text-muted-foreground/70 mt-0.5 leading-relaxed line-clamp-2">{n.message}</div>
+                                <div className="text-[8px] text-muted-foreground/40 mt-1">{new Date(n.createdAt).toLocaleString("ar-SA", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</div>
+                              </div>
+                              {!n.read && <div className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-1.5 shrink-0" />}
+                            </div>
+                          </button>
+                        );
+                      })
                     )}
                   </div>
                 </div>
               )}
-              {showNotifications && <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)} />}
+              {showUserAnnounc && <div className="fixed inset-0 z-40" onClick={() => setShowUserAnnounc(false)} />}
             </div>
             )}
             {/* Audio Controls */}
@@ -5474,6 +5632,18 @@ export default function HomePage() {
                       <p className="text-[9px] text-muted-foreground mt-0.5">الإعدادات العامة والتطبيق</p>
                     </div>
                   </button>
+
+                  {/* Announcements */}
+                  <button onClick={() => { setAdminSubTab("announcements"); fetchAnnouncements(); }}
+                    className="glass-card p-4 text-right space-y-3 hover:border-rose-500/25 transition-all active:scale-[0.98]">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-rose-500/20 to-pink-500/10 border border-rose-500/15 flex items-center justify-center">
+                      <Megaphone className="w-5 h-5 text-rose-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-bold text-foreground">الإعلانات</h3>
+                      <p className="text-[9px] text-muted-foreground mt-0.5">إرسال إشعارات للمستخدمين</p>
+                    </div>
+                  </button>
                 </div>
               </>
             )}
@@ -6228,6 +6398,162 @@ export default function HomePage() {
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
+
+              </>
+            )}
+
+            {/* ══════════════════════════════════════════════════
+                SUB-TAB: ANNOUNCEMENTS
+               ══════════════════════════════════════════════════ */}
+            {adminSubTab === "announcements" && (
+              <>
+            {/* ── Create Announcement Form ── */}
+            <div className="glass-card overflow-hidden">
+              <div className="px-4 py-3.5 border-b border-white/[0.05] flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-rose-500/20 to-pink-500/10 border border-rose-500/15 flex items-center justify-center">
+                  <Megaphone className="w-4 h-4 text-rose-400" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold text-foreground">إرسال إعلان جديد</h3>
+                  <p className="text-[8px] text-muted-foreground">إرسال إشعار احترافي للمستخدمين</p>
+                </div>
+              </div>
+              <div className="p-4 space-y-3">
+                <div>
+                  <label className="text-[10px] font-semibold text-muted-foreground block mb-1">عنوان الإعلان *</label>
+                  <Input value={announcTitle} onChange={e => setAnnouncTitle(e.target.value)} placeholder="مثال: تحديث مهم للنظام" className="glass-input text-xs" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-semibold text-muted-foreground block mb-1">محتوى الرسالة *</label>
+                  <Textarea value={announcMessage} onChange={e => setAnnouncMessage(e.target.value)} placeholder="اكتب رسالتك هنا..." rows={3} className="glass-input text-xs resize-none" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] font-semibold text-muted-foreground block mb-1">النوع</label>
+                    <div className="relative">
+                      <select value={announcType} onChange={e => setAnnouncType(e.target.value as typeof announcType)}
+                        className="w-full h-9 rounded-xl bg-white/[0.04] border border-white/[0.08] text-[11px] text-foreground px-3 appearance-none cursor-pointer focus:outline-none focus:border-rose-500/30">
+                        <option value="info">معلومة</option>
+                        <option value="warning">تحذير</option>
+                        <option value="urgent">عاجل</option>
+                        <option value="maintenance">صيانة</option>
+                        <option value="promo">ترويج</option>
+                      </select>
+                      <ChevronDown className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-muted-foreground block mb-1">الأولوية</label>
+                    <div className="relative">
+                      <select value={announcPriority} onChange={e => setAnnouncPriority(e.target.value as typeof announcPriority)}
+                        className="w-full h-9 rounded-xl bg-white/[0.04] border border-white/[0.08] text-[11px] text-foreground px-3 appearance-none cursor-pointer focus:outline-none focus:border-rose-500/30">
+                        <option value="high">عالية</option>
+                        <option value="medium">متوسطة</option>
+                        <option value="low">منخفضة</option>
+                      </select>
+                      <ChevronDown className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] font-semibold text-muted-foreground block mb-1">الاستهداف</label>
+                  <div className="relative">
+                    <select value={announcTarget} onChange={e => setAnnouncTarget(e.target.value as typeof announcTarget)}
+                      className="w-full h-9 rounded-xl bg-white/[0.04] border border-white/[0.08] text-[11px] text-foreground px-3 appearance-none cursor-pointer focus:outline-none focus:border-rose-500/30">
+                      <option value="all">جميع المستخدمين النشطين</option>
+                      <option value="specific">مستخدم محدد</option>
+                    </select>
+                    <ChevronDown className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+                  </div>
+                </div>
+                {announcTarget === "specific" && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[10px] font-semibold text-muted-foreground block mb-1">معرف المستخدم</label>
+                      <Input value={announcTargetUserId} onChange={e => setAnnouncTargetUserId(e.target.value)} placeholder="UUID" className="glass-input text-xs font-mono" dir="ltr" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-semibold text-muted-foreground block mb-1">اسم المستخدم (اختياري)</label>
+                      <Input value={announcTargetUserName} onChange={e => setAnnouncTargetUserName(e.target.value)} placeholder="اسم المستخدم" className="glass-input text-xs" />
+                    </div>
+                  </div>
+                )}
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between bg-muted/50 rounded-xl p-3 border border-border">
+                    <div>
+                      <div className="text-[11px] font-semibold text-foreground">إرسال Push</div>
+                      <div className="text-[9px] text-muted-foreground mt-0.5">إشعار مباشر للمتصفح والتطبيق</div>
+                    </div>
+                    <button onClick={() => setAnnouncSendPush(!announcSendPush)}
+                      className={`w-11 h-6 rounded-full transition-all duration-300 relative ${announcSendPush ? "bg-rose-500" : "bg-white/10"}`}>
+                      <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-md transition-all duration-300 ${announcSendPush ? "left-[22px]" : "left-0.5"}`} />
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-between bg-muted/50 rounded-xl p-3 border border-border">
+                    <div>
+                      <div className="text-[11px] font-semibold text-foreground">إرسال بريد إلكتروني</div>
+                      <div className="text-[9px] text-muted-foreground mt-0.5">بطاقة إعلان بتصميم احترافي</div>
+                    </div>
+                    <button onClick={() => setAnnouncSendEmail(!announcSendEmail)}
+                      className={`w-11 h-6 rounded-full transition-all duration-300 relative ${announcSendEmail ? "bg-rose-500" : "bg-white/10"}`}>
+                      <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-md transition-all duration-300 ${announcSendEmail ? "left-[22px]" : "left-0.5"}`} />
+                    </button>
+                  </div>
+                </div>
+                <button onClick={handleSendAnnouncement} disabled={!announcTitle.trim() || !announcMessage.trim() || announcSending}
+                  className="w-full h-10 rounded-xl bg-gradient-to-r from-rose-500 to-pink-600 text-white text-[11px] font-bold flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-40 shadow-lg shadow-rose-500/20">
+                  {announcSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Megaphone className="w-4 h-4" />}
+                  {announcSending ? "جاري الإرسال..." : "إرسال الإعلان"}
+                </button>
+              </div>
+            </div>
+
+            {/* ── Announcements List ── */}
+            {announcements.length > 0 && (
+              <div className="glass-card overflow-hidden">
+                <div className="px-4 py-3.5 border-b border-white/[0.05] flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500/20 to-orange-500/10 border border-amber-500/15 flex items-center justify-center">
+                      <Bell className="w-4 h-4 text-amber-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-bold text-foreground">الإعلانات المرسلة</h3>
+                      <p className="text-[8px] text-muted-foreground">{announcements.length} إعلان</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="divide-y divide-white/[0.04]">
+                  {announcements.map(a => {
+                    const typeIcon: Record<string, string> = { info: "ℹ️", warning: "⚠️", urgent: "🔴", maintenance: "🔧", promo: "🎁" };
+                    const typeLabel: Record<string, string> = { info: "معلومة", warning: "تحذير", urgent: "عاجل", maintenance: "صيانة", promo: "ترويج" };
+                    const priorityLabel: Record<string, string> = { high: "عالية", medium: "متوسطة", low: "منخفضة" };
+                    return (
+                      <div key={a.id} className="px-4 py-3 hover:bg-white/[0.02] transition-colors">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-start gap-2 flex-1 min-w-0">
+                            <span className="text-sm mt-0.5 shrink-0">{typeIcon[a.type] || "📢"}</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-[11px] font-bold text-foreground truncate">{a.title}</div>
+                              <div className="text-[9px] text-muted-foreground/70 mt-0.5 line-clamp-1">{a.message}</div>
+                              <div className="flex items-center gap-2 mt-1.5">
+                                <span className="text-[8px] px-1.5 py-0.5 rounded-md bg-white/[0.04] text-muted-foreground">{typeLabel[a.type] || a.type}</span>
+                                <span className="text-[8px] px-1.5 py-0.5 rounded-md bg-white/[0.04] text-muted-foreground">{a.target === "all" ? "الجميع" : a.targetUserName || "مستخدم"}</span>
+                                {a.sendPush && <span className="text-[8px] px-1.5 py-0.5 rounded-md bg-rose-500/10 text-rose-400">Push</span>}
+                                {a.sendEmail && <span className="text-[8px] px-1.5 py-0.5 rounded-md bg-sky-500/10 text-sky-400">بريد</span>}
+                                <span className="text-[8px] text-muted-foreground/40">{new Date(a.createdAt).toLocaleString("ar-SA", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+                              </div>
+                            </div>
+                          </div>
+                          <button onClick={() => handleDeleteAnnouncement(a.id)} className="shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-red-400 hover:bg-red-500/[0.08] transition-all">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
               </>
             )}

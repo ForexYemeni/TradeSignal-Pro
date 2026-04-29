@@ -16,6 +16,7 @@ import {
   Wallet,
   Banknote,
   Ticket,
+  Megaphone,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Tab, AdminSubTab } from '@/lib/types';
@@ -107,6 +108,14 @@ const MORE_SUB_ITEMS: MoreSubItem[] = [
     color: 'text-sky-400',
     bgColor: 'bg-sky-500/15',
     borderColor: 'border-sky-500/20',
+  },
+  {
+    key: 'announcements',
+    label: 'الإعلانات',
+    icon: <Megaphone className="w-4 h-4" />,
+    color: 'text-rose-400',
+    bgColor: 'bg-rose-500/15',
+    borderColor: 'border-rose-500/20',
   },
 ];
 

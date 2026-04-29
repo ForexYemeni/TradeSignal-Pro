@@ -785,3 +785,133 @@ export async function sendDuplicateAccountAlert(adminEmail: string, data: {
   const { subject, html } = buildDuplicateAccountEmail(data);
   return await sendViaGAS({ to: adminEmail, subject, html });
 }
+
+// ═══════════════════════════════════════════════════════════════
+//  ANNOUNCEMENT EMAIL
+// ═══════════════════════════════════════════════════════════════
+
+type AnnouncementType = "info" | "warning" | "urgent" | "maintenance" | "promo";
+type AnnouncementPriority = "high" | "medium" | "low";
+
+function announcementTypeBadge(type: AnnouncementType): { label: string; color: string; bg: string } {
+  const map: Record<AnnouncementType, { label: string; color: string; bg: string }> = {
+    info: { label: "معلومة", color: "#60a5fa", bg: "#60a5fa18" },
+    warning: { label: "تحذير", color: "#fbbf24", bg: "#fbbf2418" },
+    urgent: { label: "عاجل", color: "#ef4444", bg: "#ef444418" },
+    maintenance: { label: "صيانة", color: "#a78bfa", bg: "#a78bfa18" },
+    promo: { label: "ترويج", color: "#34d399", bg: "#34d39918" },
+  };
+  return map[type];
+}
+
+function announcementPriorityLabel(priority: AnnouncementPriority): string {
+  const map: Record<AnnouncementPriority, string> = { high: "أولوية عالية", medium: "أولوية متوسطة", low: "أولوية منخفضة" };
+  return map[priority];
+}
+
+function announcementPriorityColor(priority: AnnouncementPriority): string {
+  const map: Record<AnnouncementPriority, string> = { high: "#ef4444", medium: "#fbbf24", low: "#6b7280" };
+  return map[priority];
+}
+
+export function buildAnnouncementEmail(announcement: {
+  title: string;
+  message: string;
+  type: AnnouncementType;
+  priority: AnnouncementPriority;
+}): {
+  subject: string;
+  html: string;
+} {
+  const { title, message, type, priority } = announcement;
+  const badge = announcementTypeBadge(type);
+  const priorityLabel = announcementPriorityLabel(priority);
+  const priorityColor = announcementPriorityColor(priority);
+  const dateFormatted = new Date().toLocaleString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+  return {
+    subject: `[ForexYemeni] ${title}`,
+    html: `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>${escapeHtml(title)}</title></head>
+<body style="margin:0;padding:0;background:#070b14;font-family:'Segoe UI',Tahoma,Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#070b14;min-height:100vh;"><tr><td align="center" style="padding:40px 16px;">
+<table width="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;">
+
+<!-- Top accent line -->
+<tr><td style="height:3px;background:linear-gradient(90deg,transparent,${badge.color},transparent);border-radius:8px 8px 0 0;"></td></tr>
+
+<!-- Card -->
+<tr><td style="background:#111827;border:1px solid #1f2937;border-top:none;border-radius:0 0 16px 16px;overflow:hidden;">
+
+<!-- Header -->
+<tr><td style="padding:24px 24px 0;">
+<table width="100%" cellpadding="0" cellspacing="0"><tr>
+<td style="vertical-align:middle;">
+<div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#f59e0b,#d97706);display:inline-block;text-align:center;line-height:40px;">
+<span style="font-size:15px;font-weight:900;color:#111827;">FY</span>
+</div>
+</td>
+<td style="text-align:left;vertical-align:middle;">
+<span style="display:inline-block;padding:4px 12px;border-radius:6px;font-size:10px;font-weight:700;color:${badge.color};background:${badge.bg};border:1px solid ${badge.color}30;letter-spacing:0.5px;">${badge.label}</span>
+</td>
+</tr></table>
+</td></tr>
+
+<!-- Priority indicator -->
+<tr><td style="padding:16px 24px 0;">
+<div style="display:inline-block;padding:3px 10px;border-radius:4px;font-size:9px;font-weight:600;color:${priorityColor};background:${priorityColor}12;border:1px solid ${priorityColor}25;">${priorityLabel}</div>
+</td></tr>
+
+<!-- Title -->
+<tr><td style="padding:12px 24px 0;">
+<h1 style="margin:0;font-size:18px;font-weight:800;color:#ffffff;line-height:1.5;">${escapeHtml(title)}</h1>
+</td></tr>
+
+<!-- Message -->
+<tr><td style="padding:12px 24px 0;">
+<div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:16px 18px;">
+<p style="margin:0;font-size:13px;color:rgba(255,255,255,0.75);line-height:1.9;white-space:pre-wrap;">${escapeHtml(message)}</p>
+</div>
+</td></tr>
+
+<!-- Footer -->
+<tr><td style="padding:20px 24px 0;">
+<table width="100%" cellpadding="0" cellspacing="0"><tr>
+<td style="vertical-align:middle;">
+<span style="font-size:10px;color:rgba(255,255,255,0.3);">${dateFormatted}</span>
+</td>
+<td style="text-align:left;vertical-align:middle;">
+<span style="font-size:10px;color:rgba(255,255,255,0.2);">ForexYemeni Signals</span>
+</td>
+</tr></table>
+</td></tr>
+
+</td></tr>
+</table>
+</td></tr></table>
+</body></html>`,
+  };
+}
+
+export async function broadcastAnnouncementEmail(
+  announcement: { title: string; message: string; type: AnnouncementType; priority: AnnouncementPriority },
+  userEmails: string[]
+): Promise<{ sent: number; failed: number }> {
+  if (userEmails.length === 0) return { sent: 0, failed: 0 };
+
+  const { subject, html } = buildAnnouncementEmail(announcement);
+  const batchEmails = userEmails.map(email => ({ to: email, subject, html }));
+
+  let totalSent = 0;
+  let totalFailed = 0;
+  const batchSize = 50;
+
+  for (let i = 0; i < batchEmails.length; i += batchSize) {
+    const batch = batchEmails.slice(i, i + batchSize);
+    const result = await sendBatchViaGAS(batch);
+    totalSent += result.sent;
+    totalFailed += result.failed;
+  }
+
+  console.log(`[Announcement Email] "${announcement.title}": ${totalSent} sent, ${totalFailed} failed out of ${userEmails.length}`);
+  return { sent: totalSent, failed: totalFailed };
+}
