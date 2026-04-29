@@ -95,12 +95,14 @@ export async function POST(request: NextRequest) {
 
       const updated = await handleUpdateSignal(parseResult.signal);
       if (updated) {
+        // Parse parent TPs ONCE for all update types (fix: was scoped only to TP block, causing Vercel error)
+        let parsedParentTps: { tp: number; rr: number }[] = [];
+        try { parsedParentTps = JSON.parse(String(updated.takeProfits || "[]")); } catch { parsedParentTps = []; }
+
         // Send push notification for the update
         if (cat === "TP_HIT" || cat === "REENTRY_TP" || cat === "PYRAMID_TP") {
           notifyTpHit(parseResult.signal.pair, parseResult.signal.hitTpIndex ?? 0, undefined, cat).catch(() => {});
           // Telegram: TP hit notification
-          let parsedParentTps: { tp: number; rr: number }[] = [];
-          try { parsedParentTps = JSON.parse(String(updated.takeProfits || "[]")); } catch { parsedParentTps = []; }
           sendSignalUpdateToTelegram({
             pair: updated.pair,
             updateType: cat as "TP_HIT" | "REENTRY_TP" | "PYRAMID_TP",
