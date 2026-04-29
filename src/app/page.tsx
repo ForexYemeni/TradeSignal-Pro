@@ -37,6 +37,7 @@ import { useCountUp } from "@/hooks/useCountUp";
 import { haptic } from "@/hooks/useHaptic";
 import { Onboarding, hasCompletedOnboarding } from "@/components/Onboarding";
 import { TpMiniCard, TradeStatusBanner, EntryCard, ClosedSignalCard, SplashScreen } from "@/components/SignalCards";
+import Sidebar from "@/components/Sidebar";
 
 
 
@@ -3089,7 +3090,7 @@ export default function HomePage() {
         {/* Background: animated mesh gradient + grid */}
         <div className="absolute inset-0 bg-mesh-animated" />
         <div className="absolute inset-0 bg-grid-subtle opacity-60" />
-        <div className="absolute top-[-20%] left-[-10%] w-80 h-80 rounded-full opacity-20" style={{ background: "radial-gradient(circle, #FFD700 0%, transparent 70%)", filter: "blur(100px)", animation: "meshFloat3 18s ease-in-out infinite" }} />
+        <div className="absolute top-[-20%] left-[-10%] w-80 h-80 rounded-full opacity-20" style={{ background: "radial-gradient(circle, var(--ds-gold-start) 0%, transparent 70%)", filter: "blur(100px)", animation: "meshFloat3 18s ease-in-out infinite" }} />
         <div className="absolute bottom-[-15%] right-[-10%] w-72 h-72 rounded-full opacity-15" style={{ background: "radial-gradient(circle, #00E676 0%, transparent 70%)", filter: "blur(100px)", animation: "meshFloat2 20s ease-in-out infinite" }} />
         <div className="absolute top-[40%] left-[50%] w-60 h-60 rounded-full opacity-10" style={{ background: "radial-gradient(circle, #FF8F00 0%, transparent 70%)", filter: "blur(80px)", transform: "translate(-50%, -50%)", animation: "meshFloat1 16s ease-in-out infinite" }} />
 
@@ -3353,7 +3354,7 @@ export default function HomePage() {
               <button
                 onClick={() => { setView("register"); setLoginErr(""); setLoginFeedback(null); }}
                 className="text-sm font-medium transition-colors hover:brightness-110"
-                style={{ color: "#FFD700" }}
+                style={{ color: "var(--ds-gold-start)" }}
               >
                 ليس لديك اشتراك؟ أنشئ حسابك الآن
               </button>
@@ -3382,7 +3383,7 @@ export default function HomePage() {
       <>
 
       <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-background">
-        <div className="absolute top-[-20%] left-[-10%] w-80 h-80 rounded-full opacity-20" style={{ background: "radial-gradient(circle, #FFD700 0%, transparent 70%)", filter: "blur(100px)" }} />
+        <div className="absolute top-[-20%] left-[-10%] w-80 h-80 rounded-full opacity-20" style={{ background: "radial-gradient(circle, var(--ds-gold-start) 0%, transparent 70%)", filter: "blur(100px)" }} />
         <div className="absolute bottom-[-15%] right-[-10%] w-72 h-72 rounded-full opacity-15" style={{ background: "radial-gradient(circle, #00E676 0%, transparent 70%)", filter: "blur(100px)" }} />
 
         <div className="w-full max-w-[480px] animate-[fadeInUp_0.5s_ease-out] relative z-10">
@@ -3455,7 +3456,7 @@ export default function HomePage() {
                   <button
                     onClick={() => handleSendOtp(otpPurpose, otpEmail, otpName || undefined, otpPwd || undefined)}
                     className="text-sm font-medium transition-colors hover:brightness-110"
-                    style={{ color: "#FFD700" }}
+                    style={{ color: "var(--ds-gold-start)" }}
                   >
                     إعادة إرسال الكود
                   </button>
@@ -3488,7 +3489,7 @@ export default function HomePage() {
     if (fpSuccess) {
       return (
         <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-background">
-          <div className="absolute top-[-20%] left-[-10%] w-80 h-80 rounded-full opacity-20" style={{ background: "radial-gradient(circle, #FFD700 0%, transparent 70%)", filter: "blur(100px)" }} />
+          <div className="absolute top-[-20%] left-[-10%] w-80 h-80 rounded-full opacity-20" style={{ background: "radial-gradient(circle, var(--ds-gold-start) 0%, transparent 70%)", filter: "blur(100px)" }} />
           <div className="absolute bottom-[-15%] right-[-10%] w-72 h-72 rounded-full opacity-15" style={{ background: "radial-gradient(circle, #00E676 0%, transparent 70%)", filter: "blur(100px)" }} />
           <div className="w-full max-w-[480px] animate-[fadeInUp_0.5s_ease-out] relative z-10">
             <div className="glass-card rounded-3xl p-8 space-y-6 text-center">
@@ -3509,7 +3510,7 @@ export default function HomePage() {
     }
     return (
       <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-background">
-        <div className="absolute top-[-20%] left-[-10%] w-80 h-80 rounded-full opacity-20" style={{ background: "radial-gradient(circle, #FFD700 0%, transparent 70%)", filter: "blur(100px)" }} />
+        <div className="absolute top-[-20%] left-[-10%] w-80 h-80 rounded-full opacity-20" style={{ background: "radial-gradient(circle, var(--ds-gold-start) 0%, transparent 70%)", filter: "blur(100px)" }} />
         <div className="absolute bottom-[-15%] right-[-10%] w-72 h-72 rounded-full opacity-15" style={{ background: "radial-gradient(circle, #00E676 0%, transparent 70%)", filter: "blur(100px)" }} />
         <div className="w-full max-w-[480px] animate-[fadeInUp_0.5s_ease-out] relative z-10">
           <div className="glass-card rounded-3xl p-8 space-y-6">
@@ -3618,7 +3619,7 @@ export default function HomePage() {
       <>
       <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-background">
         {/* Background gradient blurs */}
-        <div className="absolute top-[-20%] left-[-10%] w-80 h-80 rounded-full opacity-20" style={{ background: "radial-gradient(circle, #FFD700 0%, transparent 70%)", filter: "blur(100px)" }} />
+        <div className="absolute top-[-20%] left-[-10%] w-80 h-80 rounded-full opacity-20" style={{ background: "radial-gradient(circle, var(--ds-gold-start) 0%, transparent 70%)", filter: "blur(100px)" }} />
         <div className="absolute bottom-[-15%] right-[-10%] w-72 h-72 rounded-full opacity-15" style={{ background: "radial-gradient(circle, #00E676 0%, transparent 70%)", filter: "blur(100px)" }} />
 
         <div className="w-full max-w-[480px] animate-[fadeInUp_0.5s_ease-out] relative z-10">
@@ -3704,7 +3705,7 @@ export default function HomePage() {
               <button
                 onClick={() => { setView("login"); setLoginErr(""); setLoginFeedback(null); }}
                 className="text-sm font-medium transition-colors hover:brightness-110"
-                style={{ color: "#FFD700" }}
+                style={{ color: "var(--ds-gold-start)" }}
               >
                 لديك حساب؟ سجل دخولك
               </button>
@@ -3805,7 +3806,7 @@ export default function HomePage() {
   if (view === "expired") {
     return (
       <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-background">
-        <div className="absolute top-[-20%] left-[-10%] w-80 h-80 rounded-full opacity-20" style={{ background: "radial-gradient(circle, #FFD700 0%, transparent 70%)", filter: "blur(100px)" }} />
+        <div className="absolute top-[-20%] left-[-10%] w-80 h-80 rounded-full opacity-20" style={{ background: "radial-gradient(circle, var(--ds-gold-start) 0%, transparent 70%)", filter: "blur(100px)" }} />
         <div className="absolute bottom-[-15%] right-[-10%] w-72 h-72 rounded-full opacity-15" style={{ background: "radial-gradient(circle, #FF8F00 0%, transparent 70%)", filter: "blur(100px)" }} />
 
         <div className="w-full max-w-[480px] animate-[fadeInUp_0.5s_ease-out] relative z-10">
@@ -3848,7 +3849,7 @@ export default function HomePage() {
   if (view === "changePwd") {
     return (
       <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-background">
-        <div className="absolute top-[-20%] left-[-10%] w-80 h-80 rounded-full opacity-20" style={{ background: "radial-gradient(circle, #FFD700 0%, transparent 70%)", filter: "blur(100px)" }} />
+        <div className="absolute top-[-20%] left-[-10%] w-80 h-80 rounded-full opacity-20" style={{ background: "radial-gradient(circle, var(--ds-gold-start) 0%, transparent 70%)", filter: "blur(100px)" }} />
         <div className="absolute bottom-[-15%] right-[-10%] w-72 h-72 rounded-full opacity-15" style={{ background: "radial-gradient(circle, #00E676 0%, transparent 70%)", filter: "blur(100px)" }} />
 
         <div className="w-full max-w-[480px] animate-[fadeInUp_0.5s_ease-out] relative z-10">
@@ -3928,7 +3929,7 @@ export default function HomePage() {
   const mainContent = (
     <div
       className="h-[100dvh] flex flex-col swipe-container"
-      style={{ background: "linear-gradient(135deg, #080d1a 0%, #0f172a 50%, #080d1a 100%)" }}
+      style={{ background: "linear-gradient(135deg, var(--ds-navy-900) 0%, #0f172a 50%, var(--ds-navy-900) 100%)" }}
       onTouchStart={(e) => { touchStartXRef.current = e.changedTouches[0].screenX; touchStartYRef.current = e.changedTouches[0].screenY; isSwipingRef.current = false; }}
       onTouchMove={(e) => {
         const dx = Math.abs(e.changedTouches[0].screenX - touchStartXRef.current);
@@ -4121,8 +4122,19 @@ export default function HomePage() {
         </div>
       </header>
 
+      {/* ── Desktop Sidebar (RTL: appears on right) ── */}
+      <Sidebar
+        tab={tab}
+        setTab={setTab}
+        isAdmin={session?.role === "admin"}
+        adminSubTab={adminSubTab}
+        setAdminSubTab={setAdminSubTab}
+        logout={() => { setSession(null); localStorage.removeItem("fy_session"); }}
+        activeSignalCount={activeCount}
+      />
+
       {/* ── Content ── */}
-      <main className="flex-1 overflow-y-auto overflow-x-hidden px-4 pb-4 pt-3 max-w-lg mx-auto w-full" style={{ WebkitOverflowScrolling: 'touch' }}>
+      <main className="flex-1 overflow-y-auto overflow-x-hidden px-4 pb-4 pt-3 max-w-app mx-auto md:max-w-tablet lg:max-w-desktop md:mr-64" style={{ WebkitOverflowScrolling: 'touch' }}>
 
         {/* ══════ TAB: HOME — PROFESSIONAL DASHBOARD ══════ */}
         {tab === "home" && (<motion.div key="home" initial={{ opacity: 0, y: 8, filter: "blur(4px)" }} animate={{ opacity: 1, y: 0, filter: "blur(0px)" }} exit={{ opacity: 0, y: -8, filter: "blur(4px)" }} transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}>{(() => {
@@ -7907,7 +7919,7 @@ export default function HomePage() {
 
       {/* ── Mobile Bottom Navigation ── */}
       <nav className="flex-shrink-0 md:hidden glass-nav-premium glass-nav-border-animated safe-area-bottom h-16 border-t border-white/[0.04]" style={{ touchAction: 'manipulation' }}>
-        <div className="max-w-lg mx-auto flex items-stretch h-full">
+        <div className="max-w-app mx-auto md:max-w-tablet lg:max-w-desktop flex items-stretch h-full">
           {tabs.map(t => (
             <button key={t.key} onClick={() => setTab(t.key)}
               className={`flex-1 flex flex-col items-center justify-center gap-0.5 relative select-none ${tab === t.key ? "" : "text-muted-foreground/60"}`}
@@ -7929,7 +7941,7 @@ export default function HomePage() {
 
       {/* ── Desktop Bottom Navigation ── */}
       <nav className="hidden md:flex flex-shrink-0 glass-nav-premium glass-nav-border-animated border-t border-white/[0.04] safe-area-bottom h-14">
-        <div className="max-w-lg mx-auto flex h-full">
+        <div className="max-w-app mx-auto md:max-w-tablet lg:max-w-desktop flex h-full">
           {tabs.map(t => (
             <button key={t.key} onClick={() => setTab(t.key)}
               className={`flex-1 flex flex-col items-center justify-center gap-0.5 relative select-none ${tab === t.key ? "text-amber-400" : "text-muted-foreground/60 hover:text-muted-foreground"}`}>
@@ -8033,7 +8045,7 @@ export default function HomePage() {
       {proofModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={() => setProofModalOpen(false)}>
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
-          <div className="relative z-10 w-full max-w-lg" onClick={e => e.stopPropagation()}>
+          <div className="relative z-10 w-full max-w-app md:max-w-tablet lg:max-w-desktop" onClick={e => e.stopPropagation()}>
             {/* Close button */}
             <button onClick={() => setProofModalOpen(false)} className="absolute -top-12 left-0 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors z-20">
               <XCircle className="w-5 h-5" />
