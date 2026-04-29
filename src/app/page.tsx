@@ -2088,8 +2088,10 @@ export default function HomePage() {
 
   async function handleSetTrialPkg(pkgId: string) {
     try {
-      await fetch("/api/settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ freeTrialPackageId: pkgId === appSettings.freeTrialPackageId ? null : pkgId }) });
-      fetchPackages();
+      const newId = pkgId === appSettings.freeTrialPackageId ? null : pkgId;
+      await fetch("/api/settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ freeTrialPackageId: newId }) });
+      setAppSettings(s => ({ ...s, freeTrialPackageId: newId }));
+      toast.success(newId ? "تم تعيين الباقة التجريبية التلقائية" : "تم إلغاء الباقة التجريبية التلقائية");
     } catch (e) { console.error("Set trial:", e); }
   }
 
@@ -6362,15 +6364,50 @@ export default function HomePage() {
                   <Settings className="w-4 h-4 text-amber-400" />
                   <span className="text-xs font-bold text-amber-400">إعدادات التسجيل</span>
                 </div>
+                {/* Auto-approve toggle */}
                 <div className="flex items-center justify-between bg-muted/50 rounded-xl p-3 border border-border">
                   <div>
                     <div className="text-[11px] font-semibold text-foreground">تفعيل تلقائي عند التسجيل</div>
-                    <div className="text-[9px] text-muted-foreground mt-0.5">يتم تفعيل الحساب والباقة المجانية تلقائياً بدون موافقة</div>
+                    <div className="text-[9px] text-muted-foreground mt-0.5">تفعيل حساب المستخدم تلقائياً بدون انتظار موافقة الإدارة</div>
                   </div>
                   <button onClick={() => handleSetAutoApprove(!appSettings.autoApproveOnRegister)}
                     className={`w-11 h-6 rounded-full transition-all duration-300 relative ${appSettings.autoApproveOnRegister ? "bg-amber-500" : "bg-white/10"}`}>
                     <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-md transition-all duration-300 ${appSettings.autoApproveOnRegister ? "left-[22px]" : "left-0.5"}`} />
                   </button>
+                </div>
+                {/* Free Trial Package Indicator */}
+                <div className="bg-muted/50 rounded-xl p-3 border border-border">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${appSettings.freeTrialPackageId ? "bg-emerald-500/15 border border-emerald-500/15" : "bg-red-500/10 border border-red-500/10"}`}>
+                        <Gift className={`w-3.5 h-3.5 ${appSettings.freeTrialPackageId ? "text-emerald-400" : "text-red-400/60"}`} />
+                      </div>
+                      <div>
+                        <div className="text-[11px] font-semibold text-foreground">الباقة التجريبية التلقائية</div>
+                        <div className="text-[9px] text-muted-foreground mt-0.5">
+                          {appSettings.freeTrialPackageId
+                            ? `يتم تعيينها تلقائياً للمستخدمين الجدد: ${packages.find(p => p.id === appSettings.freeTrialPackageId)?.name || "باقة محذوفة"}`
+                            : "لم يتم تعيين باقة تجريبية — انتقل إلى الباقات واضغط 'تعيين كتجربة'"}
+                        </div>
+                      </div>
+                    </div>
+                    {appSettings.freeTrialPackageId && (
+                      <button onClick={() => handleSetTrialPkg(appSettings.freeTrialPackageId!)} className="px-2.5 py-1.5 rounded-lg text-[9px] font-medium bg-red-500/10 text-red-400 border border-red-500/15 active:scale-95 transition-transform flex items-center gap-1 hover:bg-red-500/20">
+                        <X className="w-3 h-3" /> إلغاء
+                      </button>
+                    )}
+                  </div>
+                  {!appSettings.freeTrialPackageId && packages.filter(p => p.type === "trial" || p.type === "free").length > 0 && (
+                    <div className="mt-2.5 flex flex-wrap gap-1.5">
+                      <span className="text-[8px] text-muted-foreground self-center ml-1">اختر باقة:</span>
+                      {packages.filter(p => (p.type === "trial" || p.type === "free") && p.isActive).map(p => (
+                        <button key={p.id} onClick={() => handleSetTrialPkg(p.id)}
+                          className={`px-2.5 py-1.5 rounded-lg text-[9px] font-medium border active:scale-95 transition-all flex items-center gap-1 ${appSettings.freeTrialPackageId === p.id ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/20" : "bg-sky-500/10 text-sky-400 border-sky-500/15 hover:bg-sky-500/20"}`}>
+                          <Gift className="w-2.5 h-2.5" /> {p.name} ({p.durationDays}ي)
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -8160,11 +8197,12 @@ export default function HomePage() {
               <div className="space-y-5">
 
                 {/* ═══ Stats Bar ═══ */}
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-5 gap-2">
                   {[
-                    { label: "الكل", count: users.length, color: "text-foreground", bg: "bg-muted/40" },
-                    { label: "نشط", count: users.filter(u => u.status === "active").length, color: "text-emerald-400", bg: "bg-emerald-500/10" },
+                    { label: "الكل", count: users.filter(u => u.role !== "admin").length, color: "text-foreground", bg: "bg-muted/40" },
+                    { label: "نشط", count: users.filter(u => u.status === "active" && u.role !== "admin").length, color: "text-emerald-400", bg: "bg-emerald-500/10" },
                     { label: "معلق", count: users.filter(u => u.status === "pending").length, color: "text-amber-400", bg: "bg-amber-500/10" },
+                    { label: "منتهي", count: users.filter(u => u.status === "expired").length, color: "text-orange-400", bg: "bg-orange-500/10" },
                     { label: "محظور", count: users.filter(u => u.status === "blocked").length, color: "text-red-400", bg: "bg-red-500/10" },
                   ].map(s => (
                     <div key={s.label} className={`${s.bg} rounded-xl p-2.5 border border-border/50 text-center`}>
@@ -8514,6 +8552,50 @@ export default function HomePage() {
                   </div>
                   );
                 })()}
+
+                {/* ═══ Expired Users ═══ */}
+                {users.filter(u => u.status === "expired").length > 0 && (
+                  <div className="glass-card p-4">
+                    <div className="flex items-center gap-2.5 mb-3">
+                      <div className="w-1.5 h-5 rounded-full bg-orange-400" />
+                      <span className="text-[11px] text-orange-400 font-bold">اشتراك منتهي</span>
+                      <span className="text-[7px] bg-orange-500/15 text-orange-400 px-1.5 py-0.5 rounded-full font-bold">{users.filter(u => u.status === "expired").length}</span>
+                    </div>
+                    <div className="space-y-2">
+                    {users.filter(u => u.status === "expired").map(u => (
+                      <div key={u.id} className="rounded-xl border border-orange-500/10 bg-orange-500/[0.02] p-3 hover:bg-orange-500/[0.04] transition-colors">
+                        <div className="flex items-center gap-3">
+                          {/* Avatar */}
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500/20 to-orange-600/10 border border-orange-500/20 flex items-center justify-center flex-shrink-0">
+                            <span className="text-sm font-black text-orange-400">{u.name?.charAt(0)?.toUpperCase() || "?"}</span>
+                          </div>
+                          {/* Info */}
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[11px] font-bold text-foreground/70 flex items-center gap-1.5">
+                              {u.name}
+                              <span className="text-[7px] bg-orange-500/15 text-orange-400 px-1.5 py-0.5 rounded-full font-bold border border-orange-500/10">منتهي</span>
+                              {u.hadFreeTrial && <span className="text-[7px] bg-amber-500/10 text-amber-400/60 px-1.5 py-0.5 rounded-md font-medium">سبق تجربة</span>}
+                            </div>
+                            <div className="text-[9px] text-muted-foreground font-mono truncate mt-0.5" dir="ltr">{u.email}</div>
+                            <div className="text-[8px] text-muted-foreground/50 mt-0.5">
+                              {u.packageName ? `آخر باقة: ${u.packageName}` : "لا يوجد اشتراك"} · تاريخ التسجيل: {new Date(u.createdAt).toLocaleDateString("ar-SA", { year: "numeric", month: "short", day: "numeric" })}
+                            </div>
+                          </div>
+                          {/* Actions */}
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            <button onClick={() => setShowAssignPkg(u.id)} className="px-2.5 py-1.5 rounded-lg text-[9px] font-medium bg-sky-500/10 text-sky-400 border border-sky-500/15 active:scale-95 transition-transform flex items-center gap-1 hover:bg-sky-500/20">
+                              <Package className="w-3 h-3" /> تجديد
+                            </button>
+                            <button onClick={() => handleDeleteUser(u.id)} className="px-2.5 py-1.5 rounded-lg text-[9px] font-medium bg-red-500/10 text-red-400 border border-red-500/15 active:scale-95 transition-transform flex items-center gap-1 hover:bg-red-500/20">
+                              <Trash2 className="w-3 h-3" /> حذف
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* ═══ Blocked Users ═══ */}
                 {users.filter(u => u.status === "blocked").length > 0 && (
