@@ -1794,14 +1794,17 @@ export default function HomePage() {
 
   async function fetchPackages() {
     try {
-      const [pkgRes, setRes] = await Promise.all([fetch("/api/packages"), fetch("/api/settings")]);
+      const [pkgRes, setRes] = await Promise.all([
+        fetch("/api/packages"),
+        fetch(isAdmin ? "/api/settings" : "/api/settings?public=true"),
+      ]);
       const pkgData = await pkgRes.json();
       const setData = await setRes.json();
       if (pkgData.success) setPackages(pkgData.packages);
       if (setData.success) {
-        setAppSettings(setData.settings);
+        setAppSettings(prev => ({ ...prev, ...setData.settings }));
         setUsdtNetworks(setData.settings.usdtNetworks || []);
-        setTgConnections(setData.settings.telegramConnections || []);
+        if (isAdmin && setData.settings.telegramConnections) setTgConnections(setData.settings.telegramConnections);
       }
     } catch (e) { console.error("Fetch packages:", e); }
   }
@@ -2526,6 +2529,7 @@ export default function HomePage() {
         const remVal = (remDays / curPkg.durationDays) * curPkg.price;
         effectivePrice = Math.ceil(Math.max(0, selectedPkg.price - remVal));
       }
+      if (appliedCoupon) effectivePrice = Math.max(0, Math.round(effectivePrice * (1 - appliedCoupon.discountPercent / 100)));
 
       const localAmount = effectivePrice * selectedLocalMethod.exchangeRate;
       const res = await fetch("/api/payments", {
@@ -6947,6 +6951,7 @@ export default function HomePage() {
                               const remVal = (remDays / curPkg.durationDays) * curPkg.price;
                               eff = Math.ceil(Math.max(0, selectedPkg.price - remVal));
                             }
+                            if (appliedCoupon) eff = Math.max(0, Math.round(eff * (1 - appliedCoupon.discountPercent / 100)));
                             return ((eff * (m.exchangeRate ?? 0))).toLocaleString();
                           })()}</div>
                           <div className="text-[8px] text-muted-foreground">{m.currencyCode}</div>
@@ -7090,6 +7095,7 @@ export default function HomePage() {
                           const remVal = (remDays / curPkg.durationDays) * curPkg.price;
                           eff = Math.ceil(Math.max(0, selectedPkg.price - remVal));
                         }
+                        if (appliedCoupon) eff = Math.max(0, Math.round(eff * (1 - appliedCoupon.discountPercent / 100)));
                         return (
                           <div className="bg-gradient-to-r from-sky-500/10 to-cyan-500/5 rounded-xl p-3 border border-sky-500/15">
                             <div className="text-[9px] text-muted-foreground mb-1">{isUpg ? "المبلغ المطلوب للترقية" : "المبلغ المطلوب التحويل"}</div>

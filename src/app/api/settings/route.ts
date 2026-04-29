@@ -4,6 +4,24 @@ import { requireAdmin } from "@/lib/admin-auth";
 
 export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url);
+    const isPublic = searchParams.get("public") === "true";
+
+    // Public endpoint: return only settings needed by regular users
+    if (isPublic) {
+      const settings = await getAppSettings();
+      return NextResponse.json({
+        success: true,
+        settings: {
+          usdtNetworks: settings.usdtNetworks || [],
+          usdtWalletAddress: settings.usdtWalletAddress,
+          referralEnabled: settings.referralEnabled,
+          autoApproveOnRegister: settings.autoApproveOnRegister,
+        },
+      });
+    }
+
+    // Admin endpoint: return all settings
     const authError = await requireAdmin(request);
     if (authError) return authError;
 
