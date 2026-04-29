@@ -406,14 +406,6 @@ export default function HomePage() {
   const touchStartYRef = useRef<number>(0);
   const isSwipingRef = useRef<boolean>(false);
 
-  /* ── Premium: Animated Number Counters (Dashboard) ── */
-  const animatedTotal = useCountUp(displayStats?.total ?? 0);
-  const animatedActive = useCountUp(displayStats?.active ?? 0);
-  const animatedWinRate = useCountUp(displayStats?.winRate ?? 0);
-  const animatedWeekly = useCountUp(displayStats?.recentWeek ?? 0);
-  const animatedBuyCount = useCountUp(displayStats?.buyCount ?? 0);
-  const animatedSellCount = useCountUp(displayStats?.sellCount ?? 0);
-
   /* ── Analyst ── */
   const [rawText, setRawText] = useState("");
   const [parseResult, setParseResult] = useState<Signal | null>(null);
@@ -2993,6 +2985,14 @@ export default function HomePage() {
 
   /* ── displayStats: use userStats for non-admin, global stats for admin ── */
   const displayStats = isAdmin ? stats : userStats;
+
+  /* ── Premium: Animated Number Counters (Dashboard) ── */
+  const animatedTotal = useCountUp(displayStats?.total ?? 0);
+  const animatedActive = useCountUp(displayStats?.active ?? 0);
+  const animatedWinRate = useCountUp(displayStats?.winRate ?? 0);
+  const animatedWeekly = useCountUp(displayStats?.recentWeek ?? 0);
+  const animatedBuyCount = useCountUp(displayStats?.buyCount ?? 0);
+  const animatedSellCount = useCountUp(displayStats?.sellCount ?? 0);
 
   /* ═══════════════════════════════════════════════════════════════
      DEVICE WARNING DIALOG (extracted for use in all views)

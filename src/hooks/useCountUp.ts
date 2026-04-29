@@ -23,7 +23,7 @@ export function useCountUp(target: number, duration = 800, enabled = true) {
       const progress = Math.min((now - start) / duration, 1);
       // ease-out cubic
       const eased = 1 - Math.pow(1 - progress, 3);
-      setValue(Math.round(startVal + (eased * (targetRef.current - startVal)));
+      setValue(Math.round(startVal + (eased * (targetRef.current - startVal))));
       if (progress < 1) {
         rafRef.current = requestAnimationFrame(animate);
       }
