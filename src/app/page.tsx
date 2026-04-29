@@ -4892,17 +4892,21 @@ export default function HomePage() {
               />
             ) : (
               <>
-                {/* ── Active Signals Section — Grouped by Instrument ── */}
+                {/* ── Active Signals Section — Grouped by Date then Instrument ── */}
                 {activeSignals.length > 0 && (() => {
-                  // Group active signals by instrument category
-                  const groupedByInstrument = new Map<string, typeof activeSignals>();
+                  // Group by date first
+                  const groupedByDate = new Map<string, typeof activeSignals>();
                   for (const s of activeSignals) {
-                    const cat = getPairCategory(s.pair);
-                    if (!groupedByInstrument.has(cat)) groupedByInstrument.set(cat, []);
-                    groupedByInstrument.get(cat)!.push(s);
+                    const dk = getDateKey(s.createdAt);
+                    if (!groupedByDate.has(dk)) groupedByDate.set(dk, []);
+                    groupedByDate.get(dk)!.push(s);
                   }
-                  // Sort categories by order in INST_CATS
-                  const sortedCats = Array.from(groupedByInstrument.keys()).sort((a, b) => {
+                  // Sort dates descending (newest first)
+                  const sortedDates = Array.from(groupedByDate.keys()).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+                  // Check if multiple instrument categories exist (for sub-grouping)
+                  const allCats = new Set(activeSignals.map(s => getPairCategory(s.pair)));
+                  const showInstGroup = allCats.size > 1 && !categoryFilter;
+                  const sortedCats = Array.from(allCats).sort((a, b) => {
                     const aIdx = INST_CATS.findIndex(c => c.id === a);
                     const bIdx = INST_CATS.findIndex(c => c.id === b);
                     return (aIdx === -1 ? 99 : aIdx) - (bIdx === -1 ? 99 : bIdx);
@@ -4914,79 +4918,68 @@ export default function HomePage() {
                         <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                         <span className="text-[11px] font-bold text-emerald-400">الإشارات النشطة</span>
                         <span className="text-[9px] bg-emerald-500/15 text-emerald-400 px-1.5 py-0.5 rounded-md font-bold">{activeSignals.length}</span>
-                        {sortedCats.length > 1 && (
-                          <span className="text-[8px] text-muted-foreground/40">{sortedCats.length} أدوات</span>
+                        {allCats.size > 1 && (
+                          <span className="text-[8px] text-muted-foreground/40">{allCats.size} أدوات</span>
                         )}
                       </div>
-                      {/* Show grouped by instrument only when multiple categories exist AND no category filter */}
-                      {sortedCats.length > 1 && !categoryFilter ? (
-                        sortedCats.map(cat => {
-                          const catInfo = INST_CATS.find(c => c.id === cat);
-                          const catSignals = groupedByInstrument.get(cat) || [];
-                          return (
-                            <div key={cat} className="space-y-1.5">
-                              <div className="flex items-center gap-2 px-1 pt-1">
-                                <span className="text-[10px]">{catInfo?.icon || "📋"}</span>
-                                <span className="text-[9px] font-semibold text-muted-foreground/70">{catInfo?.label || cat}</span>
-                                <span className="text-[8px] text-muted-foreground/30 bg-white/[0.03] px-1.5 py-px rounded-md">{catSignals.length}</span>
-                              </div>
-                              <div className="space-y-3">
-                                {catSignals.map((s, i) => {
-                                  const showDateSep = i === 0 || getDateKey(catSignals[i - 1].createdAt) !== getDateKey(s.createdAt);
-                                  return (
-                                    <React.Fragment key={s.id}>
-                                      {showDateSep && (
-                                        <div className="flex items-center gap-3 pt-2 pb-1">
-                                          <div className="flex-1 h-px bg-gradient-to-l from-white/[0.08] to-transparent" />
-                                          <span className="text-[9px] font-semibold text-muted-foreground/50 whitespace-nowrap">{formatDateLabel(s.createdAt)}</span>
-                                          <div className="flex-1 h-px bg-gradient-to-r from-white/[0.08] to-transparent" />
-                                        </div>
-                                      )}
-                                      <div className={newSignalIdsRef.current.has(s.id) ? "animate-slide-in-right animate-new-signal-glow" : ""}>
+                      {sortedDates.map(dk => {
+                        const dateSignals = groupedByDate.get(dk)!;
+                        return (
+                          <div key={dk} className="space-y-2.5">
+                            {/* Date separator — shown once per date */}
+                            <div className="flex items-center gap-3 pt-1 pb-0.5">
+                              <div className="flex-1 h-px bg-gradient-to-l from-white/[0.08] to-transparent" />
+                              <span className="text-[9px] font-semibold text-muted-foreground/50 whitespace-nowrap">{formatDateLabel(dateSignals[0].createdAt)}</span>
+                              <div className="flex-1 h-px bg-gradient-to-r from-white/[0.08] to-transparent" />
+                            </div>
+                            {showInstGroup ? (
+                              /* Sub-group by instrument within this date */
+                              sortedCats.filter(cat => dateSignals.some(s => getPairCategory(s.pair) === cat)).map(cat => {
+                                const catInfo = INST_CATS.find(c => c.id === cat);
+                                const catSignals = dateSignals.filter(s => getPairCategory(s.pair) === cat);
+                                return (
+                                  <div key={cat} className="space-y-1.5">
+                                    <div className="flex items-center gap-2 px-1">
+                                      <span className="text-[10px]">{catInfo?.icon || "📋"}</span>
+                                      <span className="text-[9px] font-semibold text-muted-foreground/70">{catInfo?.label || cat}</span>
+                                      <span className="text-[8px] text-muted-foreground/30 bg-white/[0.03] px-1.5 py-px rounded-md">{catSignals.length}</span>
+                                    </div>
+                                    {catSignals.map((s, i) => (
+                                      <div key={s.id} className={newSignalIdsRef.current.has(s.id) ? "animate-slide-in-right animate-new-signal-glow" : ""}>
                                         <SignalCard s={s} idx={i} isAdmin={isAdmin} onUpdate={handleUpdate} onDelete={handleDelete} isNew={newSignalIdsRef.current.has(s.id)} statusChanged={statusChangeIdsRef.current.has(s.id)} isFavorite={favorites.has(s.id)} onToggleFavorite={toggleFavorite} />
                                       </div>
-                                    </React.Fragment>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          );
-                        })
-                      ) : (
-                        /* Single category or filter active — show flat list */
-                        <div className="space-y-3">
-                          {activeSignals.map((s, i) => {
-                            const showDateSep = i === 0 || getDateKey(activeSignals[i - 1].createdAt) !== getDateKey(s.createdAt);
-                            return (
-                              <React.Fragment key={s.id}>
-                                {showDateSep && (
-                                  <div className="flex items-center gap-3 pt-2 pb-1">
-                                    <div className="flex-1 h-px bg-gradient-to-l from-white/[0.08] to-transparent" />
-                                    <span className="text-[9px] font-semibold text-muted-foreground/50 whitespace-nowrap">{formatDateLabel(s.createdAt)}</span>
-                                    <div className="flex-1 h-px bg-gradient-to-r from-white/[0.08] to-transparent" />
+                                    ))}
                                   </div>
-                                )}
-                                <div className={newSignalIdsRef.current.has(s.id) ? "animate-slide-in-right animate-new-signal-glow" : ""}>
+                                );
+                              })
+                            ) : (
+                              /* Flat list within this date */
+                              dateSignals.map((s, i) => (
+                                <div key={s.id} className={newSignalIdsRef.current.has(s.id) ? "animate-slide-in-right animate-new-signal-glow" : ""}>
                                   <SignalCard s={s} idx={i} isAdmin={isAdmin} onUpdate={handleUpdate} onDelete={handleDelete} isNew={newSignalIdsRef.current.has(s.id)} statusChanged={statusChangeIdsRef.current.has(s.id)} isFavorite={favorites.has(s.id)} onToggleFavorite={toggleFavorite} />
                                 </div>
-                              </React.Fragment>
-                            );
-                          })}
-                        </div>
-                      )}
+                              ))
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   );
                 })()}
 
-                {/* ── Closed Signals Section — Grouped by Instrument ── */}
+                {/* ── Closed Signals Section — Grouped by Date then Instrument ── */}
                 {closedSignals.length > 0 && (() => {
-                  const groupedClosed = new Map<string, typeof closedSignals>();
+                  // Group by date first
+                  const groupedByDate = new Map<string, typeof closedSignals>();
                   for (const s of closedSignals) {
-                    const cat = getPairCategory(s.pair);
-                    if (!groupedClosed.has(cat)) groupedClosed.set(cat, []);
-                    groupedClosed.get(cat)!.push(s);
+                    const dk = getDateKey(s.createdAt);
+                    if (!groupedByDate.has(dk)) groupedByDate.set(dk, []);
+                    groupedByDate.get(dk)!.push(s);
                   }
-                  const sortedClosedCats = Array.from(groupedClosed.keys()).sort((a, b) => {
+                  const sortedDates = Array.from(groupedByDate.keys()).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+                  const allCats = new Set(closedSignals.map(s => getPairCategory(s.pair)));
+                  const showInstGroup = allCats.size > 1 && !categoryFilter;
+                  const sortedCats = Array.from(allCats).sort((a, b) => {
                     const aIdx = INST_CATS.findIndex(c => c.id === a);
                     const bIdx = INST_CATS.findIndex(c => c.id === b);
                     return (aIdx === -1 ? 99 : aIdx) - (bIdx === -1 ? 99 : bIdx);
@@ -5004,68 +4997,57 @@ export default function HomePage() {
                           </span>
                         )}
                       </div>
-                      {sortedClosedCats.length > 1 && !categoryFilter ? (
-                        sortedClosedCats.map(cat => {
-                          const catInfo = INST_CATS.find(c => c.id === cat);
-                          const catClosed = groupedClosed.get(cat) || [];
-                          return (
-                            <div key={cat} className="space-y-1.5">
-                              <div className="flex items-center gap-2 px-1 pt-1">
-                                <span className="text-[10px]">{catInfo?.icon || "📋"}</span>
-                                <span className="text-[9px] font-semibold text-muted-foreground/70">{catInfo?.label || cat}</span>
-                                <span className="text-[8px] text-muted-foreground/30 bg-white/[0.03] px-1.5 py-px rounded-md">{catClosed.length}</span>
-                              </div>
-                              <div className="space-y-2">
-                                {catClosed.map((s, i) => {
-                                  const isNew = newSignalIdsRef.current.has(s.id);
-                                  const isStatusChange = statusChangeIdsRef.current.has(s.id);
-                                  const isTpHit = s.status === "HIT_TP";
-                                  const isSlHit = s.status === "HIT_SL";
-                                  const showDateSep = i === 0 || getDateKey(catClosed[i - 1].createdAt) !== getDateKey(s.createdAt);
-                                  return (
-                                    <React.Fragment key={s.id}>
-                                      {showDateSep && (
-                                        <div className="flex items-center gap-3 pt-2 pb-1">
-                                          <div className="flex-1 h-px bg-gradient-to-l from-white/[0.08] to-transparent" />
-                                          <span className="text-[9px] font-semibold text-muted-foreground/50 whitespace-nowrap">{formatDateLabel(s.createdAt)}</span>
-                                          <div className="flex-1 h-px bg-gradient-to-r from-white/[0.08] to-transparent" />
-                                        </div>
-                                      )}
-                                      <div className={`${isNew ? "animate-slide-in-right" : ""} ${isStatusChange ? (isTpHit ? "animate-tp-hit-pulse" : isSlHit ? "animate-sl-hit-pulse" : "animate-status-pulse") : ""}`}>
-                                        <SignalCard s={s} idx={i + (activeSignals.length || 0)} isAdmin={isAdmin} onUpdate={handleUpdate} onDelete={handleDelete} isNew={isNew} statusChanged={isStatusChange} isFavorite={favorites.has(s.id)} onToggleFavorite={toggleFavorite} />
-                                      </div>
-                                    </React.Fragment>
-                                  );
-                                })}
-                              </div>
+                      {sortedDates.map(dk => {
+                        const dateSignals = groupedByDate.get(dk)!;
+                        return (
+                          <div key={dk} className="space-y-2">
+                            {/* Date separator — shown once per date */}
+                            <div className="flex items-center gap-3 pt-1 pb-0.5">
+                              <div className="flex-1 h-px bg-gradient-to-l from-white/[0.08] to-transparent" />
+                              <span className="text-[9px] font-semibold text-muted-foreground/50 whitespace-nowrap">{formatDateLabel(dateSignals[0].createdAt)}</span>
+                              <div className="flex-1 h-px bg-gradient-to-r from-white/[0.08] to-transparent" />
                             </div>
-                          );
-                        })
-                      ) : (
-                        <div className="space-y-2">
-                          {closedSignals.map((s, i) => {
-                            const isNew = newSignalIdsRef.current.has(s.id);
-                            const isStatusChange = statusChangeIdsRef.current.has(s.id);
-                            const isTpHit = s.status === "HIT_TP";
-                            const isSlHit = s.status === "HIT_SL";
-                            const showDateSep = i === 0 || getDateKey(closedSignals[i - 1].createdAt) !== getDateKey(s.createdAt);
-                            return (
-                              <React.Fragment key={s.id}>
-                                {showDateSep && (
-                                  <div className="flex items-center gap-3 pt-2 pb-1">
-                                    <div className="flex-1 h-px bg-gradient-to-l from-white/[0.08] to-transparent" />
-                                    <span className="text-[9px] font-semibold text-muted-foreground/50 whitespace-nowrap">{formatDateLabel(s.createdAt)}</span>
-                                    <div className="flex-1 h-px bg-gradient-to-r from-white/[0.08] to-transparent" />
+                            {showInstGroup ? (
+                              sortedCats.filter(cat => dateSignals.some(s => getPairCategory(s.pair) === cat)).map(cat => {
+                                const catInfo = INST_CATS.find(c => c.id === cat);
+                                const catSignals = dateSignals.filter(s => getPairCategory(s.pair) === cat);
+                                return (
+                                  <div key={cat} className="space-y-1.5">
+                                    <div className="flex items-center gap-2 px-1">
+                                      <span className="text-[10px]">{catInfo?.icon || "📋"}</span>
+                                      <span className="text-[9px] font-semibold text-muted-foreground/70">{catInfo?.label || cat}</span>
+                                      <span className="text-[8px] text-muted-foreground/30 bg-white/[0.03] px-1.5 py-px rounded-md">{catSignals.length}</span>
+                                    </div>
+                                    {catSignals.map((s, i) => {
+                                      const isNew = newSignalIdsRef.current.has(s.id);
+                                      const isStatusChange = statusChangeIdsRef.current.has(s.id);
+                                      const isTpHit = s.status === "HIT_TP";
+                                      const isSlHit = s.status === "HIT_SL";
+                                      return (
+                                        <div key={s.id} className={`${isNew ? "animate-slide-in-right" : ""} ${isStatusChange ? (isTpHit ? "animate-tp-hit-pulse" : isSlHit ? "animate-sl-hit-pulse" : "animate-status-pulse") : ""}`}>
+                                          <SignalCard s={s} idx={i + (activeSignals.length || 0)} isAdmin={isAdmin} onUpdate={handleUpdate} onDelete={handleDelete} isNew={isNew} statusChanged={isStatusChange} isFavorite={favorites.has(s.id)} onToggleFavorite={toggleFavorite} />
+                                        </div>
+                                      );
+                                    })}
                                   </div>
-                                )}
-                                <div className={`${isNew ? "animate-slide-in-right" : ""} ${isStatusChange ? (isTpHit ? "animate-tp-hit-pulse" : isSlHit ? "animate-sl-hit-pulse" : "animate-status-pulse") : ""}`}>
-                                  <SignalCard s={s} idx={i + (activeSignals.length || 0)} isAdmin={isAdmin} onUpdate={handleUpdate} onDelete={handleDelete} isNew={isNew} statusChanged={isStatusChange} isFavorite={favorites.has(s.id)} onToggleFavorite={toggleFavorite} />
-                                </div>
-                              </React.Fragment>
-                            );
-                          })}
-                        </div>
-                      )}
+                                );
+                              })
+                            ) : (
+                              dateSignals.map((s, i) => {
+                                const isNew = newSignalIdsRef.current.has(s.id);
+                                const isStatusChange = statusChangeIdsRef.current.has(s.id);
+                                const isTpHit = s.status === "HIT_TP";
+                                const isSlHit = s.status === "HIT_SL";
+                                return (
+                                  <div key={s.id} className={`${isNew ? "animate-slide-in-right" : ""} ${isStatusChange ? (isTpHit ? "animate-tp-hit-pulse" : isSlHit ? "animate-sl-hit-pulse" : "animate-status-pulse") : ""}`}>
+                                    <SignalCard s={s} idx={i + (activeSignals.length || 0)} isAdmin={isAdmin} onUpdate={handleUpdate} onDelete={handleDelete} isNew={isNew} statusChanged={isStatusChange} isFavorite={favorites.has(s.id)} onToggleFavorite={toggleFavorite} />
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   );
                 })()}
