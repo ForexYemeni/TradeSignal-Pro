@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { Toaster } from "@/components/ui/sonner";
+import { CenterToastProvider } from "@/lib/center-toast";
 import { ErrorBoundary } from "@/components/ErrorBoundaryPremium";
 
 export const dynamic = 'force-dynamic';
@@ -51,10 +51,11 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <ErrorBoundary>
-          {children}
-        </ErrorBoundary>
-        <Toaster />
+        <CenterToastProvider>
+          <ErrorBoundary>
+            {children}
+          </ErrorBoundary>
+        </CenterToastProvider>
         <script
           dangerouslySetInnerHTML={{
             __html: `

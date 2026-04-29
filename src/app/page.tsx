@@ -2,7 +2,7 @@
 
 // ═══ IMPORTS ═══
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { toast } from "sonner";
+import { useCenterToast } from "@/lib/center-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -110,6 +110,8 @@ function SignalCard({ s, idx, isAdmin, onUpdate, onDelete, isNew, statusChanged,
    ═══════════════════════════════════════════════════════════════ */
 
 function ReferralSection({ session, appSettings }: { session: any; appSettings: any }) {
+  const toast = useCenterToast();
+
   const [referralData, setReferralData] = useState<{
     enabled: boolean;
     referralCode: string | null;
@@ -327,6 +329,8 @@ function ReferralSection({ session, appSettings }: { session: any; appSettings: 
    ═══════════════════════════════════════════════════════════════ */
 
 export default function HomePage() {
+  const toast = useCenterToast();
+
   /* ── Online Status ── */
   const isOnline = useOnlineStatus();
 
@@ -1502,7 +1506,7 @@ export default function HomePage() {
     prevIdsRef.current = new Set();
     allKnownSignalIdsRef.current = new Set();
     prevPageRef.current = 0;
-    toast("تم تسجيل الخروج");
+    toast.info("تم تسجيل الخروج");
   }
 
   async function handleRegister() {
