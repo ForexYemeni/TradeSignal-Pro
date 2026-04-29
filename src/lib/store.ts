@@ -641,6 +641,7 @@ export async function enforceSubscriptions(): Promise<string[]> {
   const expiredIds: string[] = [];
   const now = new Date().toISOString();
   const oneHourAgo = new Date(Date.now() - 3600000).toISOString(); // 1 hour grace period
+  const oneDayAgo = new Date(Date.now() - 86400000).toISOString(); // 24 hours
   let changed = false;
   for (const u of users) {
     if (u.role === "admin") continue;
@@ -650,6 +651,12 @@ export async function enforceSubscriptions(): Promise<string[]> {
       if (u.createdAt && u.createdAt > oneHourAgo) {
         console.log(`[EnforceSubscriptions] Grace period active for ${u.name} (${u.email}) — created ${u.createdAt}, skipping expiry`);
         continue;
+      }
+      // If user expired within 24 hours of registration, they never meaningfully used the trial
+      // Reset hadFreeTrial so admin can re-assign the trial package
+      if (u.createdAt && u.createdAt > oneDayAgo && u.hadFreeTrial) {
+        console.log(`[EnforceSubscriptions] Resetting hadFreeTrial for ${u.name} (${u.email}) — expired within 24h of registration, trial was never used`);
+        u.hadFreeTrial = false;
       }
       u.status = "expired";
       u.subscriptionType = "none";

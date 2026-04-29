@@ -157,6 +157,9 @@ export async function PUT(request: NextRequest) {
         };
         break;
       }
+      case "reset_trial":
+        updates = { hadFreeTrial: false };
+        break;
       default:
         return NextResponse.json({ success: false, error: "إجراء غير معروف" }, { status: 400 });
     }

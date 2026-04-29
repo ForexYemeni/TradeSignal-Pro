@@ -20,7 +20,7 @@ import {
   Crown, Package, Users, CalendarDays, Settings,
   Home, Flame, Trophy, ArrowUpRight, ArrowDownRight, Hash, Globe, PieChart, Sparkles, Timer, Wallet,
   MoreHorizontal, CreditCard, Upload, CheckCircle2, XCircle, Image, Copy, Plus, Banknote,
-  ShieldCheck, ShieldX, ShieldBan, WifiOff, Gift, Ticket,
+  ShieldCheck, ShieldX, ShieldBan, WifiOff, Gift, Ticket, RotateCcw,
   Search, Unlock, ArrowLeft, X, Check, Save, Wifi, Pencil, Pause, Play,
   ChevronDown, Megaphone, Tag, MessageSquare, Link2 as Link2Icon, MousePointerClick,
 } from "lucide-react";
@@ -2947,6 +2947,17 @@ export default function HomePage() {
       });
       return;
     }
+    if (action === "reset_trial") {
+      askConfirm({
+        title: "إعادة تعيين التجربة",
+        description: `هل تريد إعادة تعيين علامة التجربة المجانية لـ "${userName}"؟ سيصبح قادراً على الحصول على باقة تجريبية جديدة.`,
+        variant: "warning",
+        confirmLabel: "نعم، إعادة تعيين",
+        icon: <RotateCcw className="w-5 h-5 text-amber-400" />,
+        action: () => executeUserAction(id, action, userName),
+      });
+      return;
+    }
     await executeUserAction(id, action, userName);
   }
 
@@ -2963,7 +2974,7 @@ export default function HomePage() {
         return;
       }
       fetchUsers();
-      toast.success(action === "remove_admin" ? "تم إزالة صلاحية المدير" : action === "make_admin" ? `تم ترقية ${userName} لمدير` : "تم تحديث حالة المستخدم", { description: action === "remove_admin" ? `تمت إزالة صلاحيات الإدارة عن ${userName}` : action === "make_admin" ? `${userName} أصبح الآن مدير في النظام` : "تم تحديث بيانات المستخدم" });
+      toast.success(action === "remove_admin" ? "تم إزالة صلاحية المدير" : action === "make_admin" ? `تم ترقية ${userName} لمدير` : action === "reset_trial" ? "تم إعادة تعيين التجربة" : "تم تحديث حالة المستخدم", { description: action === "remove_admin" ? `تمت إزالة صلاحيات الإدارة عن ${userName}` : action === "make_admin" ? `${userName} أصبح الآن مدير في النظام` : action === "reset_trial" ? `يمكن الآن تعيين باقة تجريبية لـ ${userName}` : "تم تحديث بيانات المستخدم" });
     } catch (e) { console.error("User action:", e); toast.error("فشل الاتصال", { description: "تعذر الوصول إلى الخادم، حاول مجدداً" }); }
   }
 
@@ -8476,9 +8487,13 @@ export default function HomePage() {
                               {u.hadFreeTrial && (
                                 <div className="flex items-center gap-1.5 bg-amber-500/10 rounded-lg px-2.5 py-2 border border-amber-500/15">
                                   <AlertTriangle className="w-3 h-3 text-amber-400 flex-shrink-0" />
-                                  <span className="text-[9px] text-amber-300/80 leading-relaxed">
+                                  <span className="text-[9px] text-amber-300/80 leading-relaxed flex-1">
                                     هذا المستخدم سبق له أخذ تجربة مجانية. لا يمكن تفعيل الباقة المجانية مرة أخرى.
                                   </span>
+                                  <button onClick={() => { setShowAssignPkg(null); handleUserAction(u.id, "reset_trial"); }}
+                                    className="px-2 py-1 rounded-md text-[8px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/25 active:scale-95 transition-transform flex items-center gap-0.5 flex-shrink-0 hover:bg-amber-500/30">
+                                    <RotateCcw className="w-2.5 h-2.5" /> إعادة تعيين
+                                  </button>
                                 </div>
                               )}
                               <div className="grid grid-cols-2 gap-2">
@@ -8616,9 +8631,13 @@ export default function HomePage() {
                                 {u.hadFreeTrial && (
                                   <div className="flex items-center gap-1.5 bg-amber-500/10 rounded-lg px-2.5 py-2 border border-amber-500/15">
                                     <AlertTriangle className="w-3 h-3 text-amber-400 flex-shrink-0" />
-                                    <span className="text-[9px] text-amber-300/80 leading-relaxed">
+                                    <span className="text-[9px] text-amber-300/80 leading-relaxed flex-1">
                                       هذا المستخدم سبق له أخذ تجربة مجانية. لا يمكن تفعيل الباقة المجانية مرة أخرى.
                                     </span>
+                                    <button onClick={() => { setShowAssignPkg(null); handleUserAction(u.id, "reset_trial"); }}
+                                      className="px-2 py-1 rounded-md text-[8px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/25 active:scale-95 transition-transform flex items-center gap-0.5 flex-shrink-0 hover:bg-amber-500/30">
+                                      <RotateCcw className="w-2.5 h-2.5" /> إعادة تعيين
+                                    </button>
                                   </div>
                                 )}
                                 <div className="grid grid-cols-2 gap-2">
