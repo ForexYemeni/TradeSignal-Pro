@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
     const referrer = await getUserByReferralCode(trimmedCode);
 
     if (!referrer) {
-      return NextResponse.json({ success: false, error: "كود الاحالة غير صالح" }, { status: 404 });
+      return NextResponse.json({ success: false, error: "كود الاحالة غير صالح. تأكد من صحة الكود وحاول مرة أخرى." }, { status: 404 });
     }
 
     // Can't refer yourself

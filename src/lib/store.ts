@@ -777,7 +777,8 @@ export async function updatePaymentRequest(id: string, updates: Partial<PaymentR
 export async function getUserByReferralCode(code: string): Promise<StoredUser | null> {
   if (!code) return null;
   const users = await getUsers();
-  return users.find(u => u.referralCode === code.trim() && u.role !== "admin") || null;
+  const trimmed = code.trim().toUpperCase();
+  return users.find(u => u.referralCode && u.referralCode.toUpperCase() === trimmed && u.role !== "admin") || null;
 }
 
 export async function getReferrals(userId: string): Promise<{ referrer: StoredUser; referred: StoredUser[] }> {
