@@ -29,6 +29,13 @@ import {
 import type { Signal, AdminSession, Stats, View, Tab, Filter, SubPackage, AppSettingsData, LocalPaymentMethodData, UsdtNetworkAddress, AdminSubTab } from "@/lib/types";
 import { timeAgo, isEntry, entryAccent, isTpLike, isSlLike, nativeNotify, playSound, registerPushNotification, unregisterPushNotification, formatCountdown, warmAudio, ensureNotificationPermission, showBrowserNotification, notifySignal, shareSessionToken } from "@/lib/utils";
 import { Stars, Div, Glass, SkeletonCard, SignalsLoadingSkeleton, StatsLoadingSkeleton, EmptyState, Confetti, useOnlineStatus, usePullToRefresh, ProgressRing } from "@/components/shared";
+
+// ═══ PREMIUM UI COMPONENTS ═══
+import { WinRateChart } from "@/components/WinRateChart";
+import { PairPerformanceHeatMap } from "@/components/HeatMap";
+import { useCountUp } from "@/hooks/useCountUp";
+import { haptic } from "@/hooks/useHaptic";
+import { Onboarding, hasCompletedOnboarding } from "@/components/Onboarding";
 import { TpMiniCard, TradeStatusBanner, EntryCard, ClosedSignalCard, SplashScreen } from "@/components/SignalCards";
 
 
@@ -390,6 +397,22 @@ export default function HomePage() {
   const [showConfetti, setShowConfetti] = useState(false);
   const [winStreakCount, setWinStreakCount] = useState(0);
   const prevStreakRef = useRef<number>(0);
+
+  /* ── Premium: Onboarding ── */
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
+  /* ── Premium: Swipe Gesture State ── */
+  const touchStartXRef = useRef<number>(0);
+  const touchStartYRef = useRef<number>(0);
+  const isSwipingRef = useRef<boolean>(false);
+
+  /* ── Premium: Animated Number Counters (Dashboard) ── */
+  const animatedTotal = useCountUp(displayStats?.total ?? 0);
+  const animatedActive = useCountUp(displayStats?.active ?? 0);
+  const animatedWinRate = useCountUp(displayStats?.winRate ?? 0);
+  const animatedWeekly = useCountUp(displayStats?.recentWeek ?? 0);
+  const animatedBuyCount = useCountUp(displayStats?.buyCount ?? 0);
+  const animatedSellCount = useCountUp(displayStats?.sellCount ?? 0);
 
   /* ── Analyst ── */
   const [rawText, setRawText] = useState("");
@@ -947,12 +970,16 @@ export default function HomePage() {
                 if (isEntry(s.signalCategory)) {
                   const isBuy = s.type === "BUY";
                   notifySignal(isBuy ? "buy" : "sell", isBuy ? "📊 إشارة شراء — " + s.pair : "📊 إشارة بيع — " + s.pair, isBuy ? "شراء @" + s.entry : "بيع @" + s.entry, isBuy ? "buy" : "sell");
+                  haptic('medium');
                 } else if (isTpLike(s.signalCategory)) {
                   notifySignal("tp", "🎯 تحقق هدف — " + s.pair, "هدف " + s.hitTpIndex + " تم تحقيقه", "tp_hit");
+                  haptic('success');
                 } else if (isSlLike(s.signalCategory)) {
                   notifySignal("sl", "🛑 وقف خسارة — " + s.pair, "تم ضرب وقف الخسارة", "sl_hit");
+                  haptic('error');
                 } else {
                   playSound("message", audioVol);
+                  haptic('light');
                 }
               }
             } else if (oldIds.has(s.id)) {
@@ -1200,6 +1227,11 @@ export default function HomePage() {
     warmAudio();
     // Ensure notification permission is granted
     ensureNotificationPermission().catch(() => {});
+
+    // Premium: Show onboarding for new users
+    if (!hasCompletedOnboarding()) {
+      setTimeout(() => setShowOnboarding(true), 800);
+    }
 
     // Update check every 30 seconds (optimized — SSE handles instant updates)
     const updateInterval = setInterval(checkForUpdates, 30000);
@@ -3894,7 +3926,34 @@ export default function HomePage() {
   ];
 
   const mainContent = (
-    <div className="h-[100dvh] flex flex-col" style={{ background: "linear-gradient(135deg, #080d1a 0%, #0f172a 50%, #080d1a 100%)" }}>
+    <div
+      className="h-[100dvh] flex flex-col swipe-container"
+      style={{ background: "linear-gradient(135deg, #080d1a 0%, #0f172a 50%, #080d1a 100%)" }}
+      onTouchStart={(e) => { touchStartXRef.current = e.changedTouches[0].screenX; touchStartYRef.current = e.changedTouches[0].screenY; isSwipingRef.current = false; }}
+      onTouchMove={(e) => {
+        const dx = Math.abs(e.changedTouches[0].screenX - touchStartXRef.current);
+        const dy = Math.abs(e.changedTouches[0].screenY - touchStartYRef.current);
+        if (dx > 15 && dx > dy * 1.5) isSwipingRef.current = true;
+      }}
+      onTouchEnd={(e) => {
+        if (!isSwipingRef.current) return;
+        const diff = touchStartXRef.current - e.changedTouches[0].screenX;
+        const tabKeys = tabs.map(t => t.key);
+        const currentIdx = tabKeys.indexOf(tab);
+        if (Math.abs(diff) > 80) {
+          haptic('tap');
+          if (diff > 0 && currentIdx < tabKeys.length - 1) {
+            setTab(tabKeys[currentIdx + 1] as Tab);
+          } else if (diff < 0 && currentIdx > 0) {
+            setTab(tabKeys[currentIdx - 1] as Tab);
+          }
+        }
+        isSwipingRef.current = false;
+      }}
+    >
+      {/* ── Premium: Onboarding Overlay ── */}
+      {showOnboarding && <Onboarding onComplete={() => setShowOnboarding(false)} />}
+
       {/* ── Confetti ── */}
       <Confetti show={showConfetti} />
       {showConfetti && (
@@ -3923,6 +3982,22 @@ export default function HomePage() {
                 <span className={`text-[9px] font-medium ${isOnline ? "text-emerald-400" : "text-red-400"}`}>{isOnline ? "متصل" : "غير متصل"}</span>
               </div>
             </div>
+          </div>
+
+          {/* ═══ Premium: Status Ticker Bar ═══ */}
+          <div className="hidden md:flex ticker-bar">
+            {signals.slice(0, 5).map(s => {
+              const dotClass = s.status === 'HIT_TP' ? 'ticker-dot-win' : s.status === 'HIT_SL' ? 'ticker-dot-loss' : 'ticker-dot-active';
+              return (
+                <div key={s.id} className="ticker-item">
+                  <span className={dotClass} />
+                  <span>{s.pair}</span>
+                  <span className={s.status === 'HIT_TP' ? 'text-emerald-500/50' : s.status === 'HIT_SL' ? 'text-red-500/50' : 'text-amber-500/50'}>
+                    {s.status === 'HIT_TP' ? '✓' : s.status === 'HIT_SL' ? '✗' : '●'}
+                  </span>
+                </div>
+              );
+            })}
           </div>
           {/* Controls */}
           <div className="flex items-center gap-1">
@@ -4050,7 +4125,7 @@ export default function HomePage() {
       <main className="flex-1 overflow-y-auto overflow-x-hidden px-4 pb-4 pt-3 max-w-lg mx-auto w-full" style={{ WebkitOverflowScrolling: 'touch' }}>
 
         {/* ══════ TAB: HOME — PROFESSIONAL DASHBOARD ══════ */}
-        {tab === "home" && (<motion.div key="home" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>{(() => {
+        {tab === "home" && (<motion.div key="home" initial={{ opacity: 0, y: 8, filter: "blur(4px)" }} animate={{ opacity: 1, y: 0, filter: "blur(0px)" }} exit={{ opacity: 0, y: -8, filter: "blur(4px)" }} transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}>{(() => {
           /* ── Use userSignals (package-filtered) for non-admin, signals for admin ── */
           const statsSource = isAdmin ? signals : userSignals;
           const activeSignals = statsSource.filter(s => s.status === "ACTIVE");
@@ -4548,7 +4623,7 @@ export default function HomePage() {
         })()}</motion.div>)}
 
         {/* ══════ TAB: SIGNALS — PREMIUM DESIGN ══════ */}
-        {tab === "signals" && (<motion.div key="signals" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>{(() => {
+        {tab === "signals" && (<motion.div key="signals" initial={{ opacity: 0, y: 8, filter: "blur(4px)" }} animate={{ opacity: 1, y: 0, filter: "blur(0px)" }} exit={{ opacity: 0, y: -8, filter: "blur(4px)" }} transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}>{(() => {
           const activeSignals = filtered.filter(s => isEntry(s.signalCategory) && s.status === "ACTIVE");
           const closedSignals = filtered.filter(s => !isEntry(s.signalCategory) || s.status !== "ACTIVE");
           const winClosed = closedSignals.filter(s => s.status === "HIT_TP");
@@ -4946,7 +5021,7 @@ export default function HomePage() {
 
         {/* ══════ TAB: DASHBOARD ══════ */}
         {tab === "dashboard" && (
-          <motion.div key="dashboard" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }} className="space-y-5">
+          <motion.div key="dashboard" initial={{ opacity: 0, y: 8, filter: "blur(4px)" }} animate={{ opacity: 1, y: 0, filter: "blur(0px)" }} exit={{ opacity: 0, y: -8, filter: "blur(4px)" }} transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }} className="space-y-5">
             {loading && !displayStats ? (
               <StatsLoadingSkeleton />
             ) : displayStats ? (
@@ -4962,54 +5037,43 @@ export default function HomePage() {
                   </div>
                 </div>
 
-                {/* Stats Grid — 2×3 */}
+                {/* Stats Grid — 2×3 with Animated Counters */}
                 <div className="grid grid-cols-2 gap-3">
                   {/* إجمالي الصفقات */}
-                  <div className="glass-card rounded-xl p-4 border-b-2 border-b-violet-500/50">
+                  <div className="glass-card rounded-xl p-4 border-b-2 border-b-violet-500/50 hover-lift">
                     <div className="flex items-center gap-2 mb-2">
                       <div className="w-7 h-7 rounded-lg bg-violet-500/15 flex items-center justify-center">
                         <Hash className="w-3.5 h-3.5 text-violet-400" />
                       </div>
                       <span className="text-[10px] text-muted-foreground font-medium">إجمالي الصفقات</span>
                     </div>
-                    <div className="text-2xl font-bold text-white tabular-nums">{displayStats.total}</div>
+                    <div className="text-2xl font-bold text-white tabular-nums-animated">{animatedTotal}</div>
                   </div>
 
                   {/* الصفقات النشطة */}
-                  <div className="glass-card rounded-xl p-4 border-b-2 border-b-emerald-500/50">
+                  <div className="glass-card rounded-xl p-4 border-b-2 border-b-emerald-500/50 hover-lift">
                     <div className="flex items-center gap-2 mb-2">
                       <div className="w-7 h-7 rounded-lg bg-emerald-500/15 flex items-center justify-center">
                         <Activity className="w-3.5 h-3.5 text-emerald-400" />
                       </div>
                       <span className="text-[10px] text-muted-foreground font-medium">الصفقات النشطة</span>
                     </div>
-                    <div className="text-2xl font-bold text-emerald-400 tabular-nums">{displayStats.active}</div>
+                    <div className="text-2xl font-bold text-emerald-400 tabular-nums-animated">{animatedActive}</div>
                   </div>
 
-                  {/* نسبة الفوز */}
-                  <div className="glass-card rounded-xl p-4 border-b-2 border-b-amber-500/50">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="w-7 h-7 rounded-lg bg-amber-500/15 flex items-center justify-center">
-                        <Target className="w-3.5 h-3.5 text-amber-400" />
-                      </div>
-                      <span className="text-[10px] text-muted-foreground font-medium">نسبة الفوز</span>
-                    </div>
-                    <div className="text-2xl font-bold text-amber-400 tabular-nums">{displayStats.winRate}%</div>
-                  </div>
-
-                  {/* أداء الأسبوع */}
-                  <div className="glass-card rounded-xl p-4 border-b-2 border-b-sky-500/50">
+                  {/* أداة الأسبوع */}
+                  <div className="glass-card rounded-xl p-4 border-b-2 border-b-sky-500/50 hover-lift">
                     <div className="flex items-center gap-2 mb-2">
                       <div className="w-7 h-7 rounded-lg bg-sky-500/15 flex items-center justify-center">
                         <Timer className="w-3.5 h-3.5 text-sky-400" />
                       </div>
                       <span className="text-[10px] text-muted-foreground font-medium">أداء الأسبوع</span>
                     </div>
-                    <div className="text-2xl font-bold text-sky-400 tabular-nums">{displayStats.recentWeek}</div>
+                    <div className="text-2xl font-bold text-sky-400 tabular-nums-animated">{animatedWeekly}</div>
                   </div>
 
                   {/* نسبة الشراء/البيع */}
-                  <div className="glass-card rounded-xl p-4 border-b-2 border-b-emerald-500/30">
+                  <div className="glass-card rounded-xl p-4 border-b-2 border-b-emerald-500/30 hover-lift">
                     <div className="flex items-center gap-2 mb-2">
                       <div className="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center">
                         <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
@@ -5017,9 +5081,9 @@ export default function HomePage() {
                       <span className="text-[10px] text-muted-foreground font-medium">شراء / بيع</span>
                     </div>
                     <div className="flex items-center gap-2 mb-1.5">
-                      <span className="text-lg font-bold text-emerald-400 tabular-nums">{displayStats.buyCount}</span>
+                      <span className="text-lg font-bold text-emerald-400 tabular-nums-animated">{animatedBuyCount}</span>
                       <span className="text-xs text-muted-foreground/50">/</span>
-                      <span className="text-lg font-bold text-red-400 tabular-nums">{displayStats.sellCount}</span>
+                      <span className="text-lg font-bold text-red-400 tabular-nums-animated">{animatedSellCount}</span>
                     </div>
                     <div className="h-1.5 rounded-full bg-white/5 overflow-hidden flex">
                       <div className="bg-gradient-to-l from-emerald-500 to-emerald-400 h-full rounded-r-full transition-all duration-500" style={{ width: `${displayStats.buyCount + displayStats.sellCount > 0 ? (displayStats.buyCount / (displayStats.buyCount + displayStats.sellCount)) * 100 : 50}%` }} />
@@ -5076,6 +5140,18 @@ export default function HomePage() {
                     </div>
                   </div>
                 </div>
+
+                {/* ═══ Premium: Win Rate Donut Chart ═══ */}
+                <WinRateChart
+                  winRate={displayStats.hitTp + displayStats.hitSl > 0 ? Math.round((displayStats.hitTp / (displayStats.hitTp + displayStats.hitSl)) * 100) : 0}
+                  wins={displayStats.hitTp}
+                  losses={displayStats.hitSl}
+                />
+
+                {/* ═══ Premium: Pair Performance Heat Map ═══ */}
+                {signals.length > 0 && (
+                  <PairPerformanceHeatMap signals={signals} />
+                )}
 
                 {/* Top Performing Pairs */}
                 {displayStats.topPairs?.length > 0 && (
