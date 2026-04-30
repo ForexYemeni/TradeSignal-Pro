@@ -7241,7 +7241,7 @@ export default function HomePage() {
                               <div className="text-[9px] text-muted-foreground/70 mt-0.5 line-clamp-1">{a.message}</div>
                               <div className="flex items-center gap-2 mt-1.5">
                                 <span className="text-[8px] px-1.5 py-0.5 rounded-md bg-white/[0.04] text-muted-foreground">{typeLabel[a.type] || a.type}</span>
-                                <span className="text-[8px] px-1.5 py-0.5 rounded-md bg-white/[0.04] text-muted-foreground">{a.target === "all" ? "الجميع" : a.targetUserName || "مستخدم"}</span>
+                                <span className="text-[8px] px-1.5 py-0.5 rounded-md bg-white/[0.04] text-muted-foreground">{a.target === "all" ? "الجميع" : a.target === "active" ? "النشطين" : a.target === "expired" ? "المنتهي اشتراكهم" : a.target === "blocked" ? "المحظورين" : a.targetUserName || "مستخدم"}</span>
                                 {a.sendPush && <span className="text-[8px] px-1.5 py-0.5 rounded-md bg-rose-500/10 text-rose-400">Push</span>}
                                 {a.sendEmail && <span className="text-[8px] px-1.5 py-0.5 rounded-md bg-sky-500/10 text-sky-400">بريد</span>}
                                 <span className="text-[8px] text-muted-foreground/40">{new Date(a.createdAt).toLocaleString("ar-SA", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
