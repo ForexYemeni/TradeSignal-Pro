@@ -1488,28 +1488,36 @@ export default function HomePage() {
           const data = JSON.parse(event.data);
           const eventType = data.type;
           if (eventType === "signal" || eventType === "new_signal" || eventType === "tp_hit" || eventType === "sl_hit") {
-            // ── INSTANT: Play sound + native notification IMMEDIATELY from SSE ──
-            // Don't wait for fetchSignals() — use SSE data directly for speed
-            const pair = data.pair || "";
-            const sigType = data.signalType || "";
-            const tpIndex = data.tpIndex;
+            // ── Check if user has active subscription before showing notifications ──
+            // Expired/unsubscribed users should NOT receive signal alerts via SSE
+            const sessionData = JSON.parse(localStorage.getItem("adminSession") || "{}");
+            const hasActiveSub = sessionData?.role === "admin" ||
+              (sessionData?.status === "active" && sessionData?.packageId);
 
-            // Deduplicate: skip if same event processed recently
-            const eventKey = `${eventType}:${pair}:${tpIndex || ""}`;
-            if (eventKey !== lastSseEventRef.current && !audioMuted) {
-              lastSseEventRef.current = eventKey;
+            if (hasActiveSub) {
+              // ── INSTANT: Play sound + native notification IMMEDIATELY from SSE ──
+              // Don't wait for fetchSignals() — use SSE data directly for speed
+              const pair = data.pair || "";
+              const sigType = data.signalType || "";
+              const tpIndex = data.tpIndex;
 
-              if (eventType === "tp_hit") {
-                notifySignal("tp", "🎯 تحقق هدف — " + pair, "هدف " + (tpIndex || "?") + " تم تحقيقه", "tp_hit");
-              } else if (eventType === "sl_hit") {
-                notifySignal("sl", "🛑 وقف خسارة — " + pair, "تم ضرب وقف الخسارة", "sl_hit");
-              } else if (eventType === "signal" || eventType === "new_signal") {
-                // Use signalDirection (BUY/SELL) from SSE event
-                const isBuy = data.signalDirection === "BUY";
-                notifySignal(isBuy ? "buy" : "sell", (isBuy ? "📊 إشارة شراء — " : "📊 إشارة بيع — ") + pair, isBuy ? "شراء" : "بيع", isBuy ? "buy" : "sell");
+              // Deduplicate: skip if same event processed recently
+              const eventKey = `${eventType}:${pair}:${tpIndex || ""}`;
+              if (eventKey !== lastSseEventRef.current && !audioMuted) {
+                lastSseEventRef.current = eventKey;
+
+                if (eventType === "tp_hit") {
+                  notifySignal("tp", "🎯 تحقق هدف — " + pair, "هدف " + (tpIndex || "?") + " تم تحقيقه", "tp_hit");
+                } else if (eventType === "sl_hit") {
+                  notifySignal("sl", "🛑 وقف خسارة — " + pair, "تم ضرب وقف الخسارة", "sl_hit");
+                } else if (eventType === "signal" || eventType === "new_signal") {
+                  // Use signalDirection (BUY/SELL) from SSE event
+                  const isBuy = data.signalDirection === "BUY";
+                  notifySignal(isBuy ? "buy" : "sell", (isBuy ? "📊 إشارة شراء — " : "📊 إشارة بيع — ") + pair, isBuy ? "شراء" : "بيع", isBuy ? "buy" : "sell");
+                }
               }
             }
-            // Then fetch full signals to update UI (runs in parallel with notification)
+            // Still fetch signals to update UI (fetchSignals returns empty for expired users)
             fetchSignals();
           }
 

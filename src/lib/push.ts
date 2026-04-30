@@ -102,6 +102,81 @@ export async function sendPushToAll(payload: PushPayload): Promise<{ success: nu
 }
 
 /**
+ * Send push notification only to users with active subscriptions.
+ * Used for trading signal notifications (not announcements).
+ */
+export async function sendPushToSubscribers(payload: PushPayload): Promise<{ success: number; failed: number; skipped: number }> {
+  if (!configureVapid()) {
+    return { success: 0, failed: 0, skipped: 0 };
+  }
+
+  try {
+    const [subs, users] = await Promise.all([getPushSubscriptions(), getUsers()]);
+    if (subs.length === 0) return { success: 0, failed: 0, skipped: 0 };
+
+    // Build set of user IDs with active subscriptions (status=active, has packageId, not admin)
+    const eligibleIds = new Set(
+      users.filter(u => u.status === 'active' && u.role !== 'admin' && u.packageId).map(u => u.id)
+    );
+
+    // Filter push subscriptions to only eligible users
+    const eligibleSubs = subs.filter(s => eligibleIds.has(s.userId));
+    const skipped = subs.length - eligibleSubs.length;
+
+    if (eligibleSubs.length === 0) {
+      console.log(`[Push] 0 eligible subscribers for signal push (${skipped} skipped — no active subscription)`);
+      return { success: 0, failed: 0, skipped };
+    }
+
+    let success = 0;
+    let failed = 0;
+
+    const promises = eligibleSubs.map(async (sub) => {
+      try {
+        await webpush.sendNotification(
+          {
+            endpoint: sub.endpoint,
+            keys: sub.keys,
+          },
+          JSON.stringify({
+            title: payload.title,
+            body: payload.body,
+            icon: payload.icon || '/icon-192x192.png',
+            badge: payload.badge || '/icon-192x192.png',
+            tag: payload.tag || `fy-${Date.now()}`,
+            data: payload.data || {},
+            sound: payload.sound || 'new_signal',
+            requireInteraction: payload.requireInteraction !== false,
+            actions: [
+              { action: 'open', title: 'فتح التطبيق' },
+            ],
+          }),
+          {
+            TTL: 86400, // 24 hours
+            urgency: payload.urgency || 'high',
+          }
+        );
+        success++;
+      } catch (err: unknown) {
+        failed++;
+        const error = err as { statusCode?: number };
+        if (error.statusCode === 404 || error.statusCode === 410) {
+          removePushSubscription(sub.endpoint).catch(() => {});
+          console.warn(`[Push] Dead subscription removed: ${sub.endpoint.substring(0, 50)}...`);
+        }
+      }
+    });
+
+    await Promise.allSettled(promises);
+    console.log(`[Push] Sent signal push to ${success}/${eligibleSubs.length} subscribers (${skipped} skipped — no active subscription)`);
+    return { success, failed, skipped };
+  } catch (error) {
+    console.error('[Push] Error sending subscriber notifications:', error);
+    return { success: 0, failed: 0, skipped: 0 };
+  }
+}
+
+/**
  * Send push notification to a specific user
  */
 export async function sendPushToUser(userId: string, payload: PushPayload): Promise<boolean> {
@@ -195,13 +270,13 @@ export async function sendPushToAdmins(payload: PushPayload): Promise<{ success:
 }
 
 /**
- * Helper: New signal notification
+ * Helper: New signal notification (only to active subscribers)
  */
 export async function notifyNewSignal(pair: string, type: string, entry: number, timeframe: string) {
   const typeAr = type === 'BUY' ? 'شراء' : 'بيع';
   const title = `📊 إشارة جديدة — ${pair}`;
   const body = `${typeAr} @ ${entry} | ${timeframe || ''}`.trim();
-  return sendPushToAll({
+  return sendPushToSubscribers({
     title,
     body,
     tag: `signal-${pair}-${Date.now()}`,
@@ -213,7 +288,7 @@ export async function notifyNewSignal(pair: string, type: string, entry: number,
 }
 
 /**
- * Helper: Take profit hit notification
+ * Helper: Take profit hit notification (only to active subscribers)
  */
 export async function notifyTpHit(pair: string, tpIndex: number, pnl?: number, category?: string) {
   // Category-specific labels
@@ -225,7 +300,7 @@ export async function notifyTpHit(pair: string, tpIndex: number, pnl?: number, c
   const body = pnl
     ? `${catLabel} ${tpIndex} تم تحقيقه! ربح: +$${pnl.toFixed(2)}`
     : `${catLabel} ${tpIndex} تم تحقيقه بنجاح!`;
-  return sendPushToAll({
+  return sendPushToSubscribers({
     title,
     body,
     tag: `tp-${pair}-${Date.now()}`,
@@ -237,12 +312,12 @@ export async function notifyTpHit(pair: string, tpIndex: number, pnl?: number, c
 }
 
 /**
- * Helper: Stop loss hit notification
+ * Helper: Stop loss hit notification (only to active subscribers)
  */
 export async function notifySlHit(pair: string, pnl?: number) {
   const title = `🛑 وقف خسارة — ${pair}`;
   const body = pnl ? `تم ضرب وقف الخسارة! خسارة: -$${Math.abs(pnl).toFixed(2)}` : `تم ضرب وقف الخسارة!`;
-  return sendPushToAll({
+  return sendPushToSubscribers({
     title,
     body,
     tag: `sl-${pair}-${Date.now()}`,

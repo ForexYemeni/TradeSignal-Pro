@@ -70,10 +70,10 @@ export async function POST(request: NextRequest) {
     if (target === "specific" && targetUserId) {
       targetUserIds = [targetUserId];
     } else {
-      // All active subscribers (not admin, not blocked, not pending)
+      // All users (not admin) — announcements visible to ALL regardless of subscription status
       const allUsers = await getUsers();
       targetUserIds = allUsers
-        .filter(u => u.role !== "admin" && u.status === "active")
+        .filter(u => u.role !== "admin" && u.status !== "blocked")
         .map(u => u.id);
     }
 
@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
               return user ? [user.email] : [];
             })()
           : allUsers
-              .filter(u => u.role !== "admin" && u.status === "active" && u.email)
+              .filter(u => u.role !== "admin" && u.status !== "blocked" && u.email)
               .map(u => u.email);
 
         await broadcastAnnouncementEmail(

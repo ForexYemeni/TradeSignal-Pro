@@ -492,14 +492,19 @@ export async function broadcastSignalToSubscribers(signal: {
   instrument?: string;
   signalId?: string;
 }): Promise<{ sent: number; failed: number; skipped: number }> {
-  const { getUsers, getPackageById, getSignals } = await import('@/lib/store');
+  const { getUsers, getPackageById, getSignals, enforceSubscriptions } = await import('@/lib/store');
+
+  // Ensure subscription statuses are up-to-date before broadcasting
+  await enforceSubscriptions();
+
   const users = await getUsers();
 
-  // Filter to active non-admin users with emails
+  // Filter to active non-admin users with emails AND a valid subscription (packageId)
   const activeSubscribers = users.filter(u =>
     u.status === 'active' &&
     u.role !== 'admin' &&
-    u.email
+    u.email &&
+    u.packageId
   );
 
   if (activeSubscribers.length === 0) {
@@ -534,17 +539,12 @@ export async function broadcastSignalToSubscribers(signal: {
   let skippedMaxSignals = 0;
 
   for (const user of activeSubscribers) {
-    if (!user.packageId) {
-      // No package → no filtering, send email
-      emailRecipients.push(user.email);
-      continue;
-    }
-
+    // User must have a packageId (enforced by filter above)
+    // Skip if package lookup fails (subscription no longer valid)
     try {
-      const pkg = await getPackageById(user.packageId);
+      const pkg = await getPackageById(user.packageId!);
       if (!pkg) {
-        emailRecipients.push(user.email);
-        continue;
+        continue; // Package no longer exists — skip this user
       }
 
       // 1. Filter by instruments
@@ -586,8 +586,7 @@ export async function broadcastSignalToSubscribers(signal: {
 
       emailRecipients.push(user.email);
     } catch {
-      // If package lookup fails, still send the email (fail-open)
-      emailRecipients.push(user.email);
+      // Package lookup error — skip this user (fail-closed for security)
     }
   }
 
