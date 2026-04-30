@@ -420,10 +420,13 @@ export default function HomePage() {
   const [announcMessage, setAnnouncMessage] = useState("");
   const [announcType, setAnnouncType] = useState<"info" | "warning" | "urgent" | "maintenance" | "promo">("info");
   const [announcPriority, setAnnouncPriority] = useState<"high" | "medium" | "low">("medium");
-  const [announcTarget, setAnnouncTarget] = useState<"all" | "specific">("all");
+  const [announcTarget, setAnnouncTarget] = useState<"all" | "active" | "expired" | "blocked" | "specific">("all");
   const [announcTargetUserId, setAnnouncTargetUserId] = useState("");
   const [announcUserSearch, setAnnouncUserSearch] = useState("");
   const [announcUserDropdownOpen, setAnnouncUserDropdownOpen] = useState(false);
+  const [announcTypeDropdownOpen, setAnnouncTypeDropdownOpen] = useState(false);
+  const [announcPriorityDropdownOpen, setAnnouncPriorityDropdownOpen] = useState(false);
+  const [announcTargetDropdownOpen, setAnnouncTargetDropdownOpen] = useState(false);
   const [announcSendPush, setAnnouncSendPush] = useState(true);
   const [announcSendEmail, setAnnouncSendEmail] = useState(false);
   const [announcSending, setAnnouncSending] = useState(false);
@@ -6793,101 +6796,216 @@ export default function HomePage() {
                   </div>
                 </div>
 
-                {/* Type + Priority — Side by side with visual cards */}
-                <div className="grid grid-cols-2 gap-4">
+                {/* Type + Priority + Target — Professional Dropdowns */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {/* ── Type Dropdown ── */}
                   <div>
                     <label className="text-[11px] font-bold text-foreground block mb-2 flex items-center gap-1.5">
                       <Tag className="w-3.5 h-3.5 text-rose-400" />
                       نوع الإعلان
                     </label>
-                    <div className="grid grid-cols-2 gap-1.5">
-                      {[
-                        { val: "info" as const, label: "معلومة", icon: "ℹ️", color: "blue" },
-                        { val: "warning" as const, label: "تحذير", icon: "⚠️", color: "amber" },
-                        { val: "urgent" as const, label: "عاجل", icon: "🔴", color: "red" },
-                        { val: "maintenance" as const, label: "صيانة", icon: "🔧", color: "purple" },
-                        { val: "promo" as const, label: "ترويج", icon: "🎁", color: "emerald" },
-                      ].map(opt => (
-                        <button key={opt.val} onClick={() => setAnnouncType(opt.val)}
-                          className={`flex items-center gap-1.5 px-2.5 py-2 rounded-xl border text-[10px] font-semibold transition-all duration-200 ${
-                            announcType === opt.val
-                              ? `bg-${opt.color}-500/15 border-${opt.color}-500/30 text-${opt.color}-300 shadow-sm shadow-${opt.color}-500/10`
-                              : "bg-white/[0.03] border-white/[0.06] text-muted-foreground hover:bg-white/[0.06] hover:text-foreground"
+                    <div className="relative">
+                      <div
+                        onClick={() => { setAnnouncTypeDropdownOpen(!announcTypeDropdownOpen); setAnnouncPriorityDropdownOpen(false); setAnnouncTargetDropdownOpen(false); }}
+                        className="w-full min-h-[44px] rounded-xl border px-4 py-2.5 cursor-pointer flex items-center gap-3 transition-all duration-200 bg-white/[0.03] border-white/[0.08] hover:border-white/[0.15]"
+                      >
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                          announcType === "info" ? "bg-blue-500/15" :
+                          announcType === "warning" ? "bg-amber-500/15" :
+                          announcType === "urgent" ? "bg-red-500/15" :
+                          announcType === "maintenance" ? "bg-purple-500/15" :
+                          "bg-emerald-500/15"
+                        }`}>
+                          <span className="text-sm">{announcType === "info" ? "ℹ️" : announcType === "warning" ? "⚠️" : announcType === "urgent" ? "🔴" : announcType === "maintenance" ? "🔧" : "🎁"}</span>
+                        </div>
+                        <div className="flex-1 text-right">
+                          <div className={`text-[11px] font-bold ${
+                            announcType === "info" ? "text-blue-400" :
+                            announcType === "warning" ? "text-amber-400" :
+                            announcType === "urgent" ? "text-red-400" :
+                            announcType === "maintenance" ? "text-purple-400" :
+                            "text-emerald-400"
                           }`}>
-                          <span className="text-sm">{opt.icon}</span>
-                          <span>{opt.label}</span>
-                        </button>
-                      ))}
+                            {announcType === "info" ? "معلومة" : announcType === "warning" ? "تحذير" : announcType === "urgent" ? "عاجل" : announcType === "maintenance" ? "صيانة" : "ترويج"}
+                          </div>
+                        </div>
+                        <ChevronDown className={`w-4 h-4 text-muted-foreground/40 transition-transform duration-200 ${announcTypeDropdownOpen ? "rotate-180" : ""}`} />
+                      </div>
+                      {announcTypeDropdownOpen && <div className="fixed inset-0 z-40" onClick={() => setAnnouncTypeDropdownOpen(false)} />}
+                      {announcTypeDropdownOpen && (
+                        <div className="absolute top-full left-0 right-0 mt-1.5 z-50 rounded-2xl bg-[#0d1117]/[0.99] border border-white/[0.1] backdrop-blur-2xl shadow-2xl shadow-black/50 overflow-hidden py-1.5">
+                          {[
+                            { val: "info" as const, label: "معلومة", icon: "ℹ️", color: "blue", desc: "إعلان عام أو إخباري" },
+                            { val: "warning" as const, label: "تحذير", icon: "⚠️", color: "amber", desc: "تنبيه مهم يحتاج انتباه" },
+                            { val: "urgent" as const, label: "عاجل", icon: "🔴", color: "red", desc: "أمر عاجل وحرج" },
+                            { val: "maintenance" as const, label: "صيانة", icon: "🔧", color: "purple", desc: "تحديث أو صيانة النظام" },
+                            { val: "promo" as const, label: "ترويج", icon: "🎁", color: "emerald", desc: "عرض أو ترويج خاص" },
+                          ].map(opt => (
+                            <button key={opt.val}
+                              onClick={() => { setAnnouncType(opt.val); setAnnouncTypeDropdownOpen(false); }}
+                              className={`w-full px-4 py-2.5 text-right flex items-center gap-3 transition-all duration-150 ${
+                                announcType === opt.val ? "bg-white/[0.08]" : "hover:bg-white/[0.04]"
+                              }`}
+                            >
+                              <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-${opt.color}-500/15`}>
+                                <span className="text-sm">{opt.icon}</span>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className={`text-[11px] font-bold ${announcType === opt.val ? `text-${opt.color}-400` : "text-foreground"}`}>{opt.label}</div>
+                                <div className="text-[9px] text-muted-foreground/50">{opt.desc}</div>
+                              </div>
+                              {announcType === opt.val && <Check className={`w-4 h-4 text-${opt.color}-400 shrink-0`} />}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
+
+                  {/* ── Priority Dropdown ── */}
                   <div>
                     <label className="text-[11px] font-bold text-foreground block mb-2 flex items-center gap-1.5">
                       <Zap className="w-3.5 h-3.5 text-rose-400" />
                       الأولوية
                     </label>
-                    <div className="space-y-1.5">
-                      {[
-                        { val: "high" as const, label: "عالية", desc: "يظهر أولاً مع تنبيه مميز", color: "red", icon: "🔥" },
-                        { val: "medium" as const, label: "متوسطة", desc: "ترتيب عادي بين الإعلانات", color: "amber", icon: "⚡" },
-                        { val: "low" as const, label: "منخفضة", desc: "إعلان عادي بدون تمييز", color: "slate", icon: "📝" },
-                      ].map(opt => (
-                        <button key={opt.val} onClick={() => setAnnouncPriority(opt.val)}
-                          className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl border text-right transition-all duration-200 ${
-                            announcPriority === opt.val
-                              ? `bg-${opt.color}-500/10 border-${opt.color}-500/25`
-                              : "bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.05]"
+                    <div className="relative">
+                      <div
+                        onClick={() => { setAnnouncPriorityDropdownOpen(!announcPriorityDropdownOpen); setAnnouncTypeDropdownOpen(false); setAnnouncTargetDropdownOpen(false); }}
+                        className="w-full min-h-[44px] rounded-xl border px-4 py-2.5 cursor-pointer flex items-center gap-3 transition-all duration-200 bg-white/[0.03] border-white/[0.08] hover:border-white/[0.15]"
+                      >
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                          announcPriority === "high" ? "bg-red-500/15" :
+                          announcPriority === "medium" ? "bg-amber-500/15" :
+                          "bg-slate-500/15"
+                        }`}>
+                          <span className="text-sm">{announcPriority === "high" ? "🔥" : announcPriority === "medium" ? "⚡" : "📝"}</span>
+                        </div>
+                        <div className="flex-1 text-right">
+                          <div className={`text-[11px] font-bold ${
+                            announcPriority === "high" ? "text-red-400" :
+                            announcPriority === "medium" ? "text-amber-400" :
+                            "text-slate-400"
                           }`}>
-                          <span className="text-sm">{opt.icon}</span>
-                          <div className="flex-1 min-w-0">
-                            <div className={`text-[10px] font-bold ${announcPriority === opt.val ? `text-${opt.color}-400` : "text-foreground"}`}>{opt.label}</div>
-                            <div className="text-[8px] text-muted-foreground/50">{opt.desc}</div>
+                            {announcPriority === "high" ? "عالية" : announcPriority === "medium" ? "متوسطة" : "منخفضة"}
                           </div>
-                          {announcPriority === opt.val && (
-                            <div className={`w-4 h-4 rounded-full bg-${opt.color}-500/20 border border-${opt.color}-500/30 flex items-center justify-center`}>
-                              <Check className={`w-2.5 h-2.5 text-${opt.color}-400`} />
-                            </div>
-                          )}
-                        </button>
-                      ))}
+                        </div>
+                        <ChevronDown className={`w-4 h-4 text-muted-foreground/40 transition-transform duration-200 ${announcPriorityDropdownOpen ? "rotate-180" : ""}`} />
+                      </div>
+                      {announcPriorityDropdownOpen && <div className="fixed inset-0 z-40" onClick={() => setAnnouncPriorityDropdownOpen(false)} />}
+                      {announcPriorityDropdownOpen && (
+                        <div className="absolute top-full left-0 right-0 mt-1.5 z-50 rounded-2xl bg-[#0d1117]/[0.99] border border-white/[0.1] backdrop-blur-2xl shadow-2xl shadow-black/50 overflow-hidden py-1.5">
+                          {[
+                            { val: "high" as const, label: "عالية", icon: "🔥", color: "red", desc: "يظهر أولاً مع تنبيه مميز" },
+                            { val: "medium" as const, label: "متوسطة", icon: "⚡", color: "amber", desc: "ترتيب عادي بين الإعلانات" },
+                            { val: "low" as const, label: "منخفضة", icon: "📝", color: "slate", desc: "إعلان عادي بدون تمييز" },
+                          ].map(opt => (
+                            <button key={opt.val}
+                              onClick={() => { setAnnouncPriority(opt.val); setAnnouncPriorityDropdownOpen(false); }}
+                              className={`w-full px-4 py-2.5 text-right flex items-center gap-3 transition-all duration-150 ${
+                                announcPriority === opt.val ? "bg-white/[0.08]" : "hover:bg-white/[0.04]"
+                              }`}
+                            >
+                              <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-${opt.color}-500/15`}>
+                                <span className="text-sm">{opt.icon}</span>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className={`text-[11px] font-bold ${announcPriority === opt.val ? `text-${opt.color}-400` : "text-foreground"}`}>{opt.label}</div>
+                                <div className="text-[9px] text-muted-foreground/50">{opt.desc}</div>
+                              </div>
+                              {announcPriority === opt.val && <Check className={`w-4 h-4 text-${opt.color}-400 shrink-0`} />}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
-                </div>
 
-                {/* Targeting */}
-                <div>
-                  <label className="text-[11px] font-bold text-foreground block mb-2 flex items-center gap-1.5">
-                    <Users className="w-3.5 h-3.5 text-rose-400" />
-                    الاستهداف
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button onClick={() => setAnnouncTarget("all")}
-                      className={`flex items-center gap-2.5 px-3 py-3 rounded-xl border transition-all duration-200 ${
-                        announcTarget === "all"
-                          ? "bg-emerald-500/10 border-emerald-500/25"
-                          : "bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.05]"
-                      }`}>
-                      <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0">
-                        <Globe className="w-4 h-4 text-emerald-400" />
+                  {/* ── Target Dropdown ── */}
+                  <div>
+                    <label className="text-[11px] font-bold text-foreground block mb-2 flex items-center gap-1.5">
+                      <Users className="w-3.5 h-3.5 text-rose-400" />
+                      الاستهداف
+                    </label>
+                    <div className="relative">
+                      <div
+                        onClick={() => { setAnnouncTargetDropdownOpen(!announcTargetDropdownOpen); setAnnouncTypeDropdownOpen(false); setAnnouncPriorityDropdownOpen(false); }}
+                        className={`w-full min-h-[44px] rounded-xl border px-4 py-2.5 cursor-pointer flex items-center gap-3 transition-all duration-200 ${
+                          announcTarget === "all" ? "bg-emerald-500/[0.04] border-emerald-500/20" :
+                          announcTarget === "active" ? "bg-sky-500/[0.04] border-sky-500/20" :
+                          announcTarget === "expired" ? "bg-orange-500/[0.04] border-orange-500/20" :
+                          announcTarget === "blocked" ? "bg-red-500/[0.04] border-red-500/20" :
+                          "bg-violet-500/[0.04] border-violet-500/20"
+                        } hover:border-white/[0.15]`}
+                      >
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                          announcTarget === "all" ? "bg-emerald-500/15" :
+                          announcTarget === "active" ? "bg-sky-500/15" :
+                          announcTarget === "expired" ? "bg-orange-500/15" :
+                          announcTarget === "blocked" ? "bg-red-500/15" :
+                          "bg-violet-500/15"
+                        }`}>
+                          <span className="text-sm">{announcTarget === "all" ? "🌐" : announcTarget === "active" ? "✅" : announcTarget === "expired" ? "⏰" : announcTarget === "blocked" ? "🚫" : "👤"}</span>
+                        </div>
+                        <div className="flex-1 text-right">
+                          <div className={`text-[11px] font-bold ${
+                            announcTarget === "all" ? "text-emerald-400" :
+                            announcTarget === "active" ? "text-sky-400" :
+                            announcTarget === "expired" ? "text-orange-400" :
+                            announcTarget === "blocked" ? "text-red-400" :
+                            "text-violet-400"
+                          }`}>
+                            {announcTarget === "all" ? "جميع المستخدمين" :
+                             announcTarget === "active" ? "النشطين" :
+                             announcTarget === "expired" ? "المنتهي اشتراكهم" :
+                             announcTarget === "blocked" ? "المحظورين" :
+                             "مستخدم محدد"}
+                          </div>
+                          <div className="text-[8px] text-muted-foreground/50">
+                            {announcTarget === "all" ? "كل الأعضاء بدون استثناء" :
+                             announcTarget === "active" ? "لديهم باقة فعّالة" :
+                             announcTarget === "expired" ? "انتهت باقاتهم" :
+                             announcTarget === "blocked" ? "الحسابات المحظورة" :
+                             announcTargetUserId
+                               ? (() => { const u = users.find(x => x.id === announcTargetUserId); return u ? u.name : ""; })()
+                               : "اختر مستخدم واحد"}
+                          </div>
+                        </div>
+                        <ChevronDown className={`w-4 h-4 text-muted-foreground/40 transition-transform duration-200 ${announcTargetDropdownOpen ? "rotate-180" : ""}`} />
                       </div>
-                      <div className="text-right">
-                        <div className={`text-[10px] font-bold ${announcTarget === "all" ? "text-emerald-400" : "text-foreground"}`}>جميع المستخدمين</div>
-                        <div className="text-[8px] text-muted-foreground/50">يُرسل لكل الأعضاء النشطين</div>
-                      </div>
-                    </button>
-                    <button onClick={() => setAnnouncTarget("specific")}
-                      className={`flex items-center gap-2.5 px-3 py-3 rounded-xl border transition-all duration-200 ${
-                        announcTarget === "specific"
-                          ? "bg-violet-500/10 border-violet-500/25"
-                          : "bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.05]"
-                      }`}>
-                      <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center shrink-0">
-                        <User className="w-4 h-4 text-violet-400" />
-                      </div>
-                      <div className="text-right">
-                        <div className={`text-[10px] font-bold ${announcTarget === "specific" ? "text-violet-400" : "text-foreground"}`}>مستخدم محدد</div>
-                        <div className="text-[8px] text-muted-foreground/50">اختر مستخدم واحد فقط</div>
-                      </div>
-                    </button>
+                      {announcTargetDropdownOpen && <div className="fixed inset-0 z-40" onClick={() => setAnnouncTargetDropdownOpen(false)} />}
+                      {announcTargetDropdownOpen && (
+                        <div className="absolute top-full left-0 right-0 mt-1.5 z-50 rounded-2xl bg-[#0d1117]/[0.99] border border-white/[0.1] backdrop-blur-2xl shadow-2xl shadow-black/50 overflow-hidden py-1.5">
+                          {[
+                            { val: "all" as const, label: "جميع المستخدمين", icon: "🌐", color: "emerald", desc: "كل الأعضاء بدون استثناء", count: users.filter(u => u.role !== "admin").length },
+                            { val: "active" as const, label: "النشطين", icon: "✅", color: "sky", desc: "لديهم باقة فعّالة حالياً", count: users.filter(u => u.role !== "admin" && u.status === "active" && u.packageId).length },
+                            { val: "expired" as const, label: "المنتهي اشتراكهم", icon: "⏰", color: "orange", desc: "انتهت باقاتهم التجريبية أو المدفوعة", count: users.filter(u => u.role !== "admin" && u.status === "expired").length },
+                            { val: "blocked" as const, label: "المحظورين", icon: "🚫", color: "red", desc: "الحسابات المحظورة", count: users.filter(u => u.role !== "admin" && u.status === "blocked").length },
+                            { val: "specific" as const, label: "مستخدم محدد", icon: "👤", color: "violet", desc: "اختر مستخدم واحد بالبحث", count: 0 },
+                          ].map(opt => (
+                            <button key={opt.val}
+                              onClick={() => { setAnnouncTarget(opt.val); setAnnouncTargetDropdownOpen(false); }}
+                              className={`w-full px-4 py-2.5 text-right flex items-center gap-3 transition-all duration-150 ${
+                                announcTarget === opt.val ? "bg-white/[0.08]" : "hover:bg-white/[0.04]"
+                              }`}
+                            >
+                              <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-${opt.color}-500/15`}>
+                                <span className="text-sm">{opt.icon}</span>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className={`text-[11px] font-bold ${announcTarget === opt.val ? `text-${opt.color}-400` : "text-foreground"}`}>{opt.label}</div>
+                                <div className="text-[9px] text-muted-foreground/50">{opt.desc}</div>
+                              </div>
+                              {opt.count > 0 && (
+                                <span className={`text-[9px] px-2 py-0.5 rounded-lg font-bold shrink-0 bg-${opt.color}-500/10 text-${opt.color}-400 border border-${opt.color}-500/15`}>
+                                  {opt.count}
+                                </span>
+                              )}
+                              {announcTarget === opt.val && <Check className={`w-4 h-4 text-${opt.color}-400 shrink-0`} />}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 

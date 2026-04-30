@@ -65,15 +65,31 @@ export async function POST(request: NextRequest) {
       expiresAt: expiresAt || undefined,
     });
 
-    // Determine target users
+    // Determine target users based on targeting option
     let targetUserIds: string[] = [];
+    const allUsers = await getUsers();
+
     if (target === "specific" && targetUserId) {
       targetUserIds = [targetUserId];
-    } else {
-      // All users (not admin) — announcements visible to ALL regardless of subscription status
-      const allUsers = await getUsers();
+    } else if (target === "active") {
+      // Only users with active subscription (status=active + has packageId)
       targetUserIds = allUsers
-        .filter(u => u.role !== "admin" && u.status !== "blocked")
+        .filter(u => u.role !== "admin" && u.status === "active" && u.packageId)
+        .map(u => u.id);
+    } else if (target === "expired") {
+      // Users whose subscription has expired
+      targetUserIds = allUsers
+        .filter(u => u.role !== "admin" && u.status === "expired")
+        .map(u => u.id);
+    } else if (target === "blocked") {
+      // Blocked users only
+      targetUserIds = allUsers
+        .filter(u => u.role !== "admin" && u.status === "blocked")
+        .map(u => u.id);
+    } else {
+      // "all" — all users regardless of subscription status (except admin)
+      targetUserIds = allUsers
+        .filter(u => u.role !== "admin")
         .map(u => u.id);
     }
 
@@ -108,20 +124,22 @@ export async function POST(request: NextRequest) {
     // Send email broadcast
     if (sendEmail) {
       try {
-        const allUsers = await getUsers();
         const emailRecipients = target === "specific" && targetUserId
           ? (() => {
               const user = allUsers.find(u => u.id === targetUserId);
-              return user ? [user.email] : [];
+              return user && user.email ? [user.email] : [];
             })()
-          : allUsers
-              .filter(u => u.role !== "admin" && u.status !== "blocked" && u.email)
+          : targetUserIds
+              .map(uid => allUsers.find(u => u.id === uid))
+              .filter((u): u is NonNullable<typeof u> => !!u && !!u.email)
               .map(u => u.email);
 
-        await broadcastAnnouncementEmail(
-          { title, message, type: type || "info", priority: priority || "medium", link: link || undefined, linkText: linkText || undefined },
-          emailRecipients
-        );
+        if (emailRecipients.length > 0) {
+          await broadcastAnnouncementEmail(
+            { title, message, type: type || "info", priority: priority || "medium", link: link || undefined, linkText: linkText || undefined },
+            emailRecipients
+          );
+        }
       } catch (emailError) {
         console.error("[Announcements POST] Email error:", emailError);
       }
