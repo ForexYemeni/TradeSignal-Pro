@@ -113,8 +113,17 @@ export async function POST(request: NextRequest) {
 
         if (target === "specific" && targetUserId) {
           await sendPushToUser(targetUserId, pushPayload);
-        } else {
+        } else if (target === "all") {
+          // Only use sendPushToAll for "all" target
           await sendPushToAll(pushPayload);
+        } else {
+          // Targeted group (active/expired/blocked) — send to each user individually
+          let pushSent = 0;
+          for (const uid of targetUserIds) {
+            const sent = await sendPushToUser(uid, pushPayload).catch(() => false);
+            if (sent) pushSent++;
+          }
+          console.log(`[Announcements POST] Push sent to ${pushSent}/${targetUserIds.length} targeted users (target: ${target})`);
         }
       } catch (pushError) {
         console.error("[Announcements POST] Push error:", pushError);
@@ -134,11 +143,23 @@ export async function POST(request: NextRequest) {
               .filter((u): u is NonNullable<typeof u> => !!u && !!u.email)
               .map(u => u.email);
 
+        // Log skipped users (no email in record)
+        const usersWithoutEmail = targetUserIds.filter(uid => {
+          const u = allUsers.find(x => x.id === uid);
+          return !u || !u.email;
+        });
+        if (usersWithoutEmail.length > 0) {
+          console.warn(`[Announcements POST] ${usersWithoutEmail.length} users skipped (no email): ${usersWithoutEmail.map(uid => allUsers.find(x => x.id === uid)?.name || uid).join(', ')}`);
+        }
+
         if (emailRecipients.length > 0) {
           await broadcastAnnouncementEmail(
             { title, message, type: type || "info", priority: priority || "medium", link: link || undefined, linkText: linkText || undefined },
             emailRecipients
           );
+          console.log(`[Announcements POST] Email sent to ${emailRecipients.length}/${targetUserIds.length} users (target: ${target})`);
+        } else {
+          console.warn(`[Announcements POST] No email recipients (target: ${target}, total targeted: ${targetUserIds.length})`);
         }
       } catch (emailError) {
         console.error("[Announcements POST] Email error:", emailError);
