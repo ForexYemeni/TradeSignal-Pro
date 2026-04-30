@@ -26,6 +26,8 @@ export interface Stats {
   winRate: number; buyCount: number; sellCount: number;
   recentWeek: number; avgConfidence: number;
   topPairs: { pair: string; count: number }[];
+  totalPnl?: number; totalPoints?: number;
+  todayPnl?: number; todayPoints?: number;
 }
 
 export type View = "login" | "register" | "forgotPwd" | "pending" | "blocked" | "expired" | "main" | "changePwd";

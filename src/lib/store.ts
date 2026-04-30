@@ -173,7 +173,12 @@ export async function getStats() {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 10)
     .map(([pair, count]) => ({ pair, count }));
-  return { total, active, hitTp, hitSl, winRate, buyCount, sellCount, recentWeek, avgConfidence, topPairs };
+  // ── Total PnL across ALL signals (not page-limited) ──
+  const totalPnl = parseFloat(signals.reduce((acc, s) => acc + (s.pnlDollars ?? 0), 0).toFixed(2));
+  const totalPoints = signals.reduce((acc, s) => acc + (s.pnlPoints ?? 0), 0);
+  const todayPnl = parseFloat(signals.filter(s => new Date(s.createdAt).getTime() > Date.now() - 86400000).reduce((acc, s) => acc + (s.pnlDollars ?? 0), 0).toFixed(2));
+  const todayPoints = signals.filter(s => new Date(s.createdAt).getTime() > Date.now() - 86400000).reduce((acc, s) => acc + (s.pnlPoints ?? 0), 0);
+  return { total, active, hitTp, hitSl, winRate, buyCount, sellCount, recentWeek, avgConfidence, topPairs, totalPnl, totalPoints, todayPnl, todayPoints };
 }
 
 // ─── Push Subscriptions ─────────────────────────────────

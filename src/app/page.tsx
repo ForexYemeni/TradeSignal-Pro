@@ -647,6 +647,10 @@ export default function HomePage() {
   const SIGNALS_PER_PAGE = 30;
   const [signalsPage, setSignalsPage] = useState(0);
   const [totalSignals, setTotalSignals] = useState(0);
+  const [serverTotalPnl, setServerTotalPnl] = useState(0);
+  const [serverTotalPoints, setServerTotalPoints] = useState(0);
+  const [serverTodayPnl, setServerTodayPnl] = useState(0);
+  const [serverTodayPoints, setServerTodayPoints] = useState(0);
 
   const [usdtNetworks, setUsdtNetworks] = useState<UsdtNetworkAddress[]>([]);
   const [showUsdtNetworkForm, setShowUsdtNetworkForm] = useState(false);
@@ -991,6 +995,11 @@ export default function HomePage() {
       if (data.success) {
         const newSignals: Signal[] = data.signals;
         if (data.total !== undefined) setTotalSignals(data.total);
+        // Store server-side aggregate PnL (computed from ALL signals, not just this page)
+        if (data.totalPnl !== undefined) setServerTotalPnl(data.totalPnl);
+        if (data.totalPoints !== undefined) setServerTotalPoints(data.totalPoints);
+        if (data.todayPnl !== undefined) setServerTodayPnl(data.todayPnl);
+        if (data.todayPoints !== undefined) setServerTodayPoints(data.todayPoints);
         const newIds = new Set(newSignals.map((s: Signal) => s.id));
         const oldIds = prevIdsRef.current;
         const oldStates = prevStateRef.current;
@@ -4582,8 +4591,9 @@ export default function HomePage() {
           const closedSignals = statsSource.filter(s => s.status !== "ACTIVE");
           const winClosed = closedSignals.filter(s => s.status === "HIT_TP");
           const lossClosed = closedSignals.filter(s => s.status === "HIT_SL");
-          const totalPnl = parseFloat(statsSource.reduce((acc, s) => acc + (s.pnlDollars ?? 0), 0).toFixed(2));
-          const totalPoints = statsSource.reduce((acc, s) => acc + (s.pnlPoints ?? 0), 0);
+          // ── Use server-side PnL (computed from ALL signals, not page-limited) ──
+          const totalPnl = isAdmin ? (stats?.totalPnl ?? 0) : serverTotalPnl;
+          const totalPoints = isAdmin ? (stats?.totalPoints ?? 0) : serverTotalPoints;
           const todaySignals = statsSource.filter(s => {
             const d = new Date(s.createdAt);
             const now = new Date();
@@ -4591,7 +4601,7 @@ export default function HomePage() {
           });
           const todayWins = todaySignals.filter(s => s.status === "HIT_TP").length;
           const todayLosses = todaySignals.filter(s => s.status === "HIT_SL").length;
-          const todayPnl = parseFloat(todaySignals.reduce((acc, s) => acc + (s.pnlDollars ?? 0), 0).toFixed(2));
+          const todayPnl = isAdmin ? (stats?.todayPnl ?? 0) : serverTodayPnl;
           const subDaysLeft = session?.subscriptionExpiry ? Math.max(0, Math.ceil((new Date(session.subscriptionExpiry).getTime() - Date.now()) / 86400000)) : null;
           const totalActiveUsers = users.filter(u => u.status === "active" && u.role === "user").length;
           const totalSubscribers = users.filter(u =>

@@ -708,6 +708,11 @@ export async function GET(request: NextRequest) {
       total,
       offset,
       limit,
+      // ── Aggregate PnL across ALL filtered signals (not page-limited) ──
+      totalPnl: parseFloat(filteredSignals.reduce((acc, s) => acc + (s.pnlDollars ?? 0), 0).toFixed(2)),
+      totalPoints: filteredSignals.reduce((acc, s) => acc + (s.pnlPoints ?? 0), 0),
+      todayPnl: parseFloat(filteredSignals.filter(s => new Date(s.createdAt).getTime() > Date.now() - 86400000).reduce((acc, s) => acc + (s.pnlDollars ?? 0), 0).toFixed(2)),
+      todayPoints: filteredSignals.filter(s => new Date(s.createdAt).getTime() > Date.now() - 86400000).reduce((acc, s) => acc + (s.pnlPoints ?? 0), 0),
     });
   } catch (error) {
     console.error("Error fetching signals:", error);
